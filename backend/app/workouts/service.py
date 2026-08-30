@@ -40,6 +40,7 @@ from app.profile.training_compatibility import (
     require_supported_resistance_training_days,
 )
 from app.profile.training_focus import validate_user_priority_muscles
+from app.training_templates.bodyweight_reference import load_bodyweight_template
 from app.training_templates.engine_reference import load_template_references
 from app.workout_cycles.enums import WorkoutCycleStatus
 from app.workout_cycles.models import WorkoutCycle, WorkoutCycleWeeklyCheckIn
@@ -62,8 +63,8 @@ from app.workouts.bodyweight_template_builder import (
     build_bodyweight_template_program,
 )
 from app.workouts.bodyweight_templates import (
+    BodyweightProgramTemplate,
     bodyweight_template_fingerprint,
-    get_bodyweight_template,
 )
 from app.workouts.candidate_selector import (
     WorkoutCandidateSelector,
@@ -220,7 +221,7 @@ class _BodyweightRouteContext:
     source_profile: ProfileSnapshot
     effective_overrides: ProgramGenerationOverrides | None
     request: ProgramGenerationRequest
-    template_slug: str
+    template: BodyweightProgramTemplate
     template_fingerprint: str
 
 
@@ -305,14 +306,14 @@ class WorkoutGenerationService:
             raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED) from error
         except (InvalidProfilePreferencesError, ValidationError) as error:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
-        template = get_bodyweight_template(profile.experience_level, effective_days)
+        template = load_bodyweight_template(self._db, profile.experience_level, effective_days)
         if template is None:
             raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED)
         return _BodyweightRouteContext(
             source_profile=source_profile,
             effective_overrides=effective_overrides,
             request=request,
-            template_slug=template.slug,
+            template=template,
             template_fingerprint=bodyweight_template_fingerprint(template),
         )
 
@@ -339,10 +340,7 @@ class WorkoutGenerationService:
         self._enforce_cooldown(request.user_id)
         generation = self._start_generation(request.user_id, len(catalog))
         started_at = perf_counter()
-        template = get_bodyweight_template(
-            ExperienceLevel(request.training_experience.value),
-            request.available_training_days,
-        )
+        template = context.template
         if template is None:
             self._mark_failure(
                 generation,

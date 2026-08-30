@@ -25,6 +25,7 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleFocus,
     MuscleGroup,
+    PrescriptionMode,
 )
 from app.exercises.schemas import ExerciseDetail
 from app.exercises.taxonomy import is_compatible_muscle_focus
@@ -224,9 +225,12 @@ class AdminTrainingTemplateSlot(BaseModel):
     superset_group: str | None
     superset_exercise_id: UUID | None
     sets: int
-    rep_min: int
-    rep_max: int
-    target_rir: int
+    prescription_mode: PrescriptionMode
+    rep_min: int | None
+    rep_max: int | None
+    target_rir: int | None
+    duration_min_seconds: int | None
+    duration_max_seconds: int | None
     rest_seconds: int
     exercise: AdminTrainingTemplateExercise | None
     superset_exercise: AdminTrainingTemplateExercise | None = None
@@ -289,6 +293,8 @@ class AdminTrainingProgramTemplate(BaseModel):
     programming_rationale: list[AdminTrainingTemplateProgrammingRationale]
     source_name: str
     source_url: str
+    category: str
+    engine_eligible: bool
     days: list[AdminTrainingTemplateDay]
     # Nullable: admin-created programs without a structure assignment return null
     structure_id: UUID | None = None
@@ -369,15 +375,30 @@ class AdminTrainingTemplateSlotWrite(BaseModel):
     ] = None
     superset_exercise_id: UUID | None = None
     sets: int = Field(ge=1, le=10)
-    rep_min: int = Field(ge=1, le=100)
-    rep_max: int = Field(ge=1, le=100)
-    target_rir: int = Field(ge=0, le=6)
+    prescription_mode: PrescriptionMode = PrescriptionMode.REPS
+    rep_min: int | None = Field(default=None, ge=1, le=100)
+    rep_max: int | None = Field(default=None, ge=1, le=100)
+    target_rir: int | None = Field(default=None, ge=0, le=6)
+    duration_min_seconds: int | None = Field(default=None, ge=1, le=3600)
+    duration_max_seconds: int | None = Field(default=None, ge=1, le=3600)
     rest_seconds: int = Field(ge=0, le=600)
 
     @model_validator(mode="after")
     def validate_rep_range(self) -> "AdminTrainingTemplateSlotWrite":
-        if self.rep_min > self.rep_max:
-            raise ValueError("Minimum repetitions cannot exceed maximum repetitions")
+        if self.prescription_mode is PrescriptionMode.REPS:
+            if self.rep_min is None or self.rep_max is None or self.target_rir is None:
+                raise ValueError("Rep prescriptions require rep range and RIR")
+            if self.rep_min > self.rep_max:
+                raise ValueError("Minimum repetitions cannot exceed maximum repetitions")
+            if self.duration_min_seconds is not None or self.duration_max_seconds is not None:
+                raise ValueError("Rep prescriptions cannot declare duration")
+        else:
+            if self.duration_min_seconds is None or self.duration_max_seconds is None:
+                raise ValueError("Duration prescriptions require duration range")
+            if self.duration_min_seconds > self.duration_max_seconds:
+                raise ValueError("Minimum duration cannot exceed maximum duration")
+            if self.rep_min is not None or self.rep_max is not None or self.target_rir is not None:
+                raise ValueError("Duration prescriptions cannot declare repetitions or RIR")
         return self
 
     @model_validator(mode="after")

@@ -23,6 +23,7 @@ import type {
   AdminTrainingTemplateDayWrite,
   AdminTrainingTemplateSlotWrite,
   TrainingTemplateMethod,
+  TrainingTemplatePrescriptionMode,
   TrainingTemplateSlotPriority,
 } from "./types";
 import "./admin.css";
@@ -56,6 +57,7 @@ type AdminTrainingProgramTemplateForm = Omit<AdminTrainingProgramTemplateWrite, 
 const levels: ExperienceLevel[] = ["first_month", "beginner", "intermediate", "advanced"];
 const methods: TrainingTemplateMethod[] = ["standard", "superset", "drop_set"];
 const priorities: TrainingTemplateSlotPriority[] = ["core", "accessory", "optional"];
+const prescriptionModes: TrainingTemplatePrescriptionMode[] = ["reps", "duration"];
 
 export function AdminTrainingTemplateEditorPage() {
   const { t, i18n } = useTranslation();
@@ -105,7 +107,7 @@ export function AdminTrainingTemplateEditorPage() {
   }, [templateId]);
 
   const slotCountProblems = useMemo(
-    () => form.days.some((day) => day.slots.length < 5 || day.slots.length > 9),
+    () => form.days.some((day) => day.slots.length < 4 || day.slots.length > 9),
     [form.days],
   );
 
@@ -191,6 +193,34 @@ export function AdminTrainingTemplateEditorPage() {
     }));
   }
 
+  function patchSlotPrescriptionMode(
+    dayIndex: number,
+    slotIndex: number,
+    mode: TrainingTemplatePrescriptionMode,
+  ) {
+    patchSlot(
+      dayIndex,
+      slotIndex,
+      mode === "duration"
+        ? {
+            prescription_mode: mode,
+            rep_min: null,
+            rep_max: null,
+            target_rir: null,
+            duration_min_seconds: 20,
+            duration_max_seconds: 30,
+          }
+        : {
+            prescription_mode: mode,
+            rep_min: 8,
+            rep_max: 12,
+            target_rir: 2,
+            duration_min_seconds: null,
+            duration_max_seconds: null,
+          },
+    );
+  }
+
   function removeSlot(dayIndex: number, slotIndex: number) {
     const slotKeyPrefix = `${dayIndex}-`;
     setForm((current) => ({
@@ -221,13 +251,19 @@ export function AdminTrainingTemplateEditorPage() {
       const noviceDefaults = form.supported_levels.some(
         (level) => level === "first_month" || level === "beginner",
       );
+      const currentSlot = form.days[dayIndex]?.slots[slotIndex];
+      const novicePrescription = noviceDefaults
+        ? currentSlot?.prescription_mode === "duration"
+          ? { sets: 3 }
+          : { sets: 3, rep_min: 8, rep_max: 12 }
+        : {};
       if (pickerTarget.member === "superset") {
         patchSlot(dayIndex, slotIndex, {
           superset_exercise_id: selected.exercise_id,
           superset_exercise_name_fa: selected.exercise_name_fa,
           superset_exercise_name_en: selected.exercise_name_en,
           superset_exercise_slug: selected.exercise_slug,
-          ...(noviceDefaults ? { sets: 3, rep_min: 8, rep_max: 12 } : {}),
+          ...novicePrescription,
         });
       } else {
         patchSlot(dayIndex, slotIndex, {
@@ -237,7 +273,7 @@ export function AdminTrainingTemplateEditorPage() {
           exercise_slug: selected.exercise_slug,
           movement_pattern: selected.movement_pattern,
           target_muscles: selected.target_muscles,
-          ...(noviceDefaults ? { sets: 3, rep_min: 8, rep_max: 12 } : {}),
+          ...novicePrescription,
         });
       }
     } else {
@@ -260,9 +296,12 @@ export function AdminTrainingTemplateEditorPage() {
         adaptation_priority: "core",
         superset_group: null,
         sets: 3,
+        prescription_mode: "reps",
         rep_min: 8,
         rep_max: 12,
         target_rir: 2,
+        duration_min_seconds: null,
+        duration_max_seconds: null,
         rest_seconds: 90,
       };
       const newSlotKey = `${dayIndex}-${existingSlotCount}`;
@@ -297,9 +336,12 @@ export function AdminTrainingTemplateEditorPage() {
       adaptation_priority: "accessory",
       superset_group: null,
       sets: 3,
+      prescription_mode: "reps",
       rep_min: 8,
       rep_max: 12,
       target_rir: 2,
+      duration_min_seconds: null,
+      duration_max_seconds: null,
       rest_seconds: 90,
     };
     const newSlotKey = `${dayIndex}-${existingSlotCount}`;
@@ -514,7 +556,9 @@ export function AdminTrainingTemplateEditorPage() {
                                 overrideEn ||
                                 baseNameEn ||
                                 t("admin.templates.dayNumber", { number: slotIndex + 1 });
-                              const prescriptionSummary = `${slot.sets} × ${slot.rep_min}–${slot.rep_max} · RIR ${slot.target_rir}`;
+                              const prescriptionSummary = slot.prescription_mode === "duration"
+                                ? `${slot.sets} × ${slot.duration_min_seconds}–${slot.duration_max_seconds} sec`
+                                : `${slot.sets} × ${slot.rep_min}–${slot.rep_max} · RIR ${slot.target_rir}`;
 
                               return (
                                 <li
@@ -629,9 +673,27 @@ export function AdminTrainingTemplateEditorPage() {
                                           onChange={(value) => patchSlot(dayIndex, slotIndex, { display_name_en: value || null })}
                                         />
                                         <NumberInput label={t("admin.templateEditor.sets")} value={slot.sets} onChange={(value) => patchSlot(dayIndex, slotIndex, { sets: value })} />
-                                        <NumberInput label={t("admin.templateEditor.repMin")} value={slot.rep_min} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_min: value })} />
-                                        <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
-                                        <NumberInput label={t("admin.templateEditor.rir")} value={slot.target_rir} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_rir: value })} />
+                                        <label className="admin-field">
+                                          <span>{t("admin.templateEditor.prescriptionMode")}</span>
+                                          <select
+                                            value={slot.prescription_mode ?? "reps"}
+                                            onChange={(event) => patchSlotPrescriptionMode(dayIndex, slotIndex, event.target.value as TrainingTemplatePrescriptionMode)}
+                                          >
+                                            {prescriptionModes.map((mode) => <option key={mode} value={mode}>{t(`admin.templateEditor.prescriptionModes.${mode}`)}</option>)}
+                                          </select>
+                                        </label>
+                                        {slot.prescription_mode === "duration" ? (
+                                          <>
+                                            <NumberInput label={t("admin.templateEditor.durationMin")} value={slot.duration_min_seconds ?? 20} onChange={(value) => patchSlot(dayIndex, slotIndex, { duration_min_seconds: value })} />
+                                            <NumberInput label={t("admin.templateEditor.durationMax")} value={slot.duration_max_seconds ?? 30} onChange={(value) => patchSlot(dayIndex, slotIndex, { duration_max_seconds: value })} />
+                                          </>
+                                        ) : (
+                                          <>
+                                            <NumberInput label={t("admin.templateEditor.repMin")} value={slot.rep_min ?? 1} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_min: value })} />
+                                            <NumberInput label={t("admin.templateEditor.repMax")} value={slot.rep_max ?? 1} onChange={(value) => patchSlot(dayIndex, slotIndex, { rep_max: value })} />
+                                            <NumberInput label={t("admin.templateEditor.rir")} value={slot.target_rir ?? 0} onChange={(value) => patchSlot(dayIndex, slotIndex, { target_rir: value })} />
+                                          </>
+                                        )}
                                         <NumberInput label={t("admin.templateEditor.rest")} value={slot.rest_seconds} onChange={(value) => patchSlot(dayIndex, slotIndex, { rest_seconds: value })} />
 
                                         <label className="admin-field">
@@ -828,10 +890,13 @@ function templateToForm(template: AdminTrainingProgramTemplate): AdminTrainingPr
         intensity_method: slot.intensity_method,
         adaptation_priority: slot.adaptation_priority,
         superset_group: slot.superset_group,
+        prescription_mode: slot.prescription_mode ?? "reps",
         sets: slot.sets,
         rep_min: slot.rep_min,
         rep_max: slot.rep_max,
         target_rir: slot.target_rir,
+        duration_min_seconds: slot.duration_min_seconds ?? null,
+        duration_max_seconds: slot.duration_max_seconds ?? null,
         rest_seconds: slot.rest_seconds,
       })),
     })),
@@ -867,10 +932,13 @@ function formToPayload(form: AdminTrainingProgramTemplateForm): AdminTrainingPro
         intensity_method: slot.intensity_method,
         adaptation_priority: slot.adaptation_priority,
         superset_group: slot.superset_group,
+        prescription_mode: slot.prescription_mode ?? "reps",
         sets: slot.sets,
-        rep_min: slot.rep_min,
-        rep_max: slot.rep_max,
-        target_rir: slot.target_rir,
+        rep_min: slot.prescription_mode === "duration" ? null : slot.rep_min,
+        rep_max: slot.prescription_mode === "duration" ? null : slot.rep_max,
+        target_rir: slot.prescription_mode === "duration" ? null : slot.target_rir,
+        duration_min_seconds: slot.prescription_mode === "duration" ? slot.duration_min_seconds : null,
+        duration_max_seconds: slot.prescription_mode === "duration" ? slot.duration_max_seconds : null,
         rest_seconds: slot.rest_seconds,
       })),
     })),

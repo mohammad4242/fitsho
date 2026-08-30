@@ -285,6 +285,9 @@ export function AdminTrainingTemplatesPage() {
                     >
                       <span className="admin-program-accordion-copy">
                         <span className="admin-program-accordion-title">{displayName}</span>
+                        {template.category === "bodyweight_fixed" && (
+                          <span className="admin-template-level">{t("admin.templates.bodyweightFixed")}</span>
+                        )}
                       </span>
                       <span className="admin-program-accordion-meta">
                         <span className="admin-template-levels">
@@ -377,7 +380,9 @@ export function AdminTrainingTemplatesPage() {
                                           {slot.exercise?.needs_review && <small>{t("admin.templates.reviewMedia")}</small>}
                                         </div>
                                         <span dir="ltr">
-                                          {slot.sets} × {slot.rep_min}–{slot.rep_max} · RIR {slot.target_rir}
+                                          {slot.prescription_mode === "duration"
+                                            ? `${slot.sets} × ${slot.duration_min_seconds}–${slot.duration_max_seconds} sec`
+                                            : `${slot.sets} × ${slot.rep_min}–${slot.rep_max} · RIR ${slot.target_rir}`}
                                         </span>
                                       </li>
                                     );

@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
-from app.exercises.enums import MovementPattern
+from app.exercises.enums import MovementPattern, PrescriptionMode
 from app.exercises.models import Exercise, enum_values
 
 
@@ -144,6 +144,11 @@ class TrainingTemplateSlotPriority(StrEnum):
     OPTIONAL = "optional"
 
 
+class TrainingProgramTemplateCategory(StrEnum):
+    GENERIC = "generic"
+    BODYWEIGHT_FIXED = "bodyweight_fixed"
+
+
 class TrainingTemplateCatalogState(Base):
     __tablename__ = "training_template_catalog_state"
 
@@ -182,6 +187,23 @@ class TrainingProgramTemplate(Base):
     )
     source_name: Mapped[str] = mapped_column(String(160), nullable=False)
     source_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    category: Mapped[TrainingProgramTemplateCategory] = mapped_column(
+        Enum(
+            TrainingProgramTemplateCategory,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_training_program_templates_category_values",
+        ),
+        nullable=False,
+        default=TrainingProgramTemplateCategory.GENERIC,
+        server_default=TrainingProgramTemplateCategory.GENERIC.value,
+        index=True,
+    )
+    engine_eligible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true", index=True
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
@@ -243,10 +265,13 @@ class TrainingProgramTemplateSlot(Base):
         CheckConstraint("slot_order >= 1", name="ck_training_program_template_slots_slot_order"),
         CheckConstraint("sets BETWEEN 1 AND 10", name="ck_training_program_template_slots_sets"),
         CheckConstraint(
-            "rep_min BETWEEN 1 AND rep_max", name="ck_training_program_template_slots_reps"
-        ),
-        CheckConstraint(
-            "target_rir BETWEEN 0 AND 6", name="ck_training_program_template_slots_rir"
+            "((prescription_mode = 'reps' AND rep_min BETWEEN 1 AND rep_max "
+            "AND target_rir BETWEEN 0 AND 6 AND duration_min_seconds IS NULL "
+            "AND duration_max_seconds IS NULL) OR "
+            "(prescription_mode = 'duration' AND rep_min IS NULL AND rep_max IS NULL "
+            "AND target_rir IS NULL AND duration_min_seconds BETWEEN 1 AND duration_max_seconds "
+            "AND duration_max_seconds <= 3600))",
+            name="ck_training_program_template_slots_prescription",
         ),
         CheckConstraint(
             "rest_seconds BETWEEN 0 AND 600", name="ck_training_program_template_slots_rest"
@@ -315,9 +340,24 @@ class TrainingProgramTemplateSlot(Base):
     )
     superset_exercise_slug_hint: Mapped[str | None] = mapped_column(String(120), nullable=True)
     sets: Mapped[int] = mapped_column(Integer, nullable=False)
-    rep_min: Mapped[int] = mapped_column(Integer, nullable=False)
-    rep_max: Mapped[int] = mapped_column(Integer, nullable=False)
-    target_rir: Mapped[int] = mapped_column(Integer, nullable=False)
+    prescription_mode: Mapped[PrescriptionMode] = mapped_column(
+        Enum(
+            PrescriptionMode,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_training_program_template_slots_prescription_mode_values",
+        ),
+        nullable=False,
+        default=PrescriptionMode.REPS,
+        server_default=PrescriptionMode.REPS.value,
+    )
+    rep_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rep_max: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    target_rir: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_min_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_max_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rest_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
 
     day: Mapped[TrainingProgramTemplateDay] = relationship(back_populates="slots")

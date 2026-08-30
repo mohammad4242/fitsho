@@ -57,7 +57,7 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
 
     assert response.status_code == 200, response.text
     templates = response.json()["items"]
-    assert len(templates) == 16
+    assert len(templates) == 18
     classic = next(
         item
         for item in templates
@@ -82,6 +82,34 @@ def test_admin_lists_complete_four_day_template_details(client: TestClient, db: 
         for day in classic["days"]
         for slot in day["slots"]
     )
+
+
+def test_admin_lists_fixed_bodyweight_templates_with_duration_prescriptions(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _seed_library(db)
+    _make_current_user_admin(client, db)
+
+    response = client.get(
+        "/api/v1/admin/training-program-templates?days_per_week=2&training_level=first_month"
+    )
+
+    assert response.status_code == 200, response.text
+    fixed = next(
+        item for item in response.json()["items"] if item["slug"] == "bw-first-month-2d-v1"
+    )
+    assert fixed["category"] == "bodyweight_fixed"
+    assert fixed["engine_eligible"] is False
+    plank = next(
+        slot
+        for day in fixed["days"]
+        for slot in day["slots"]
+        if slot["exercise_slug_hint"] == "fedb-0464-front-plank"
+    )
+    assert plank["prescription_mode"] == "duration"
+    assert plank["duration_min_seconds"] == 20
+    assert plank["duration_max_seconds"] == 30
 
 
 def test_training_template_library_has_no_public_endpoint(client: TestClient) -> None:

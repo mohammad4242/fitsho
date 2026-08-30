@@ -3,7 +3,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.enums import MuscleGroup
 from app.training_templates.engine_reference import load_template_references
-from app.training_templates.models import TrainingProgramTemplate, TrainingProgramTemplateDay
+from app.training_templates.models import (
+    TrainingProgramTemplate,
+    TrainingProgramTemplateCategory,
+    TrainingProgramTemplateDay,
+)
 from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
 from app.training_templates.service import seed_training_program_templates
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
@@ -107,7 +111,10 @@ def test_active_catalog_metadata_and_slot_order_match_canonical_seed(db: Session
     references = load_template_references(db)
     templates = db.scalars(
         select(TrainingProgramTemplate)
-        .where(TrainingProgramTemplate.is_active.is_(True))
+        .where(
+            TrainingProgramTemplate.is_active.is_(True),
+            TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC,
+        )
         .options(
             selectinload(TrainingProgramTemplate.days).selectinload(
                 TrainingProgramTemplateDay.slots

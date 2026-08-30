@@ -8,6 +8,7 @@ from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel
 from app.training_templates.models import (
     TrainingProgramTemplate,
+    TrainingProgramTemplateCategory,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
@@ -30,7 +31,14 @@ def test_seed_adds_exactly_53_level_specific_canonical_templates(db: Session) ->
 
     assert len(CANONICAL_TEMPLATE_DEFINITIONS) == 53
     assert result.templates == 53
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 53
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+        )
+        == 53
+    )
     assert {template.days_per_week for template in db.scalars(select(TrainingProgramTemplate))} == {
         2,
         3,
@@ -78,7 +86,14 @@ def test_seed_uses_real_active_programmable_exercise_rows_only(db: Session) -> N
 
     result = seed_training_program_templates(db)
 
-    slots = list(db.scalars(select(TrainingProgramTemplateSlot)))
+    slots = list(
+        db.scalars(
+            select(TrainingProgramTemplateSlot)
+            .join(TrainingProgramTemplateDay)
+            .join(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+        )
+    )
     assert result.linked_slots == len(slots)
     assert result.placeholder_slots == 0
     assert all(slot.exercise_id is not None for slot in slots)
@@ -111,9 +126,22 @@ def test_seed_is_idempotent_without_duplicate_rows_or_days(db: Session) -> None:
     second = seed_training_program_templates(db)
 
     assert first == second
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 53
     assert (
-        db.scalar(select(func.count()).select_from(TrainingProgramTemplateSlot))
+        db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+        )
+        == 53
+    )
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplateSlot)
+            .join(TrainingProgramTemplateDay)
+            .join(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+        )
         == first.linked_slots
     )
 

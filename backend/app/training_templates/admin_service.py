@@ -302,9 +302,12 @@ def update_training_program_template_slot(
         else None
     )
     slot.sets = payload.sets
+    slot.prescription_mode = payload.prescription_mode
     slot.rep_min = payload.rep_min
     slot.rep_max = payload.rep_max
     slot.target_rir = payload.target_rir
+    slot.duration_min_seconds = payload.duration_min_seconds
+    slot.duration_max_seconds = payload.duration_max_seconds
     slot.rest_seconds = payload.rest_seconds
     db.commit()
     return _get_template_or_raise(db, template_id)
@@ -534,9 +537,12 @@ def _replace_template_content(
                         else None
                     ),
                     sets=slot_payload.sets,
+                    prescription_mode=slot_payload.prescription_mode,
                     rep_min=slot_payload.rep_min,
                     rep_max=slot_payload.rep_max,
                     target_rir=slot_payload.target_rir,
+                    duration_min_seconds=slot_payload.duration_min_seconds,
+                    duration_max_seconds=slot_payload.duration_max_seconds,
                     rest_seconds=slot_payload.rest_seconds,
                 )
             )

@@ -68,7 +68,10 @@ def upgrade() -> None:
             templates.c.source_url == SOURCE_URL,
         )
     )
-    if has_installed_catalog:
+    template_columns = {
+        column["name"] for column in sa.inspect(bind).get_columns("training_program_templates")
+    }
+    if has_installed_catalog and "category" in template_columns:
         session = Session(bind=bind, join_transaction_mode="create_savepoint")
         try:
             upgrade_training_program_template_catalog(session)

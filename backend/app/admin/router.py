@@ -100,6 +100,8 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
         programming_rationale=template.programming_rationale,
         source_name=template.source_name,
         source_url=template.source_url,
+        category=template.category,
+        engine_eligible=template.engine_eligible,
         structure_id=template.structure_id,
         days=[
             AdminTrainingTemplateDay(
@@ -123,9 +125,12 @@ def _training_template_detail(template: TrainingProgramTemplate) -> AdminTrainin
                         superset_group=slot.superset_group,
                         superset_exercise_id=slot.superset_exercise_id,
                         sets=slot.sets,
+                        prescription_mode=slot.prescription_mode,
                         rep_min=slot.rep_min,
                         rep_max=slot.rep_max,
                         target_rir=slot.target_rir,
+                        duration_min_seconds=slot.duration_min_seconds,
+                        duration_max_seconds=slot.duration_max_seconds,
                         rest_seconds=slot.rest_seconds,
                         exercise=(
                             AdminTrainingTemplateExercise(

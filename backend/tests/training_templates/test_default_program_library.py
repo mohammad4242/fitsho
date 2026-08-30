@@ -9,6 +9,7 @@ from app.exercises.models import Exercise
 from app.profile.enums import ExperienceLevel
 from app.training_templates.models import (
     TrainingProgramTemplate,
+    TrainingProgramTemplateCategory,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
@@ -1048,7 +1049,14 @@ def test_seed_is_idempotent_and_does_not_duplicate_program_days_or_slots(db: Ses
 
     assert second == first
     assert second.templates == 53
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == 53
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+        )
+        == 53
+    )
     assert db.scalar(select(func.count()).select_from(TrainingProgramTemplateDay)) == first_days
     assert db.scalar(select(func.count()).select_from(TrainingProgramTemplateSlot)) == first_slots
 
@@ -1061,7 +1069,11 @@ def test_seed_uses_only_active_programmable_exercise_library_records(db: Session
 
     slots = list(
         db.scalars(
-            select(TrainingProgramTemplateSlot).options(
+            select(TrainingProgramTemplateSlot)
+            .join(TrainingProgramTemplateDay)
+            .join(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+            .options(
                 selectinload(TrainingProgramTemplateSlot.exercise)
             )
         )

@@ -15,6 +15,8 @@ from app.exercises.enums import (
 from app.exercises.models import Exercise
 from app.training_templates.models import (
     TrainingProgramTemplate,
+    TrainingProgramTemplateCategory,
+    TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
 from app.training_templates.seed_data import TRAINING_PROGRAM_TEMPLATE_SEEDS
@@ -163,7 +165,14 @@ def test_catalog_seed_requires_real_library_rows_and_creates_no_placeholders(db:
     result = seed_training_program_templates(db)
 
     assert result.placeholder_slots == 0
-    slots = list(db.scalars(select(TrainingProgramTemplateSlot)))
+    slots = list(
+        db.scalars(
+            select(TrainingProgramTemplateSlot)
+            .join(TrainingProgramTemplateDay)
+            .join(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+        )
+    )
     assert slots
     assert all(slot.exercise_id is not None for slot in slots)
 
@@ -217,7 +226,14 @@ def test_catalog_seed_is_idempotent_and_replaces_owned_days_and_slots(db: Sessio
     second = seed_training_program_templates(db)
 
     assert second == first
-    assert db.scalar(select(func.count()).select_from(TrainingProgramTemplate)) == first.templates
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+        )
+        == first.templates
+    )
     assert (db.scalar(select(func.count()).select_from(TrainingProgramTemplateSlot)) or 0) > 0
 
 
@@ -227,7 +243,14 @@ def test_catalog_slots_are_linked_to_active_programmable_non_placeholder_exercis
     _seed_real_catalog_exercises(db)
     seed_training_program_templates(db)
 
-    slots = list(db.scalars(select(TrainingProgramTemplateSlot)))
+    slots = list(
+        db.scalars(
+            select(TrainingProgramTemplateSlot)
+            .join(TrainingProgramTemplateDay)
+            .join(TrainingProgramTemplate)
+            .where(TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC)
+        )
+    )
     assert all(
         slot.exercise is not None
         and slot.exercise.is_active

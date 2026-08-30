@@ -340,6 +340,7 @@ export type AdminAiCatalogRefresh = {
 
 export type TrainingTemplateMethod = "standard" | "superset" | "drop_set";
 export type TrainingTemplateSlotPriority = "core" | "accessory" | "optional";
+export type TrainingTemplatePrescriptionMode = "reps" | "duration";
 
 export type AdminTrainingTemplateExercise = {
   id: string;
@@ -362,9 +363,12 @@ export type AdminTrainingTemplateSlot = {
   superset_group: string | null;
   superset_exercise_id: string | null;
   sets: number;
-  rep_min: number;
-  rep_max: number;
-  target_rir: number;
+  prescription_mode?: TrainingTemplatePrescriptionMode;
+  rep_min: number | null;
+  rep_max: number | null;
+  target_rir: number | null;
+  duration_min_seconds?: number | null;
+  duration_max_seconds?: number | null;
   rest_seconds: number;
   exercise: AdminTrainingTemplateExercise | null;
   superset_exercise: AdminTrainingTemplateExercise | null;
@@ -401,6 +405,8 @@ export type AdminTrainingProgramTemplate = {
   programming_rationale: AdminTrainingTemplateProgrammingRationale[];
   source_name: string;
   source_url: string;
+  category?: string;
+  engine_eligible?: boolean;
   days: AdminTrainingTemplateDay[];
   structure_id: string | null;
 };
@@ -475,9 +481,12 @@ export type AdminTrainingTemplateSlotWrite = {
   superset_group: string | null;
   superset_exercise_id: string | null;
   sets: number;
-  rep_min: number;
-  rep_max: number;
-  target_rir: number;
+  prescription_mode?: TrainingTemplatePrescriptionMode;
+  rep_min: number | null;
+  rep_max: number | null;
+  target_rir: number | null;
+  duration_min_seconds?: number | null;
+  duration_max_seconds?: number | null;
   rest_seconds: number;
 };
 

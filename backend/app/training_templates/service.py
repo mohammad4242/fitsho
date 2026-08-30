@@ -13,6 +13,7 @@ from app.training_templates.models import (
     TrainingProgramStructure,
     TrainingProgramStructureDay,
     TrainingProgramTemplate,
+    TrainingProgramTemplateCategory,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
     TrainingTemplateCatalogState,
@@ -52,8 +53,17 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
     )
     db.flush()
     _ensure_approved_structures(db)
+    _link_bodyweight_template_exercises(db)
     state = db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY)
-    if state is not None and state.catalog_revision >= _CATALOG_REVISION:
+    has_canonical_catalog = db.scalar(
+        select(func.count())
+        .select_from(TrainingProgramTemplate)
+        .where(
+            TrainingProgramTemplate.source_name == SOURCE_NAME,
+            TrainingProgramTemplate.source_url == SOURCE_URL,
+        )
+    ) > 0
+    if state is not None and state.catalog_revision >= _CATALOG_REVISION and has_canonical_catalog:
         db.commit()
         return _current_seed_result(db)
 
@@ -74,6 +84,7 @@ def seed_training_program_templates(db: Session) -> TrainingTemplateSeedResult:
 def upgrade_training_program_template_catalog(db: Session) -> TrainingTemplateSeedResult:
     """Explicitly replace the managed catalog with the current approved revision."""
     _ensure_approved_structures(db)
+    _link_bodyweight_template_exercises(db)
     _sync_canonical_catalog(db, replace_existing=True)
     state = db.get(TrainingTemplateCatalogState, _CATALOG_STATE_KEY)
     if state is None:
@@ -180,6 +191,52 @@ def _sync_canonical_catalog(db: Session, *, replace_existing: bool) -> None:
 
         _write_template(template, seed, exercises_by_slug, structure_ids_by_slug)
 
+    db.flush()
+
+
+def _link_bodyweight_template_exercises(db: Session) -> None:
+    """Link migration-created fixed rows without overwriting admin edits."""
+    fixed_templates = list(
+        db.scalars(
+            select(TrainingProgramTemplate)
+            .where(
+                TrainingProgramTemplate.category == TrainingProgramTemplateCategory.BODYWEIGHT_FIXED
+            )
+            .options(
+                selectinload(TrainingProgramTemplate.days).selectinload(
+                    TrainingProgramTemplateDay.slots
+                )
+            )
+        )
+    )
+    if not fixed_templates:
+        return
+    slugs = {
+        slot.exercise_slug_hint
+        for template in fixed_templates
+        for day in template.days
+        for slot in day.slots
+        if slot.exercise_id is None
+    }
+    if not slugs:
+        return
+    exercises_by_slug = {
+        exercise.slug: exercise.id
+        for exercise in db.scalars(
+            select(Exercise).where(
+                Exercise.slug.in_(slugs),
+                Exercise.content_type == ExerciseContentType.EXERCISE,
+                Exercise.is_active.is_(True),
+                Exercise.is_programmable.is_(True),
+            )
+        )
+    }
+    for template in fixed_templates:
+        for day in template.days:
+            for slot in day.slots:
+                exercise_id = exercises_by_slug.get(slot.exercise_slug_hint)
+                if slot.exercise_id is None and exercise_id is not None:
+                    slot.exercise_id = exercise_id
     db.flush()
 
 

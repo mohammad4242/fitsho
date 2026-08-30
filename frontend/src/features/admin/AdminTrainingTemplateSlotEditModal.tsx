@@ -14,16 +14,19 @@ import type {
   AdminTrainingTemplateSlot,
   AdminTrainingTemplateSlotWrite,
   TrainingTemplateMethod,
+  TrainingTemplatePrescriptionMode,
   TrainingTemplateSlotPriority,
 } from "./types";
 
 type PickerTarget = "primary" | "superset";
 
-type SlotDraft = Omit<AdminTrainingTemplateSlotWrite, "sets" | "rep_min" | "rep_max" | "target_rir" | "rest_seconds"> & {
+type SlotDraft = Omit<AdminTrainingTemplateSlotWrite, "sets" | "rep_min" | "rep_max" | "target_rir" | "duration_min_seconds" | "duration_max_seconds" | "rest_seconds"> & {
   sets: number | "";
   rep_min: number | "";
   rep_max: number | "";
   target_rir: number | "";
+  duration_min_seconds: number | "";
+  duration_max_seconds: number | "";
   rest_seconds: number | "";
   exercise: AdminTrainingTemplateExercise | null;
   superset_exercise: AdminTrainingTemplateExercise | null;
@@ -56,6 +59,7 @@ export function AdminTrainingTemplateSlotEditModal({
   const exercise = draft.exercise ?? slot.exercise;
   const exerciseName = draft.display_name_fa || draft.display_name_en || exercise?.name_fa || exercise?.name_en || slot.exercise_slug_hint;
   const supersetExercise = draft.superset_exercise ?? slot.superset_exercise;
+  const isDuration = draft.prescription_mode === "duration";
 
   function patch(patchValue: Partial<SlotDraft>) {
     setDraft((current) => ({ ...current, ...patchValue }));
@@ -73,6 +77,11 @@ export function AdminTrainingTemplateSlotEditModal({
     if (pickerTarget === "superset") {
       patch({ superset_exercise_id: selectedFields.exercise_id, superset_exercise: selectedSummary });
     } else {
+      const novicePrescription = noviceDefaults
+        ? draft.prescription_mode === "duration"
+          ? { sets: 3 }
+          : { sets: 3, rep_min: 8, rep_max: 12 }
+        : {};
       patch({
         exercise_id: selectedFields.exercise_id,
         display_name_en: selectedFields.exercise_name_en,
@@ -81,7 +90,7 @@ export function AdminTrainingTemplateSlotEditModal({
         movement_pattern: selectedFields.movement_pattern,
         target_muscles: selectedFields.target_muscles,
         sets: 3,
-        ...(noviceDefaults ? { rep_min: 8, rep_max: 12 } : {}),
+        ...novicePrescription,
       });
     }
     setPickerTarget(null);
@@ -165,9 +174,25 @@ export function AdminTrainingTemplateSlotEditModal({
             <TextInput dir="rtl" label={t("admin.templateEditor.displayNameFa")} value={draft.display_name_fa ?? ""} onChange={(value) => patch({ display_name_fa: value || null })} />
             <TextInput dir="ltr" label={t("admin.templateEditor.displayNameEn")} value={draft.display_name_en ?? ""} onChange={(value) => patch({ display_name_en: value || null })} />
             <NumberInput label={t("admin.templateEditor.sets")} max={10} min={1} value={draft.sets} onChange={(value) => patch({ sets: value })} />
-            <NumberInput label={t("admin.templateEditor.repMin")} max={100} min={1} value={draft.rep_min} onChange={(value) => patch({ rep_min: value })} />
-            <NumberInput label={t("admin.templateEditor.repMax")} max={100} min={1} value={draft.rep_max} onChange={(value) => patch({ rep_max: value })} />
-            <NumberInput label={t("admin.templateEditor.rir")} max={6} min={0} value={draft.target_rir} onChange={(value) => patch({ target_rir: value })} />
+            <SelectInput
+              label={t("admin.templateEditor.prescriptionMode")}
+              value={draft.prescription_mode ?? "reps"}
+              options={["reps", "duration"]}
+              getLabel={(value) => t(`admin.templateEditor.prescriptionModes.${value}`)}
+              onChange={(value) => patchPrescriptionMode(patch, value as TrainingTemplatePrescriptionMode)}
+            />
+            {isDuration ? (
+              <>
+                <NumberInput label={t("admin.templateEditor.durationMin")} max={3600} min={1} value={draft.duration_min_seconds} onChange={(value) => patch({ duration_min_seconds: value })} />
+                <NumberInput label={t("admin.templateEditor.durationMax")} max={3600} min={1} value={draft.duration_max_seconds} onChange={(value) => patch({ duration_max_seconds: value })} />
+              </>
+            ) : (
+              <>
+                <NumberInput label={t("admin.templateEditor.repMin")} max={100} min={1} value={draft.rep_min} onChange={(value) => patch({ rep_min: value })} />
+                <NumberInput label={t("admin.templateEditor.repMax")} max={100} min={1} value={draft.rep_max} onChange={(value) => patch({ rep_max: value })} />
+                <NumberInput label={t("admin.templateEditor.rir")} max={6} min={0} value={draft.target_rir} onChange={(value) => patch({ target_rir: value })} />
+              </>
+            )}
             <NumberInput label={t("admin.templateEditor.rest")} max={600} min={0} value={draft.rest_seconds} onChange={(value) => patch({ rest_seconds: value })} />
             <SelectInput label={t("admin.templateEditor.priority")} value={draft.adaptation_priority} options={["core", "accessory", "optional"]} getLabel={(value) => t(`admin.templateEditor.priorities.${value}`)} onChange={(value) => patch({ adaptation_priority: value as TrainingTemplateSlotPriority })} />
             <SelectInput label={t("admin.templateEditor.movementPattern")} value={draft.movement_pattern} options={movementPatterns} getLabel={(value) => t(`admin.programming.movementPattern.${value}`, value)} onChange={(value) => patch({ movement_pattern: value as AdminTrainingTemplateSlotWrite["movement_pattern"] })} />
@@ -228,9 +253,12 @@ function slotToDraft(slot: AdminTrainingTemplateSlot): SlotDraft {
     superset_group: slot.superset_group ?? null,
     superset_exercise_id: slot.superset_exercise_id ?? null,
     sets: slot.sets,
-    rep_min: slot.rep_min,
-    rep_max: slot.rep_max,
-    target_rir: slot.target_rir,
+    prescription_mode: slot.prescription_mode ?? "reps",
+    rep_min: slot.rep_min ?? "",
+    rep_max: slot.rep_max ?? "",
+    target_rir: slot.target_rir ?? "",
+    duration_min_seconds: slot.duration_min_seconds ?? "",
+    duration_max_seconds: slot.duration_max_seconds ?? "",
     rest_seconds: slot.rest_seconds,
     exercise: slot.exercise,
     superset_exercise: slot.superset_exercise ?? null,
@@ -245,15 +273,43 @@ function toPayload(draft: SlotDraft): AdminTrainingTemplateSlotWrite {
     target_muscles: draft.target_muscles,
     movement_pattern: draft.movement_pattern,
     intensity_method: draft.intensity_method,
+    prescription_mode: draft.prescription_mode ?? "reps",
     adaptation_priority: draft.adaptation_priority,
     superset_group: draft.superset_group,
     superset_exercise_id: draft.superset_exercise_id,
     sets: normalizeNumber(draft.sets, 1, 10),
-    rep_min: normalizeNumber(draft.rep_min, 1, 100),
-    rep_max: normalizeNumber(draft.rep_max, 1, 100),
-    target_rir: normalizeNumber(draft.target_rir, 0, 6),
+    rep_min: draft.prescription_mode === "duration" ? null : normalizeNumber(draft.rep_min, 1, 100),
+    rep_max: draft.prescription_mode === "duration" ? null : normalizeNumber(draft.rep_max, 1, 100),
+    target_rir: draft.prescription_mode === "duration" ? null : normalizeNumber(draft.target_rir, 0, 6),
+    duration_min_seconds: draft.prescription_mode === "duration" ? normalizeNumber(draft.duration_min_seconds, 1, 3600) : null,
+    duration_max_seconds: draft.prescription_mode === "duration" ? normalizeNumber(draft.duration_max_seconds, 1, 3600) : null,
     rest_seconds: normalizeNumber(draft.rest_seconds, 0, 600),
   };
+}
+
+function patchPrescriptionMode(
+  patch: (value: Partial<SlotDraft>) => void,
+  mode: TrainingTemplatePrescriptionMode,
+) {
+  if (mode === "duration") {
+    patch({
+      prescription_mode: mode,
+      rep_min: "",
+      rep_max: "",
+      target_rir: "",
+      duration_min_seconds: 20,
+      duration_max_seconds: 30,
+    });
+    return;
+  }
+  patch({
+    prescription_mode: mode,
+    rep_min: 8,
+    rep_max: 12,
+    target_rir: 2,
+    duration_min_seconds: "",
+    duration_max_seconds: "",
+  });
 }
 
 function parseMuscles(value: string): MuscleGroup[] {

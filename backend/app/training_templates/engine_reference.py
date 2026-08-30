@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.exercises.enums import MuscleGroup
 from app.training_templates.models import (
     TrainingProgramTemplate,
+    TrainingProgramTemplateCategory,
     TrainingProgramTemplateDay,
     TrainingProgramTemplateSlot,
 )
@@ -18,7 +19,11 @@ from app.workouts.program_engine.schemas import (
 def load_template_references(db: Session) -> tuple[TemplateReference, ...]:
     templates = db.scalars(
         select(TrainingProgramTemplate)
-        .where(TrainingProgramTemplate.is_active.is_(True))
+        .where(
+            TrainingProgramTemplate.is_active.is_(True),
+            TrainingProgramTemplate.engine_eligible.is_(True),
+            TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC,
+        )
         .options(
             selectinload(TrainingProgramTemplate.days).selectinload(
                 TrainingProgramTemplateDay.slots
