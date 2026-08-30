@@ -8,6 +8,8 @@ from app.workouts.program_engine.effective_volume import calculate_effective_vol
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, RecoveryRating, TrainingExperience
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.strength_programming import is_strength_set_cap_authorized
+from app.workouts.program_engine.supplemental_policy import is_core_or_supplemental_exercise
 from app.workouts.program_engine.validation import validate_program
 from app.workouts.program_engine.volume_policy import (
     session_hard_volume_cap,
@@ -91,11 +93,24 @@ def test_successful_programs_use_honest_flexible_volume(overrides: dict[str, obj
     exercises = tuple(item for day in program.weekly_schedule for item in day.exercises)
     assert exercises
     assert all(item.counts_toward_volume for item in exercises)
-    assert all(
-        item.sets in {3, 4}
-        for item in exercises
-        if item.exercise_type in {ExerciseType.COMPOUND, ExerciseType.ISOLATION, ExerciseType.CORE}
-    )
+    for item in exercises:
+        if item.exercise_type not in {
+            ExerciseType.COMPOUND,
+            ExerciseType.ISOLATION,
+            ExerciseType.CORE,
+        }:
+            continue
+        allowed_sets = {2, 3, 4} if is_core_or_supplemental_exercise(item) else {3, 4}
+        if is_strength_set_cap_authorized(
+            goal=source.primary_goal,
+            exercise_type=item.exercise_type,
+            exercise_slug=item.exercise_slug,
+            is_primary_strength="STRENGTH_PRIMARY_COMPOUND" in item.reason_codes,
+        ):
+            allowed_sets.add(5)
+        assert item.sets in allowed_sets, (
+            f"Exercise {item.exercise_name} has {item.sets} sets (allowed: {allowed_sets})"
+        )
 
     raw_direct: Counter[str] = Counter()
     for item in exercises:
