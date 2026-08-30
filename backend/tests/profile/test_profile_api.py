@@ -106,7 +106,7 @@ def test_profile_response_exposes_allowed_training_schedule_status(
 @pytest.mark.parametrize(
     ("home_training_setup", "expected_equipment"),
     [
-        ("bodyweight_only", ["bodyweight"]),
+        ("bodyweight_only", ["bodyweight", "pull_up_bar"]),
         ("dumbbells_available", ["bodyweight", "dumbbell"]),
     ],
 )

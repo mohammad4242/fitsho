@@ -7,7 +7,10 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.exercises.service import seed_exercises
-from app.training_templates.models import TrainingProgramTemplate
+from app.training_templates.models import (
+    TrainingProgramTemplate,
+    TrainingProgramTemplateCategory,
+)
 from app.training_templates.service import seed_training_program_templates
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 
@@ -33,7 +36,11 @@ def _seed_library(db: Session) -> None:
     seed_training_program_templates(db)
     assert all(
         template.structure_id is not None
-        for template in db.scalars(select(TrainingProgramTemplate))
+        for template in db.scalars(
+            select(TrainingProgramTemplate).where(
+                TrainingProgramTemplate.category == TrainingProgramTemplateCategory.GENERIC
+            )
+        )
     )
 
 

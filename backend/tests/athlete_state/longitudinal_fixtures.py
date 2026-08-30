@@ -110,6 +110,7 @@ class ScenarioProfile:
     training_location: TrainingLocation
     home_training_setup: HomeTrainingSetup | None
     session_duration_minutes: int
+    available_equipment: tuple[Equipment, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -160,6 +161,11 @@ def materialize_scenario(
         training_days_per_week=scenario.profile.training_days_per_week,
         training_location=scenario.profile.training_location,
         home_training_setup=scenario.profile.home_training_setup,
+        available_equipment=(
+            [item.value for item in scenario.profile.available_equipment]
+            if scenario.profile.available_equipment is not None
+            else None
+        ),
         session_duration_minutes=scenario.profile.session_duration_minutes,
         plan_duration_weeks=scenario.cycles[-1].duration_weeks,
     )
@@ -392,6 +398,7 @@ def longitudinal_scenarios() -> tuple[LongitudinalScenario, ...]:
                 TrainingLocation.HOME,
                 HomeTrainingSetup.BODYWEIGHT_ONLY,
                 45,
+                (Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND),
             ),
             cycles=(CycleFixture(4), CycleFixture(4)),
             defining_signals=frozenset({"home", "bodyweight_only", "equipment_limited"}),
