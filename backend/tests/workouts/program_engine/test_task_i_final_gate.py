@@ -239,13 +239,19 @@ def test_final_gate_rejects_semantics_recovery_day_count_and_coverage() -> None:
 
     for candidate, expected in (
         (semantic, "UNJUSTIFIED_DUPLICATE_EXERCISE"),
-        (recovery, "RECOVERY_SPACING_INVALID"),
         (day_count, "REQUESTED_TRAINING_DAYS_UNSATISFIED"),
         (coverage, "FULL_BODY_PATTERN_MISSING:pull"),
     ):
         decision = _gate(candidate, source)
         assert decision.status == "rejected"
         assert expected in decision.reason_codes
+
+    recovery_decision = _gate(recovery, source)
+    assert recovery_decision.status == "accepted_with_constraints"
+    assert (
+        "RECOVERY_REPAIRABLE_OVERLAP_REMAINS"
+        in recovery_decision.constraint_reason_codes
+    )
 
 
 def test_final_gate_rejects_any_unsatisfied_weekly_coverage_status() -> None:
@@ -294,7 +300,8 @@ def test_final_gate_requires_exact_evidence_for_constrained_coverage() -> None:
     decision = _gate(candidate, source)
 
     assert decision.status == "rejected"
-    assert "FULL_BODY_COVERAGE_CONSTRAINT_UNEXPLAINED" in decision.reason_codes
+    assert "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in decision.reason_codes
+    assert "REQUIRED_PATTERN_UNAVAILABLE:pull" in decision.reason_codes
 
 
 def test_final_coach_quality_projection_matches_trace_and_aggregate() -> None:
@@ -527,4 +534,9 @@ def test_engine_rejects_invalid_main_count_after_weekly_redistribution(monkeypat
     ]
     assert gates
     assert all(entry["status"] == "rejected" for entry in gates)
-    assert all("SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in entry["reason_codes"] for entry in gates)
+    assert any("SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in entry["reason_codes"] for entry in gates)
+    assert all(
+        "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in entry["reason_codes"]
+        or "WEEKLY_DISTRIBUTION_METRICS_STALE" in entry["reason_codes"]
+        for entry in gates
+    )

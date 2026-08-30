@@ -90,7 +90,7 @@ EQUIPMENT_CASES = (
         TrainingExperience.INTERMEDIATE,
         Goal.MUSCLE_GAIN,
         2,
-        True,
+        False,
         id="bands-dumbbells-intermediate-muscle-gain-2d",
     ),
     pytest.param(
@@ -113,7 +113,7 @@ EQUIPMENT_CASES = (
         TrainingExperience.BEGINNER,
         Goal.MUSCLE_GAIN,
         2,
-        True,
+        False,
         id="complete-home-beginner-muscle-gain-2d",
     ),
 )

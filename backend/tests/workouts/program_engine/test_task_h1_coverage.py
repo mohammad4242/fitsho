@@ -2,9 +2,7 @@ from dataclasses import replace
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.equipment import effective_required_equipment
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
-from app.workouts.program_engine.safety import effective_caution_tags
 from app.workouts.program_engine.weekly_coverage import (
     assess_weekly_coverage,
     build_coverage_availability_evidence,
@@ -40,87 +38,14 @@ def _run_batch2_profile_6(monkeypatch):
     return results[0], captured[0]
 
 
-def test_batch2_profile_6_reports_unavailable_pull_without_balanced_claim(monkeypatch) -> None:
-    (profile, response), (source, generation) = _run_batch2_profile_6(monkeypatch)
+def test_batch2_profile_6_fails_closed_when_pull_is_unavailable(monkeypatch) -> None:
+    (profile, response), (_source, generation) = _run_batch2_profile_6(monkeypatch)
 
-    assert response["success"] is True
-    plan = response["plan"]
-    program = generation.program
-    assert plan is not None
-    assert program is not None, generation.errors
     assert profile["num"] == 6
-    assert len(program.weekly_schedule) == 2
-
-    actual_patterns = {
-        item.movement_pattern for day in program.weekly_schedule for item in day.exercises
-    }
-    assert {
-        MovementPattern.HORIZONTAL_PUSH,
-        MovementPattern.SQUAT,
-        MovementPattern.HIP_EXTENSION,
-    }.issubset(actual_patterns)
-    assert not actual_patterns.intersection(
-        {MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}
-    )
-    actual_muscles = {
-        muscle
-        for day in program.weekly_schedule
-        for item in day.exercises
-        for muscle in (item.primary_muscle, *item.secondary_muscles)
-        if muscle is not None
-    }
-    assert {
-        MuscleGroup.CHEST,
-        MuscleGroup.SHOULDERS,
-        MuscleGroup.QUADRICEPS,
-        MuscleGroup.HAMSTRINGS,
-        MuscleGroup.GLUTES,
-    }.issubset(actual_muscles)
-    assert MuscleGroup.BACK not in actual_muscles
-
-    coverage = program.aggregate_metrics["weekly_coverage"]
-    assert coverage["status"] == "constrained"
-    assert coverage["covered_patterns"] == ("push", "knee", "hinge")
-    assert coverage["missing_patterns"] == ("pull",)
-    assert coverage["missing_major_muscles"] == ("back",)
-    assert coverage["unavailable_patterns"] == ("pull",)
-    assert coverage["unavailable_major_muscles"] == ("back",)
-    assert "FULL_BODY_PATTERN_UNAVAILABLE:pull" in coverage["reason_codes"]
-    assert "FULL_BODY_COVERAGE_UNAVAILABLE:back" in coverage["reason_codes"]
-    pull_evidence = coverage["availability_evidence"]["patterns"]["pull"]
-    back_evidence = coverage["availability_evidence"]["muscles"]["back"]
-    assert pull_evidence["candidate_count"] == pull_evidence["rejected_candidate_count"]
-    assert pull_evidence["eligible_candidate_count"] == 0
-    assert "EXERCISE_REJECTED_MISSING_EQUIPMENT" in pull_evidence["rejection_reason_codes"]
-    assert back_evidence["candidate_count"] == back_evidence["rejected_candidate_count"]
-    assert back_evidence["eligible_candidate_count"] == 0
-    assert "EXERCISE_REJECTED_MISSING_EQUIPMENT" in back_evidence["rejection_reason_codes"]
-    assert pull_evidence["unavailable"] is True
-    assert back_evidence["unavailable"] is True
-    assert coverage["fully_balanced"] is False
-    assert coverage["claimed_balanced"] is False
-    assert program.aggregate_metrics["coach_quality"]["coverage_fit"] == "constrained"
-    response_coverage = plan.aggregate_metrics["weekly_coverage"]
-    assert response_coverage["status"] == "constrained"
-    assert response_coverage["missing_patterns"] == ["pull"]
-    assert response_coverage["unavailable_major_muscles"] == ["back"]
-    assert not any(
-        item.primary_muscle is MuscleGroup.BACK
-        for day in program.weekly_schedule
-        for item in day.exercises
-    )
-    assert all(
-        item.is_active
-        and item.is_programmable
-        and not item.needs_review
-        and item.counts_toward_volume
-        and effective_required_equipment(item.equipment, item.movement_pattern).issubset(
-            source.available_equipment
-        )
-        and not effective_caution_tags(item).intersection(source.blocked_caution_tags)
-        for day in program.weekly_schedule
-        for item in day.exercises
-    )
+    assert response["success"] is False
+    assert generation.program is None
+    assert "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in generation.errors
+    assert "REQUIRED_PATTERN_UNAVAILABLE:pull" in generation.errors
 
 
 def test_full_body_coverage_reports_satisfied_for_actual_exercises() -> None:

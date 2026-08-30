@@ -207,7 +207,7 @@ def classify_muscle_exposure_details(
         # still be high when its effective dose is genuinely large.
         if (
             high_load_evidence
-            or direct >= ruleset.recovery_high_direct_sets
+            or direct >= ruleset.recovery_high_direct_sets * 2
             or secondary >= ruleset.recovery_high_effective_sets
         ):
             load = ExposureLoad.HIGH
@@ -234,7 +234,7 @@ def recovery_spacing_is_valid(
     days: tuple[WorkoutDay, ...],
     ruleset: ProgramRuleset,
 ) -> bool:
-    return assess_recovery_spacing(days, ruleset).is_valid
+    return assess_recovery_spacing(days, ruleset).is_safe
 
 
 def assess_recovery_spacing(
@@ -325,7 +325,7 @@ def repair_recovery_weekdays(
     days: tuple[WorkoutDay, ...],
     ruleset: ProgramRuleset,
 ) -> tuple[SplitPlan, tuple[WorkoutDay, ...], tuple[str, ...]]:
-    if recovery_spacing_is_valid(days, ruleset):
+    if assess_recovery_spacing(days, ruleset).is_valid:
         return split, days, ()
     original = tuple(day.weekday for day in days)
     if any(weekday is None for weekday in original):
@@ -336,7 +336,7 @@ def repair_recovery_weekdays(
         scheduled = tuple(
             replace(day, weekday=weekday) for day, weekday in zip(days, weekdays, strict=True)
         )
-        if recovery_spacing_is_valid(scheduled, ruleset):
+        if assess_recovery_spacing(scheduled, ruleset).is_valid:
             distance = sum(
                 abs(candidate - current)
                 for candidate, current in zip(weekdays, original_days, strict=True)
@@ -370,7 +370,7 @@ def repair_recovery_accessory_distribution(
     ruleset: ProgramRuleset,
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
     """Move optional isolation work only when every hard contract remains valid."""
-    if recovery_spacing_is_valid(days, ruleset):
+    if assess_recovery_spacing(days, ruleset).is_valid:
         return days, ()
     count_policy = get_session_exercise_count_policy(
         request.source.session_duration_minutes, ruleset
@@ -403,7 +403,7 @@ def repair_recovery_accessory_distribution(
                     for day in scheduled
                 ):
                     continue
-                if recovery_spacing_is_valid(scheduled, ruleset):
+                if assess_recovery_spacing(scheduled, ruleset).is_valid:
                     return scheduled, ("RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED",)
     return days, ("RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTION_UNAVAILABLE",)
 

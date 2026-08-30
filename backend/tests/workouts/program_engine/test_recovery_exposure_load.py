@@ -14,6 +14,7 @@ from app.workouts.program_engine.enums import (
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.recovery import (
     ExposureLoad,
+    assess_recovery_spacing,
     classify_muscle_exposures,
     recovery_spacing_is_valid,
     repair_recovery_weekdays,
@@ -87,7 +88,7 @@ def test_light_accessory_exposures_can_be_consecutive() -> None:
     assert recovery_spacing_is_valid(days, RULESET)
 
 
-def test_moderate_exposure_relaxes_only_against_light_follow_up() -> None:
+def test_moderate_overlap_is_safe_but_still_repairable() -> None:
     moderate_then_light = (
         _day(weekday=0, exercise=_exercise(sets=3)),
         _day(weekday=1, exercise=_exercise(sets=2)),
@@ -98,23 +99,23 @@ def test_moderate_exposure_relaxes_only_against_light_follow_up() -> None:
     )
 
     assert recovery_spacing_is_valid(moderate_then_light, RULESET)
-    assert not recovery_spacing_is_valid(two_moderate, RULESET)
+    assert recovery_spacing_is_valid(two_moderate, RULESET)
+    assert assess_recovery_spacing(two_moderate, RULESET).repairable_conflicts
 
 
-def test_high_exposure_requires_two_day_calendar_spacing() -> None:
+def test_high_to_light_overlap_is_safe_but_prefers_calendar_spacing() -> None:
     high = _exercise(sets=3, reason_codes=("STRENGTH_PRIMARY_COMPOUND",))
 
-    assert not recovery_spacing_is_valid(
-        (_day(weekday=0, exercise=high), _day(weekday=1, exercise=_exercise(sets=2))),
-        RULESET,
-    )
+    adjacent = (_day(weekday=0, exercise=high), _day(weekday=1, exercise=_exercise(sets=2)))
+    assert recovery_spacing_is_valid(adjacent, RULESET)
+    assert assess_recovery_spacing(adjacent, RULESET).repairable_conflicts
     assert recovery_spacing_is_valid(
         (_day(weekday=0, exercise=high), _day(weekday=2, exercise=_exercise(sets=2))),
         RULESET,
     )
 
 
-def test_meaningful_secondary_chest_stress_blocks_next_day_direct_shoulders() -> None:
+def test_meaningful_secondary_chest_stress_is_repairable_before_direct_shoulders() -> None:
     chest_day = _day(
         weekday=0,
         exercise=_exercise(
@@ -133,11 +134,12 @@ def test_meaningful_secondary_chest_stress_blocks_next_day_direct_shoulders() ->
         classify_muscle_exposures(chest_day, RULESET)[MuscleGroup.SHOULDERS]
         is ExposureLoad.MODERATE
     )
-    assert not recovery_spacing_is_valid((chest_day, shoulder_day), RULESET)
+    assert recovery_spacing_is_valid((chest_day, shoulder_day), RULESET)
+    assert assess_recovery_spacing((chest_day, shoulder_day), RULESET).repairable_conflicts
     assert recovery_spacing_is_valid((chest_day, replace(shoulder_day, weekday=2)), RULESET)
 
 
-def test_meaningful_secondary_glute_stress_blocks_next_day_direct_glutes() -> None:
+def test_meaningful_secondary_glute_stress_is_repairable_before_direct_glutes() -> None:
     quad_day = _day(
         weekday=0,
         exercise=_exercise(
@@ -153,7 +155,8 @@ def test_meaningful_secondary_glute_stress_blocks_next_day_direct_glutes() -> No
     )
 
     assert classify_muscle_exposures(quad_day, RULESET)[MuscleGroup.GLUTES] is ExposureLoad.MODERATE
-    assert not recovery_spacing_is_valid((quad_day, glute_day), RULESET)
+    assert recovery_spacing_is_valid((quad_day, glute_day), RULESET)
+    assert assess_recovery_spacing((quad_day, glute_day), RULESET).repairable_conflicts
 
 
 def test_recovery_repair_rearranges_days_without_removing_a_session() -> None:

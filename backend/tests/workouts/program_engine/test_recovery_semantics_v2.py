@@ -103,6 +103,22 @@ def test_detailed_exposure_keeps_direct_and_secondary_sets_separate() -> None:
     assert details.high_load_evidence is False
 
 
+def test_six_direct_isolation_sets_are_moderate_without_high_fatigue_evidence() -> None:
+    details = classify_muscle_exposure_details(
+        _day(0, _exercise(sets=6)), RULESET
+    )[MuscleGroup.BICEPS]
+
+    assert details.load is ExposureLoad.MODERATE
+
+
+def test_very_large_direct_isolation_dose_is_still_high() -> None:
+    details = classify_muscle_exposure_details(
+        _day(0, _exercise(sets=RULESET.recovery_high_direct_sets * 2)), RULESET
+    )[MuscleGroup.BICEPS]
+
+    assert details.load is ExposureLoad.HIGH
+
+
 def test_direct_high_to_direct_high_is_a_hard_conflict() -> None:
     days = (
         _day(0, _exercise(sets=5, high=True)),

@@ -870,7 +870,7 @@ def test_duration_evidence_cannot_downgrade_main_count_violation(
     assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" not in report.warnings
 
 
-def test_validator_rejects_adjacent_full_body_sessions() -> None:
+def test_validator_warns_for_repairable_adjacent_full_body_sessions() -> None:
     source = request(available_training_days=3, session_duration_minutes=30)
     result = generate_program(source, catalog(), RULESET)
     assert result.program is not None
@@ -881,7 +881,8 @@ def test_validator_rejects_adjacent_full_body_sessions() -> None:
 
     report = validate_program(invalid, source, RULESET)
 
-    assert "RECOVERY_SPACING_INVALID" in report.errors
+    assert "RECOVERY_SPACING_INVALID" not in report.errors
+    assert "RECOVERY_REPAIRABLE_OVERLAP_REMAINS" in report.warnings
 
 
 def test_validator_still_rejects_an_unjustified_duplicate_exercise() -> None:

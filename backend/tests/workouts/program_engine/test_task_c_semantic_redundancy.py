@@ -136,7 +136,14 @@ def test_actual_batch2_service_path_replays_profiles_2_3_6_and_9(monkeypatch) ->
     assert {profile["num"] for profile, _result in results} == selected_numbers
     assert len(captured) == len(selected_numbers)
     observed_stages = set()
-    for generation, source in zip(captured, captured_requests, strict=True):
+    for (profile, _response), generation, source in zip(
+        results, captured, captured_requests, strict=True
+    ):
+        if profile["num"] == 6:
+            assert not generation.is_success
+            assert "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in generation.errors
+            assert "REQUIRED_PATTERN_UNAVAILABLE:pull" in generation.errors
+            continue
         assert generation.is_success, generation.errors
         assert generation.program is not None
         assert validate_program(generation.program, source, RULESET).errors == ()

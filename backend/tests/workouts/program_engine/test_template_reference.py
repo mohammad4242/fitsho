@@ -408,6 +408,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         "volume",
         "volume_repair",
         "session_duration",
+        "recovery_repair",
         "session_structure",
         "weekly_coverage",
         "substitution_observability",
