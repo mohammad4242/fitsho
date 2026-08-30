@@ -178,7 +178,16 @@ def generate_program(
         rejected_slot_candidates,
     )
     template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
-    for ranking in template_selection.candidates:
+    successful_templates: list[
+        tuple[
+            tuple[int, int, int, int],
+            TemplateRankingResult,
+            ProgramGenerationResult,
+            dict[str, object],
+        ]
+    ] = []
+    evaluated_attempts: list[dict[str, object]] = []
+    for candidate_index, ranking in enumerate(template_selection.candidates):
         reference = ranking.template
         try:
             reference_build = build_template_sessions(
@@ -206,14 +215,35 @@ def generate_program(
                 coverage_availability_evidence=coverage_availability_evidence,
             )
             if reference_result.is_success:
-                return _append_successful_template_attempt(
-                    reference_result,
-                    _template_attempt_trace(
-                        ranking,
-                        status="succeeded",
-                        repair_events=_post_construction_repair_events(reference_result),
-                    ),
+                repair_events = _post_construction_repair_events(reference_result)
+                survival = assess_candidate_survival(
+                    is_success=True,
+                    reason_codes=("TEMPLATE_ATTEMPT_SUCCEEDED",),
+                    repair_events=repair_events,
                 )
+                selection_key = candidate_survival_sort_key(
+                    survival, product_score=ranking.score.total
+                )
+                attempt_trace = _template_attempt_trace(
+                    ranking,
+                    status="succeeded",
+                    repair_events=repair_events,
+                )
+                evaluated_attempts.append(attempt_trace)
+                successful_templates.append(
+                    (selection_key, ranking, reference_result, attempt_trace)
+                )
+                remaining = template_selection.candidates[candidate_index + 1 :]
+                best_key = max(item[0] for item in successful_templates)
+                best_remaining_product_score = max(
+                    (item.score.total for item in remaining), default=None
+                )
+                if (
+                    best_remaining_product_score is None
+                    or best_remaining_product_score <= best_key[1]
+                ):
+                    break
+                continue
             rejection_category = _template_rejection_category(reference_result.errors)
             rejection = {
                 "stage": "template_reference",
@@ -232,16 +262,15 @@ def generate_program(
                 "reason_codes": reference_result.errors,
                 "decision_trace": reference_result.decision_trace[len(template_rejection_trace) :],
             }
-            template_rejection_trace += (
-                rejection,
-                _template_attempt_trace(
-                    ranking,
-                    status="rejected",
-                    rejection_category=rejection_category,
-                    reason_codes=reference_result.errors,
-                    repair_events=_post_construction_repair_events(reference_result),
-                ),
+            attempt_trace = _template_attempt_trace(
+                ranking,
+                status="rejected",
+                rejection_category=rejection_category,
+                reason_codes=reference_result.errors,
+                repair_events=_post_construction_repair_events(reference_result),
             )
+            evaluated_attempts.append(attempt_trace)
+            template_rejection_trace += (rejection, attempt_trace)
         except TemplateConstructionError as exc:
             reason_codes = ("INITIAL_TEMPLATE_REJECTED_UNFILLABLE", *exc.reason_codes)
             rejection_category = _template_rejection_category(reason_codes)
@@ -261,15 +290,37 @@ def generate_program(
                 "rejection_category": rejection_category,
                 "reason_codes": reason_codes,
             }
-            template_rejection_trace += (
-                rejection,
-                _template_attempt_trace(
-                    ranking,
-                    status="rejected",
-                    rejection_category=rejection_category,
-                    reason_codes=reason_codes,
-                ),
+            attempt_trace = _template_attempt_trace(
+                ranking,
+                status="rejected",
+                rejection_category=rejection_category,
+                reason_codes=reason_codes,
             )
+            evaluated_attempts.append(attempt_trace)
+            template_rejection_trace += (rejection, attempt_trace)
+    if successful_templates:
+        selected_key, selected_ranking, selected_result, selected_attempt = max(
+            successful_templates, key=lambda item: item[0]
+        )
+        selected_result = _append_successful_template_attempt(
+            selected_result, selected_attempt
+        )
+        return _append_successful_template_attempt(
+            selected_result,
+            {
+                "stage": "post_construction_template_selection",
+                "status": "selected",
+                "selected_slug": selected_ranking.template.slug,
+                "selected_key": selected_key,
+                "evaluated_count": len(evaluated_attempts),
+                "pruned_count": len(template_selection.candidates) - len(evaluated_attempts),
+                "candidates": tuple(evaluated_attempts),
+                "reason_codes": (
+                    "POST_CONSTRUCTION_SURVIVAL_COMPARED",
+                    "REPAIR_COST_APPLIED_TO_TEMPLATE_SELECTION",
+                ),
+            },
+        )
     if template_selection.candidates:
         template_rejection_trace += (
             {

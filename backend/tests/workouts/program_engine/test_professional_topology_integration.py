@@ -5,6 +5,7 @@ import pytest
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.profile.enums import TrainingLocation
 from app.training_templates.tags import TemplateFocusTag
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.duration_capacity import build_session_capacity
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, SplitType, TrainingExperience
@@ -290,6 +291,49 @@ def test_generate_program_ranks_and_attempts_feasible_professional_reference_fir
     }
     assert attempt["post_construction_feasibility"]["hard_reason_codes"] == ()
     assert result.program.aggregate_metrics["reference_template"] == professional.slug
+
+
+def test_generate_program_compares_close_successes_by_real_repair_cost(monkeypatch) -> None:
+    source = request(
+        primary_goal=Goal.HYPERTROPHY,
+        training_experience=TrainingExperience.INTERMEDIATE,
+        training_age_months=24,
+        available_training_days=4,
+        session_duration_minutes=45,
+        available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
+        training_location=TrainingLocation.HOME,
+    )
+    generic = _reference("z-generic-upper-lower", (TemplateFocusTag.UPPER_LOWER,))
+    professional = _reference(
+        "a-professional-body-part", (TemplateFocusTag.BODY_PART_ROTATION,)
+    )
+
+    def repair_events(result):
+        assert result.program is not None
+        if result.program.aggregate_metrics["reference_template"] == professional.slug:
+            return tuple(f"MAJOR_REPAIR_{index}" for index in range(100))
+        return ()
+
+    monkeypatch.setattr(engine, "_post_construction_repair_events", repair_events)
+
+    result = generate_program(
+        source,
+        full_catalog(),
+        RULESET,
+        reference_templates=(generic, professional),
+    )
+
+    assert result.program is not None, result.errors
+    assert result.program.aggregate_metrics["reference_template"] == generic.slug
+    selection = next(
+        item
+        for item in result.program.decision_trace
+        if item.get("stage") == "post_construction_template_selection"
+    )
+    assert selection["evaluated_count"] == 2
+    assert selection["selected_slug"] == generic.slug
+    assert selection["candidates"][0]["slug"] == professional.slug
+    assert selection["candidates"][1]["slug"] == generic.slug
 
 
 def test_generate_program_keeps_upper_lower_when_professional_reference_is_ineligible() -> None:

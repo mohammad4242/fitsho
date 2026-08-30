@@ -85,7 +85,13 @@ def candidate_survival_sort_key(
     assessment: CandidateSurvival,
     *,
     product_score: int,
-) -> tuple[int, int, int]:
-    """Keep validity hard, product preference primary, and repair cost bounded."""
+) -> tuple[int, int, int, int]:
+    """Keep validity hard and charge one score point per real repair event."""
 
-    return (int(assessment.is_success), product_score, -assessment.repair_cost)
+    repair_adjusted_score = product_score - assessment.repair_cost
+    return (
+        int(assessment.is_success),
+        repair_adjusted_score,
+        product_score,
+        -assessment.repair_cost,
+    )
