@@ -17,6 +17,10 @@ from app.workouts.program_engine.focus_topology import (
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import NormalizedProgramRequest
+from app.workouts.program_engine.session_coherence import (
+    SessionCoherence,
+    specialization_focus_for_priorities,
+)
 from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
 from app.workouts.program_engine.volume_policy import recovery_burden_for_request
 
@@ -237,20 +241,7 @@ class PriorityAllocationPolicy:
         if focus != "specialization":
             return focus
         priority_source = self.explicit_priorities or self.priorities
-        if priority_source == (MuscleGroup.BICEPS,):
-            return "biceps"
-        if priority_source == (MuscleGroup.TRICEPS,):
-            return "triceps"
-        for group, specialized_focus in (
-            ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
-            ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
-            ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
-            ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
-            ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS), "posterior_chain_core"),
-        ):
-            if set(group).intersection(priority_source):
-                return specialized_focus
-        return "chest_triceps"
+        return specialization_focus_for_priorities(priority_source)
 
     def day_priority_key(
         self,
@@ -260,22 +251,30 @@ class PriorityAllocationPolicy:
         *,
         preferred_frequency: int | None = None,
     ) -> tuple[int, int, int, int]:
-        """Prefer new, well-spaced exposures until the desired frequency is met."""
+        """Prefer existing intended exposures, then another coherent intended day."""
         target_frequency = (
             self.preferred_frequency if preferred_frequency is None else preferred_frequency
         )
         if muscle not in self.priorities or target_frequency <= 0:
             return (1, 0, 0, day_index)
+        intended_days = [
+            index
+            for index, day in enumerate(days)
+            if SessionCoherence.from_workout_day(day).allows_direct(muscle)
+        ]
+        if day_index not in intended_days:
+            return (2, 3, len(intended_days), day_index)
         exposure_indexes = [
             index
             for index, day in enumerate(days)
-            if any(getattr(item, "primary_muscle", None) is muscle for item in _day_exercises(day))
+            if index in intended_days
+            and any(getattr(item, "primary_muscle", None) is muscle for item in _day_exercises(day))
         ]
         has_exposure = day_index in exposure_indexes
         spacing_valid = self._spacing_is_valid(days, muscle, day_index, exposure_indexes)
         if len(exposure_indexes) < target_frequency:
             return (
-                0 if not has_exposure else 1,
+                0 if has_exposure else 1,
                 0 if spacing_valid else 1,
                 len(exposure_indexes),
                 day_index,

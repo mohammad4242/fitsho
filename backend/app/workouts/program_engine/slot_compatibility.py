@@ -5,6 +5,7 @@ from typing import Protocol
 
 from app.exercises.enums import ExerciseLabel, ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.enums import CompatibilityLevel
+from app.workouts.program_engine.session_coherence import direct_scope_for_focus
 from app.workouts.program_engine.substitution_policy import (
     ARM_PATTERNS,
     CORE_PATTERNS,
@@ -95,12 +96,19 @@ def evaluate_candidate_slot_compatibility(
         return SlotCompatibility(CompatibilityLevel.PREFERRED, ())
     if candidate.primary_muscle in effective_targets:
         return SlotCompatibility(CompatibilityLevel.PREFERRED, ())
-    if candidate.exercise_type is ExerciseType.COMPOUND and set(
-        candidate.secondary_muscles
-    ).intersection(effective_targets):
+    # Secondary recruitment is useful for effective-volume accounting, but it must never
+    # authorize a direct exercise whose primary muscle is outside the session scope.  A
+    # compound may still fill a narrower slot when its primary remains in the broad session
+    # scope and the slot target is only recruited secondarily.
+    if (
+        candidate.exercise_type is ExerciseType.COMPOUND
+        and focus_muscles is not None
+        and candidate.primary_muscle in focus_muscles
+        and bool(set(candidate.secondary_muscles).intersection(effective_targets))
+    ):
         return SlotCompatibility(
             CompatibilityLevel.VALID_BUT_SUBOPTIMAL,
-            ("SLOT_COMPATIBLE_COMPOUND_SECONDARY_TARGET",),
+            ("SLOT_SECONDARY_TARGET_COMPATIBLE",),
         )
     return SlotCompatibility(CompatibilityLevel.HARD_INCOMPATIBLE, ("SLOT_SEMANTIC_MISMATCH",))
 
@@ -168,7 +176,7 @@ def _scope_for_focus(
             | SHOULDER_PATTERNS
             | ARM_PATTERNS
             | frozenset({MovementPattern.SHRUG}),
-            None,
+            direct_scope_for_focus(focus),
         )
     if focus.startswith("upper"):
         return (
@@ -176,71 +184,57 @@ def _scope_for_focus(
             | PULL_PATTERNS
             | ARM_PATTERNS
             | frozenset({MovementPattern.SHOULDER_ABDUCTION, MovementPattern.SHRUG}),
-            frozenset(
-                {
-                    MuscleGroup.CHEST,
-                    MuscleGroup.BACK,
-                    MuscleGroup.SHOULDERS,
-                    MuscleGroup.TRAPS,
-                    MuscleGroup.BICEPS,
-                    MuscleGroup.TRICEPS,
-                }
-            ),
+            direct_scope_for_focus(focus),
         )
     if focus in {"lower", "legs"} or focus.startswith("lower"):
         return (
             KNEE_PATTERNS | HINGE_PATTERNS | CORE_PATTERNS | LOWER_ACCESSORY_PATTERNS,
-            frozenset(
-                {
-                    MuscleGroup.QUADRICEPS,
-                    MuscleGroup.HAMSTRINGS,
-                    MuscleGroup.GLUTES,
-                    MuscleGroup.CALVES,
-                    MuscleGroup.ABS,
-                }
-            ),
+            direct_scope_for_focus(focus),
         )
     scopes: dict[str, tuple[frozenset[MovementPattern], frozenset[MuscleGroup]]] = {
         "push": (
             PUSH_PATTERNS | frozenset({MovementPattern.ELBOW_EXTENSION}),
-            frozenset({MuscleGroup.CHEST, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS}),
+            direct_scope_for_focus(focus),
         ),
         "pull": (
             PULL_PATTERNS | frozenset({MovementPattern.ELBOW_FLEXION}),
-            frozenset({MuscleGroup.BACK, MuscleGroup.BICEPS}),
+            direct_scope_for_focus(focus),
         ),
         "chest_triceps": (
             PUSH_PATTERNS | frozenset({MovementPattern.ELBOW_EXTENSION}),
-            frozenset({MuscleGroup.CHEST, MuscleGroup.TRICEPS}),
+            direct_scope_for_focus(focus),
         ),
         "back_biceps": (
             PULL_PATTERNS | frozenset({MovementPattern.ELBOW_FLEXION}),
-            frozenset({MuscleGroup.BACK, MuscleGroup.BICEPS}),
+            direct_scope_for_focus(focus),
         ),
         "biceps": (
             frozenset({MovementPattern.ELBOW_FLEXION}),
-            frozenset({MuscleGroup.BICEPS}),
+            direct_scope_for_focus(focus),
         ),
         "triceps": (
             frozenset({MovementPattern.ELBOW_EXTENSION}),
-            frozenset({MuscleGroup.TRICEPS}),
+            direct_scope_for_focus(focus),
         ),
         "shoulders_traps": (
             SHOULDER_PATTERNS | frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.SHRUG}),
-            frozenset({MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}),
+            direct_scope_for_focus(focus),
         ),
         "quadriceps_calves": (
             KNEE_PATTERNS | frozenset({MovementPattern.CALF_RAISE}),
-            frozenset({MuscleGroup.QUADRICEPS, MuscleGroup.CALVES}),
+            direct_scope_for_focus(focus),
         ),
         "posterior_chain_core": (
             HINGE_PATTERNS | CORE_PATTERNS | frozenset({MovementPattern.KNEE_FLEXION}),
-            frozenset({MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES, MuscleGroup.ABS}),
+            direct_scope_for_focus(focus),
         ),
     }
     return scopes.get(
         focus,
-        (PUSH_PATTERNS | PULL_PATTERNS | KNEE_PATTERNS | HINGE_PATTERNS | CORE_PATTERNS, None),
+        (
+            PUSH_PATTERNS | PULL_PATTERNS | KNEE_PATTERNS | HINGE_PATTERNS | CORE_PATTERNS,
+            None,
+        ),
     )
 
 

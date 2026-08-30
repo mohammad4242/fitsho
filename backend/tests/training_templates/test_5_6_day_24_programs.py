@@ -404,7 +404,7 @@ EXPECTED_EXERCISE_ORDER = {
     ),
     "p38-6-day-ppl-ab-intermediate": (
         ("bar", "incline", "military", "cable_lateral", "triceps"),
-        ("lat", "high", "rear", "db_curl", "shrug"),
+        ("lat", "high", "db_curl", "shrug"),
         ("squat", "press", "extension", "seated_leg", "calf"),
         ("smith_press", "db", "hammer_press", "db_lateral", "overhead"),
         ("seated_row", "row", "straight", "hammer_curl", "rear"),
@@ -412,7 +412,7 @@ EXPECTED_EXERCISE_ORDER = {
     ),
     "p39-6-day-ppl-ab-advanced": (
         ("bar", "hammer_press", "fly", "cable_lateral", "rope_triceps"),
-        ("lat", "high", "rear", "bar_curl", "shrug"),
+        ("lat", "high", "bar_curl", "shrug"),
         ("squat", "press", "extension", "seated_leg", "calf"),
         ("smith_press", "db", "fly", "db_lateral", "overhead"),
         ("row", "seated_row", "straight", "hammer_curl", "rear"),
@@ -440,7 +440,7 @@ EXPECTED_EXERCISE_ORDER = {
         ("squat", "press", "extension", "seated_leg", "calf"),
         ("military", "cable_lateral", "rear", "shrug", "plank"),
         ("machine", "seated_row", "hammer_press", "lat", "fly", "straight"),
-        ("rdl", "lying_leg", "bridge", "lunge", "calf", "side_plank"),
+        ("rdl", "lying_leg", "bridge", "calf", "side_plank"),
     ),
     "p43-6-day-fitclub-hybrid-advanced": (
         ("bar", "incline", "fly", "rope_triceps", "overhead"),
@@ -448,7 +448,7 @@ EXPECTED_EXERCISE_ORDER = {
         ("squat", "press", "extension", "seated_leg", "calf"),
         ("military", "cable_lateral", "rear", "shrug", "plank"),
         ("machine", "seated_row", "fly", "straight", "hammer_press", "lat"),
-        ("rdl", "lying_leg", "bridge", "lunge", "calf", "side_plank"),
+        ("rdl", "lying_leg", "bridge", "calf", "side_plank"),
     ),
     "p44-6-day-arnold-split-intermediate": (
         ("bar", "row", "incline", "lat", "fly", "straight"),

@@ -22,6 +22,7 @@ from app.workouts.program_engine.schemas import (
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import slots_for_focus
+from app.workouts.program_engine.session_coherence import SessionCoherence
 from app.workouts.program_engine.session_structure import session_structure_errors
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
@@ -33,6 +34,7 @@ from app.workouts.program_engine.strength_programming import (
 from app.workouts.program_engine.supersets import superset_structure_errors
 from app.workouts.program_engine.supplemental_policy import (
     contextual_minimum_working_sets,
+    is_core_or_supplemental_exercise,
     main_exercise_count,
 )
 from app.workouts.program_engine.volume_policy import (
@@ -75,6 +77,7 @@ def validate_program(
         )
     count_policy = get_session_exercise_count_policy(request.session_duration_minutes, ruleset)
     for day in program.weekly_schedule:
+        coherence = SessionCoherence.from_workout_day(day)
         exercise_count = main_exercise_count(day.exercises)
         main_minutes = calculate_main_training_minutes(day)
         errors.extend(superset_structure_errors(day.exercises))
@@ -105,6 +108,18 @@ def validate_program(
 
         per_session: Counter[str] = Counter()
         for index, item in enumerate(day.exercises):
+            if (
+                item.primary_muscle is not None
+                and not is_core_or_supplemental_exercise(item)
+                and not coherence.allows_direct(item.primary_muscle)
+            ):
+                errors.extend(
+                    (
+                        "SESSION_DIRECT_MUSCLE_OUTSIDE_FOCUS_REJECTED",
+                        "SESSION_DIRECT_MUSCLE_OUTSIDE_FOCUS_REJECTED:"
+                        f"{item.primary_muscle.value}",
+                    )
+                )
             if has_near_equivalent(item, day.exercises[:index]):
                 errors.append("SEMANTIC_NEAR_DUPLICATE_EXERCISE")
             if "OPTIONAL_SUPPLEMENTAL_WORK" not in item.reason_codes:

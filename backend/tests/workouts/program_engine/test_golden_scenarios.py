@@ -261,7 +261,13 @@ def test_generate_program_home_excludes_bodyweight_pull_up_without_bar_metadata(
 
 def test_final_validation_rejects_metadata_unsafe_programmed_exercise() -> None:
     source = request(blocked_caution_tags=[ExerciseCautionTag.WRIST_LOADING])
-    result = generate_program(request(), full_catalog(), RULESET)
+    # Use a bodyweight-only baseline so the tampered wrist-loading push-up is
+    # guaranteed to be present; the blocked source is validated below.
+    result = generate_program(
+        request(available_equipment=[Equipment.BODYWEIGHT]),
+        full_catalog(),
+        RULESET,
+    )
     assert result.program is not None, result.errors
     target_day = next(
         day

@@ -42,6 +42,12 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
 )
 from app.workouts.program_engine.session_builder import exercise_fits_focus
+from app.workouts.program_engine.session_coherence import (
+    SessionCoherence,
+    SessionCoherenceDecision,
+    SessionMuscleRole,
+    record_coherence_decision,
+)
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import (
     STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,
@@ -237,6 +243,7 @@ class DurationRepairResult:
     days: tuple[WorkoutDay, ...]
     reasons: tuple[str, ...]
     evidence: tuple[SessionDurationRepairEvidence, ...]
+    coherence_decisions: tuple[SessionCoherenceDecision, ...] = ()
 
     def __iter__(self) -> Iterator[tuple[WorkoutDay, ...] | tuple[str, ...]]:
         """Preserve the historical ``days, reasons = ...`` call contract."""
@@ -263,6 +270,7 @@ def repair_session_durations(
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     day_reason_codes: list[tuple[str, ...]] = []
+    coherence_decisions: list[SessionCoherenceDecision] = []
     for day_index, day in enumerate(days):
         day_reason_start = len(reasons)
         # -------------------------------------------------------------------
@@ -315,6 +323,7 @@ def repair_session_durations(
                 ),
                 minimum_exercises=planned_minimum_exercises,
                 hard_volume_status=hard_volume_status,
+                coherence_decisions=coherence_decisions,
             )
             if hard_volume_status and hard_volume_status[0]:
                 reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
@@ -366,6 +375,7 @@ def repair_session_durations(
         days=repaired_tuple,
         reasons=tuple(dict.fromkeys(reasons)),
         evidence=evidence,
+        coherence_decisions=tuple(coherence_decisions),
     )
 
 
@@ -408,6 +418,7 @@ def _repair_underfill(
     prefer_acceptable_volume_for_minimum_fill: bool,
     minimum_exercises: int,
     hard_volume_status: list[bool] | None = None,
+    coherence_decisions: list[SessionCoherenceDecision] | None = None,
 ) -> WorkoutDay:
     """Add safe main-training work until duration and structure are satisfied."""
     exercises = list(day.exercises)
@@ -427,6 +438,20 @@ def _repair_underfill(
             )
             if set_addition is not None:
                 index, updated = set_addition
+                muscle = updated.primary_muscle
+                assert muscle is not None
+                coherence = SessionCoherence.from_workout_day(day)
+                record_coherence_decision(
+                    coherence_decisions,
+                    SessionCoherenceDecision(
+                        stage="duration_repair",
+                        muscle_requested=muscle,
+                        candidate_day=day.day_index,
+                        candidate_day_role=coherence.role_for(muscle),
+                        status="accepted",
+                        reason=_duration_coherence_reason(coherence, muscle),
+                    ),
+                )
                 exercises[index] = updated
                 day = _rebuild_day(day, tuple(exercises), ruleset)
                 continue
@@ -441,8 +466,23 @@ def _repair_underfill(
             volume=volume,
             prefer_acceptable_volume_for_minimum_fill=(prefer_acceptable_volume_for_minimum_fill),
             minimum_exercises=minimum_exercises,
+            coherence_decisions=coherence_decisions,
         )
         if addition is not None:
+            muscle = addition.primary_muscle
+            assert muscle is not None
+            coherence = SessionCoherence.from_workout_day(day)
+            record_coherence_decision(
+                coherence_decisions,
+                SessionCoherenceDecision(
+                    stage="duration_repair",
+                    muscle_requested=muscle,
+                    candidate_day=day.day_index,
+                    candidate_day_role=coherence.role_for(muscle),
+                    status="accepted",
+                    reason=_duration_coherence_reason(coherence, muscle),
+                ),
+            )
             exercises.append(addition)
             day = _rebuild_day(day, tuple(exercises), ruleset)
             continue
@@ -462,6 +502,7 @@ def _repair_underfill(
                 prefer_acceptable_volume_for_minimum_fill=False,
                 minimum_exercises=minimum_exercises,
                 hard_volume_rejection=strict_hard_status,
+                coherence_decisions=coherence_decisions,
             )
             if hard_volume_status is not None and strict_hard_status == [True]:
                 hard_volume_status.append(True)
@@ -481,6 +522,7 @@ def _select_set_addition(
 ) -> tuple[int, ProgrammedExercise] | None:
     """Select one useful set without exceeding main-duration or hard limits."""
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+    coherence = SessionCoherence.from_workout_day(day)
     options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
     for index, exercise in enumerate(exercises):
         if not is_main_training_exercise(exercise) or exercise.primary_muscle is None:
@@ -513,6 +555,17 @@ def _select_set_addition(
         if direct_sets + 1 > sess_max:
             continue
         updated = _with_additional_set(exercise, ruleset)
+        updated = replace(
+            updated,
+            reason_codes=tuple(
+                dict.fromkeys(
+                    (
+                        *updated.reason_codes,
+                        _duration_coherence_reason(coherence, exercise.primary_muscle),
+                    )
+                )
+            ),
+        )
         simulated = [*exercises]
         simulated[index] = updated
         if calculate_main_training_minutes_from_exercises(simulated) > policy.maximum_minutes:
@@ -523,6 +576,7 @@ def _select_set_addition(
         options.append(
             (
                 (
+                    coherence.role_rank(exercise.primary_muscle),
                     priority_policy.precedence_key(exercise.primary_muscle),
                     adaptation_preservation_rank(exercise, priority_policy),
                     -exercise.estimated_minutes,
@@ -556,6 +610,7 @@ def _select_exercise_addition(
     prefer_acceptable_volume_for_minimum_fill: bool,
     minimum_exercises: int,
     hard_volume_rejection: list[bool] | None = None,
+    coherence_decisions: list[SessionCoherenceDecision] | None = None,
 ) -> ProgrammedExercise | None:
     if (
         main_exercise_count(exercises)
@@ -565,17 +620,33 @@ def _select_exercise_addition(
     ):
         return None
     existing_ids = {item.exercise_id for item in exercises}
-    template_muscles = frozenset(day.template_target_muscles).union(
-        item.primary_muscle for item in exercises if item.primary_muscle is not None
-    )
+    coherence = SessionCoherence.from_workout_day(day)
+    for item in candidates:
+        if (
+            item.primary_muscle is not None
+            and not is_supplemental_muscle(item.primary_muscle)
+            and not coherence.allows_direct(item.primary_muscle)
+        ):
+            record_coherence_decision(
+                coherence_decisions,
+                SessionCoherenceDecision(
+                    stage="duration_repair",
+                    muscle_requested=item.primary_muscle,
+                    candidate_day=day.day_index,
+                    candidate_day_role=SessionMuscleRole.DISALLOWED,
+                    status="rejected",
+                    reason="SESSION_DIRECT_MUSCLE_OUTSIDE_FOCUS_REJECTED",
+                ),
+            )
     options = tuple(
         item
         for item in candidates
         if item.id not in existing_ids
         and not is_supplemental_muscle(item.primary_muscle)
+        and coherence.allows_direct(item.primary_muscle)
         and (
-            item.primary_muscle in template_muscles
-            if day.focus.startswith("template_reference") and template_muscles
+            item.primary_muscle in day.template_target_muscles
+            if day.focus.startswith("template_reference") and day.template_target_muscles
             else exercise_fits_focus(item, day.focus)
         )
         and _candidate_is_safe(item, request)
@@ -605,6 +676,13 @@ def _select_exercise_addition(
             exceeds_frequency = 1 if (training_days >= 4 and new_frequency > frequency_cap) else 0
         return (
             exceeds_frequency,
+            coherence.role_rank(candidate_exercise.primary_muscle),
+            0
+            if any(
+                exercise.primary_muscle is candidate_exercise.primary_muscle
+                for exercise in exercises
+            )
+            else 1,
             *priority_policy.precedence_key(item.exercise.primary_muscle),
             -item.score,
             str(item.exercise.id),
@@ -679,7 +757,7 @@ def _select_exercise_addition(
             (STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,)
             if strength_set_cap_authorized
             else ()
-        )
+        ) + (_duration_coherence_reason(coherence, candidate.primary_muscle),)
         programmed = _program_candidate(
             candidate,
             sets,
@@ -724,6 +802,15 @@ def _select_exercise_addition(
     if hard_volume_rejection is not None:
         hard_volume_rejection.append(hard_volume_rejected)
     return hard_volume_fallback
+
+
+def _duration_coherence_reason(
+    coherence: SessionCoherence,
+    muscle: MuscleGroup,
+) -> str:
+    if coherence.role_for(muscle) is SessionMuscleRole.PRIMARY:
+        return "DURATION_REPAIR_PRIMARY_BLOCK_EXTENDED"
+    return "SESSION_GROUPED_MUSCLE_FALLBACK"
 
 
 def _programmed_strength_role(exercise: ProgrammedExercise) -> StrengthExerciseRole:

@@ -28,11 +28,11 @@ FROZEN_2_3_4_SIGNATURES = {
     "p18-4-day-3-upper-1-lower-beginner": "ec4fdc4d8bb48051caa68984540094b299506eb6f5e1e63853f21d0fbc952ea2",
     "p19-4-day-3-upper-1-lower-intermediate": "d572cc608fa7934e7622f39a3fac1ff78a79e660ad86a57431f40f1dc91365cc",
     "p20-4-day-3-upper-1-lower-advanced": "4c6b8c3442484f789ad88950e994b4c7439be6c14ca9587f02481b4846641b7c",
-    "p21-4-day-3-lower-1-upper-beginner": "54f84ba7c1bfb50a1f81a7e159364c0c643fc3274b9fe50ad65aaa66e2577bdc",
-    "p22-4-day-3-lower-1-upper-intermediate": "863bc6a14e3b31f2ee5a6145d3e2aedf4c04e0ae5e815ed9607d09f2e7741ca4",
-    "p23-4-day-3-lower-1-upper-advanced": "d7335bfc742c55314030c78c355d1d4f1b699602d600ca104756ba2d06337291",
-    "p24-4-day-push-pull-quads-posterior-intermediate": "4675d97134d4920456c4272cc2fa86e8fc5b3207c17f70d9556500cc410832a4",
-    "p25-4-day-push-pull-quads-posterior-advanced": "8d55754679e5d720792ddf5027866a6fc33624138e7ce93bb818acaf6b88efe7",
+    "p21-4-day-3-lower-1-upper-beginner": "0c03e9bc76473eefe8f196ed5ff7336748275d838bf9b19183a4d2c480c74721",
+    "p22-4-day-3-lower-1-upper-intermediate": "6565c71ffdb05662084adb6e94f55152ff2b66b934edcc35a6463b3f923a5506",
+    "p23-4-day-3-lower-1-upper-advanced": "79a5e4690f485e8cf186c22cba2e5eac71588316127c8d6dbba57c76c2e8678a",
+    "p24-4-day-push-pull-quads-posterior-intermediate": "9d9d453456326396b5e3770f314dc8fdeebd04a2c366c733c1960efe2b343865",
+    "p25-4-day-push-pull-quads-posterior-advanced": "c0b9d22ddebb78f287657db992d24b5d06b2a3f7c57a66b0c2d0197729f8e28a",
 }
 
 

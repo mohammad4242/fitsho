@@ -240,7 +240,7 @@ def test_final_gate_rejects_semantics_recovery_day_count_and_coverage() -> None:
     for candidate, expected in (
         (semantic, "UNJUSTIFIED_DUPLICATE_EXERCISE"),
         (day_count, "REQUESTED_TRAINING_DAYS_UNSATISFIED"),
-        (coverage, "FULL_BODY_PATTERN_MISSING:pull"),
+        (coverage, "FULL_BODY_COVERAGE_MISSING:back"),
     ):
         decision = _gate(candidate, source)
         assert decision.status == "rejected"

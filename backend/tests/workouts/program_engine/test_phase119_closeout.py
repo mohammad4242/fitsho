@@ -71,6 +71,7 @@ def test_phase119_cardio_additive_semantics():
 
 
 def test_phase119_underfill_repair_no_rest_extension():
+    from app.exercises.enums import MuscleGroup
     from app.workouts.program_engine.schemas import WorkoutDay
     from app.workouts.program_engine.session_duration import _repair_underfill
 
@@ -92,7 +93,12 @@ def test_phase119_underfill_repair_no_rest_extension():
         minimum_exercises=5,
     )
 
-    assert len(repaired.exercises) >= 5
+    # Candidate scarcity must not be repaired with junk or out-of-focus exercises.
+    assert repaired.exercises
+    assert all(
+        exercise.primary_muscle in (MuscleGroup.CHEST, MuscleGroup.TRICEPS)
+        for exercise in repaired.exercises
+    )
     # Ensure no rest extension reason code
     for ex in repaired.exercises:
         assert "REST_EXTENDED_FOR_SAFE_DURATION_TARGET" not in ex.reason_codes

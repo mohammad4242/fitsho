@@ -297,7 +297,11 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
         training_age_months=24,
         available_training_days=4,
         session_duration_minutes=45,
-        available_equipment=[Equipment.BODYWEIGHT, Equipment.DUMBBELL],
+        available_equipment=[
+            Equipment.BODYWEIGHT,
+            Equipment.DUMBBELL,
+            Equipment.PULL_UP_BAR,
+        ],
     )
     result = generate_program(
         source,

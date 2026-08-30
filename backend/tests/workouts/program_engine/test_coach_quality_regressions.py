@@ -386,7 +386,11 @@ def test_template_session_replaces_excess_redundancy_with_complementary_role() -
         for candidate in build.drafts[0].exercises
     ]
     assert roles.count((MuscleGroup.CHEST, MovementPattern.HORIZONTAL_PUSH)) <= 2
-    assert any(muscle is MuscleGroup.SHOULDERS for muscle, _pattern in roles)
+    assert all(
+        muscle in (MuscleGroup.CHEST, MuscleGroup.TRICEPS)
+        for muscle, _pattern in roles
+    )
+    assert not any(muscle is MuscleGroup.SHOULDERS for muscle, _pattern in roles)
     assert "TEMPLATE_REDUNDANCY_REPLACED_WITH_COMPLEMENTARY_ROLE" in build.reason_codes
 
 

@@ -1206,7 +1206,7 @@ def test_required_slot_recovery_uses_target_muscle_not_global_pattern_presence()
     assert "SLOT_SEMANTIC_MISMATCH" in sessions[0].reason_codes
 
 
-def test_required_slot_uses_valid_suboptimal_candidate_before_relaxing() -> None:
+def test_required_slot_rejects_out_of_scope_primary_even_with_secondary_match() -> None:
     request = normalized()
     split = SplitPlan(
         split_type=SplitType.BODY_PART_ROTATION,
@@ -1234,9 +1234,9 @@ def test_required_slot_uses_valid_suboptimal_candidate_before_relaxing() -> None
         RULESET,
     )
 
-    assert suboptimal_press in sessions[0].exercises
-    assert "VALID_BUT_SUBOPTIMAL_SEMANTICS" in sessions[0].selection_reasons[suboptimal_press.id]
-    assert "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION" not in sessions[0].reason_codes
+    assert suboptimal_press not in sessions[0].exercises
+    assert "RECOVERY_APPLIED_REQUIRED_SLOT_RELAXATION" in sessions[0].reason_codes
+    assert "SLOT_SEMANTIC_MISMATCH" in sessions[0].reason_codes
 
 
 def test_body_part_rotation_places_chest_and_direct_triceps_in_one_session() -> None:

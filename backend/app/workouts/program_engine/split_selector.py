@@ -33,6 +33,7 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
 )
 from app.workouts.program_engine.session_builder import slots_for_focus
+from app.workouts.program_engine.session_coherence import specialization_focus_for_priorities
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     focus_scope,
@@ -736,20 +737,7 @@ def _capacity_focus(
         return focus
     policy = PriorityAllocationPolicy.for_request(request, ruleset)
     priorities = frozenset(policy.explicit_priorities or policy.priorities)
-    if priorities == {MuscleGroup.BICEPS}:
-        return "biceps"
-    if priorities == {MuscleGroup.TRICEPS}:
-        return "triceps"
-    for muscle_groups, specialized_focus in (
-        ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
-        ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
-        ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
-        ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
-        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES), "posterior_chain_core"),
-    ):
-        if priorities.intersection(muscle_groups):
-            return specialized_focus
-    return "chest_triceps"
+    return specialization_focus_for_priorities(priorities)
 
 
 def _focus_duration_assessment(

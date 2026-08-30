@@ -24,6 +24,10 @@ from app.workouts.program_engine.schemas import (
     ProgrammedExercise,
     WorkoutDay,
 )
+from app.workouts.program_engine.session_coherence import (
+    SessionCoherence,
+    hierarchy_for_focus,
+)
 from app.workouts.program_engine.session_targets import english_session_title_for_targets
 from app.workouts.program_engine.supplemental_policy import (
     SUPPLEMENTAL_MUSCLES,
@@ -32,36 +36,6 @@ from app.workouts.program_engine.supplemental_policy import (
     main_exercise_count,
     supplemental_reason_codes,
 )
-
-_STRICT_BLOCKS: dict[str, tuple[frozenset[MuscleGroup], ...]] = {
-    "chest_triceps": (
-        frozenset({MuscleGroup.CHEST}),
-        frozenset({MuscleGroup.SHOULDERS}),
-        frozenset({MuscleGroup.TRICEPS}),
-    ),
-    "back_biceps": (
-        frozenset({MuscleGroup.BACK}),
-        frozenset({MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}),
-        frozenset({MuscleGroup.BICEPS}),
-    ),
-    "shoulders_traps": (
-        frozenset({MuscleGroup.SHOULDERS}),
-        frozenset({MuscleGroup.TRAPS}),
-    ),
-    "quadriceps_calves": (
-        frozenset({MuscleGroup.QUADRICEPS}),
-        frozenset({MuscleGroup.CALVES}),
-    ),
-    "posterior_chain_core": (frozenset({MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES}),),
-    "push": (
-        frozenset({MuscleGroup.CHEST, MuscleGroup.SHOULDERS}),
-        frozenset({MuscleGroup.TRICEPS}),
-    ),
-    "pull": (
-        frozenset({MuscleGroup.BACK, MuscleGroup.SHOULDERS, MuscleGroup.TRAPS}),
-        frozenset({MuscleGroup.BICEPS}),
-    ),
-}
 
 
 @dataclass(frozen=True)
@@ -220,8 +194,18 @@ def session_structure_errors(
             for unit in units
             if not unit.is_core_or_supplemental
         )
+        if block is None:
+            opener_units = main_units
+        else:
+            first_block_rank = min(
+                (_unit_block_rank(unit, block) for unit in main_units),
+                default=len(block),
+            )
+            opener_units = tuple(
+                unit for unit in main_units if _unit_block_rank(unit, block) == first_block_rank
+            )
         non_opener_units = tuple(
-            unit for unit in main_units if not _is_required_semantic_opener(unit, units, request)
+            unit for unit in opener_units if not _is_required_semantic_opener(unit, units, request)
         )
         if any(
             _contains_reason(unit, "STRENGTH_PRIMARY_COMPOUND") for unit in non_opener_units
@@ -529,13 +513,17 @@ def _unit_block_rank(
 
 
 def _strict_block(day: WorkoutDay) -> tuple[frozenset[MuscleGroup], ...] | None:
-    if day.focus in _STRICT_BLOCKS:
-        return _STRICT_BLOCKS[day.focus]
-    if not day.focus.startswith("template_reference"):
+    focus = (
+        day.template_structure_focus
+        if day.focus.startswith("template_reference")
+        else day.focus
+    )
+    if not hierarchy_for_focus(focus):
         return None
-    if day.template_structure_focus in _STRICT_BLOCKS:
-        return _STRICT_BLOCKS[day.template_structure_focus]
-    return None
+    coherence = SessionCoherence.from_workout_day(day)
+    if not coherence.allowed_direct_muscles:
+        return None
+    return coherence.ordered_blocks()
 
 
 __all__ = [

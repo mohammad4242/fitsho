@@ -22,6 +22,10 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
     WeeklyVolumePlan,
 )
+from app.workouts.program_engine.session_coherence import (
+    SessionCoherence,
+    specialization_focus_for_priorities,
+)
 from app.workouts.program_engine.slot_compatibility import (
     SlotCompatibility,
     evaluate_candidate_slot_compatibility,
@@ -99,12 +103,17 @@ def build_sessions(
     effective_priorities = frozenset(priority_policy.priorities)
     usage: Counter[UUID] = Counter()
     sessions: list[SessionDraft] = []
+    coverage_muscles = frozenset(
+        target.muscle for target in volume.targets if target.minimum_coverage_required
+    )
+    covered_direct_muscles: set[MuscleGroup] = set()
     short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
     count_policy = get_session_exercise_count_policy(
         request.source.session_duration_minutes, ruleset
     )
     for index, planned_focus in enumerate(split.day_focuses):
         focus = _resolve_focus(planned_focus, request, volume, ruleset)
+        coherence = SessionCoherence.from_dynamic_focus(focus)
         slots = slots_for_focus(focus)
         required_slot_count = sum(slot.required for slot in slots)
         day_capacity = session_capacity
@@ -170,6 +179,16 @@ def build_sessions(
                     allow_full_body=focus.startswith("full_body"),
                 )
                 if compatibility.compatible:
+                    if (
+                        not is_core_or_supplemental_exercise(item)
+                        and not coherence.allows_direct(item.primary_muscle)
+                    ):
+                        rejected_slot_reasons.append(
+                            f"DIRECT_MUSCLE_OUT_OF_SCOPE:{item.primary_muscle.value}"
+                            if item.primary_muscle is not None
+                            else "DIRECT_MUSCLE_OUT_OF_SCOPE"
+                        )
+                        continue
                     if has_near_equivalent(item, chosen):
                         semantic_redundancy_rejected = True
                         continue
@@ -247,6 +266,20 @@ def build_sessions(
             selected = min(
                 ranked,
                 key=lambda item: (
+                    0
+                    if (
+                        item.exercise.primary_muscle in priority_policy.explicit_priorities
+                        and item.exercise.primary_muscle not in covered_direct_muscles
+                    )
+                    else 1,
+                    0
+                    if (
+                        focus.startswith("full_body")
+                        and item.exercise.primary_muscle in coverage_muscles
+                        and item.exercise.primary_muscle not in covered_direct_muscles
+                    )
+                    else 1,
+                    coherence.role_rank(item.exercise.primary_muscle),
                     _role_repeated(item.exercise, chosen),
                     item.exercise.primary_muscle not in priority_policy.explicit_priorities,
                     usage[item.exercise.id],
@@ -292,7 +325,17 @@ def build_sessions(
             selected = min(
                 rank_exercises(request, options, ruleset, compatibility_levels=comp_levels),
                 key=lambda item: (
-                    item.exercise.primary_muscle not in priority_policy.explicit_priorities,
+                    *coherence.placement_rank(
+                        item.exercise.primary_muscle,
+                        existing_exposure=any(
+                            chosen_item.primary_muscle is item.exercise.primary_muscle
+                            for chosen_item in chosen
+                        ),
+                        user_priority=(
+                            item.exercise.primary_muscle
+                            in priority_policy.explicit_priorities
+                        ),
+                    ),
                     _role_repeated(item.exercise, chosen),
                     usage[item.exercise.id],
                     -item.score,
@@ -366,6 +409,7 @@ def build_sessions(
                     ruleset.strength_role_order[
                         classify_strength_role(item, request, ruleset).role.value
                     ],
+                    coherence.role_rank(item.primary_muscle),
                     item.primary_muscle not in effective_priorities,
                     _order_rank(item.movement_pattern, ruleset),
                 )
@@ -374,6 +418,7 @@ def build_sessions(
             chosen.sort(
                 key=lambda item: (
                     is_supplemental_muscle(item.primary_muscle),
+                    coherence.role_rank(item.primary_muscle),
                     item.primary_muscle not in effective_priorities,
                     _order_rank(item.movement_pattern, ruleset),
                 )
@@ -424,6 +469,11 @@ def build_sessions(
             substitutions[item.id] = decision.exercise_ids
         if capacity < len(slots):
             session_reasons = session_reasons + ("SESSION_TRIMMED_FOR_TIME_LIMIT",)
+        covered_direct_muscles.update(
+            item.primary_muscle
+            for item in chosen
+            if item.primary_muscle is not None and not is_core_or_supplemental_exercise(item)
+        )
         sessions.append(
             SessionDraft(
                 day_index=index + 1,
@@ -705,7 +755,6 @@ def slots_for_focus(focus: str) -> tuple[SlotSpec, ...]:
         return (
             SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), True, MuscleGroup.CHEST),
             SlotSpec(frozenset({MovementPattern.HORIZONTAL_PUSH}), False, MuscleGroup.CHEST),
-            SlotSpec(frozenset({MovementPattern.VERTICAL_PUSH}), False, MuscleGroup.SHOULDERS),
             SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False, MuscleGroup.TRICEPS),
             SlotSpec(frozenset({MovementPattern.ELBOW_EXTENSION}), False, MuscleGroup.TRICEPS),
         )
@@ -768,29 +817,8 @@ def _resolve_focus(
         return focus
     policy = PriorityAllocationPolicy.for_request(request, ruleset)
     priorities = frozenset(policy.explicit_priorities or policy.priorities)
-    if priorities == {MuscleGroup.BICEPS}:
-        return "biceps"
-    if priorities == {MuscleGroup.TRICEPS}:
-        return "triceps"
-    for muscle_group, specialized_focus in (
-        ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
-        ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
-        ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
-        ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
-        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES), "posterior_chain_core"),
-    ):
-        if priorities.intersection(muscle_group):
-            return specialized_focus
     highest_target = max(volume.targets, key=lambda target: target.target_sets).muscle
-    if highest_target in {MuscleGroup.BACK}:
-        return "back_biceps"
-    if highest_target in {MuscleGroup.SHOULDERS}:
-        return "shoulders_traps"
-    if highest_target in {MuscleGroup.QUADRICEPS, MuscleGroup.CALVES}:
-        return "quadriceps_calves"
-    if highest_target in {MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES}:
-        return "posterior_chain_core"
-    return "chest_triceps"
+    return specialization_focus_for_priorities(priorities, highest_target=highest_target)
 
 
 def _order_rank(pattern: MovementPattern, ruleset: ProgramRuleset) -> int:

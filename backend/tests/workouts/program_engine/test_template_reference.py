@@ -288,7 +288,18 @@ def test_safe_core_substitution_can_repeat_across_sessions_deterministically() -
             TemplateReferenceDay(
                 1,
                 "A",
-                (),
+                tuple(
+                    dict.fromkeys(
+                        item.primary_muscle
+                        for item in (
+                            hinge,
+                            by_name["Push Up"],
+                            by_name["Bodyweight Row"],
+                            by_name["Bodyweight Squat"],
+                            by_name["Calf Raise"],
+                        )
+                    )
+                ),
                 (
                     slot(hinge, priority="core"),
                     slot(by_name["Push Up"]),
@@ -300,7 +311,18 @@ def test_safe_core_substitution_can_repeat_across_sessions_deterministically() -
             TemplateReferenceDay(
                 2,
                 "B",
-                (),
+                tuple(
+                    dict.fromkeys(
+                        item.primary_muscle
+                        for item in (
+                            hinge,
+                            by_name["Incline Push Up"],
+                            by_name["Dumbbell Row"],
+                            by_name["Wall Knee Extension"],
+                            by_name["Calf Raise"],
+                        )
+                    )
+                ),
                 (
                     slot(hinge, priority="core"),
                     slot(by_name["Incline Push Up"]),
@@ -409,6 +431,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         "volume_repair",
         "session_duration",
         "recovery_repair",
+        "session_coherence",
         "session_structure",
         "weekly_coverage",
         "substitution_observability",
@@ -424,8 +447,8 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
         if entry["stage"] == "coach_quality"
     )
     assert quality["template_preservation"] == {
-        "satisfied": 6.0,
-        "total": 6.0,
+        "satisfied": 5.0,
+        "total": 5.0,
         "percentage": 100.0,
     }
     selection_trace = result.program.decision_trace[0]
@@ -974,7 +997,7 @@ def test_final_program_caps_30_min_main_slots_without_dropping_core() -> None:
         entry for entry in result.program.decision_trace if entry["stage"] == "template_adaptation"
     )
     assert adaptation["retained_core_slot_count"] == adaptation["core_slot_count"]
-    assert "TEMPLATE_MAIN_COUNT_CAPPED_FOR_DURATION" in adaptation["reason_codes"]
+    assert "TEMPLATE_DIRECT_MUSCLE_OUT_OF_SCOPE" in adaptation["reason_codes"]
     count_policy = get_session_exercise_count_policy(30, RULESET)
     assert all(
         count_policy.contains(main_exercise_count(day.exercises))

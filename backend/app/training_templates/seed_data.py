@@ -193,6 +193,12 @@ RDL = _movement(
     (M.HAMSTRINGS, M.GLUTES),
     P.HIP_HINGE,
 )
+RDL_HAMSTRING_SCOPE = _movement(
+    "romanian-deadlift-hamstring-scope",
+    "fedb-0300-dumbbell-deadlift",
+    (M.HAMSTRINGS,),
+    P.HIP_HINGE,
+)
 SEATED_LEG_CURL = _movement(
     "seated-leg-curl",
     "fedb-0599-lever-seated-leg-curl",
@@ -2599,8 +2605,18 @@ def _three_lower_one_upper(
     return (
         _approved_day("Lower A", "lower", _LOWER_MUSCLES, *lower_a),
         _approved_day("Upper", "upper", _UPPER_MUSCLES, *upper),
-        _approved_day("Lower B", "posterior_chain_core", (M.HAMSTRINGS, M.GLUTES), *lower_b),
-        _approved_day("Lower C", "quadriceps_calves", (M.QUADRICEPS, M.GLUTES), *lower_c),
+        _approved_day(
+            "Lower B",
+            "posterior_chain_core",
+            (M.HAMSTRINGS, M.GLUTES, M.CALVES),
+            *lower_b,
+        ),
+        _approved_day(
+            "Lower C",
+            "lower",
+            (M.QUADRICEPS, M.GLUTES, M.CALVES),
+            *lower_c,
+        ),
     )
 
 
@@ -2631,17 +2647,15 @@ _PUSH_PULL_QUADS_POSTERIOR = (
         (SQUAT, "P"),
         (LEG_PRESS, "P"),
         (LEG_EXTENSION, "I"),
-        (SEATED_LEG_CURL, "S"),
         (CALF_RAISE, "I"),
     ),
     _approved_day(
         "Posterior",
         "posterior_chain_core",
-        (M.HAMSTRINGS, M.GLUTES),
+        (M.HAMSTRINGS, M.GLUTES, M.CALVES),
         (RDL, "P"),
         (LYING_LEG_CURL, "S"),
         (GLUTE_BRIDGE, "P"),
-        (LUNGE, "S"),
         (CALF_RAISE, "I"),
     ),
 )
@@ -3257,7 +3271,7 @@ def _upper_lower_iranian_5d(
         (
             "Chest + Triceps",
             "upper",
-            UPPER_MUSCLES_APPROVED,
+            (M.CHEST, M.TRICEPS),
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(
@@ -3279,7 +3293,7 @@ def _upper_lower_iranian_5d(
         (
             "Shoulders + Biceps",
             "upper",
-            UPPER_MUSCLES_APPROVED,
+            (M.SHOULDERS, M.BICEPS),
             (
                 _approved_slot(
                     SMITH_SHOULDER_PRESS if level is Level.INTERMEDIATE else SHOULDER_PRESS,
@@ -3321,7 +3335,7 @@ def _upper_lower_iranian_5d(
         (
             "Upper Chest + Biceps",
             "upper",
-            UPPER_MUSCLES_APPROVED,
+            (M.CHEST, M.BICEPS),
             (
                 _approved_slot(INCLINE_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(
@@ -3348,7 +3362,7 @@ def _upper_lower_iranian_5d(
         (
             "Back + Core",
             "upper",
-            UPPER_MUSCLES_APPROVED,
+            (M.BACK,),
             (
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(
@@ -3515,7 +3529,7 @@ def _fst7_arms_priority_5d(
         (
             "Chest + Biceps",
             "upper",
-            UPPER_MUSCLES_APPROVED,
+            (M.CHEST, M.BICEPS),
             (
                 _approved_slot(
                     FLAT_PRESS if advanced else DUMBBELL_BENCH_PRESS,
@@ -3541,7 +3555,7 @@ def _fst7_arms_priority_5d(
         (
             "Back + Triceps",
             "upper",
-            UPPER_MUSCLES_APPROVED,
+            (M.BACK, M.TRICEPS),
             (
                 _approved_slot(
                     ROW if advanced else HIGH_ROW, "large_primary", _advanced_rest(level, 120, 150)
@@ -3589,7 +3603,7 @@ def _fst7_arms_priority_5d(
         (
             "Shoulders + Calves",
             "shoulders",
-            SHOULDER_MUSCLES,
+            (*SHOULDER_MUSCLES, M.CALVES),
             (
                 _approved_slot(SMITH_SHOULDER_PRESS, "small_main", _advanced_rest(level, 90, 120)),
                 *(
@@ -3639,7 +3653,7 @@ def _professional_compound_5d(
         (
             "Chest + Triceps",
             "upper",
-            UPPER_MUSCLES_APPROVED,
+            (M.CHEST, M.TRICEPS),
             (
                 _approved_slot(FLAT_PRESS, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(
@@ -3681,7 +3695,7 @@ def _professional_compound_5d(
         (
             "Back + Biceps",
             "upper",
-            UPPER_MUSCLES_APPROVED,
+            (M.BACK, M.BICEPS),
             (
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(ROW, "large_primary", _advanced_rest(level, 120, 150)),
@@ -3779,7 +3793,6 @@ def _ppl_ab_6d(
             (
                 _approved_slot(LAT_PULLDOWN, "large_primary", _advanced_rest(level, 120, 150)),
                 _approved_slot(HIGH_ROW, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(REAR_DELT_FLY, "small_isolation", _advanced_rest(level, 60, 75)),
                 _approved_slot(
                     BARBELL_CURL if advanced else DUMBBELL_CURL,
                     "small_main",
@@ -4093,7 +4106,6 @@ def _fitclub_hybrid_6d(
                 _approved_slot(RDL, "large_primary", 150),
                 _approved_slot(LYING_LEG_CURL, "large_isolation", _advanced_rest(level, 60, 75)),
                 _approved_slot(GLUTE_BRIDGE, "large_primary", _advanced_rest(level, 120, 150)),
-                _approved_slot(LUNGE, "large_compound", 120),
                 _approved_slot(CALF_RAISE, "small_isolation", _advanced_rest(level, 60, 75)),
                 _approved_slot(SIDE_PLANK, "side_plank", 60),
             ),
@@ -5000,7 +5012,7 @@ _BRANDED_4_DAY_PROGRAM_BLUEPRINTS = (
                     _approved_slot(SHOULDER_PRESS, "small_main", 90),
                     _approved_slot(LATERAL_RAISE, "small_isolation", 60),
                     _approved_slot(REAR_DELT_FLY, "small_isolation", 60),
-                    _approved_slot(RDL, "large_primary", 120),
+                    _approved_slot(RDL_HAMSTRING_SCOPE, "large_primary", 120),
                     _approved_slot(LYING_LEG_CURL, "large_isolation", 60),
                 ),
             ),

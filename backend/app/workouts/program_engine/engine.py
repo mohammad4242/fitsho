@@ -60,6 +60,12 @@ from app.workouts.program_engine.schemas import (
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
+from app.workouts.program_engine.session_coherence import (
+    SessionCoherence,
+    SessionCoherenceDecision,
+    SessionMuscleRole,
+    ordered_coherence_decisions,
+)
 from app.workouts.program_engine.session_duration import (
     DurationRepairResult,
     SessionDurationRepairEvidence,
@@ -759,6 +765,8 @@ def _program_for_split(
         volume,
         ruleset,
     )
+    construction_days = days
+    volume_coherence_decisions: list[SessionCoherenceDecision] = []
     days, repair_reasons = repair_weekly_volume(
         days,
         normalized,
@@ -766,6 +774,7 @@ def _program_for_split(
         ruleset,
         candidates=eligible,
         substitution_decisions=substitution_decisions,
+        coherence_decisions=volume_coherence_decisions,
     )
     days_before_duration_repair = days
     duration_repair = repair_session_durations(
@@ -897,6 +906,12 @@ def _program_for_split(
         ),
         **substitution_metrics,
     }
+    coherence_metrics = _session_coherence_metrics(
+        construction_days,
+        days,
+        (*volume_coherence_decisions, *duration_repair.coherence_decisions),
+    )
+    metrics["session_coherence"] = coherence_metrics
     weekly_coverage = assess_weekly_coverage(
         days,
         metrics,
@@ -969,6 +984,10 @@ def _program_for_split(
             "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
             "weekly_direct_sets": dict(direct),
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
+            "coherence_decisions": tuple(
+                decision.as_trace()
+                for decision in ordered_coherence_decisions(volume_coherence_decisions)
+            ),
         },
         _duration_repair_trace(
             session_capacity,
@@ -976,8 +995,10 @@ def _program_for_split(
             days,
             duration_repair_reasons,
             duration_repair.evidence,
+            ordered_coherence_decisions(duration_repair.coherence_decisions),
         ),
         recovery_trace,
+        {"stage": "session_coherence", **coherence_metrics},
         {
             "stage": "session_structure",
             "status": "finalized",
@@ -1080,6 +1101,8 @@ def _reference_program(
         ruleset,
     )
     days = apply_template_intent(days, build, ruleset)
+    construction_days = days
+    volume_coherence_decisions: list[SessionCoherenceDecision] = []
     days, repair_reasons = repair_weekly_volume(
         days,
         normalized,
@@ -1089,6 +1112,7 @@ def _reference_program(
         allow_soft_exercise_additions=False,
         preserve_template_core_structure=True,
         substitution_decisions=substitution_decisions,
+        coherence_decisions=volume_coherence_decisions,
     )
     days_before_duration_repair = days
     duration_repair = repair_session_durations(
@@ -1167,6 +1191,12 @@ def _reference_program(
         ),
         **substitution_metrics,
     }
+    coherence_metrics = _session_coherence_metrics(
+        construction_days,
+        days,
+        (*volume_coherence_decisions, *duration_repair.coherence_decisions),
+    )
+    metrics["session_coherence"] = coherence_metrics
     weekly_coverage = assess_weekly_coverage(
         days,
         metrics,
@@ -1222,6 +1252,10 @@ def _reference_program(
             "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
             "weekly_direct_sets": dict(direct),
             "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
+            "coherence_decisions": tuple(
+                decision.as_trace()
+                for decision in ordered_coherence_decisions(volume_coherence_decisions)
+            ),
         },
         _duration_repair_trace(
             session_capacity,
@@ -1229,8 +1263,10 @@ def _reference_program(
             days,
             duration_repair_reasons,
             duration_repair.evidence,
+            ordered_coherence_decisions(duration_repair.coherence_decisions),
         ),
         recovery_trace,
+        {"stage": "session_coherence", **coherence_metrics},
         {
             "stage": "session_structure",
             "status": "finalized",
@@ -1414,6 +1450,66 @@ def _day_count_errors(actual: int, expected: int, *, stage: str) -> tuple[str, .
     )
 
 
+def _session_coherence_metrics(
+    construction_days: tuple[WorkoutDay, ...],
+    final_days: tuple[WorkoutDay, ...],
+    decisions: tuple[SessionCoherenceDecision, ...],
+) -> dict[str, object]:
+    initial_by_index = {day.day_index: day for day in construction_days}
+    sessions: list[dict[str, object]] = []
+    new_group_count = 0
+    out_of_scope_new_count = 0
+    orphan_count = 0
+    single_non_primary_count = 0
+    for day in final_days:
+        policy = SessionCoherence.from_workout_day(day)
+        audit = policy.audit(day)
+        direct_counts = audit["direct_exercise_counts"]
+        assert isinstance(direct_counts, dict)
+        initial = initial_by_index.get(day.day_index)
+        initial_audit = policy.audit(initial) if initial is not None else {"direct_groups": ()}
+        initial_groups = set(initial_audit["direct_groups"])
+        final_groups = set(audit["direct_groups"])
+        new_groups = sorted(final_groups - initial_groups)
+        out_of_scope_new = sorted(
+            muscle for muscle in new_groups if muscle in audit["orphan_direct_exposures"]
+        )
+        single_non_primary = sorted(
+            muscle.value
+            for muscle in policy.allowed_direct_muscles
+            if policy.role_for(muscle) is not SessionMuscleRole.PRIMARY
+            and direct_counts.get(muscle.value) == 1
+        )
+        new_group_count += len(new_groups)
+        out_of_scope_new_count += len(out_of_scope_new)
+        orphan_count += len(audit["orphan_direct_exposures"])
+        single_non_primary_count += len(single_non_primary)
+        sessions.append(
+            {
+                "day_index": day.day_index,
+                **policy.trace(),
+                **audit,
+                "post_construction_new_direct_muscles": new_groups,
+                "post_construction_out_of_scope_direct_muscles": out_of_scope_new,
+                "single_non_primary_direct_exposures": single_non_primary,
+            }
+        )
+    rejected = tuple(
+        decision.as_trace()
+        for decision in ordered_coherence_decisions(decisions)
+        if decision.status == "rejected"
+    )
+    return {
+        "sessions": tuple(sessions),
+        "post_construction_new_direct_muscle_groups": new_group_count,
+        "post_construction_out_of_scope_direct_muscle_additions": out_of_scope_new_count,
+        "orphan_direct_exposure_count": orphan_count,
+        "single_non_primary_direct_exposure_count": single_non_primary_count,
+        "exercise_counts_per_session": tuple(len(day.exercises) for day in final_days),
+        "disallowed_attempted_additions": rejected,
+    }
+
+
 def _attach_coach_quality_metrics(
     program: WorkoutProgram,
     request: ProgramGenerationRequest,
@@ -1527,6 +1623,7 @@ def _duration_repair_trace(
     after: tuple[WorkoutDay, ...],
     reason_codes: tuple[str, ...],
     evidence: tuple[SessionDurationRepairEvidence, ...],
+    coherence_decisions: tuple[SessionCoherenceDecision, ...],
 ) -> dict[str, object]:
     repair_applied = "SESSION_DURATION_REPAIR_APPLIED" in reason_codes
     duration_deltas = tuple(
@@ -1587,6 +1684,9 @@ def _duration_repair_trace(
         "unavoidable_duration_constraints": unavoidable_constraints,
         "reason_codes": reason_codes,
         "per_session_evidence": tuple(item.as_trace() for item in evidence),
+        "coherence_decisions": tuple(
+            decision.as_trace() for decision in ordered_coherence_decisions(coherence_decisions)
+        ),
     }
 
 
@@ -1678,6 +1778,9 @@ def _certify_duration_repair(
         days=certified.days,
         reasons=tuple(dict.fromkeys((*original.reasons, *certified.reasons))),
         evidence=certified.evidence,
+        coherence_decisions=tuple(
+            dict.fromkeys((*original.coherence_decisions, *certified.coherence_decisions))
+        ),
     )
 
 

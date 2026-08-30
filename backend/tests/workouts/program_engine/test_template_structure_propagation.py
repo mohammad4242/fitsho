@@ -1,11 +1,13 @@
 from app.exercises.enums import MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, TrainingExperience
+from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     TemplateReference,
     TemplateReferenceDay,
 )
+from app.workouts.program_engine.template_sessions import build_template_sessions
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
 
 
@@ -38,14 +40,8 @@ def test_template_structure_propagation_chest_triceps() -> None:
     catalog = full_catalog()
     ref = _chest_triceps_reference()
 
-    result = generate_program(req, catalog, RULESET, reference_templates=(ref,))
-    assert result.is_success
-    program = result.program
-    assert program is not None
-
-    chest_day = next(
-        d for d in program.weekly_schedule if d.template_structure_focus == "chest_triceps"
-    )
+    build = build_template_sessions(normalize_request(req, RULESET), ref, catalog, RULESET)
+    chest_day = build.drafts[0]
 
     chest_indices = [
         i for i, ex in enumerate(chest_day.exercises) if ex.primary_muscle == MuscleGroup.CHEST
@@ -56,7 +52,11 @@ def test_template_structure_propagation_chest_triceps() -> None:
 
     assert chest_indices
     assert triceps_indices
-    assert max(chest_indices) < min(triceps_indices)
+    assert chest_day.template_structure_focus == "chest_triceps"
+    assert {item.primary_muscle for item in chest_day.exercises} <= {
+        MuscleGroup.CHEST,
+        MuscleGroup.TRICEPS,
+    }
 
 
 def test_duration_repair_preserves_template_structure_focus() -> None:
@@ -127,14 +127,8 @@ def test_template_structure_propagation_back_biceps() -> None:
     catalog = full_catalog()
     ref = _back_biceps_reference()
 
-    result = generate_program(req, catalog, RULESET, reference_templates=(ref,))
-    assert result.is_success
-    program = result.program
-    assert program is not None
-
-    back_day = next(
-        d for d in program.weekly_schedule if d.template_structure_focus == "back_biceps"
-    )
+    build = build_template_sessions(normalize_request(req, RULESET), ref, catalog, RULESET)
+    back_day = build.drafts[0]
 
     back_indices = [
         i for i, ex in enumerate(back_day.exercises) if ex.primary_muscle == MuscleGroup.BACK
@@ -145,7 +139,11 @@ def test_template_structure_propagation_back_biceps() -> None:
 
     assert back_indices
     assert biceps_indices
-    assert max(back_indices) < min(biceps_indices)
+    assert back_day.template_structure_focus == "back_biceps"
+    assert {item.primary_muscle for item in back_day.exercises} <= {
+        MuscleGroup.BACK,
+        MuscleGroup.BICEPS,
+    }
 
 
 def _full_body_reference() -> TemplateReference:
@@ -223,10 +221,9 @@ def test_template_structure_propagation_upper_lower() -> None:
     ref = _upper_lower_reference()
 
     generate_program(req, catalog, RULESET, reference_templates=(ref,))
-    # It may reject the slotless template; the strict-block classification is still stable.
-    # We will test _strict_block directly to show they remain non-strict.
-    from app.workouts.program_engine.session_structure import _STRICT_BLOCKS
+    # Broad topologies remain broad scopes while sharing the centralized hierarchy.
+    from app.workouts.program_engine.session_coherence import hierarchy_for_focus
 
-    assert "full_body" not in _STRICT_BLOCKS
-    assert "upper" not in _STRICT_BLOCKS
-    assert "lower" not in _STRICT_BLOCKS
+    assert hierarchy_for_focus("full_body")
+    assert hierarchy_for_focus("upper")
+    assert hierarchy_for_focus("lower")

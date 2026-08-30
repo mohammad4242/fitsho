@@ -21,14 +21,14 @@ VALID_FOCUSES = {
 
 
 STRICT_FOCUS_MUSCLES = {
-    "chest_triceps": {MuscleGroup.CHEST, MuscleGroup.TRICEPS, MuscleGroup.SHOULDERS},
-    "back_biceps": {MuscleGroup.BACK, MuscleGroup.BICEPS, MuscleGroup.SHOULDERS, MuscleGroup.TRAPS},
+    "chest_triceps": {MuscleGroup.CHEST, MuscleGroup.TRICEPS},
+    "back_biceps": {MuscleGroup.BACK, MuscleGroup.BICEPS},
     "shoulders_traps": {MuscleGroup.SHOULDERS, MuscleGroup.TRAPS},
-    "quadriceps_calves": {MuscleGroup.QUADRICEPS, MuscleGroup.CALVES, MuscleGroup.GLUTES},
+    "quadriceps_calves": {MuscleGroup.QUADRICEPS, MuscleGroup.CALVES},
     "posterior_chain_core": {
         MuscleGroup.HAMSTRINGS,
         MuscleGroup.GLUTES,
-        MuscleGroup.BACK,
+        MuscleGroup.CALVES,
         MuscleGroup.ABS,
     },
     "push": {MuscleGroup.CHEST, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS},

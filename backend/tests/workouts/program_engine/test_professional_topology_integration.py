@@ -65,7 +65,7 @@ def _reference(
             TemplateReferenceDay(
                 1,
                 "Chest",
-                (MuscleGroup.CHEST,),
+                (MuscleGroup.CHEST, MuscleGroup.SHOULDERS, MuscleGroup.TRICEPS),
                 (
                     _slot(MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
                     _slot(
@@ -83,7 +83,7 @@ def _reference(
             TemplateReferenceDay(
                 2,
                 "Back",
-                (MuscleGroup.BACK,),
+                (MuscleGroup.BACK, MuscleGroup.BICEPS),
                 (
                     _slot(MovementPattern.HORIZONTAL_PULL, MuscleGroup.BACK),
                     _slot(
@@ -101,7 +101,7 @@ def _reference(
             TemplateReferenceDay(
                 3,
                 "Lower",
-                (MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS),
+                (MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS, MuscleGroup.CALVES),
                 (
                     _slot(MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
                     _slot(MovementPattern.HIP_HINGE, MuscleGroup.HAMSTRINGS),
@@ -115,7 +115,7 @@ def _reference(
             TemplateReferenceDay(
                 4,
                 "Shoulders",
-                (MuscleGroup.SHOULDERS,),
+                (MuscleGroup.SHOULDERS, MuscleGroup.TRAPS),
                 (
                     _slot(MovementPattern.VERTICAL_PUSH, MuscleGroup.SHOULDERS),
                     _slot(

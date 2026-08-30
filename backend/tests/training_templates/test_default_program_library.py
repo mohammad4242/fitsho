@@ -891,7 +891,6 @@ EXPECTED_PROGRAMS = {
                 movement("back_squat", "P"),
                 movement("leg_press", "P"),
                 movement("leg_extension", "I"),
-                movement("leg_curl_seated", "S"),
                 movement("calf", "I"),
             ),
             day(
@@ -899,7 +898,6 @@ EXPECTED_PROGRAMS = {
                 movement("deadlift", "P"),
                 movement("leg_curl_lying", "S"),
                 movement("bridge", "P"),
-                movement("lunge", "S"),
                 movement("calf", "I"),
             ),
         ),
@@ -928,7 +926,6 @@ EXPECTED_PROGRAMS = {
                 movement("back_squat", "P"),
                 movement("leg_press", "P"),
                 movement("leg_extension", "I"),
-                movement("leg_curl_seated", "S"),
                 movement("calf", "I"),
             ),
             day(
@@ -936,7 +933,6 @@ EXPECTED_PROGRAMS = {
                 movement("deadlift", "P"),
                 movement("leg_curl_lying", "S"),
                 movement("bridge", "P"),
-                movement("lunge", "S"),
                 movement("calf", "I"),
             ),
         ),

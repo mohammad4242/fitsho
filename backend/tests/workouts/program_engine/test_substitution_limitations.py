@@ -332,7 +332,13 @@ def test_template_builder_keeps_simultaneous_constraint_replacements_safe() -> N
     day = TemplateReferenceDay(
         day_number=1,
         title="Safe full body",
-        focus=(MuscleGroup.CHEST, MuscleGroup.BACK, MuscleGroup.QUADRICEPS),
+        focus=(
+            MuscleGroup.CHEST,
+            MuscleGroup.BACK,
+            MuscleGroup.QUADRICEPS,
+            MuscleGroup.HAMSTRINGS,
+            MuscleGroup.SHOULDERS,
+        ),
         slots=tuple(
             TemplateReferenceSlot(
                 exercise_id=target.id if pattern is patterns[0][0] else None,

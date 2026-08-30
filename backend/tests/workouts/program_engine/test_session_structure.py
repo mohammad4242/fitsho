@@ -322,6 +322,48 @@ def test_strength_primary_lift_stays_first() -> None:
     assert finalized.exercises[0].exercise_name == "Primary Bench"
 
 
+def test_upper_hierarchy_places_shoulders_after_chest_and_back() -> None:
+    chest = _programmed(
+        "Chest Fly",
+        MuscleGroup.CHEST,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        order=1,
+    )
+    back = _programmed(
+        "Row",
+        MuscleGroup.BACK,
+        ExerciseType.COMPOUND,
+        pattern=MovementPattern.HORIZONTAL_PULL,
+        order=2,
+    )
+    shoulders = _programmed(
+        "Shoulder Press",
+        MuscleGroup.SHOULDERS,
+        ExerciseType.COMPOUND,
+        pattern=MovementPattern.VERTICAL_PUSH,
+        order=3,
+    )
+    curl = _programmed(
+        "Curl",
+        MuscleGroup.BICEPS,
+        ExerciseType.ISOLATION,
+        pattern=MovementPattern.ELBOW_FLEXION,
+        order=4,
+    )
+
+    finalized = finalize_session_structure(
+        (_day("upper", (shoulders, curl, chest, back)),),
+        _normalized(),
+        RULESET,
+    )[0]
+
+    muscles = [item.primary_muscle for item in finalized.exercises]
+    assert set(muscles[:2]) == {MuscleGroup.CHEST, MuscleGroup.BACK}
+    assert muscles[2] is MuscleGroup.SHOULDERS
+    assert muscles[3] is MuscleGroup.BICEPS
+
+
 def test_working_bodyweight_push_is_in_first_two_main_exercises() -> None:
     push_up = _programmed(
         "Working Push",
@@ -979,7 +1021,7 @@ def test_template_muscle_blocks_must_use_structure_focus() -> None:
     assert finalized.exercises[0].exercise_name == "Fly"
     assert finalized.exercises[1].exercise_name == "Extension"
 
-    # 2) Full Body with CHEST + TRICEPS does NOT
+    # 2) Full Body remains broad while still honoring its major-before-accessory hierarchy.
     day_full_body = replace(
         day,
         template_structure_focus="full_body",
@@ -987,9 +1029,8 @@ def test_template_muscle_blocks_must_use_structure_focus() -> None:
         title="Full Body",
     )
     finalized_fb = finalize_session_structure((day_full_body,), normalized, RULESET)[0]
-    # Without strict block, they maintain original order: triceps first, chest second
-    assert finalized_fb.exercises[0].exercise_name == "Extension"
-    assert finalized_fb.exercises[1].exercise_name == "Fly"
+    assert finalized_fb.exercises[0].exercise_name == "Fly"
+    assert finalized_fb.exercises[1].exercise_name == "Extension"
 
     # 3) Full Body with HAMSTRINGS + GLUTES does NOT
     hamstrings = _programmed(

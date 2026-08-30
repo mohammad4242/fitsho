@@ -232,7 +232,14 @@ def test_template_retains_core_candidate_with_non_core_slot_metadata() -> None:
         supported_levels=(normalized.source.training_experience.value,),
         focus_tags=("full_body",),
         intensity_methods=("standard",),
-        days=(TemplateReferenceDay(1, "Short", (MuscleGroup.CHEST,), slots),),
+        days=(
+            TemplateReferenceDay(
+                1,
+                "Short",
+                tuple(dict.fromkeys(item.primary_muscle for item in (*main, core))),
+                slots,
+            ),
+        ),
     )
 
     build = build_template_sessions(normalized, template, catalog, RULESET)

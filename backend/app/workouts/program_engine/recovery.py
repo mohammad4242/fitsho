@@ -19,10 +19,11 @@ from app.workouts.program_engine.schemas import (
     SplitPlan,
     WorkoutDay,
 )
-from app.workouts.program_engine.slot_compatibility import focus_scope
+from app.workouts.program_engine.session_coherence import SessionCoherence
 from app.workouts.program_engine.supplemental_policy import (
     is_supplemental_muscle,
     main_exercise_count,
+    supplemental_muscle_fits_focus,
 )
 from app.workouts.program_engine.volume_policy import session_hard_volume_cap
 
@@ -420,12 +421,12 @@ def repair_recovery_accessory_distribution(
 
 
 def _recipient_supports_muscle(day: WorkoutDay, muscle: MuscleGroup) -> bool:
-    if day.template_target_muscles:
-        return muscle in day.template_target_muscles
-    _, semantic_muscles = focus_scope(day.focus)
-    if semantic_muscles is not None:
-        return muscle in semantic_muscles
-    return any(item.primary_muscle is muscle for item in day.exercises)
+    if is_supplemental_muscle(muscle):
+        return supplemental_muscle_fits_focus(
+            muscle,
+            day.template_structure_focus if day.template_target_muscles else day.focus,
+        )
+    return SessionCoherence.from_workout_day(day).allows_direct(muscle)
 
 
 def _within_session_hard_volume(

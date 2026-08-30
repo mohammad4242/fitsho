@@ -31,6 +31,12 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
 )
 from app.workouts.program_engine.session_builder import exercise_fits_focus
+from app.workouts.program_engine.session_coherence import (
+    SessionCoherence,
+    SessionCoherenceDecision,
+    SessionMuscleRole,
+    record_coherence_decision,
+)
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import (
     STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,
@@ -79,6 +85,7 @@ def repair_weekly_volume(
     allow_soft_exercise_additions: bool = True,
     preserve_template_core_structure: bool = False,
     substitution_decisions: list[SubstitutionDecision] | None = None,
+    coherence_decisions: list[SessionCoherenceDecision] | None = None,
 ) -> tuple[tuple[WorkoutDay, ...], tuple[str, ...]]:
     """Keep effective volume inside targets and hard caps before validation.
 
@@ -230,6 +237,7 @@ def repair_weekly_volume(
         if repairing_hard_minimum and hard_direct_under:
             redistribution = _select_set_redistribution(
                 repaired,
+                days,
                 hard_direct_under,
                 targets,
                 request,
@@ -264,6 +272,20 @@ def repair_weekly_volume(
                     + ("VOLUME_REPAIR_REDISTRIBUTED_SET_FROM_SURPLUS",),
                 )
                 reasons.append("VOLUME_REPAIR_REDISTRIBUTED_SET_FOR_MINIMUM_COVERAGE")
+                muscle = recipient.primary_muscle
+                assert muscle is not None
+                coherence = SessionCoherence.from_workout_day(days[day_index])
+                record_coherence_decision(
+                    coherence_decisions,
+                    SessionCoherenceDecision(
+                        stage="volume_repair",
+                        muscle_requested=muscle,
+                        candidate_day=days[day_index].day_index,
+                        candidate_day_role=coherence.role_for(muscle),
+                        status="accepted",
+                        reason="VOLUME_REPAIR_EXISTING_FOCUS_PREFERRED",
+                    ),
+                )
                 continue
         exercise_addition = _select_exercise_addition(
             repaired,
@@ -275,6 +297,7 @@ def repair_weekly_volume(
             targets,
             ruleset,
             use_hard_maximums=repairing_hard_minimum,
+            coherence_decisions=coherence_decisions,
         )
         if (
             exercise_addition is None
@@ -291,11 +314,32 @@ def repair_weekly_volume(
                 targets,
                 ruleset,
                 use_hard_maximums=False,
+                coherence_decisions=coherence_decisions,
             )
         if exercise_addition is not None:
             day_index, programmed, substitution_decision = exercise_addition
             if substitution_decisions is not None:
                 substitution_decisions.append(substitution_decision)
+            muscle = programmed.primary_muscle
+            assert muscle is not None
+            coherence = SessionCoherence.from_workout_day(days[day_index])
+            record_coherence_decision(
+                coherence_decisions,
+                SessionCoherenceDecision(
+                    stage="volume_repair",
+                    muscle_requested=muscle,
+                    candidate_day=days[day_index].day_index,
+                    candidate_day_role=coherence.role_for(muscle),
+                    status="accepted",
+                    reason=_volume_coherence_reason(
+                        coherence,
+                        muscle,
+                        existing=any(
+                            item.primary_muscle is muscle for item in repaired[day_index]
+                        ),
+                    ),
+                ),
+            )
             if (
                 programmed.primary_muscle in priority_policy.priorities
                 and request.primary_goal is not Goal.STRENGTH
@@ -309,6 +353,7 @@ def repair_weekly_volume(
             continue
         addition = _select_addition_candidate(
             repaired,
+            days,
             hard_direct_under if repairing_hard_minimum else direct_under,
             hard_effective_under if repairing_hard_minimum else effective_under,
             direct,
@@ -321,6 +366,7 @@ def repair_weekly_volume(
             if repairing_hard_minimum:
                 soft_addition = _select_addition_candidate(
                     repaired,
+                    days,
                     direct_under,
                     effective_under,
                     direct,
@@ -343,6 +389,11 @@ def repair_weekly_volume(
                         reason_codes=exercise.reason_codes + (reason,),
                     )
                     reasons.append(reason)
+                    _record_volume_set_decision(
+                        coherence_decisions,
+                        days[day_index],
+                        exercise,
+                    )
                     continue
             reasons.append(
                 "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED"
@@ -363,6 +414,11 @@ def repair_weekly_volume(
             reason_codes=exercise.reason_codes + (reason,),
         )
         reasons.append(reason)
+        _record_volume_set_decision(
+            coherence_decisions,
+            days[day_index],
+            exercise,
+        )
         if exercise.primary_muscle in priority_policy.priorities:
             reasons.append("PRIORITY_VOLUME_REDISTRIBUTED")
 
@@ -371,6 +427,7 @@ def repair_weekly_volume(
 
 def _select_set_redistribution(
     days: list[list[ProgrammedExercise]],
+    originals: tuple[WorkoutDay, ...],
     hard_direct_under: set[MuscleGroup],
     targets: dict[MuscleGroup, VolumeTarget],
     request: NormalizedProgramRequest,
@@ -381,8 +438,9 @@ def _select_set_redistribution(
     )
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     direct = _direct_sets(days)
-    options: list[tuple[int, int, int, int, str, str]] = []
-    for day_index, exercises in enumerate(days):
+    options: list[tuple[int, int, int, int, int, str, str]] = []
+    for day_index, (exercises, original) in enumerate(zip(days, originals, strict=True)):
+        coherence = SessionCoherence.from_workout_day(original)
         direct_by_session = _direct_sets([exercises])
         for recipient_index, recipient in enumerate(exercises):
             recipient_muscle = recipient.primary_muscle
@@ -454,6 +512,7 @@ def _select_set_redistribution(
                     continue
                 options.append(
                     (
+                        coherence.role_rank(recipient_muscle),
                         priority_policy.preservation_rank(donor_muscle),
                         day_index,
                         recipient_index,
@@ -465,7 +524,7 @@ def _select_set_redistribution(
     if not options:
         return None
     selected = min(options)
-    return selected[1], selected[2], selected[3]
+    return selected[2], selected[3], selected[4]
 
 
 def _select_exercise_addition(
@@ -479,6 +538,7 @@ def _select_exercise_addition(
     ruleset: ProgramRuleset,
     *,
     use_hard_maximums: bool,
+    coherence_decisions: list[SessionCoherenceDecision] | None = None,
 ) -> tuple[int, ProgrammedExercise, SubstitutionDecision] | None:
     needed = direct_under | effective_under
     if not needed or not candidates:
@@ -523,11 +583,6 @@ def _select_exercise_addition(
             )
         for ranked in rank_exercises(request, muscle_candidates, ruleset, needed_muscle=muscle):
             candidate = ranked.exercise
-            template_has_target_day = any(
-                candidate.primary_muscle in original.template_target_muscles
-                for original in originals
-                if original.focus.startswith("template_reference")
-            )
             repeated_exercise = candidate.id in selected_ids
             required_sets = (
                 targets[muscle].minimum_direct_sets - current_direct_sets.get(muscle.value, 0)
@@ -567,6 +622,7 @@ def _select_exercise_addition(
             )
             estimated = estimate_exercise_minutes(sets, prescription.rest_seconds, 0, ruleset)
             for day_index, (day, original) in enumerate(zip(days, originals, strict=True)):
+                coherence = SessionCoherence.from_workout_day(original)
                 if (
                     is_main_resistance_exercise(candidate)
                     and main_exercise_count(day) >= main_ceiling
@@ -576,15 +632,21 @@ def _select_exercise_addition(
                     continue
                 if has_near_equivalent(candidate, day):
                     continue
+                if not coherence.allows_direct(candidate.primary_muscle):
+                    record_coherence_decision(
+                        coherence_decisions,
+                        SessionCoherenceDecision(
+                            stage="volume_repair",
+                            muscle_requested=muscle,
+                            candidate_day=original.day_index,
+                            candidate_day_role=SessionMuscleRole.DISALLOWED,
+                            status="rejected",
+                            reason="VOLUME_REPAIR_NEW_EXPOSURE_PROHIBITED",
+                        ),
+                    )
+                    continue
                 if original.focus.startswith("template_reference"):
-                    if (
-                        template_has_target_day
-                        and candidate.primary_muscle not in original.template_target_muscles
-                        and not (
-                            use_hard_maximums
-                            and candidate.primary_muscle in priority_policy.explicit_priorities
-                        )
-                    ):
+                    if candidate.primary_muscle not in original.template_target_muscles:
                         continue
                 elif not exercise_fits_focus(candidate, original.focus):
                     continue
@@ -620,6 +682,11 @@ def _select_exercise_addition(
                 reasons = [
                     *ranked.reason_codes,
                     "VOLUME_REPAIR_ADDED_EXERCISE_FOR_MINIMUM_COVERAGE",
+                    _volume_coherence_reason(
+                        coherence,
+                        muscle,
+                        existing=bool(direct_by_session[muscle]),
+                    ),
                 ]
                 if role_repeated:
                     reasons.append("DELIBERATE_REDUNDANCY_FOR_MINIMUM_COVERAGE")
@@ -709,6 +776,11 @@ def _select_exercise_addition(
                     (
                         (
                             0 if muscle in direct_under else 1,
+                            *coherence.placement_rank(
+                                muscle,
+                                existing_exposure=bool(direct_by_session[muscle]),
+                                user_priority=muscle in priority_policy.priorities,
+                            ),
                             0 if muscle in priority_policy.priorities else 1,
                             1 if exceeds_frequency else 0,
                             *priority_policy.day_priority_key(
@@ -947,6 +1019,7 @@ def _is_last_hard_movement_role(
 
 def _select_addition_candidate(
     days: list[list[ProgrammedExercise]],
+    originals: tuple[WorkoutDay, ...],
     direct_under: set[MuscleGroup],
     effective_under: set[MuscleGroup],
     weekly_direct: Counter[str],
@@ -970,7 +1043,12 @@ def _select_addition_candidate(
     )
     current_effective_sets = current_effective.effective_sets_by_muscle
     current_direct_sets = current_effective.direct_sets_by_muscle
+    day_contexts = tuple(
+        replace(original, exercises=tuple(exercises))
+        for original, exercises in zip(originals, days, strict=True)
+    )
     for day_index, exercises in enumerate(days):
+        coherence = SessionCoherence.from_workout_day(originals[day_index])
         direct_by_session = _direct_sets([exercises])
         for exercise_index, exercise in enumerate(exercises):
             if exercise.primary_muscle is None:
@@ -1050,14 +1128,24 @@ def _select_addition_candidate(
                 if direct_needs
                 else "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET"
             )
+            coherence_reason = _volume_coherence_reason(
+                coherence,
+                primary,
+                existing=True,
+            )
             candidates.append(
                 (
                     (
                         0 if direct_needs else 1,
                         0 if primary in effective_under else 1,
+                        *coherence.placement_rank(
+                            primary,
+                            existing_exposure=True,
+                            user_priority=primary in priority_policy.priorities,
+                        ),
                         0 if primary in priority_policy.priorities else 1,
                         *priority_policy.day_priority_key(
-                            days,
+                            day_contexts,
                             primary,
                             day_index,
                             preferred_frequency=priority_policy.useful_frequency(
@@ -1076,12 +1164,52 @@ def _select_addition_candidate(
                     exercise_index,
                     exercise,
                     reason,
+                    coherence_reason,
                 )
             )
     if not candidates:
         return None
     selected = min(candidates, key=lambda candidate: candidate[0])
-    return selected[1], selected[2], selected[3], selected[4]
+    selected_exercise = replace(
+        selected[3],
+        reason_codes=tuple(dict.fromkeys((*selected[3].reason_codes, selected[5]))),
+    )
+    return selected[1], selected[2], selected_exercise, selected[4]
+
+
+def _volume_coherence_reason(
+    coherence: SessionCoherence,
+    muscle: MuscleGroup,
+    *,
+    existing: bool,
+) -> str:
+    if existing:
+        return "VOLUME_REPAIR_EXISTING_FOCUS_PREFERRED"
+    if coherence.role_for(muscle) is SessionMuscleRole.PRIMARY:
+        return "SESSION_PRIMARY_MUSCLE_PREFERRED"
+    return "SESSION_GROUPED_MUSCLE_FALLBACK"
+
+
+def _record_volume_set_decision(
+    decisions: list[SessionCoherenceDecision] | None,
+    day: WorkoutDay,
+    exercise: ProgrammedExercise,
+) -> None:
+    muscle = exercise.primary_muscle
+    if muscle is None:
+        return
+    coherence = SessionCoherence.from_workout_day(day)
+    record_coherence_decision(
+        decisions,
+        SessionCoherenceDecision(
+            stage="volume_repair",
+            muscle_requested=muscle,
+            candidate_day=day.day_index,
+            candidate_day_role=coherence.role_for(muscle),
+            status="accepted",
+            reason="VOLUME_REPAIR_EXISTING_FOCUS_PREFERRED",
+        ),
+    )
 
 
 def _direct_sets(days: list[list[ProgrammedExercise]]) -> Counter[MuscleGroup]:

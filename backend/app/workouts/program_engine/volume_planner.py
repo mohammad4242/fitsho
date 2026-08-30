@@ -16,6 +16,10 @@ from app.workouts.program_engine.schemas import (
     VolumeTarget,
     WeeklyVolumePlan,
 )
+from app.workouts.program_engine.session_coherence import (
+    SessionCoherence,
+    specialization_focus_for_priorities,
+)
 from app.workouts.program_engine.supplemental_policy import SUPPLEMENTAL_MUSCLES
 from app.workouts.program_engine.volume_history import (
     PreviousVolumeBaseline,
@@ -425,38 +429,13 @@ def _direct_exposure_counts(
 ) -> Counter[MuscleGroup]:
     if split.split_type is not SplitType.BODY_PART_ROTATION:
         return Counter()
-    by_focus = {
-        "chest_triceps": (MuscleGroup.CHEST, MuscleGroup.TRICEPS),
-        "back_biceps": (MuscleGroup.BACK, MuscleGroup.BICEPS),
-        "shoulders_traps": (MuscleGroup.SHOULDERS, MuscleGroup.TRAPS),
-        "legs": (
-            MuscleGroup.QUADRICEPS,
-            MuscleGroup.HAMSTRINGS,
-            MuscleGroup.GLUTES,
-            MuscleGroup.CALVES,
-        ),
-        "quadriceps_calves": (MuscleGroup.QUADRICEPS, MuscleGroup.CALVES),
-        "posterior_chain_core": (
-            MuscleGroup.HAMSTRINGS,
-            MuscleGroup.GLUTES,
-        ),
-    }
     counts: Counter[MuscleGroup] = Counter()
     for focus in split.day_focuses:
         if focus == "specialization":
-            focus = _specialization_focus(priorities)
-        counts.update(by_focus[focus])
+            focus = specialization_focus_for_priorities(priorities)
+        counts.update(SessionCoherence.from_dynamic_focus(focus).allowed_direct_muscles)
     return counts
 
 
 def _specialization_focus(priorities: frozenset[MuscleGroup]) -> str:
-    for muscle_groups, focus in (
-        ((MuscleGroup.CHEST, MuscleGroup.TRICEPS), "chest_triceps"),
-        ((MuscleGroup.BACK, MuscleGroup.BICEPS), "back_biceps"),
-        ((MuscleGroup.SHOULDERS, MuscleGroup.TRAPS), "shoulders_traps"),
-        ((MuscleGroup.QUADRICEPS, MuscleGroup.CALVES), "quadriceps_calves"),
-        ((MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES), "posterior_chain_core"),
-    ):
-        if priorities.intersection(muscle_groups):
-            return focus
-    return "chest_triceps"
+    return specialization_focus_for_priorities(priorities)

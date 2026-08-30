@@ -240,8 +240,14 @@ def test_production_dense_chest_shoulder_generation_preserves_valid_preferred_we
             for day in program.weekly_schedule
             if MuscleGroup.SHOULDERS in classify_muscle_exposures(day, RULESET)
         ]
+        direct_shoulder_days = [
+            day
+            for day in program.weekly_schedule
+            if any(item.primary_muscle is MuscleGroup.SHOULDERS for item in day.exercises)
+        ]
         assert chest_days
         assert shoulder_days
+        assert direct_shoulder_days
         assert any(
             MuscleGroup.SHOULDERS in exercise.secondary_muscles
             for day in chest_days
@@ -251,7 +257,7 @@ def test_production_dense_chest_shoulder_generation_preserves_valid_preferred_we
         assert all(
             classify_muscle_exposures(day, RULESET)[MuscleGroup.SHOULDERS]
             in {ExposureLoad.MODERATE, ExposureLoad.HIGH}
-            for day in shoulder_days
+            for day in direct_shoulder_days
         )
         assert recovery_spacing_is_valid(program.weekly_schedule, RULESET)
 

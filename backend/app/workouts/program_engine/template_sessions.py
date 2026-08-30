@@ -23,6 +23,7 @@ from app.workouts.program_engine.schemas import (
     TemplateReferenceSlot,
     WorkoutDay,
 )
+from app.workouts.program_engine.session_coherence import SessionCoherence
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     template_slot_allowed_patterns,
@@ -121,6 +122,7 @@ def build_template_sessions(
         request.source.session_duration_minutes, ruleset
     )
     for index, reference_day in enumerate(template.days, start=1):
+        coherence = SessionCoherence.from_template_reference_day(reference_day)
         required_slot_count = sum(
             slot.adaptation_priority == "core" for slot in reference_day.slots
         )
@@ -304,6 +306,17 @@ def build_template_sessions(
                 else:
                     build_reasons.append("TEMPLATE_OPTIONAL_SLOT_OMITTED_UNAVAILABLE")
                     continue
+            if (
+                not is_core_or_supplemental_exercise(candidate)
+                and not coherence.allows_direct(candidate.primary_muscle)
+            ):
+                build_reasons.append("TEMPLATE_DIRECT_MUSCLE_OUT_OF_SCOPE")
+                if slot.adaptation_priority == "core":
+                    raise TemplateConstructionError(
+                        "TEMPLATE_CORE_SLOT_OUT_OF_SCOPE",
+                        f"TEMPLATE_DAY:{index}",
+                    )
+                continue
             semantic_duplicate = has_near_equivalent(
                 candidate,
                 (selected_candidate for selected_candidate, _selected_slot in selected),
@@ -671,6 +684,11 @@ def _level_appropriate_template_candidate(
     reserved: Counter[UUID],
     ruleset: ProgramRuleset,
 ) -> ExerciseCandidate:
+    # Core/supplemental template slots are anatomical or accessory work, not
+    # main-resistance opportunities. Preserve the explicit candidate even when
+    # level adaptation would otherwise prefer a higher-ranked main exercise.
+    if is_core_or_supplemental_exercise(original):
+        return original
     if (
         request.source.training_experience is TrainingExperience.INTERMEDIATE
         and not original.equipment.intersection({Equipment.MACHINE, Equipment.CABLE})
@@ -749,10 +767,7 @@ def _complementary_template_candidate(
     ruleset: ProgramRuleset,
 ) -> ExerciseCandidate | None:
     focus = set(reference_day.focus)
-    if focus.intersection({MuscleGroup.CHEST, MuscleGroup.TRICEPS}):
-        focus.add(MuscleGroup.SHOULDERS)
-    if focus.intersection({MuscleGroup.BACK, MuscleGroup.BICEPS}):
-        focus.update({MuscleGroup.SHOULDERS, MuscleGroup.TRAPS})
+    coherence = SessionCoherence.from_template_reference_day(reference_day)
     options = [
         item
         for item in eligible
@@ -773,7 +788,21 @@ def _complementary_template_candidate(
     ]
     if not options:
         return None
-    return rank_exercises(request, options, ruleset)[0].exercise
+    ranked = rank_exercises(request, options, ruleset)
+    return min(
+        ranked,
+        key=lambda item: (
+            *coherence.placement_rank(
+                item.exercise.primary_muscle,
+                existing_exposure=any(
+                    selected_item.primary_muscle is item.exercise.primary_muscle
+                    for selected_item, _slot in selected
+                ),
+            ),
+            -item.score,
+            str(item.exercise.id),
+        ),
+    ).exercise
 
 
 def apply_template_intent(
@@ -939,6 +968,7 @@ def _add_targeted_accessories(
     repeated_targeted_accessories: set[tuple[int, UUID]],
 ) -> bool:
     target_muscles = reference_day.focus
+    coherence = SessionCoherence.from_template_reference_day(reference_day)
     while main_exercise_count(candidate for candidate, _slot in selected) < minimum_exercises:
         options = [
             item
@@ -969,7 +999,21 @@ def _add_targeted_accessories(
         ]
         if not options:
             return True
-        candidate = rank_exercises(request, options, ruleset)[0].exercise
+        ranked = rank_exercises(request, options, ruleset)
+        candidate = min(
+            ranked,
+            key=lambda item: (
+                *coherence.placement_rank(
+                    item.exercise.primary_muscle,
+                    existing_exposure=any(
+                        selected_item.primary_muscle is item.exercise.primary_muscle
+                        for selected_item, _slot in selected
+                    ),
+                ),
+                -item.score,
+                str(item.exercise.id),
+            ),
+        ).exercise
         if used[candidate.id]:
             repeated_targeted_accessories.add((reference_day.day_number, candidate.id))
         supplemental_start = next(

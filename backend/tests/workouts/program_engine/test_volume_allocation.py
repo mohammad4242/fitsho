@@ -474,7 +474,7 @@ def test_volume_repair_substitutions_are_hard_safe_and_keep_strength_role_order(
     )
 
 
-def test_reference_repair_adds_hard_major_coverage_outside_original_focus() -> None:
+def test_reference_repair_does_not_add_hard_coverage_outside_original_focus() -> None:
     press = _programmed("Push-Up", MuscleGroup.CHEST, 3)
     abs_candidate = replace(
         _candidate("Dead Bug", MuscleGroup.ABS),
@@ -499,7 +499,7 @@ def test_reference_repair_adds_hard_major_coverage_outside_original_focus() -> N
         reason_codes=(),
     )
 
-    days, _reasons = repair_weekly_volume(
+    days, reasons = repair_weekly_volume(
         (_day(1, (press,), focus="template_reference:test:upper"),),
         normalized(),
         volume,
@@ -507,7 +507,8 @@ def test_reference_repair_adds_hard_major_coverage_outside_original_focus() -> N
         candidates=(abs_candidate,),
     )
 
-    assert any(item.primary_muscle is MuscleGroup.ABS for item in days[0].exercises)
+    assert all(item.primary_muscle is not MuscleGroup.ABS for item in days[0].exercises)
+    assert "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED" in reasons
 
 
 def test_volume_repair_reduces_unclassified_excess_preserving_hard_role() -> None:
@@ -632,6 +633,7 @@ def test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten() 
 
     selected = _select_addition_candidate(
         [[target, *fillers]],
+        (_day(1, (target, *fillers)),),
         {MuscleGroup.CHEST},
         set(),
         Counter({MuscleGroup.CHEST.value: 2}),
@@ -653,6 +655,7 @@ def test_volume_repair_handles_secondary_target_for_untracked_primary() -> None:
 
     selected = _select_addition_candidate(
         [[oblique_exercise]],
+        (_day(1, (oblique_exercise,)),),
         set(),
         {MuscleGroup.CHEST},
         Counter(),
