@@ -10,6 +10,7 @@ from app.exercises.enums import (
     ExerciseType,
     MediaType,
     MovementPattern,
+    MuscleFocus,
     MuscleGroup,
 )
 from app.exercises.models import Exercise, ExerciseCautionTagItem, ExerciseEquipment
@@ -128,6 +129,27 @@ def test_floor_bridge_is_lying_low_stability() -> None:
     assert demands.stability_demand is StabilityDemand.LOW
     assert metadata["body_position"] is BodyPosition.LYING
     assert metadata["stability_demand"] is StabilityDemand.LOW
+
+
+def test_canonical_rear_decline_bridge_stability_override_wins_backfill(db: Session) -> None:
+    exercise = make_exercise("fedb-0668-rear-decline-bridge")
+    exercise.source = "free-exercise-db"
+    exercise.source_id = "0668"
+    exercise.name_en = "Rear Decline Bridge"
+    exercise.primary_muscle = MuscleGroup.GLUTES
+    exercise.muscle_focus = MuscleFocus.GLUTE_MAX
+    exercise.movement_pattern = MovementPattern.HIP_EXTENSION
+    exercise.stability_demand = StabilityDemand.HIGH
+    db.add(exercise)
+    db.flush()
+
+    report = backfill_programming_metadata(db)
+    db.expire_all()
+    stored = db.scalar(select(Exercise).where(Exercise.id == exercise.id))
+
+    assert stored is not None
+    assert report.field_updates["stability_demand"] == 1
+    assert stored.stability_demand is StabilityDemand.LOW
 
 
 def test_infers_axial_loading_for_unsupported_rows_but_preserves_supported_rows() -> None:

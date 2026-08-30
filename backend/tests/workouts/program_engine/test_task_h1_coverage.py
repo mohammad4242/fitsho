@@ -1,6 +1,6 @@
 from dataclasses import replace
 
-from app.exercises.enums import MovementPattern, MuscleGroup
+from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.weekly_coverage import (
@@ -38,14 +38,13 @@ def _run_batch2_profile_6(monkeypatch):
     return results[0], captured[0]
 
 
-def test_batch2_profile_6_fails_closed_when_pull_is_unavailable(monkeypatch) -> None:
-    (profile, response), (_source, generation) = _run_batch2_profile_6(monkeypatch)
+def test_batch2_profile_6_uses_legacy_pull_up_bar_default(monkeypatch) -> None:
+    (profile, response), (source, generation) = _run_batch2_profile_6(monkeypatch)
 
     assert profile["num"] == 6
-    assert response["success"] is False
-    assert generation.program is None
-    assert "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in generation.errors
-    assert "REQUIRED_PATTERN_UNAVAILABLE:pull" in generation.errors
+    assert response["success"] is True
+    assert generation.program is not None
+    assert Equipment.PULL_UP_BAR in source.available_equipment
 
 
 def test_full_body_coverage_reports_satisfied_for_actual_exercises() -> None:

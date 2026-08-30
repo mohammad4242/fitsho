@@ -306,6 +306,18 @@ it("shows home setup only for home training and clears it after switching to gym
   expect(screen.getByLabelText("کش تمرینی")).toBeInTheDocument();
   expect(screen.getByLabelText("نیمکت")).toBeInTheDocument();
   expect(screen.getByLabelText("میله بارفیکس")).toBeInTheDocument();
+  await user.click(screen.getByLabelText("وزن بدن"));
+  expect(screen.getByLabelText("وزن بدن")).toBeChecked();
+  expect(screen.getByLabelText("میله بارفیکس")).toBeChecked();
+  await user.click(screen.getByLabelText("میله بارفیکس"));
+  expect(screen.getByLabelText("وزن بدن")).toBeChecked();
+  expect(screen.getByLabelText("میله بارفیکس")).not.toBeChecked();
+  await user.click(screen.getByLabelText("وزن بدن"));
+  expect(screen.getByLabelText("وزن بدن")).not.toBeChecked();
+  expect(screen.getByLabelText("میله بارفیکس")).not.toBeChecked();
+  await user.click(screen.getByLabelText("میله بارفیکس"));
+  expect(screen.getByLabelText("وزن بدن")).toBeChecked();
+  expect(screen.getByLabelText("میله بارفیکس")).toBeChecked();
   await user.click(screen.getByLabelText("دمبل"));
   await user.click(screen.getByLabelText("نیمکت"));
   await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
@@ -403,6 +415,34 @@ it("submits one normalized typed profile payload", async () => {
     training_cautions: ["knee"],
     plan_duration_weeks: 6,
   });
+});
+
+it("keeps bodyweight and pull-up-bar equipment toggles synchronized", async () => {
+  const user = userEvent.setup();
+  renderOnboarding();
+  await reachExperienceStep(user);
+  await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "home");
+
+  const bodyweight = screen.getByRole("checkbox", { name: "وزن بدن" });
+  const pullUpBar = screen.getByRole("checkbox", { name: "میله بارفیکس" });
+  expect(bodyweight).not.toBeChecked();
+  expect(pullUpBar).not.toBeChecked();
+
+  await user.click(bodyweight);
+  expect(bodyweight).toBeChecked();
+  expect(pullUpBar).toBeChecked();
+
+  await user.click(pullUpBar);
+  expect(bodyweight).toBeChecked();
+  expect(pullUpBar).not.toBeChecked();
+
+  await user.click(bodyweight);
+  expect(bodyweight).not.toBeChecked();
+  expect(pullUpBar).not.toBeChecked();
+
+  await user.click(pullUpBar);
+  expect(bodyweight).toBeChecked();
+  expect(pullUpBar).toBeChecked();
 });
 
 it("offers the optional photo flow after successful profile creation", async () => {

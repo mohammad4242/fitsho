@@ -318,7 +318,9 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
       : "",
     training_location: profile.training_location,
     home_training_setup: profile.home_training_setup ?? "",
-    available_equipment: [...(profile.available_equipment ?? [])],
+    available_equipment: profile.available_equipment === null
+      ? legacySetupEquipment(profile.home_training_setup ?? "")
+      : [...(profile.available_equipment ?? [])],
     session_duration_minutes: String(profile.session_duration_minutes),
     training_intensity: profile.training_intensity ?? "",
     training_cautions: profile.training_cautions,
@@ -412,14 +414,18 @@ function normalizeEquipment(values: Equipment[]): Equipment[] {
 }
 
 function legacySetupEquipment(setup: ProfileFormValues["home_training_setup"]): Equipment[] {
-  if (setup === "bodyweight_only") return ["bodyweight"];
+  if (setup === "bodyweight_only") return ["bodyweight", "pull_up_bar"];
   if (setup === "dumbbells_available") return ["bodyweight", "dumbbell"];
   return [];
 }
 
 function deriveHomeTrainingSetup(equipment: Equipment[] | null): HomeTrainingSetup | null {
   if (equipment === null) return null;
-  if (equipment.length === 1 && equipment[0] === "bodyweight") return "bodyweight_only";
+  const selected = new Set(equipment);
+  if (
+    selected.has("bodyweight")
+    && [...selected].every((item) => item === "bodyweight" || item === "pull_up_bar")
+  ) return "bodyweight_only";
   if (equipment.includes("dumbbell")) return "dumbbells_available";
   return null;
 }

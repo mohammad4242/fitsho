@@ -41,6 +41,7 @@ from app.exercises.models import (
     ExerciseSecondaryMuscle,
 )
 from app.exercises.prescription_metadata import prescription_metadata_for_identifier
+from app.exercises.programming_metadata import canonical_stability_demand_for_identifier
 from app.exercises.substitution_groups import curated_substitution_group
 
 BODY_REGION_MAP: dict[str, BodyRegion] = {
@@ -844,6 +845,9 @@ class FreeExerciseDbImporter:
     def _is_current(self, exercise: Exercise, candidate: ImportCandidate) -> bool:
         managed_assets = [asset for asset in exercise.media_assets if asset.source == SOURCE_NAME]
         prescription = prescription_metadata_for_identifier(SOURCE_NAME, candidate.source_id)
+        canonical_stability_demand = canonical_stability_demand_for_identifier(
+            SOURCE_NAME, candidate.source_id
+        )
         expected_assets = {
             (asset.presentation, asset.role, asset.source_url) for asset in candidate.media_assets
         }
@@ -871,6 +875,10 @@ class FreeExerciseDbImporter:
             and exercise.prescription_mode is prescription.mode
             and exercise.duration_min_seconds == prescription.duration_min_seconds
             and exercise.duration_max_seconds == prescription.duration_max_seconds
+            and (
+                canonical_stability_demand is None
+                or exercise.stability_demand is canonical_stability_demand
+            )
             and {item.equipment for item in exercise.equipment_items} == set(candidate.equipment)
             and exercise.is_programmable is True
             and {item.label for item in exercise.labels} == set(candidate.labels)
@@ -982,6 +990,11 @@ class FreeExerciseDbImporter:
         exercise.prescription_mode = prescription.mode
         exercise.duration_min_seconds = prescription.duration_min_seconds
         exercise.duration_max_seconds = prescription.duration_max_seconds
+        canonical_stability_demand = canonical_stability_demand_for_identifier(
+            SOURCE_NAME, candidate.source_id
+        )
+        if canonical_stability_demand is not None:
+            exercise.stability_demand = canonical_stability_demand
         exercise.instructions_en = candidate.instructions_en
         exercise.instructions_fa = [item.strip() for item in translation.instructions_fa]
         exercise.safety_notes_en = []

@@ -16,12 +16,20 @@ def test_legacy_home_inventory_remains_backward_compatible() -> None:
         TrainingLocation.HOME,
         HomeTrainingSetup.BODYWEIGHT_ONLY,
         None,
-    ) == frozenset({Equipment.BODYWEIGHT})
+    ) == frozenset({Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR})
     assert resolve_available_equipment(
         TrainingLocation.HOME,
         HomeTrainingSetup.DUMBBELLS_AVAILABLE,
         None,
     ) == frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL})
+
+
+def test_explicit_bodyweight_inventory_does_not_add_pull_up_bar() -> None:
+    assert resolve_available_equipment(
+        TrainingLocation.HOME,
+        HomeTrainingSetup.BODYWEIGHT_ONLY,
+        (Equipment.BODYWEIGHT,),
+    ) == frozenset({Equipment.BODYWEIGHT})
 
 
 def test_legacy_gym_inventory_excludes_uncategorized_equipment() -> None:

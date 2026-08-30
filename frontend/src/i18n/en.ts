@@ -219,7 +219,7 @@ const en = {
         preferredWeekdays: "Choose no more than your number of training days.",
         priorityMuscles: "If you want, choose one muscle for extra focus.",
         circumference: "Used for body-proportion analysis; measure at the widest point.",
-        homeTrainingSetup: "Select every piece of equipment you actually have at home.",
+        homeTrainingSetup: "In bodyweight mode, the pull-up bar is selected by default so back and lat exercises are available too. If you do not have a pull-up bar, you can uncheck it.",
       },
       options: {
         select: "Select an option",
@@ -1275,7 +1275,7 @@ const en = {
       loadError: "Your workout plan could not be loaded.",
       emptyTitle: "Your plan is ready to be built",
       emptyBody: "Fitsho will use your saved preferences and eligible exercises.",
-      generate: "Generate plan", generating: "Generating plan…", update: "Refresh plan", reused: "Your current plan still matches your current conditions.", stale: "This plan no longer matches your current conditions or selected duration. Generate the next plan when you are ready.", generateError: "Generation did not finish. Your current plan is still available; try again.", generateCooldown: "Please try again in a few minutes.",
+      generate: "Generate plan", generating: "Generating plan…", update: "Refresh plan", reused: "Your current plan still matches your current conditions.", stale: "This plan no longer matches your current conditions or selected duration. Generate the next plan when you are ready.", generateError: "Generation did not finish. Your current plan is still available; try again.", generateCooldown: "Please try again in a few minutes.", bodyweightLevelUnsupported: "Bodyweight-only workout plans are currently available for First Month and Beginner levels.", bodyweightDaysUnsupported: "Bodyweight workout plans are currently designed for 2, 3, or 4 days per week.", bodyweightPullUpBarRequired: "A pull-up bar is needed to complete this plan and train your back and lats. Add a pull-up bar to your equipment.", bodyweightExerciseUnavailable: "One exercise in this plan cannot be performed safely with your current limitations. Check your equipment and training restrictions.",
       corePreservationDurationWarning: "To preserve the program's effectiveness, please allow a little more workout time.",
       weekly: "Weekly schedule", scheduleTitle: "Your training days", sessionMinutes: "{{count}} minutes", sets: "Sets", reps: "Reps", durationTarget: "Duration", rest: "Rest", seconds: "s", rir: "RIR", detail: "View exercise details", alternatives: "View alternatives", superset: "Superset", supersetInstruction: "Perform this exercise immediately with the next exercise, then rest.",
       weeklyCheckIn: {

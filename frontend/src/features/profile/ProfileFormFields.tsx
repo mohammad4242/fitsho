@@ -282,13 +282,28 @@ export function ExperienceFields({
   }
 
   function toggleEquipment(equipment: Equipment) {
-    const selected = values.available_equipment ?? [];
-    onChange(
-      "available_equipment",
-      selected.includes(equipment)
-        ? selected.filter((item) => item !== equipment)
-        : [...selected, equipment],
-    );
+    const selected = new Set(values.available_equipment ?? []);
+    if (equipment === "bodyweight") {
+      if (selected.has(equipment)) {
+        selected.delete("bodyweight");
+        selected.delete("pull_up_bar");
+      } else {
+        selected.add("bodyweight");
+        selected.add("pull_up_bar");
+      }
+    } else if (equipment === "pull_up_bar") {
+      if (selected.has(equipment)) {
+        selected.delete("pull_up_bar");
+      } else {
+        selected.add("bodyweight");
+        selected.add("pull_up_bar");
+      }
+    } else if (selected.has(equipment)) {
+      selected.delete(equipment);
+    } else {
+      selected.add(equipment);
+    }
+    onChange("available_equipment", availableEquipment.filter((item) => selected.has(item)));
   }
 
   return (

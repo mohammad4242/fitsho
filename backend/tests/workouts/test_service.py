@@ -1,10 +1,12 @@
 import asyncio
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from functools import wraps
 
 import pytest
 from sqlalchemy.orm import Session
 
+import app.workouts.service as workout_service_module
 from app.ai.schemas import ProviderErrorCode, WorkoutProviderError
 from app.auth.models import User
 from app.body_analysis.enums import BodyAnalysisStatus
@@ -22,6 +24,7 @@ from app.exercises.enums import (
     MovementPattern,
     MuscleFocus,
     MuscleGroup,
+    PrescriptionMode,
 )
 from app.exercises.models import (
     Exercise,
@@ -94,7 +97,7 @@ from app.workouts.service import (
 )
 
 
-def _user_with_profile(db: Session) -> User:
+def _user_with_profile(db: Session, *, pure_bodyweight: bool = False) -> User:
     user = User(email="workout-service@example.com", password_hash="hash")
     db.add(user)
     db.flush()
@@ -110,6 +113,11 @@ def _user_with_profile(db: Session) -> User:
             training_days_per_week=2,
             training_location=TrainingLocation.HOME,
             home_training_setup=HomeTrainingSetup.BODYWEIGHT_ONLY,
+            available_equipment=(
+                None
+                if pure_bodyweight
+                else [Equipment.BODYWEIGHT.value, Equipment.DUMBBELL.value]
+            ),
             session_duration_minutes=45,
             plan_duration_weeks=4,
         )
@@ -631,6 +639,66 @@ def _seed_candidates(db: Session) -> list[Exercise]:
             exercise_type=ExerciseType.ISOLATION,
         ),
     ]
+
+
+def _seed_bodyweight_template_catalog(db: Session) -> list[Exercise]:
+    specs = (
+        ("fedb-drv-squat-squat", MovementPattern.SQUAT, MuscleGroup.QUADRICEPS),
+        ("fedb-0493-incline-push-up", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        ("fedb-drv-push-ups-push-up", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.CHEST),
+        ("fedb-0259-close-grip-push-up", MovementPattern.HORIZONTAL_PUSH, MuscleGroup.TRICEPS),
+        (
+            "fedb-0499-inverted-row-between-chairs",
+            MovementPattern.HORIZONTAL_PULL,
+            MuscleGroup.BACK,
+        ),
+        (
+            "fedb-0651-shoulder-width-pull-up",
+            MovementPattern.VERTICAL_PULL,
+            MuscleGroup.BACK,
+        ),
+        (
+            "fedb-2327-reverse-grip-pull-up",
+            MovementPattern.VERTICAL_PULL,
+            MuscleGroup.BACK,
+        ),
+        (
+            "fedb-2987-close-grip-chin-up",
+            MovementPattern.VERTICAL_PULL,
+            MuscleGroup.BACK,
+        ),
+        ("fedb-1429-pull-up-wide-grip", MovementPattern.VERTICAL_PULL, MuscleGroup.BACK),
+        ("fedb-0668-rear-decline-bridge", MovementPattern.HIP_EXTENSION, MuscleGroup.GLUTES),
+        (
+            "fedb-0464-front-plank",
+            MovementPattern.CORE_ANTI_EXTENSION,
+            MuscleGroup.ABS,
+        ),
+        (
+            "fedb-0705-side-plank",
+            MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+            MuscleGroup.OBLIQUES,
+        ),
+        ("fedb-0872-reverse-crunch", MovementPattern.SPINAL_FLEXION, MuscleGroup.ABS),
+    )
+    seeded: list[Exercise] = []
+    for slug, pattern, muscle in specs:
+        item = _exercise(db, slug, pattern, muscle)
+        item.slug = slug
+        item.stability_demand = StabilityDemand.LOW
+        item.skill_demand = SkillDemand.LOW
+        if pattern is MovementPattern.VERTICAL_PULL:
+            item.equipment_items = [
+                ExerciseEquipment(equipment=Equipment.BODYWEIGHT),
+                ExerciseEquipment(equipment=Equipment.PULL_UP_BAR),
+            ]
+        if slug in {"fedb-0464-front-plank", "fedb-0705-side-plank"}:
+            item.prescription_mode = PrescriptionMode.DURATION
+            item.duration_min_seconds = 20
+            item.duration_max_seconds = 40
+        seeded.append(item)
+    db.flush()
+    return seeded
 
 
 def _ai_template(slug: str, exercise_ids: tuple[object, ...]) -> TemplateReference:
@@ -1427,3 +1495,210 @@ def test_failed_body_analysis_does_not_block_normal_plan_generation(db: Session)
 
     assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert result.plan.body_analysis_provenance == {}
+
+
+def test_first_month_legacy_bodyweight_uses_fixed_template_without_engine(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    profile = get_profile(db, user.id).profile
+    profile.experience_level = ExperienceLevel.FIRST_MONTH
+    profile.training_days_per_week = 2
+    _seed_bodyweight_template_catalog(db)
+
+    def fail_if_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("generate_program must not be called")
+
+    monkeypatch.setattr(workout_service_module, "generate_program", fail_if_called)
+
+    result = asyncio.run(_service(db).generate(user.id))
+
+    assert result.plan.engine_version == "bodyweight_template_v1"
+    assert result.plan.model_id == "bw-first-month-2d-v1"
+    assert result.plan.aggregate_metrics["template_slug"] == "bw-first-month-2d-v1"
+
+
+def test_bodyweight_route_uses_effective_day_override(db: Session) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    profile = get_profile(db, user.id).profile
+    profile.experience_level = ExperienceLevel.FIRST_MONTH
+    _seed_bodyweight_template_catalog(db)
+
+    result = asyncio.run(
+        _service(db).generate(
+            user.id,
+            ProgramGenerationOverrides(available_training_days=3),
+        )
+    )
+
+    assert result.plan.model_id == "bw-first-month-3d-v1"
+    assert len(result.plan.days) == 3
+
+
+def test_beginner_bodyweight_three_days_uses_exact_fixed_pull_variants(db: Session) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    profile = get_profile(db, user.id).profile
+    profile.training_days_per_week = 3
+    profile.available_equipment = [
+        Equipment.BODYWEIGHT.value,
+        Equipment.PULL_UP_BAR.value,
+    ]
+    _seed_bodyweight_template_catalog(db)
+
+    result = asyncio.run(_service(db).generate(user.id))
+
+    assert result.plan.model_id == "bw-beginner-3d-v1"
+    slugs = {exercise.exercise.slug for day in result.plan.days for exercise in day.exercises}
+    assert {
+        "fedb-0651-shoulder-width-pull-up",
+        "fedb-2987-close-grip-chin-up",
+        "fedb-2327-reverse-grip-pull-up",
+    } <= slugs
+
+
+@pytest.mark.parametrize(
+    "extra_equipment",
+    [Equipment.DUMBBELL, Equipment.RESISTANCE_BAND],
+)
+def test_bodyweight_with_extra_equipment_uses_normal_engine(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    extra_equipment: Equipment,
+) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.available_equipment = [Equipment.BODYWEIGHT.value, extra_equipment.value]
+    _seed_candidates(db)
+    called = False
+    original = workout_service_module.generate_program
+
+    @wraps(original)
+    def spy(*args: object, **kwargs: object) -> object:
+        nonlocal called
+        called = True
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(workout_service_module, "generate_program", spy)
+
+    result = asyncio.run(_service(db).generate(user.id))
+
+    assert called
+    assert result.plan.engine_version == "program_engine_v1"
+
+
+def test_gym_bodyweight_uses_normal_engine(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.training_location = TrainingLocation.GYM
+    profile.home_training_setup = None
+    profile.available_equipment = None
+    _seed_candidates(db)
+    called = False
+    original = workout_service_module.generate_program
+
+    @wraps(original)
+    def spy(*args: object, **kwargs: object) -> object:
+        nonlocal called
+        called = True
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(workout_service_module, "generate_program", spy)
+
+    result = asyncio.run(_service(db).generate(user.id))
+
+    assert called
+    assert result.plan.engine_version == "program_engine_v1"
+
+
+def test_intermediate_pure_bodyweight_is_rejected_before_normal_engine(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    profile = get_profile(db, user.id).profile
+    profile.experience_level = ExperienceLevel.INTERMEDIATE
+
+    def fail_if_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("generate_program must not be called")
+
+    monkeypatch.setattr(workout_service_module, "generate_program", fail_if_called)
+
+    with pytest.raises(ProgramGenerationRejectedError) as error:
+        asyncio.run(_service(db).generate(user.id))
+
+    assert error.value.error_code == "BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED"
+
+
+def test_pure_bodyweight_unsupported_days_are_rejected_before_normal_engine(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    profile = get_profile(db, user.id).profile
+    profile.experience_level = ExperienceLevel.FIRST_MONTH
+    profile.training_days_per_week = 5
+
+    def fail_if_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("generate_program must not be called")
+
+    monkeypatch.setattr(workout_service_module, "generate_program", fail_if_called)
+
+    with pytest.raises(ProgramGenerationRejectedError) as error:
+        asyncio.run(_service(db).generate(user.id))
+
+    assert error.value.error_code == "BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED"
+
+
+def test_explicit_bodyweight_without_pull_up_bar_is_rejected_without_fallback(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user_with_profile(db)
+    profile = get_profile(db, user.id).profile
+    profile.available_equipment = [Equipment.BODYWEIGHT.value]
+    _seed_bodyweight_template_catalog(db)
+
+    def fail_if_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("generate_program must not be called")
+
+    monkeypatch.setattr(workout_service_module, "generate_program", fail_if_called)
+
+    with pytest.raises(ProgramGenerationRejectedError) as error:
+        asyncio.run(_service(db).generate(user.id))
+
+    assert error.value.error_code == "BODYWEIGHT_PULL_UP_BAR_REQUIRED"
+
+
+def test_bodyweight_route_precedes_ai_provider(db: Session) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    _seed_bodyweight_template_catalog(db)
+    provider = _FailingAiCoachProvider(AssertionError("AI must not be called"))
+
+    result = asyncio.run(
+        _service(db, ai_coach_provider=provider, generation_method="ai").generate(user.id)
+    )
+
+    assert provider.calls == 0
+    assert result.plan.model_id == "bw-beginner-2d-v1"
+
+
+def test_bodyweight_caution_rejection_does_not_substitute_or_use_normal_engine(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    profile = get_profile(db, user.id).profile
+    profile.training_caution_items.append(UserProfileTrainingCaution(caution=TrainingCaution.WRIST))
+    _seed_bodyweight_template_catalog(db)
+
+    def fail_if_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("generate_program must not be called")
+
+    monkeypatch.setattr(workout_service_module, "generate_program", fail_if_called)
+
+    with pytest.raises(ProgramGenerationRejectedError) as error:
+        asyncio.run(_service(db).generate(user.id))
+
+    assert error.value.error_code == "BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE"
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0

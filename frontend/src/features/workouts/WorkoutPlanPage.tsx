@@ -28,6 +28,29 @@ import type {
 import "./workoutPlan.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
+type GenerationError =
+  | "cooldown"
+  | "failed"
+  | "bodyweight_level"
+  | "bodyweight_days"
+  | "bodyweight_pull_up_bar"
+  | "bodyweight_exercise";
+
+const bodyweightGenerationErrors: Record<string, GenerationError> = {
+  BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED: "bodyweight_level",
+  BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED: "bodyweight_days",
+  BODYWEIGHT_PULL_UP_BAR_REQUIRED: "bodyweight_pull_up_bar",
+  BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE: "bodyweight_exercise",
+};
+
+function generationErrorMessageKey(error: GenerationError): string {
+  if (error === "cooldown") return "workoutPlan.generateCooldown";
+  if (error === "bodyweight_level") return "workoutPlan.bodyweightLevelUnsupported";
+  if (error === "bodyweight_days") return "workoutPlan.bodyweightDaysUnsupported";
+  if (error === "bodyweight_pull_up_bar") return "workoutPlan.bodyweightPullUpBarRequired";
+  if (error === "bodyweight_exercise") return "workoutPlan.bodyweightExerciseUnavailable";
+  return "workoutPlan.generateError";
+}
 
 async function loadMemberPlans() {
   const [currentPlan, versions] = await Promise.all([
@@ -51,7 +74,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const [state, setState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
   const [reused, setReused] = useState(false);
-  const [generationError, setGenerationError] = useState<"cooldown" | "failed" | null>(null);
+  const [generationError, setGenerationError] = useState<GenerationError | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [generationMethod, setGenerationMethod] = useState<WorkoutGenerationMethod>("fitsho_coach");
   const [savingGenerationMethod, setSavingGenerationMethod] = useState(false);
@@ -118,7 +141,11 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
         setReused(result.reused);
       })
       .catch((error: unknown) => {
-        const errorKind = error instanceof ApiError && error.status === 429 ? "cooldown" : "failed";
+        const errorKind = error instanceof ApiError && error.status === 429
+          ? "cooldown"
+          : error instanceof ApiError && error.code !== null
+            ? bodyweightGenerationErrors[error.code] ?? "failed"
+            : "failed";
         setState(plan === null ? "empty" : "ready");
         setGenerationError(errorKind);
       })
@@ -200,11 +227,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
             {generationError !== null && (
               <StatusPanel
                 role="alert"
-                message={t(
-                  generationError === "cooldown"
-                    ? "workoutPlan.generateCooldown"
-                    : "workoutPlan.generateError",
-                )}
+                message={t(generationErrorMessageKey(generationError))}
                 action={generationError === "failed" ? t("common.retry") : undefined}
                 onAction={generationError === "failed" ? generate : undefined}
               />
@@ -267,7 +290,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
               {plan.is_stale && <p className="workout-stale" role="status">{t("workoutPlan.stale")}</p>}
               {plan.warnings?.includes("SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE") && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.corePreservationDurationWarning")}</p>}
               {plan.body_analysis_provenance?.provisional === true && <p className="workout-body-analysis-warning" role="alert">{t("workoutPlan.provisionalBodyAnalysisWarning")}</p>}
-              {generationError && <StatusPanel role="alert" message={t(generationError === "cooldown" ? "workoutPlan.generateCooldown" : "workoutPlan.generateError")} action={generationError === "failed" ? t("common.retry") : undefined} onAction={generationError === "failed" ? generate : undefined} />}
+              {generationError && <StatusPanel role="alert" message={t(generationErrorMessageKey(generationError))} action={generationError === "failed" ? t("common.retry") : undefined} onAction={generationError === "failed" ? generate : undefined} />}
             </div>
           </>
         )}

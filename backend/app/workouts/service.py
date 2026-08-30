@@ -32,7 +32,7 @@ from app.exercises.media_resolver import resolve_primary_media
 from app.exercises.models import Exercise
 from app.exercises.programming_metadata import infer_exercise_demands
 from app.exercises.substitution_groups import effective_substitution_group
-from app.profile.enums import ExperienceLevel, Sex
+from app.profile.enums import ExperienceLevel, Sex, TrainingLocation
 from app.profile.exceptions import InvalidProfilePreferencesError
 from app.profile.service import ProfileSnapshot, get_profile
 from app.profile.training_compatibility import (
@@ -56,6 +56,14 @@ from app.workouts.ai_coach_provider import (
 from app.workouts.body_analysis_resolver import (
     BodyAnalysisInfluenceResolver,
     WorkoutBodyAnalysisResolver,
+)
+from app.workouts.bodyweight_template_builder import (
+    BodyweightTemplateBuildError,
+    build_bodyweight_template_program,
+)
+from app.workouts.bodyweight_templates import (
+    bodyweight_template_fingerprint,
+    get_bodyweight_template,
 )
 from app.workouts.candidate_selector import (
     WorkoutCandidateSelector,
@@ -201,6 +209,32 @@ class WorkoutGenerationFailedError(Exception):
         self.error_code = error_code
 
 
+BODYWEIGHT_MODE_EQUIPMENT = frozenset({Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR})
+BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED = "BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED"
+BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED = "BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED"
+BODYWEIGHT_ENGINE_VERSION = "bodyweight_template_v1"
+
+
+@dataclass(frozen=True)
+class _BodyweightRouteContext:
+    source_profile: ProfileSnapshot
+    effective_overrides: ProgramGenerationOverrides | None
+    request: ProgramGenerationRequest
+    template_slug: str
+    template_fingerprint: str
+
+
+def _is_pure_bodyweight_home(
+    training_location: TrainingLocation,
+    resolved_equipment: frozenset[Equipment],
+) -> bool:
+    return (
+        training_location is TrainingLocation.HOME
+        and Equipment.BODYWEIGHT in resolved_equipment
+        and resolved_equipment.issubset(BODYWEIGHT_MODE_EQUIPMENT)
+    )
+
+
 class WorkoutGenerationService:
     def __init__(
         self,
@@ -222,9 +256,181 @@ class WorkoutGenerationService:
         user_id: UUID,
         overrides: ProgramGenerationOverrides | None = None,
     ) -> WorkoutPlanGenerationResult:
+        bodyweight_context = self._bodyweight_route_context(user_id, overrides)
+        if bodyweight_context is not None:
+            return await self._generate_bodyweight(bodyweight_context)
         if self._settings.generation_method == "ai":
             return await self._generate_with_ai(user_id)
         return await self._generate_deterministic(user_id, overrides)
+
+    def _bodyweight_route_context(
+        self,
+        user_id: UUID,
+        overrides: ProgramGenerationOverrides | None,
+    ) -> _BodyweightRouteContext | None:
+        source_profile = get_profile(self._db, user_id)
+        profile = source_profile.profile
+        effective_overrides = self._with_previous_volume_history(user_id, overrides)
+        explicit_inventory = getattr(profile, "available_equipment", None)
+        if effective_overrides is not None and effective_overrides.available_equipment is not None:
+            explicit_inventory = effective_overrides.available_equipment
+        resolved_equipment = resolve_available_equipment(
+            profile.training_location,
+            profile.home_training_setup,
+            explicit_inventory,
+        )
+        if not _is_pure_bodyweight_home(profile.training_location, resolved_equipment):
+            return None
+        if profile.experience_level not in {
+            ExperienceLevel.FIRST_MONTH,
+            ExperienceLevel.BEGINNER,
+        }:
+            raise ProgramGenerationRejectedError(BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED)
+        effective_days = (
+            effective_overrides.available_training_days
+            if effective_overrides is not None
+            and effective_overrides.available_training_days is not None
+            else profile.training_days_per_week
+        )
+        if effective_days not in {2, 3, 4}:
+            raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED)
+        body_analysis_influence = applicable_body_analysis_influence(
+            self._body_analysis_resolver.resolve(user_id), self._ruleset
+        )
+        try:
+            request = self._to_program_request(
+                source_profile, effective_overrides, body_analysis_influence
+            )
+        except UnsupportedResistanceTrainingCombinationError as error:
+            raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED) from error
+        except (InvalidProfilePreferencesError, ValidationError) as error:
+            raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
+        template = get_bodyweight_template(profile.experience_level, effective_days)
+        if template is None:
+            raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED)
+        return _BodyweightRouteContext(
+            source_profile=source_profile,
+            effective_overrides=effective_overrides,
+            request=request,
+            template_slug=template.slug,
+            template_fingerprint=bodyweight_template_fingerprint(template),
+        )
+
+    async def _generate_bodyweight(
+        self,
+        context: _BodyweightRouteContext,
+    ) -> WorkoutPlanGenerationResult:
+        request = context.request
+        catalog = self._load_catalog(context.source_profile.profile.sex)
+        catalog_hash = self._catalog_hash(catalog)
+        signature = self._bodyweight_generation_signature(
+            request,
+            catalog_hash,
+            context.template_fingerprint,
+        )
+        active_plan = get_active_plan(self._db, request.user_id)
+        if (
+            active_plan is not None
+            and active_plan.generation_signature == signature
+            and not self._is_plan_expired(active_plan)
+        ):
+            return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
+
+        self._enforce_cooldown(request.user_id)
+        generation = self._start_generation(request.user_id, len(catalog))
+        started_at = perf_counter()
+        template = get_bodyweight_template(
+            ExperienceLevel(request.training_experience.value),
+            request.available_training_days,
+        )
+        if template is None:
+            self._mark_failure(
+                generation,
+                BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED,
+                "This bodyweight template day count is not supported.",
+                [],
+            )
+            raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED)
+        try:
+            program = build_bodyweight_template_program(
+                request=request,
+                experience_level=context.source_profile.profile.experience_level,
+                template=template,
+                exercise_catalog=catalog,
+                ruleset=self._ruleset,
+            )
+        except BodyweightTemplateBuildError as error:
+            self._mark_failure(
+                generation,
+                error.code,
+                "The fixed bodyweight template could not be safely generated.",
+                [
+                    {
+                        "phase": "bodyweight_template",
+                        "template_slug": error.template_slug,
+                        "exercise_slug": error.exercise_slug,
+                        "rejection_reason_codes": list(error.rejection_reason_codes),
+                    }
+                ],
+            )
+            raise ProgramGenerationRejectedError(
+                error.code,
+                error.safety_status.value if error.safety_status else None,
+            ) from error
+
+        refreshed_context = self._bodyweight_route_context(
+            request.user_id, context.effective_overrides
+        )
+        refreshed_catalog = (
+            self._load_catalog(refreshed_context.source_profile.profile.sex)
+            if refreshed_context is not None
+            else ()
+        )
+        if (
+            refreshed_context is None
+            or refreshed_context.template_fingerprint != context.template_fingerprint
+            or self._bodyweight_generation_signature(
+                refreshed_context.request,
+                self._catalog_hash(refreshed_catalog),
+                refreshed_context.template_fingerprint,
+            )
+            != signature
+        ):
+            self._mark_failure(
+                generation,
+                "generation_inputs_changed",
+                "Workout conditions changed during generation. Please try again.",
+                [],
+            )
+            raise WorkoutGenerationFailedError(error_code="generation_inputs_changed")
+
+        try:
+            plan = self._build_plan(
+                user_id=request.user_id,
+                signature=signature,
+                catalog_hash=catalog_hash,
+                catalog=catalog,
+                program=program,
+                previous=active_plan,
+            )
+            generation.provider = "fitsho_bodyweight_template"
+            generation.model_id = template.slug
+            generation.latency_ms = int((perf_counter() - started_at) * 1000)
+            generation.validation_diagnostics = [
+                cast(dict[str, object], _json_ready(asdict(program.validation_report)))
+            ]
+            persist_pending_review_plan(self._db, plan, generation)
+            self._db.commit()
+            return WorkoutPlanGenerationResult(plan=plan, reused=False)
+        except SQLAlchemyError as error:
+            self._db.rollback()
+            self._mark_failure(
+                generation,
+                "persistence_failed",
+                "Workout generation could not be saved. Please try again.",
+                [],
+            )
+            raise WorkoutGenerationFailedError(error_code="persistence_failed") from error
 
     async def _generate_deterministic(
         self,
@@ -852,13 +1058,17 @@ class WorkoutGenerationService:
         previous: WorkoutPlan | None,
     ) -> WorkoutPlan:
         snapshots = {str(item.id): self._candidate_snapshot(item) for item in catalog}
+        is_bodyweight_template = program.engine_version == BODYWEIGHT_ENGINE_VERSION
+        template_slug = (
+            str(program.aggregate_metrics.get("template_slug")) if is_bodyweight_template else None
+        )
         plan = WorkoutPlan(
             user_id=user_id,
             status=WorkoutPlanStatus.GENERATING,
             generation_signature=signature,
             profile_snapshot=program.user_profile_snapshot,
-            provider="fitsho_domain",
-            model_id=program.engine_version,
+            provider=("fitsho_bodyweight_template" if is_bodyweight_template else "fitsho_domain"),
+            model_id=template_slug or program.engine_version,
             prompt_version="none",
             generation_policy_version=program.ruleset_version,
             candidate_set_hash=catalog_hash,
@@ -1218,6 +1428,20 @@ class WorkoutGenerationService:
         )
 
     @staticmethod
+    def _bodyweight_generation_signature(
+        request: ProgramGenerationRequest,
+        catalog_hash: str,
+        template_fingerprint: str,
+    ) -> str:
+        return build_generation_request_signature(
+            request,
+            catalog_hash=catalog_hash,
+            reference_hash=template_fingerprint,
+            engine_version=BODYWEIGHT_ENGINE_VERSION,
+            ruleset_version=BODYWEIGHT_ENGINE_VERSION,
+        )
+
+    @staticmethod
     def _template_reference_hash(references: tuple[TemplateReference, ...]) -> str:
         payload = _json_ready([asdict(reference) for reference in references])
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -1248,6 +1472,18 @@ class WorkoutGenerationService:
         plan = get_active_plan(self._db, user_id)
         if plan is None:
             return None
+        bodyweight_context = self._bodyweight_route_context(user_id, None)
+        if bodyweight_context is not None:
+            catalog = self._load_catalog(bodyweight_context.source_profile.profile.sex)
+            signature = self._bodyweight_generation_signature(
+                bodyweight_context.request,
+                self._catalog_hash(catalog),
+                bodyweight_context.template_fingerprint,
+            )
+            return ActiveWorkoutPlanResult(
+                plan=plan,
+                is_stale=plan.generation_signature != signature or self._is_plan_expired(plan),
+            )
         if self._settings.generation_method == "ai":
             profile = self._to_generation_profile(get_profile(self._db, user_id))
             eligible_exercises = WorkoutCandidateSelector(

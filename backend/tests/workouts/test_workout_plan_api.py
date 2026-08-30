@@ -686,6 +686,55 @@ def test_generate_returns_structured_professional_review_status(client: TestClie
     assert response.json()["detail"]["safety_status"] == "stop_and_refer"
 
 
+@pytest.mark.parametrize(
+    ("error_code", "message"),
+    [
+        (
+            "BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED",
+            "برنامه تمرین فقط با وزن بدن در حال حاضر برای سطح ماه اول و مبتدی ارائه می‌شود.",
+        ),
+        (
+            "BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED",
+            "برنامه تمرین با وزن بدن در حال حاضر برای ۲، ۳ یا ۴ روز در هفته طراحی شده است.",
+        ),
+        (
+            "BODYWEIGHT_PULL_UP_BAR_REQUIRED",
+            "برای اجرای کامل این برنامه و تمرین عضلات پشت و زیربغل به میله بارفیکس نیاز دارید. "
+            "میله بارفیکس را به تجهیزات اضافه کنید.",
+        ),
+        (
+            "BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE",
+            "با محدودیت‌های فعلی شما یکی از حرکات این برنامه قابل اجرا یا ایمن نیست. "
+            "تجهیزات و محدودیت‌های تمرینی خود را بررسی کنید.",
+        ),
+    ],
+)
+def test_generate_maps_bodyweight_rejections_to_actionable_422(
+    client: TestClient,
+    error_code: str,
+    message: str,
+) -> None:
+    _register_and_complete_profile(client, f"{error_code.lower()}@example.com")
+
+    class FakeService:
+        async def generate(self, current_user_id: UUID) -> WorkoutPlanGenerationResult:
+            raise ProgramGenerationRejectedError(error_code)
+
+    from app.workouts.dependencies import get_workout_generation_service
+
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_workout_generation_service] = lambda: FakeService()
+    response = client.post("/api/v1/workout-plans/generate", headers=ORIGIN)
+    app.dependency_overrides.pop(get_workout_generation_service)
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == {
+        "code": error_code,
+        "safety_status": None,
+        "message": message,
+    }
+
+
 def test_generate_returns_construction_exhaustion_as_a_specific_422(client: TestClient) -> None:
     _register_and_complete_profile(client, "construction-exhausted@example.com")
 

@@ -260,6 +260,16 @@ describe("profile validation", () => {
 
   it("converts a saved profile into editable string values", () => {
     expect(profileToFormValues(profile)).toEqual(validValues);
+    expect(
+      profileToFormValues({
+        ...profile,
+        training_location: "home",
+        home_training_setup: "bodyweight_only",
+        available_equipment: null,
+      }),
+    ).toMatchObject({
+      available_equipment: ["bodyweight", "pull_up_bar"],
+    });
   });
 
   it("does not silently rewrite a legacy multi-focus profile", () => {
@@ -304,6 +314,17 @@ describe("profile validation", () => {
       toProfileInput({
         ...validValues,
         training_location: "home",
+        home_training_setup: "bodyweight_only",
+        available_equipment: undefined,
+      }),
+    ).toMatchObject({
+      home_training_setup: "bodyweight_only",
+      available_equipment: ["bodyweight", "pull_up_bar"],
+    });
+    expect(
+      toProfileInput({
+        ...validValues,
+        training_location: "home",
         available_equipment: ["dumbbell", "bodyweight", "dumbbell"],
       }),
     ).toMatchObject({
@@ -317,6 +338,16 @@ describe("profile validation", () => {
         available_equipment: ["bodyweight"],
       }).home_training_setup,
     ).toBe("bodyweight_only");
+    expect(
+      toProfileInput({
+        ...validValues,
+        training_location: "home",
+        available_equipment: ["pull_up_bar", "bodyweight"],
+      }),
+    ).toMatchObject({
+      home_training_setup: "bodyweight_only",
+      available_equipment: ["bodyweight", "pull_up_bar"],
+    });
     expect(
       toProfileInput({
         ...validValues,

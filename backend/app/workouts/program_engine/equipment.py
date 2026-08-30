@@ -16,7 +16,7 @@ def resolve_available_equipment(
         return frozenset(item for item in Equipment if item is not Equipment.OTHER)
     if home_training_setup is HomeTrainingSetup.DUMBBELLS_AVAILABLE:
         return frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL})
-    return frozenset({Equipment.BODYWEIGHT})
+    return frozenset({Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR})
 
 
 def effective_required_equipment(

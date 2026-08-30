@@ -42,6 +42,12 @@ PROGRAMMING_METADATA_FIELDS = (
     "range_of_motion_profile",
 )
 
+# Free Exercise DB does not provide this programming signal. These narrowly scoped
+# source-keyed values are the authoritative metadata for reviewed exceptions.
+CANONICAL_STABILITY_DEMAND_OVERRIDES: dict[tuple[str, str], StabilityDemand] = {
+    ("free-exercise-db", "0668"): StabilityDemand.LOW,
+}
+
 _STANDING_PATTERNS = frozenset(
     {
         MovementPattern.SQUAT,
@@ -83,6 +89,13 @@ class InferredExerciseDemands:
     axial_loading_level: LoadLimit
     fatigue_cost: int
     setup_cost: int
+
+
+def canonical_stability_demand_for_identifier(
+    source: str | None,
+    source_id: str | None,
+) -> StabilityDemand | None:
+    return CANONICAL_STABILITY_DEMAND_OVERRIDES.get((source or "", source_id or ""))
 
 
 def _values(items: Iterable[object]) -> set[object]:
@@ -254,7 +267,9 @@ def infer_programming_metadata(exercise: Exercise) -> dict[str, object]:
     if body_position is not None:
         metadata["body_position"] = body_position
 
-    stability_demand = _infer_stability_demand(exercise, body_position)
+    stability_demand = canonical_stability_demand_for_identifier(
+        exercise.source, exercise.source_id
+    ) or _infer_stability_demand(exercise, body_position)
     if stability_demand is not None:
         metadata["stability_demand"] = stability_demand
 
@@ -320,6 +335,14 @@ def backfill_programming_metadata(
                 for field_name, value in inferred.items()
                 if getattr(exercise, field_name) is None
             }
+            canonical_stability_demand = canonical_stability_demand_for_identifier(
+                exercise.source, exercise.source_id
+            )
+            if (
+                canonical_stability_demand is not None
+                and exercise.stability_demand is not canonical_stability_demand
+            ):
+                changes["stability_demand"] = canonical_stability_demand
             if exercise.substitution_group in LEGACY_BROAD_SUBSTITUTION_GROUPS:
                 repaired_group = effective_substitution_group(
                     name_en=exercise.name_en,

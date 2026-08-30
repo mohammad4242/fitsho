@@ -53,6 +53,23 @@ router = APIRouter(prefix="/api/v1/workout-plans", tags=["workout-plans"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(require_completed_profile)]
 
+BODYWEIGHT_GENERATION_MESSAGES = {
+    "BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED": (
+        "برنامه تمرین فقط با وزن بدن در حال حاضر برای سطح ماه اول و مبتدی ارائه می‌شود."
+    ),
+    "BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED": (
+        "برنامه تمرین با وزن بدن در حال حاضر برای ۲، ۳ یا ۴ روز در هفته طراحی شده است."
+    ),
+    "BODYWEIGHT_PULL_UP_BAR_REQUIRED": (
+        "برای اجرای کامل این برنامه و تمرین عضلات پشت و زیربغل به میله بارفیکس نیاز دارید. "
+        "میله بارفیکس را به تجهیزات اضافه کنید."
+    ),
+    "BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE": (
+        "با محدودیت‌های فعلی شما یکی از حرکات این برنامه قابل اجرا یا ایمن نیست. "
+        "تجهیزات و محدودیت‌های تمرینی خود را بررسی کنید."
+    ),
+}
+
 
 @router.get("/active", response_model=WorkoutPlanResponse)
 def read_active_plan(
@@ -118,7 +135,10 @@ async def generate_plan(
                 "message": (
                     "Requested resistance-training days are not supported for this experience level"
                     if error.error_code == "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
-                    else "Professional review is required before automatic programming"
+                    else BODYWEIGHT_GENERATION_MESSAGES.get(
+                        error.error_code,
+                        "Professional review is required before automatic programming",
+                    )
                 ),
             },
         ) from None

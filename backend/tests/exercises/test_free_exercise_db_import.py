@@ -849,6 +849,51 @@ def test_importer_sets_programming_metadata_and_updates_existing_import(
     assert exercise.is_programmable is True
 
 
+def test_importer_preserves_canonical_stability_for_rear_decline_bridge(
+    db: Session,
+    test_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+    from app.workouts.program_engine.enums import StabilityDemand
+
+    source_root = tmp_path / "source"
+    record = source_record()
+    record.update(
+        {
+            "id": "0668",
+            "name": "Rear Decline Bridge",
+            "bodyPart": "upper legs",
+            "target": "glutes",
+            "secondaryMuscles": ["hamstrings", "lower back"],
+            "muscleGroup": "hamstrings",
+        }
+    )
+    write_source(source_root, record)
+    importer = FreeExerciseDbImporter(
+        db,
+        settings=test_settings,
+        source_root=source_root,
+        translator=FakeTranslator(),
+    )
+
+    first = importer.run()
+    exercise = db.scalar(select(Exercise).where(Exercise.source_id == "0668"))
+
+    assert first.imported_records == ["0668"]
+    assert exercise is not None
+    assert exercise.stability_demand is StabilityDemand.LOW
+
+    exercise.stability_demand = StabilityDemand.HIGH
+    db.commit()
+
+    second = importer.run()
+    db.refresh(exercise)
+
+    assert second.updated_records == ["0668"]
+    assert exercise.stability_demand is StabilityDemand.LOW
+
+
 def test_importer_dry_run_does_not_write_database_files_or_translations(
     db: Session,
     test_settings: Settings,

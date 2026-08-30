@@ -138,7 +138,11 @@ def test_home_rejects_vertical_pull_with_incomplete_bodyweight_metadata(db: Sess
     safe = exercise(db, "bodyweight-row", equipment=(Equipment.BODYWEIGHT,))
 
     result = WorkoutCandidateSelector(db).select(
-        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.BODYWEIGHT_ONLY)
+        profile(
+            location=TrainingLocation.HOME,
+            setup=HomeTrainingSetup.BODYWEIGHT_ONLY,
+            available_equipment=frozenset({Equipment.BODYWEIGHT}),
+        )
     )
 
     assert safe.id in result.ids
@@ -185,7 +189,11 @@ def test_bodyweight_home_excludes_every_unavailable_equipment(
     unavailable = exercise(db, "home-unavailable", equipment=(required_equipment,))
 
     result = WorkoutCandidateSelector(db).select(
-        profile(location=TrainingLocation.HOME, setup=HomeTrainingSetup.BODYWEIGHT_ONLY)
+        profile(
+            location=TrainingLocation.HOME,
+            setup=HomeTrainingSetup.BODYWEIGHT_ONLY,
+            available_equipment=frozenset({Equipment.BODYWEIGHT}),
+        )
     )
 
     assert unavailable.id not in result.ids

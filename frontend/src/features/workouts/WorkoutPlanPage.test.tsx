@@ -475,6 +475,35 @@ it("explains the generation cooldown instead of showing a generic failure", asyn
   expect(screen.queryByRole("button", { name: "تلاش دوباره" })).not.toBeInTheDocument();
 });
 
+it.each([
+  [
+    "BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED",
+    "برنامه تمرین فقط با وزن بدن در حال حاضر برای سطح ماه اول و مبتدی ارائه می‌شود.",
+  ],
+  [
+    "BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED",
+    "برنامه تمرین با وزن بدن در حال حاضر برای ۲، ۳ یا ۴ روز در هفته طراحی شده است.",
+  ],
+  [
+    "BODYWEIGHT_PULL_UP_BAR_REQUIRED",
+    "برای اجرای کامل این برنامه و تمرین عضلات پشت و زیربغل به میله بارفیکس نیاز دارید. میله بارفیکس را به تجهیزات اضافه کنید.",
+  ],
+  [
+    "BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE",
+    "با محدودیت‌های فعلی شما یکی از حرکات این برنامه قابل اجرا یا ایمن نیست. تجهیزات و محدودیت‌های تمرینی خود را بررسی کنید.",
+  ],
+])("maps %s to a dedicated bodyweight message", async (code, message) => {
+  api.getActiveWorkoutPlan.mockResolvedValue(null);
+  api.generateWorkoutPlan.mockRejectedValue(new ApiError(422, "bodyweight failure", null, code));
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(message);
+  expect(screen.queryByRole("button", { name: "تلاش دوباره" })).not.toBeInTheDocument();
+});
+
 it("renders the selected duration, exercise media, and exercise detail link", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(plan);
   const user = userEvent.setup();
