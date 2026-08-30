@@ -265,7 +265,8 @@ export type AdminAiTaskType =
   | "workout_plan_generation"
   | "body_photo_analysis"
   | "progress_comparison"
-  | "specialist_summary";
+  | "food_photo_estimation"
+  | "food_price_search";
 
 export type AdminAiCredentialStatus = {
   configured: boolean;

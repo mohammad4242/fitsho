@@ -73,6 +73,14 @@ beforeEach(() => {
   });
 });
 
+it("shows the settings load error instead of staying on the loading state", async () => {
+  api.getAdminAiTaskConfigs.mockRejectedValue(new ApiError(500, "Request failed"));
+  renderPage();
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load AI settings.");
+  expect(screen.queryByText("Loading AI settings…")).not.toBeInTheDocument();
+});
+
 it("shows task-specific vision models and capability details", async () => {
   const user = userEvent.setup();
   renderPage();

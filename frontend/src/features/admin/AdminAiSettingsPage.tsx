@@ -31,6 +31,7 @@ export function AdminAiSettingsPage() {
   const [models, setModels] = useState<AdminAiCatalogModel[]>([]);
   const [catalogStale, setCatalogStale] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [configsLoading, setConfigsLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,8 @@ export function AdminAiSettingsPage() {
           setSelectedTask(items[0].task_type);
         }
       })
-      .catch(() => setError(t("admin.aiSettings.loadError")));
+      .catch(() => setError(t("admin.aiSettings.loadError")))
+      .finally(() => setConfigsLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -220,7 +222,12 @@ export function AdminAiSettingsPage() {
 
   const backLabel = i18n.resolvedLanguage === "en" ? "Return" : "بازگشت";
 
-  if (!config) return <main className="admin-main"><p>{t("admin.aiSettings.loading")}</p></main>;
+  if (configsLoading) return <main className="admin-main"><p>{t("admin.aiSettings.loading")}</p></main>;
+  if (!config) {
+    return <main className="admin-main"><p className="form-error" role="alert">
+      {error ?? t("admin.aiSettings.loadError")}
+    </p></main>;
+  }
 
   return (
     <div className="admin-page">

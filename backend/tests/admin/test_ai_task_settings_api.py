@@ -10,12 +10,23 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
+from app.body_analysis.admin_config.enums import AITaskType
 from app.body_analysis.admin_config.models import AIAuditEvent, AIProviderCredential
 from app.body_analysis.admin_config.schemas import AITaskConfigUpdate
 from app.config import Settings
 from app.main import create_app
 
 ORIGIN = {"Origin": "http://localhost:5173"}
+
+
+def test_ai_task_type_matches_persisted_task_catalog() -> None:
+    assert {task.value for task in AITaskType} == {
+        "workout_plan_generation",
+        "body_photo_analysis",
+        "progress_comparison",
+        "food_photo_estimation",
+        "food_price_search",
+    }
 
 
 def test_task_config_rejects_unsupported_routing_policy() -> None:
@@ -95,6 +106,21 @@ def test_task_settings_require_admin_and_trusted_origin(client: TestClient) -> N
         ).status_code
         == 403
     )
+
+
+def test_admin_lists_all_supported_ai_task_configs(client: TestClient, db: Session) -> None:
+    _admin(client, db)
+
+    response = client.get("/api/v1/admin/ai/task-configs")
+
+    assert response.status_code == 200, response.text
+    assert {item["task_type"] for item in response.json()} == {
+        "workout_plan_generation",
+        "body_photo_analysis",
+        "progress_comparison",
+        "food_photo_estimation",
+        "food_price_search",
+    }
 
 
 def test_openrouter_client_is_independent_from_zen_client(test_settings: Settings) -> None:
