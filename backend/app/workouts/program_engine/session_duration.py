@@ -593,8 +593,9 @@ def _select_set_addition(
 
 
 # _select_rest_extension_for_underfill intentionally removed.
-# Inflating rest merely to fill unused session time is prohibited:
-# session_duration_minutes is a BUDGET, not a fill target.
+# Artificially extending rest merely to satisfy the duration floor is prohibited.
+# The configured main-training duration range remains a hard validation contract;
+# useful work may be added, but fake rest time must not be used to satisfy it.
 
 
 def _select_exercise_addition(

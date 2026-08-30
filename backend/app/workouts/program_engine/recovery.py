@@ -387,11 +387,30 @@ def repair_recovery_accessory_distribution(
             if muscle is None:
                 continue
             source_exercises = source.exercises[:item_index] + source.exercises[item_index + 1 :]
+            ranked_recipients: list[
+                tuple[tuple[int, int, int, int, str], int, int, WorkoutDay]
+            ] = []
             for recipient_index, recipient in enumerate(days):
                 if recipient_index == source_index or not _recipient_supports_muscle(
                     recipient, muscle
                 ):
                     continue
+                coherence = SessionCoherence.from_workout_day(recipient)
+                placement = coherence.placement_rank(
+                    muscle,
+                    existing_exposure=any(
+                        exercise.primary_muscle is muscle for exercise in recipient.exercises
+                    ),
+                )
+                if placement[0] >= 3:
+                    continue
+                ranked_recipients.append(
+                    (placement, recipient.day_index, recipient_index, recipient)
+                )
+            for _, _, recipient_index, recipient in sorted(
+                ranked_recipients,
+                key=lambda candidate: (candidate[0], candidate[1], candidate[2]),
+            ):
                 recipient_exposure = classify_muscle_exposure_details(recipient, ruleset).get(
                     muscle
                 )
