@@ -157,7 +157,7 @@ class AuthProcess:
             if process is None or process.returncode is not None or master_fd is None:
                 raise AuthProcessError("authentication process is not running")
             try:
-                await self._write_pty(master_fd, value.encode("utf-8") + b"\n")
+                await self._write_pty(master_fd, value.encode("utf-8") + b"\r")
             except (BrokenPipeError, ConnectionError, OSError) as exc:
                 raise AuthProcessError("authentication process is not accepting input") from exc
             return

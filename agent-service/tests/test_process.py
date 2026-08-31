@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from app.auth.base import AuthCommand
-from app.auth.process import AuthProcess, safe_auth_environment
+from app.auth.process import AuthProcess, AuthProcessResult, safe_auth_environment
 from app.process import ProcessTimeoutError, run_process
 
 
@@ -223,6 +223,40 @@ def test_auth_process_supports_pty_output_and_termination(
         assert not process.is_running
 
     run(scenario())
+
+
+def test_auth_process_submits_pty_input_with_carriage_return(
+    tmp_path: Path,
+) -> None:
+    script = tmp_path / "pty-input.py"
+    script.write_text(
+        "import os, sys, tty\n"
+        "fd = sys.stdin.fileno()\n"
+        "tty.setraw(fd)\n"
+        "value = os.read(fd, 64)\n"
+        "print('CR' if value == b'CODE\\r' else 'WRONG', flush=True)\n",
+        encoding="utf-8",
+    )
+
+    async def collect(_: str) -> None:
+        return None
+
+    async def scenario() -> AuthProcessResult:
+        process = AuthProcess(
+            AuthCommand(sys.executable, (str(script),), use_pty=True),
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"]},
+            max_output_bytes=4096,
+            output_callback=collect,
+        )
+        await process.start()
+        await asyncio.sleep(0.05)
+        await process.send_input("CODE")
+        return await process.wait()
+
+    result = run(scenario())
+    assert result.returncode == 0
+    assert "CR" in result.final_text
 
 
 def test_auth_process_merges_only_fixed_command_environment_for_pty(
