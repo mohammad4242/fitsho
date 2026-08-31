@@ -10,7 +10,7 @@ import pytest
 from app.auth.base import AuthCommand, ParsedAuthUpdate
 from app.auth.manager import AuthManager, AuthManagerError
 from app.auth.schemas import AuthSessionStatus
-from app.schemas import AgentName
+from app.schemas import AgentName, AuthState
 
 
 def run[T](coro: Coroutine[Any, Any, T]) -> T:
@@ -145,5 +145,60 @@ def test_manager_expires_and_terminates_pending_process(tmp_path: Path) -> None:
         assert (await manager.get(view.session_id)).status is AuthSessionStatus.EXPIRED
         assert not manager._sessions[view.session_id].process.is_running  # noqa: SLF001
         await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_reports_success_and_releases_active_session(tmp_path: Path) -> None:
+    script = write_script(tmp_path, "print('AUTHENTICATED', flush=True)\n")
+    states: list[tuple[AgentName, AuthState]] = []
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.CODEX: FakeAuthAdapter(script)},
+            workspace=tmp_path,
+            state_callback=lambda agent, state: states.append((agent, state)),
+        )
+        view = await manager.start(AgentName.CODEX)
+        await asyncio.sleep(0.1)
+        assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
+        next_view = await manager.start(AgentName.CODEX)
+        assert next_view.status in {
+            AuthSessionStatus.STARTING,
+            AuthSessionStatus.AUTHENTICATED,
+        }
+        await manager.shutdown()
+
+    run(scenario())
+    assert states == [(AgentName.CODEX, AuthState.AUTHENTICATED)]
+
+
+def test_manager_rejects_input_after_cancel_and_shutdown_reaps_process(
+    tmp_path: Path,
+) -> None:
+    script = write_script(tmp_path, "import time\ntime.sleep(60)\n")
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.CODEX: FakeAuthAdapter(script)},
+            workspace=tmp_path,
+        )
+        view = await manager.start(AgentName.CODEX)
+        await asyncio.sleep(0.05)
+        process = manager._sessions[view.session_id].process  # noqa: SLF001
+        assert process is not None
+        await manager.cancel(view.session_id)
+        with pytest.raises(AuthManagerError) as error:
+            await manager.submit_input(view.session_id, "token")
+        assert error.value.code == "auth_input_not_expected"
+
+        second = await manager.start(AgentName.CODEX)
+        await asyncio.sleep(0.05)
+        second_process = manager._sessions[second.session_id].process  # noqa: SLF001
+        assert second_process is not None
+        await manager.shutdown()
+        assert not process.is_running
+        assert not second_process.is_running
+        assert manager._sessions == {}  # noqa: SLF001
 
     run(scenario())

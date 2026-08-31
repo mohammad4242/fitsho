@@ -9,6 +9,8 @@ from typing import Any
 
 import pytest
 
+from app.auth.base import AuthCommand
+from app.auth.process import AuthProcess, AuthProcessError, safe_auth_environment
 from app.process import ProcessTimeoutError, run_process
 
 
@@ -129,3 +131,73 @@ def test_empty_command_is_rejected(tmp_path: Path, command: Sequence[str]) -> No
 def test_nonpositive_timeout_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="timeout"):
         run(run_process([sys.executable, "-c", ""], workspace=tmp_path, timeout_seconds=0))
+
+
+def test_auth_environment_is_an_exact_allowlist() -> None:
+    environment = safe_auth_environment(
+        {
+            "PATH": "/usr/bin",
+            "HOME": "/home/agent",
+            "XDG_CONFIG_HOME": "/home/agent/.config",
+            "XDG_SECRET": "private-token",
+            "AGENT_SERVICE_TOKEN": "service-token",
+            "OPENAI_API_KEY": "provider-token",
+        }
+    )
+
+    assert environment == {
+        "PATH": "/usr/bin",
+        "HOME": "/home/agent",
+        "XDG_CONFIG_HOME": "/home/agent/.config",
+    }
+
+
+def test_auth_process_uses_exec_not_shell_and_bounds_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    exec_calls: list[tuple[object, ...]] = []
+    original_exec = asyncio.create_subprocess_exec
+
+    async def recording_exec(*args: object, **kwargs: object) -> asyncio.subprocess.Process:
+        exec_calls.append(args)
+        return await original_exec(*args, **kwargs)  # type: ignore[arg-type]
+
+    async def forbidden_shell(*args: object, **kwargs: object) -> Any:
+        raise AssertionError(f"shell invocation: {args}, {kwargs}")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", recording_exec)
+    monkeypatch.setattr(asyncio, "create_subprocess_shell", forbidden_shell)
+    output: list[str] = []
+
+    async def collect_output(text: str) -> None:
+        output.append(text)
+
+    async def scenario() -> None:
+        process = AuthProcess(
+            AuthCommand(sys.executable, ("-c", "print('x' * 1000)"), use_pty=False),
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"]},
+            max_output_bytes=32,
+            output_callback=collect_output,
+        )
+        await process.start()
+        result = await process.wait()
+        assert result.returncode == 0
+        assert result.output_truncated is True
+        assert len(result.final_text.encode()) <= 32
+
+    run(scenario())
+    assert exec_calls
+
+
+def test_auth_process_rejects_pty_until_a_real_pty_flow_is_supported(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(AuthProcessError, match="PTY"):
+        AuthProcess(
+            AuthCommand("agy", (), use_pty=True),
+            workspace=tmp_path,
+            environment={},
+            max_output_bytes=32,
+            output_callback=lambda _: asyncio.sleep(0),
+        )

@@ -33,6 +33,9 @@ _SAFE_EXACT_KEYS = frozenset(
         "SSL_CERT_FILE",
         "SSL_CERT_DIR",
         "CLAUDE_CODE_DISABLE_AUTOUPDATE",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_CACHE_HOME",
     }
 )
 
@@ -55,7 +58,7 @@ def safe_auth_environment(source: Mapping[str, str] | None = None) -> dict[str, 
     return {
         key: value
         for key, value in environment.items()
-        if key in _SAFE_EXACT_KEYS or key.startswith("XDG_")
+        if key in _SAFE_EXACT_KEYS
     }
 
 

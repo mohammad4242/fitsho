@@ -5,7 +5,7 @@ from pydantic import SecretStr
 
 from app.config import Settings
 from app.main import create_app
-from app.runners.base import AgentRunner, RunnerRequest, RunnerResult
+from app.runners.base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
 from app.runners.registry import RunnerRegistry
 from app.schemas import AgentName, AuthState, RunnerCapabilities, RunnerModelCapabilities
 
@@ -14,6 +14,9 @@ TOKEN = "a" * 32
 
 class FakeRunner(AgentRunner):
     name = AgentName.ANTIGRAVITY
+
+    def __init__(self) -> None:
+        self.run_calls = 0
 
     async def capabilities(self) -> RunnerCapabilities:
         return RunnerCapabilities(
@@ -31,6 +34,7 @@ class FakeRunner(AgentRunner):
         )
 
     async def run(self, request: RunnerRequest) -> RunnerResult:
+        self.run_calls += 1
         return RunnerResult(
             payload={"ok": True},
             model_id=request.model_id,
@@ -42,7 +46,8 @@ class FakeRunner(AgentRunner):
 
 def test_capabilities_are_owned_by_runners_and_do_not_run_generation(tmp_path: Path) -> None:
     settings = Settings(agent_service_token=SecretStr(TOKEN), agent_workspace_root=tmp_path)
-    app = create_app(settings, registry=RunnerRegistry([FakeRunner()]))
+    runner = FakeRunner()
+    app = create_app(settings, registry=RunnerRegistry([runner]))
     response = TestClient(app).get(
         "/v1/capabilities", headers={"Authorization": f"Bearer {TOKEN}"}
     )
@@ -68,6 +73,7 @@ def test_capabilities_are_owned_by_runners_and_do_not_run_generation(tmp_path: P
             }
         ]
     }
+    assert runner.run_calls == 0
 
 
 def test_default_registry_has_no_invented_models(tmp_path: Path) -> None:
@@ -123,7 +129,8 @@ def test_successful_test_marks_runner_authenticated_without_model_quota_probe(
     tmp_path: Path,
 ) -> None:
     settings = Settings(agent_service_token=SecretStr(TOKEN), agent_workspace_root=tmp_path)
-    registry = RunnerRegistry([FakeRunner()])
+    runner = FakeRunner()
+    registry = RunnerRegistry([runner])
     app = create_app(settings, registry=registry)
     client = TestClient(app)
 
@@ -134,7 +141,33 @@ def test_successful_test_marks_runner_authenticated_without_model_quota_probe(
     )
 
     assert response.status_code == 200
+    assert runner.run_calls == 1
     capabilities = client.get(
         "/v1/capabilities", headers={"Authorization": f"Bearer {TOKEN}"}
     )
     assert capabilities.json()["runners"][0]["auth_state"] == "authenticated"
+
+
+def test_unauthorized_test_marks_runner_unauthenticated(tmp_path: Path) -> None:
+    class UnauthorizedRunner(FakeRunner):
+        async def run(self, request: RunnerRequest) -> RunnerResult:
+            del request
+            raise RunnerError("unauthorized", "private runner error")
+
+    settings = Settings(agent_service_token=SecretStr(TOKEN), agent_workspace_root=tmp_path)
+    runner = UnauthorizedRunner()
+    registry = RunnerRegistry([runner])
+    client = TestClient(create_app(settings, registry=registry))
+
+    response = client.post(
+        "/v1/test",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        json={"agent": "antigravity", "model_id": "fake-model"},
+    )
+
+    assert response.status_code == 401
+    assert "private runner error" not in response.text
+    capabilities = client.get(
+        "/v1/capabilities", headers={"Authorization": f"Bearer {TOKEN}"}
+    )
+    assert capabilities.json()["runners"][0]["auth_state"] == "unauthenticated"
