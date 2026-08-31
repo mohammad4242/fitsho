@@ -9,13 +9,17 @@ import { ApiError } from "../../shared/apiClient";
 import {
   getAdminAiTaskConfigs,
   getAdminAiTaskModels,
+  getAdminAiAgentServiceCapabilities,
   refreshAdminAiModels,
   saveAdminAiTaskConfig,
+  testAdminAiAgentService,
   testAdminAiProvider,
 } from "./api";
 import { AiModelSelector } from "./AiModelSelector";
 import type {
   AdminAiCatalogModel,
+  AdminAiAgentName,
+  AdminAiAgentRunnerCapability,
   AdminAiTaskConfig,
   AdminAiTaskConfigUpdate,
   AdminAiTaskType,
@@ -24,12 +28,22 @@ import "./admin.css";
 
 type AiSettingsOperation = "save" | "test" | "refresh";
 
+const agentTasks: AdminAiTaskType[] = [
+  "workout_plan_generation",
+  "body_photo_analysis",
+  "food_photo_estimation",
+];
+const agentNames: AdminAiAgentName[] = ["antigravity", "codex", "claude"];
+
 export function AdminAiSettingsPage() {
   const { i18n, t } = useTranslation();
   const [configs, setConfigs] = useState<AdminAiTaskConfig[]>([]);
   const [selectedTask, setSelectedTask] = useState<AdminAiTaskType>("body_photo_analysis");
   const [models, setModels] = useState<AdminAiCatalogModel[]>([]);
   const [catalogStale, setCatalogStale] = useState(false);
+  const [agentCapabilities, setAgentCapabilities] = useState<AdminAiAgentRunnerCapability[]>([]);
+  const [agentCapabilitiesLoading, setAgentCapabilitiesLoading] = useState(false);
+  const [agentCapabilitiesError, setAgentCapabilitiesError] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [configsLoading, setConfigsLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -38,6 +52,7 @@ export function AdminAiSettingsPage() {
   const [feedbackOperation, setFeedbackOperation] = useState<AiSettingsOperation | null>(null);
   const modelRequestVersion = useRef(0);
   const operationVersion = useRef(0);
+  const agentRequestVersion = useRef(0);
   const activeTask = useRef<AdminAiTaskType>(selectedTask);
   const taskEpoch = useRef(0);
 
@@ -45,6 +60,18 @@ export function AdminAiSettingsPage() {
     () => configs.find((item) => item.task_type === selectedTask) ?? null,
     [configs, selectedTask],
   );
+
+  const agentMode = config?.execution_backend === "agent_service";
+  const agentTaskSupported = agentTasks.includes(selectedTask);
+  const selectedAgent = config?.agent_name
+    ?? agentCapabilities.find((runner) => runner.installed)?.agent
+    ?? "antigravity";
+  const selectedRunner = agentCapabilities.find((runner) => runner.agent === selectedAgent) ?? null;
+  const agentModels = useMemo(
+    () => (selectedRunner ? toAgentCatalogModels(selectedRunner, selectedTask) : []),
+    [selectedRunner, selectedTask],
+  );
+  const selectableModels = agentMode ? agentModels : models;
 
   useEffect(() => {
     void getAdminAiTaskConfigs()
@@ -61,8 +88,50 @@ export function AdminAiSettingsPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!config) return;
+    if (config?.execution_backend === "agent_service") {
+      setModels([]);
+      setCatalogStale(false);
+      return;
+    }
     void loadModels(selectedTask, "");
-  }, [selectedTask]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedTask, config?.execution_backend]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!agentMode || !agentTaskSupported) {
+      setAgentCapabilitiesLoading(false);
+      return;
+    }
+    const taskAtStart = selectedTask;
+    const epochAtStart = taskEpoch.current;
+    const requestVersion = agentRequestVersion.current + 1;
+    agentRequestVersion.current = requestVersion;
+    setAgentCapabilitiesLoading(true);
+    setAgentCapabilitiesError(false);
+    void getAdminAiAgentServiceCapabilities()
+      .then((response) => {
+        if (
+          requestVersion !== agentRequestVersion.current
+          || activeTask.current !== taskAtStart
+          || taskEpoch.current !== epochAtStart
+        ) return;
+        setAgentCapabilities(response.runners);
+      })
+      .catch(() => {
+        if (
+          requestVersion === agentRequestVersion.current
+          && activeTask.current === taskAtStart
+          && taskEpoch.current === epochAtStart
+        ) setAgentCapabilitiesError(true);
+      })
+      .finally(() => {
+        if (
+          requestVersion === agentRequestVersion.current
+          && activeTask.current === taskAtStart
+          && taskEpoch.current === epochAtStart
+        ) setAgentCapabilitiesLoading(false);
+      });
+  }, [agentMode, agentTaskSupported, selectedTask]);
 
   function loadModels(task: AdminAiTaskType, query: string, epoch = taskEpoch.current) {
     if (activeTask.current !== task || taskEpoch.current !== epoch) return Promise.resolve();
@@ -116,6 +185,9 @@ export function AdminAiSettingsPage() {
     setError(null);
     const payload: AdminAiTaskConfigUpdate = {
       provider: target.provider,
+      execution_backend: target.execution_backend,
+      agent_name: target.agent_name,
+      agent_model_id: target.agent_model_id,
       enabled: target.enabled,
       primary_model_id: target.primary_model_id,
       fallback_model_ids: target.fallback_model_ids,
@@ -149,7 +221,20 @@ export function AdminAiSettingsPage() {
     const operation = beginOperation("test");
     setMessage(null);
     setError(null);
-    void testAdminAiProvider(apiKey || undefined)
+    const testRequest = agentMode && config !== null && targetAgentIsReady(config)
+      ? testAdminAiAgentService(config.agent_name!, config.agent_model_id!)
+      : agentMode
+        ? Promise.resolve({
+            ok: false,
+            agent: selectedAgent,
+            model_id: config?.agent_model_id ?? "",
+            checked_at: new Date().toISOString(),
+            duration_seconds: null,
+            error_code: "invalid_request",
+            safe_error_message: t("admin.aiSettings.agentTestRequiresSelection"),
+          })
+        : testAdminAiProvider(apiKey || undefined);
+    void testRequest
       .then((result) => {
         if (!isActiveOperation(taskAtStart, epochAtStart, operation)) return;
         if (result.ok) setMessage(t("admin.aiSettings.connected"));
@@ -164,6 +249,7 @@ export function AdminAiSettingsPage() {
   }
 
   function handleRefresh() {
+    if (agentMode) return;
     const taskAtStart = selectedTask;
     const epochAtStart = taskEpoch.current;
     const operation = beginOperation("refresh");
@@ -256,37 +342,96 @@ export function AdminAiSettingsPage() {
       <form className="admin-ai-settings-form" onSubmit={handleSave}>
         <section className="admin-panel">
           <h2>{t(`admin.aiSettings.tasks.${selectedTask}`)}</h2>
-          <label className="admin-ai-setting-field"><span>{t("admin.aiSettings.provider")}</span><input value="OpenRouter" disabled /></label>
-          <label className="admin-ai-setting-field" htmlFor="ai-api-key">
-            <span>{t("admin.aiSettings.apiKey")}</span>
-            <input
-              id="ai-api-key"
-              type="password"
-              autoComplete="new-password"
-              value={apiKey}
-              placeholder={config.credential.masked ?? t("admin.aiSettings.apiKeyPlaceholder")}
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-          </label>
+          <fieldset className="admin-ai-backend-switch">
+            <legend>{t("admin.aiSettings.executionBackend")}</legend>
+            <label>
+              <input
+                type="radio"
+                name="execution-backend"
+                value="api"
+                checked={config.execution_backend === "api"}
+                onChange={() => patchConfig({ execution_backend: "api" })}
+              />
+              {t("admin.aiSettings.apiBackend")}
+            </label>
+            <label className={!agentTaskSupported ? "is-disabled" : undefined}>
+              <input
+                type="radio"
+                name="execution-backend"
+                value="agent_service"
+                checked={config.execution_backend === "agent_service"}
+                disabled={!agentTaskSupported}
+                onChange={() => patchConfig({ execution_backend: "agent_service" })}
+              />
+              {t("admin.aiSettings.agentServiceBackend")}
+            </label>
+            {!agentTaskSupported && <p className="admin-ai-inline-note">{t("admin.aiSettings.agentUnsupported")}</p>}
+          </fieldset>
+          {!agentMode && <>
+            <label className="admin-ai-setting-field"><span>{t("admin.aiSettings.provider")}</span><input value="OpenRouter" disabled /></label>
+            <label className="admin-ai-setting-field" htmlFor="ai-api-key">
+              <span>{t("admin.aiSettings.apiKey")}</span>
+              <input
+                id="ai-api-key"
+                type="password"
+                autoComplete="new-password"
+                value={apiKey}
+                placeholder={config.credential.masked ?? t("admin.aiSettings.apiKeyPlaceholder")}
+                onChange={(event) => setApiKey(event.target.value)}
+              />
+            </label>
+          </>}
+          {agentMode && <div className="admin-ai-agent-panel">
+            <label className="admin-ai-setting-field" htmlFor="ai-agent-name">
+              <span>{t("admin.aiSettings.agent")}</span>
+              <select
+                id="ai-agent-name"
+                value={config.agent_name ?? ""}
+                onChange={(event) => patchConfig({ agent_name: event.target.value as AdminAiAgentName, agent_model_id: null })}
+              >
+                <option value="" disabled>{t("admin.aiSettings.selectAgent")}</option>
+                {agentNames.map((agent) => <option key={agent} value={agent}>{t(`admin.aiSettings.agents.${agent}`)}</option>)}
+              </select>
+            </label>
+            <div className="admin-ai-agent-status" role="status">
+              <strong>{t("admin.aiSettings.agentStatus")}</strong>
+              {agentCapabilitiesLoading && <span>{t("admin.aiSettings.agentLoading")}</span>}
+              {!agentCapabilitiesLoading && agentCapabilitiesError && <span className="form-error">{t("admin.aiSettings.agentUnavailable")}</span>}
+              {!agentCapabilitiesLoading && !agentCapabilitiesError && selectedRunner && <span>
+                {selectedRunner.installed ? t("admin.aiSettings.agentInstalled") : t("admin.aiSettings.agentUnavailable")}
+                {` · ${t(`admin.aiSettings.auth.${selectedRunner.auth_state}`)}`}
+                {selectedRunner.version ? ` · ${selectedRunner.version}` : ""}
+              </span>}
+              {!agentCapabilitiesLoading && !agentCapabilitiesError && !selectedRunner && <span>{t("admin.aiSettings.agentUnavailable")}</span>}
+            </div>
+          </div>}
           <dl className="admin-ai-observability">
             <div><dt>{t("admin.aiSettings.lastConnection")}</dt><dd>{config.last_successful_connection_test_at ?? "—"}</dd></div>
             <div><dt>{t("admin.aiSettings.lastCatalogRefresh")}</dt><dd>{config.last_model_catalog_refresh_at ?? "—"}</dd></div>
             <div><dt>{t("admin.aiSettings.lastError")}</dt><dd>{config.last_error_code ?? "—"}{config.last_error_message ? ` — ${config.last_error_message}` : ""}</dd></div>
           </dl>
           <div className="admin-ai-settings-actions">
-            <button type="button" disabled={busy !== null} onClick={handleConnectionTest}>{t("admin.aiSettings.test")}</button>
-            <button type="button" disabled={busy !== null || !config.credential.configured} onClick={handleRefresh}>{t("admin.aiSettings.refresh")}</button>
+            <button type="button" disabled={busy !== null || (agentMode && !targetAgentIsReady(config))} onClick={handleConnectionTest}>
+              {agentMode ? t("admin.aiSettings.testAgent") : t("admin.aiSettings.test")}
+            </button>
+            {!agentMode && <button type="button" disabled={busy !== null || !config.credential.configured} onClick={handleRefresh}>{t("admin.aiSettings.refresh")}</button>}
           </div>
           {feedbackOperation !== "save" && message && <p className="admin-ai-provider-feedback admin-ai-settings-message" role="status">{message}</p>}
           {feedbackOperation !== "save" && error && <p className="admin-ai-provider-feedback form-error" role="alert">{error}</p>}
         </section>
 
         <section className="admin-panel">
-          {catalogStale && <p className="form-error" role="status">{t("admin.aiSettings.catalogStale")}</p>}
-          <AiModelSelector id="primary-model" label={t("admin.aiSettings.primaryModel")} models={models} value={config.primary_model_id ?? ""} onChange={(value) => patchConfig({ primary_model_id: value || null })} />
-          <AiModelSelector id="fallback-models" label={t("admin.aiSettings.fallbackModels")} models={models.filter((model) => model.model_id !== config.primary_model_id)} value="" onChange={() => undefined} multiple values={config.fallback_model_ids} onMultipleChange={(values) => patchConfig({ fallback_model_ids: values })} />
+          {catalogStale && !agentMode && <p className="form-error" role="status">{t("admin.aiSettings.catalogStale")}</p>}
+          <AiModelSelector
+            id="primary-model"
+            label={agentMode ? t("admin.aiSettings.agentModel") : t("admin.aiSettings.primaryModel")}
+            models={selectableModels}
+            value={agentMode ? (config.agent_model_id ?? "") : (config.primary_model_id ?? "")}
+            onChange={(value) => patchConfig(agentMode ? { agent_name: config.agent_name ?? selectedAgent, agent_model_id: value || null } : { primary_model_id: value || null })}
+          />
+          {!agentMode && <AiModelSelector id="fallback-models" label={t("admin.aiSettings.fallbackModels")} models={models.filter((model) => model.model_id !== config.primary_model_id)} value="" onChange={() => undefined} multiple values={config.fallback_model_ids} onMultipleChange={(values) => patchConfig({ fallback_model_ids: values })} />}
           <div className="admin-ai-capabilities" aria-label={t("admin.aiSettings.selectedCapabilities")}>
-            {models.filter((model) => model.model_id === config.primary_model_id).map((model) => <div key={model.model_id}><span>{t("admin.aiSettings.imageInput")}: {model.supports_image_input ? t("admin.aiSettings.yes") : t("admin.aiSettings.no")}</span><span>{t("admin.aiSettings.structuredOutput")}: {model.supports_structured_output ? t("admin.aiSettings.yes") : t("admin.aiSettings.warningUnavailable")}</span><span>{t("admin.aiSettings.context")}: {model.context_length ?? t("admin.aiSettings.unknown")}</span><span>{t("admin.aiSettings.pricing")}: {model.input_price_per_token ?? "—"} / {model.output_price_per_token ?? "—"}</span></div>)}
+            {selectableModels.filter((model) => model.model_id === (agentMode ? config.agent_model_id : config.primary_model_id)).map((model) => <div key={model.model_id}><span>{t("admin.aiSettings.imageInput")}: {model.supports_image_input ? t("admin.aiSettings.yes") : t("admin.aiSettings.no")}</span><span>{t("admin.aiSettings.structuredOutput")}: {model.supports_structured_output ? t("admin.aiSettings.yes") : t("admin.aiSettings.warningUnavailable")}</span><span>{t("admin.aiSettings.context")}: {model.context_length ?? t("admin.aiSettings.unknown")}</span><span>{t("admin.aiSettings.pricing")}: {model.input_price_per_token ?? "—"} / {model.output_price_per_token ?? "—"}</span></div>)}
           </div>
         </section>
 
@@ -329,4 +474,37 @@ function SettingHelp({ label, guide }: { label: string; guide: string }) {
       <div role="note"><strong>{label}</strong><p>{guide}</p></div>
     </details>
   );
+}
+
+function targetAgentIsReady(config: AdminAiTaskConfig | null): config is AdminAiTaskConfig {
+  return config?.execution_backend === "agent_service"
+    && config.agent_name !== null
+    && config.agent_model_id !== null
+    && config.agent_model_id.trim().length > 0;
+}
+
+function toAgentCatalogModels(
+  runner: AdminAiAgentRunnerCapability,
+  task: AdminAiTaskType,
+): AdminAiCatalogModel[] {
+  return runner.models
+    .filter((model) => {
+      if (!runner.installed) return false;
+      const needsImage = task === "body_photo_analysis" || task === "food_photo_estimation";
+      return model.supports_structured_output
+        && (needsImage ? model.supports_image_input : model.supports_text_input);
+    })
+    .map((model) => ({
+      provider: `agent_service:${runner.agent}`,
+      model_id: model.model_id,
+      display_name: model.model_id,
+      provider_family: runner.agent,
+      supports_text_input: model.supports_text_input,
+      supports_image_input: model.supports_image_input,
+      supports_structured_output: model.supports_structured_output,
+      context_length: null,
+      input_price_per_token: null,
+      output_price_per_token: null,
+      available: true,
+    }));
 }
