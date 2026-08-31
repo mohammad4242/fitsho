@@ -5,6 +5,7 @@ import io
 import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import cast
 from uuid import uuid4
 
 import pytest
@@ -29,6 +30,7 @@ from app.body_analysis.models import (
 from app.body_analysis.providers import (
     AIProviderError,
     ProviderErrorCode,
+    StructuredGenerationRequest,
     StructuredGenerationResponse,
 )
 from app.body_analysis.runtime import _validate_budget_preflight
@@ -106,6 +108,18 @@ class _Provider:
         if isinstance(error, AIProviderError):
             return error
         return AIProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE, "Provider unavailable")
+
+
+class _CostlessProvider(_Provider):
+    def __init__(self) -> None:
+        super().__init__()
+        self.schema_names: list[str] = []
+
+    async def analyze_images(self, request: object, *, images: tuple[object, ...]) -> object:
+        self.schema_names.append(cast(StructuredGenerationRequest, request).schema_name)
+        response = await super().analyze_images(request, images=images)
+        assert isinstance(response, StructuredGenerationResponse)
+        return response.model_copy(update={"cost": None})
 
 
 class _FailingProvider(_Provider):
@@ -224,6 +238,21 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
     assert len(versions) == 1
     assert versions[0].version == 1
     assert versions[0].normalized_result["summary"]["priority_areas"] == ["shoulders"]
+
+
+def test_execution_uses_one_provider_for_preflight_and_analysis_without_cost(db: Session) -> None:
+    user, session = _submitted_session(db)
+    provider = _CostlessProvider()
+    config = _config().model_copy(update={"max_cost_per_request": Decimal("0.01")})
+    service = BodyAnalysisService(db)
+    analysis = service.queue(session.id, user.id, config)
+
+    completed = asyncio.run(service.execute(analysis.id, provider, _Storage(), config))
+
+    assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
+    assert provider.schema_names == ["fitsho_body_photo_preflight", "fitsho_body_analysis"]
+    assert provider.calls == 2
+    assert completed.request_cost is None
 
 
 def test_execution_stops_after_rejected_photo_preflight_and_preserves_view_reasons(
@@ -441,7 +470,9 @@ def test_low_confidence_and_cost_limited_results_fail_safely(db: Session) -> Non
     assert "invalid structured response" in (failed.error_message or "")
 
 
-def test_unauthorized_provider_error_tells_admin_to_replace_openrouter_key(db: Session) -> None:
+def test_unauthorized_provider_error_tells_admin_to_update_configured_credentials(
+    db: Session,
+) -> None:
     user, session = _submitted_session(db)
     analysis = BodyAnalysisService(db).queue(session.id, user.id, _config())
 
@@ -453,7 +484,7 @@ def test_unauthorized_provider_error_tells_admin_to_replace_openrouter_key(db: S
     assert failed.error_code == "unauthorized"
     assert (
         failed.error_message
-        == "The OpenRouter API key for body analysis was rejected. Update it in Admin AI settings."
+        == "The configured AI provider credential was rejected. Update it in Admin AI settings."
     )
 
 

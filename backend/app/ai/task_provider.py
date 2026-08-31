@@ -76,8 +76,10 @@ def build_task_provider(
     primary_model_id = _required_model(task.agent_model_id, "agent_model_id")
     token = getattr(settings, "agent_service_token", None)
     token_value = _secret_value(token)
+    if token_value is None:
+        raise ValueError("Agent Service token is not configured")
     if getattr(settings, "app_env", None) == "production" and (
-        token_value is None or len(token_value) < 32
+        len(token_value) < 32
     ):
         raise ValueError("production Agent Service mode requires a strong token")
     agent_provider: AIProvider = AgentServiceProvider(

@@ -7,15 +7,15 @@ import httpx
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 
+from app.ai.task_provider import build_task_provider
 from app.auth.dependencies import AppSettings, DatabaseSession
-from app.body_analysis.admin_config.enums import AIRoutingPolicy, AITaskType
+from app.body_analysis.admin_config.enums import AIExecutionBackend, AITaskType
 from app.body_analysis.admin_config.models import AIModelCatalogEntry, AITaskConfig
 from app.body_analysis.admin_config.service import (
     AIConfigError,
     decrypted_key,
-    openrouter_provider,
 )
-from app.body_analysis.providers import AIProvider, ProviderRoutingPreferences
+from app.body_analysis.providers import AIProvider
 from app.body_analysis.service import AnalysisExecutionConfig
 from app.body_photos.storage import BodyPhotoStorage
 
@@ -35,44 +35,52 @@ def get_body_analysis_runtime(
     task = db.scalar(
         select(AITaskConfig).where(AITaskConfig.task_type == AITaskType.BODY_PHOTO_ANALYSIS)
     )
-    if task is None or not task.enabled or not task.primary_model_id:
+    if task is None or not task.enabled:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Body analysis is temporarily unavailable",
         )
     try:
-        policies = tuple(AIRoutingPolicy(item) for item in task.routing_restrictions)
-        preferences = _provider_preferences(policies)
-        _validate_budget_preflight(db, task)
-    except ValueError as error:
+        backend = AIExecutionBackend(task.execution_backend)
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Body analysis is temporarily unavailable",
-        ) from error
-    client = getattr(request.app.state, "ai_http_client", None)
-    if not isinstance(client, httpx.AsyncClient):
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Body analysis is temporarily unavailable",
-        )
+        ) from None
     try:
-        key = decrypted_key(db, provider=task.provider, settings=settings)
-    except AIConfigError as error:
+        client_name = (
+            "ai_http_client" if backend is AIExecutionBackend.API else "agent_http_client"
+        )
+        client = getattr(request.app.state, client_name, None)
+        if not isinstance(client, httpx.AsyncClient):
+            raise ValueError("AI HTTP client is unavailable")
+        key = (
+            decrypted_key(db, provider=task.provider, settings=settings)
+            if backend is AIExecutionBackend.API
+            else None
+        )
+        configured = build_task_provider(
+            task,
+            settings=settings,
+            http_client=client,
+            agent_http_client=(
+                client if backend is AIExecutionBackend.AGENT_SERVICE else None
+            ),
+            api_key=key,
+        )
+        if configured.supports_cost_accounting:
+            _validate_budget_preflight(db, task)
+    except (AIConfigError, ValueError) as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Body analysis is temporarily unavailable",
         ) from error
     return BodyAnalysisRuntime(
-        provider=openrouter_provider(
-            client,
-            api_key=key,
-            settings=settings,
-            timeout_seconds=task.timeout_seconds,
-        ),
+        provider=configured.provider,
         config=AnalysisExecutionConfig(
-            provider_name=task.provider.value,
-            primary_model=task.primary_model_id,
-            fallback_models=tuple(task.fallback_model_ids),
+            provider_name=configured.provider_name,
+            primary_model=configured.primary_model_id,
+            fallback_models=configured.fallback_model_ids,
             prompt_version="body-analysis-v3",
             schema_version="3.0",
             temperature=task.temperature,
@@ -81,30 +89,18 @@ def get_body_analysis_runtime(
             minimum_confidence=task.minimum_confidence,
             max_cost_per_request=(
                 task.max_cost_per_request
-                if task.max_cost_per_request and task.max_cost_per_request > 0
+                if configured.supports_cost_accounting
+                and task.max_cost_per_request
+                and task.max_cost_per_request > 0
                 else None
             ),
-            routing_preferences=preferences,
+            routing_preferences=configured.routing_preferences,
         ),
         storage=BodyPhotoStorage(settings),
     )
 
 
 BodyAnalysisRuntimeDependency = Annotated[BodyAnalysisRuntime, Depends(get_body_analysis_runtime)]
-
-
-def _provider_preferences(
-    policies: tuple[AIRoutingPolicy, ...],
-) -> ProviderRoutingPreferences:
-    return ProviderRoutingPreferences(
-        data_collection=(
-            "deny" if AIRoutingPolicy.DENY_PROVIDER_DATA_COLLECTION in policies else None
-        ),
-        zdr=True if AIRoutingPolicy.ZERO_DATA_RETENTION in policies else None,
-        require_parameters=(
-            True if AIRoutingPolicy.REQUIRE_SUPPORTED_PARAMETERS in policies else None
-        ),
-    )
 
 
 def _validate_budget_preflight(db: DatabaseSession, task: AITaskConfig) -> None:

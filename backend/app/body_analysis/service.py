@@ -827,7 +827,7 @@ class BodyAnalysisService:
     def _safe_failure_message(code: ProviderErrorCode) -> str:
         if code is ProviderErrorCode.UNAUTHORIZED:
             return (
-                "The OpenRouter API key for body analysis was rejected. "
+                "The configured AI provider credential was rejected. "
                 "Update it in Admin AI settings."
             )
         if code is ProviderErrorCode.INVALID_OUTPUT:
