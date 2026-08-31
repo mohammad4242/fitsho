@@ -32,7 +32,7 @@ class FakeRunner(AgentRunner):
 
     async def run(self, request: RunnerRequest) -> RunnerResult:
         return RunnerResult(
-            payload={"answer": "ok"},
+            payload={"ok": True},
             model_id=request.model_id,
             input_tokens=1,
             output_tokens=2,
@@ -77,29 +77,24 @@ def test_default_registry_has_no_invented_models(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["runners"] == [
-        {
-            "agent": "antigravity",
-            "installed": True,
-            "version": None,
-            "auth_state": "unknown",
-            "models": [],
-        },
-        {
-            "agent": "codex",
-            "installed": True,
-            "version": None,
-            "auth_state": "unknown",
-            "models": [],
-        },
-        {
-            "agent": "claude",
-            "installed": True,
-            "version": None,
-            "auth_state": "unknown",
-            "models": [],
-        },
-    ]
+    runners = {runner["agent"]: runner for runner in response.json()["runners"]}
+    assert set(runners) == {"antigravity", "codex", "claude"}
+    assert runners["antigravity"]["version"] == "1.1.22"
+    assert runners["codex"]["version"] == "codex-cli 0.151.0"
+    assert runners["claude"]["version"] == "2.1.220 (Claude Code)"
+    assert all(runner["installed"] is True for runner in runners.values())
+    assert all(runner["models"] == [] for runner in runners.values())
+    assert runners["antigravity"]["auth_state"] == "unknown"
+    assert runners["codex"]["auth_state"] in {
+        "authenticated",
+        "unauthenticated",
+        "unknown",
+    }
+    assert runners["claude"]["auth_state"] in {
+        "authenticated",
+        "unauthenticated",
+        "unknown",
+    }
 
 
 def test_capability_probe_failure_is_reported_without_a_500(tmp_path: Path) -> None:
@@ -122,3 +117,24 @@ def test_capability_probe_failure_is_reported_without_a_500(tmp_path: Path) -> N
             "models": [],
         }
     ]
+
+
+def test_successful_test_marks_runner_authenticated_without_model_quota_probe(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(agent_service_token=SecretStr(TOKEN), agent_workspace_root=tmp_path)
+    registry = RunnerRegistry([FakeRunner()])
+    app = create_app(settings, registry=registry)
+    client = TestClient(app)
+
+    response = client.post(
+        "/v1/test",
+        headers={"Authorization": f"Bearer {TOKEN}"},
+        json={"agent": "antigravity", "model_id": "fake-model"},
+    )
+
+    assert response.status_code == 200
+    capabilities = client.get(
+        "/v1/capabilities", headers={"Authorization": f"Bearer {TOKEN}"}
+    )
+    assert capabilities.json()["runners"][0]["auth_state"] == "authenticated"

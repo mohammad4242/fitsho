@@ -16,6 +16,7 @@ from .schemas import (
     AgentGenerationInput,
     AgentGenerationOutput,
     AgentName,
+    AuthState,
     ErrorCode,
     RunnerCapabilities,
     TestOutput,
@@ -76,7 +77,13 @@ class AgentService:
             max_output_tokens=32,
             timeout_seconds=30,
         )
-        result = await self._run(request.agent, runner_request, request_id)
+        try:
+            result = await self._run(request.agent, runner_request, request_id)
+        except AgentServiceError as exc:
+            if exc.code is ErrorCode.UNAUTHORIZED:
+                self.registry.set_auth_state(request.agent, AuthState.UNAUTHENTICATED)
+            raise
+        self.registry.set_auth_state(request.agent, AuthState.AUTHENTICATED)
         return TestOutput(
             ok=bool(result.payload.get("ok")),
             agent=request.agent,
@@ -185,6 +192,8 @@ class AgentService:
             code, status = _RUNNER_STATUS.get(
                 exc.code, (ErrorCode.PROVIDER_UNAVAILABLE, 503)
             )
+            if code is ErrorCode.UNAUTHORIZED:
+                self.registry.set_auth_state(runner.name, AuthState.UNAUTHENTICATED)
             raise AgentServiceError(code, self._safe_message(code), status) from exc
         except (TimeoutError, OSError) as exc:
             raise AgentServiceError(

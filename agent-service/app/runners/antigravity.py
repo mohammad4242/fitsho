@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
 from ..schemas import AgentName, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
+from .probes import CliMetadataProbe
 
 
 class AntigravityRunner(AgentRunner):
@@ -54,12 +55,18 @@ class AntigravityRunner(AgentRunner):
         self.executable = executable
         self.configured_models = configured_models
         self.supports_image_input = supports_image_input
+        self._metadata = CliMetadataProbe(
+            executable=self.executable,
+            workspace=self.workspace,
+            environment=self._subprocess_environment(),
+        )
 
     async def capabilities(self) -> RunnerCapabilities:
+        installed = self._is_installed()
         return RunnerCapabilities(
             agent=self.name,
-            installed=self._is_installed(),
-            version=None,
+            installed=installed,
+            version=await self._metadata.version() if installed else None,
             auth_state=AuthState.UNKNOWN,
             models=[
                 RunnerModelCapabilities(
@@ -71,6 +78,9 @@ class AntigravityRunner(AgentRunner):
                 for model_id in self.configured_models
             ],
         )
+
+    async def probe_auth_state(self) -> AuthState:
+        return AuthState.UNKNOWN
 
     def _is_installed(self) -> bool:
         executable = Path(self.executable)

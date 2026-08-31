@@ -15,6 +15,7 @@ from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
 from ..schemas import AgentName, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
+from .probes import CliMetadataProbe
 
 
 class ClaudeRunner(AgentRunner):
@@ -61,12 +62,20 @@ class ClaudeRunner(AgentRunner):
         # Claude image input is deliberately opt-in until the exact container
         # invocation is smoke-tested with a subscription login.
         self.supports_image_input = supports_image_input
+        self._metadata = CliMetadataProbe(
+            executable=self.executable,
+            workspace=self.workspace,
+            environment=self._subprocess_environment(),
+            auth_status_args=("auth", "status", "--json"),
+            auth_status_parser=self._parse_auth_status,
+        )
 
     async def capabilities(self) -> RunnerCapabilities:
+        installed = self._is_installed()
         return RunnerCapabilities(
             agent=self.name,
-            installed=self._is_installed(),
-            version=None,
+            installed=installed,
+            version=await self._metadata.version() if installed else None,
             auth_state=AuthState.UNKNOWN,
             models=[
                 RunnerModelCapabilities(
@@ -79,6 +88,11 @@ class ClaudeRunner(AgentRunner):
             ],
         )
 
+    async def probe_auth_state(self) -> AuthState:
+        if not self._is_installed():
+            return AuthState.UNKNOWN
+        return await self._metadata.auth_state()
+
     def _is_installed(self) -> bool:
         executable = Path(self.executable)
         if executable.parent != Path("."):
@@ -87,6 +101,20 @@ class ClaudeRunner(AgentRunner):
             except OSError:
                 return False
         return shutil.which(self.executable) is not None
+
+    @staticmethod
+    def _parse_auth_status(result: Any) -> AuthState:
+        try:
+            document = json.loads(result.stdout)
+        except (json.JSONDecodeError, TypeError):
+            return AuthState.UNKNOWN
+        if not isinstance(document, dict) or not isinstance(document.get("loggedIn"), bool):
+            return AuthState.UNKNOWN
+        return (
+            AuthState.AUTHENTICATED
+            if document["loggedIn"]
+            else AuthState.UNAUTHENTICATED
+        )
 
     async def run(self, request: RunnerRequest) -> RunnerResult:
         started = time.perf_counter()

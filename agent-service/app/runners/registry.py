@@ -19,6 +19,7 @@ class RunnerRegistry:
     ) -> None:
         self._runners = {runner.name: runner for runner in runners}
         self._workspace_factories = dict(workspace_factories or {})
+        self._auth_states = {runner.name: AuthState.UNKNOWN for runner in self._runners.values()}
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "RunnerRegistry":
@@ -84,11 +85,15 @@ class RunnerRegistry:
         factory = self._workspace_factories.get(agent)
         return factory(workspace) if factory is not None else runner
 
+    def set_auth_state(self, agent: AgentName, state: AuthState) -> None:
+        if agent in self._runners:
+            self._auth_states[agent] = state
+
     async def capabilities(self) -> list[RunnerCapabilities]:
         result: list[RunnerCapabilities] = []
         for runner in self._runners.values():
             try:
-                result.append(await runner.capabilities())
+                capabilities = await runner.capabilities()
             except Exception:
                 result.append(
                     RunnerCapabilities(
@@ -99,4 +104,19 @@ class RunnerRegistry:
                         models=[],
                     )
                 )
+                continue
+            state = self._auth_states.get(runner.name, capabilities.auth_state)
+            if state is AuthState.UNKNOWN and capabilities.auth_state is not AuthState.UNKNOWN:
+                state = capabilities.auth_state
+            if capabilities.installed:
+                probe = getattr(runner, "probe_auth_state", None)
+                if probe is not None:
+                    try:
+                        probed_state = await probe()
+                    except Exception:
+                        probed_state = AuthState.UNKNOWN
+                    if probed_state is not AuthState.UNKNOWN:
+                        state = probed_state
+            self._auth_states[runner.name] = state
+            result.append(capabilities.model_copy(update={"auth_state": state}))
         return result
