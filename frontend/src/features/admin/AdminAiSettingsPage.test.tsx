@@ -9,6 +9,10 @@ const api = vi.hoisted(() => ({
   getAdminAiTaskConfigs: vi.fn(),
   getAdminAiTaskModels: vi.fn(),
   getAdminAiAgentServiceCapabilities: vi.fn(),
+  startAdminAiAgentAuth: vi.fn(),
+  getAdminAiAgentAuthSession: vi.fn(),
+  submitAdminAiAgentAuthInput: vi.fn(),
+  cancelAdminAiAgentAuthSession: vi.fn(),
   saveAdminAiTaskConfig: vi.fn(),
   testAdminAiProvider: vi.fn(),
   testAdminAiAgentService: vi.fn(),
@@ -77,6 +81,7 @@ beforeEach(() => {
     ],
   });
   api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [] });
+  api.cancelAdminAiAgentAuthSession.mockResolvedValue(undefined);
 });
 
 it("shows the settings load error instead of staying on the loading state", async () => {
@@ -379,6 +384,74 @@ it("switches to Agent Service, loads capabilities, and filters body models", asy
   expect(screen.queryByRole("option", { name: /image-only/ })).not.toBeInTheDocument();
   expect(screen.queryByLabelText("API key")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Refresh models" })).not.toBeInTheDocument();
+});
+
+it("starts Agent authentication without a model", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([{
+    ...bodyConfig,
+    execution_backend: "agent_service",
+    agent_name: "codex",
+    agent_model_id: null,
+  }]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
+    agent: "codex",
+    installed: true,
+    version: "0.151.0",
+    auth_state: "unauthenticated",
+    models: [],
+  }] });
+  api.startAdminAiAgentAuth.mockResolvedValue({
+    session_id: "session-1",
+    agent: "codex",
+    status: "waiting_for_user",
+    verification_url: "https://auth.openai.com/device?test=1",
+    user_code: "ABCD-EFGH",
+    input_label: null,
+    expires_at: "2026-08-31T12:10:00Z",
+    safe_error_message: null,
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "Authenticate Codex" }));
+  expect(api.startAdminAiAgentAuth).toHaveBeenCalledWith("codex");
+  expect(await screen.findByRole("dialog", { name: "Authenticate Codex" })).toBeInTheDocument();
+  expect(screen.getByText("ABCD-EFGH")).toBeInTheDocument();
+});
+
+it("refreshes capabilities after auth success without changing routing or enabled state", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([{
+    ...bodyConfig,
+    execution_backend: "agent_service",
+    agent_name: "codex",
+    agent_model_id: null,
+    enabled: false,
+  }]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
+    agent: "codex",
+    installed: true,
+    version: "0.151.0",
+    auth_state: "unauthenticated",
+    models: [],
+  }] });
+  api.startAdminAiAgentAuth.mockResolvedValue({
+    session_id: "session-1",
+    agent: "codex",
+    status: "authenticated",
+    verification_url: null,
+    user_code: null,
+    input_label: null,
+    expires_at: "2026-08-31T12:10:00Z",
+    safe_error_message: null,
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "Authenticate Codex" }));
+  expect(await screen.findByText("Authentication complete.")).toBeInTheDocument();
+  expect(api.getAdminAiAgentServiceCapabilities).toHaveBeenCalledTimes(2);
+  expect(screen.getByRole("checkbox", { name: "Enabled" })).not.toBeChecked();
+  expect(screen.getByRole("dialog", { name: "Authenticate Codex" })).toBeInTheDocument();
 });
 
 it("hides API-only controls and disables unsupported tuning in Agent mode", async () => {

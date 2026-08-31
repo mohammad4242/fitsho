@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
+import { ApiError } from "../../shared/apiClient";
 
 const api = vi.hoisted(() => ({
   startAdminAiAgentAuth: vi.fn(),
@@ -40,6 +41,11 @@ beforeEach(() => {
   });
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
 it("starts auth, renders safe URL and code, and opens/copies only on explicit actions", async () => {
   const user = userEvent.setup();
   const onClose = vi.fn();
@@ -59,6 +65,8 @@ it("starts auth, renders safe URL and code, and opens/copies only on explicit ac
   );
   await user.click(screen.getByRole("button", { name: "Copy link" }));
   expect(await screen.findByText("Link copied")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Copy code" }));
+  expect(await screen.findByText("Code copied")).toBeInTheDocument();
   openSpy.mockRestore();
 });
 
@@ -81,4 +89,123 @@ it("clears authorization input immediately and sends it only to the active sessi
 
   expect(input).toHaveValue("");
   await waitFor(() => expect(api.submitAdminAiAgentAuthInput).toHaveBeenCalledWith("session-1", "AUTH-CODE"));
+});
+
+it("polls until authenticated, notifies once, and stops at the terminal state", async () => {
+  vi.useFakeTimers();
+  const onAuthenticated = vi.fn();
+  api.getAdminAiAgentAuthSession.mockResolvedValue({ ...waitingForUser, status: "authenticated", verification_url: null, user_code: null });
+  render(<AgentAuthDialog agent="codex" onClose={vi.fn()} onAuthenticated={onAuthenticated} />);
+
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(screen.getByText("Waiting for browser sign-in")).toBeInTheDocument();
+  await act(async () => {
+    vi.advanceTimersByTime(2_000);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  expect(screen.getByText("Authenticated")).toBeInTheDocument();
+  expect(onAuthenticated).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    vi.advanceTimersByTime(10_000);
+    await Promise.resolve();
+  });
+  expect(api.getAdminAiAgentAuthSession).toHaveBeenCalledTimes(1);
+});
+
+it("ignores a stale poll response after a newer input response", async () => {
+  let resolvePoll: ((value: AdminAiAgentAuthSession) => void) | undefined;
+  const pollResponse = new Promise<AdminAiAgentAuthSession>((resolve) => { resolvePoll = resolve; });
+  const waitingForInput: AdminAiAgentAuthSession = {
+    ...waitingForUser,
+    status: "waiting_for_input",
+    verification_url: null,
+    user_code: null,
+    input_label: "authorization code",
+  };
+  api.startAdminAiAgentAuth.mockResolvedValue(waitingForInput);
+  api.getAdminAiAgentAuthSession.mockReturnValue(pollResponse);
+  api.submitAdminAiAgentAuthInput.mockResolvedValue({ ...waitingForInput, status: "authenticated" });
+  vi.useFakeTimers();
+  render(<AgentAuthDialog agent="codex" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(screen.getByLabelText("Authorization code")).toBeInTheDocument();
+
+  await act(async () => {
+    vi.advanceTimersByTime(2_000);
+    await Promise.resolve();
+  });
+  const input = screen.getByLabelText("Authorization code");
+  await act(async () => {
+    fireEvent.change(input, { target: { value: "AUTH-CODE" } });
+    fireEvent.submit(input.closest("form")!);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  expect(screen.getByText("Authenticated")).toBeInTheDocument();
+  resolvePoll?.(waitingForInput);
+  await act(async () => { await Promise.resolve(); });
+  expect(screen.getByText("Authenticated")).toBeInTheDocument();
+});
+
+it("cancels active auth on unmount and never polls after cleanup", async () => {
+  vi.useFakeTimers();
+  const view = render(<AgentAuthDialog agent="codex" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+  expect(screen.getByText("Waiting for browser sign-in")).toBeInTheDocument();
+  view.unmount();
+  expect(api.cancelAdminAiAgentAuthSession).toHaveBeenCalledWith("session-1");
+  await act(async () => {
+    vi.advanceTimersByTime(10_000);
+    await Promise.resolve();
+  });
+  expect(api.getAdminAiAgentAuthSession).not.toHaveBeenCalled();
+});
+
+it("shows a translated safe error instead of a downstream message", async () => {
+  api.startAdminAiAgentAuth.mockRejectedValue(
+    new ApiError(503, "raw downstream token or stderr", null, "auth_unavailable"),
+  );
+  render(<AgentAuthDialog agent="codex" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
+
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Authentication is temporarily unavailable.");
+  expect(alert).not.toHaveTextContent("raw downstream token or stderr");
+});
+
+it("does not render or open a verification URL outside the agent allowlist", async () => {
+  api.startAdminAiAgentAuth.mockResolvedValue({
+    ...waitingForUser,
+    verification_url: "https://evil.example/login?token=secret",
+  });
+  render(<AgentAuthDialog agent="codex" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
+
+  await screen.findByText("Waiting for browser sign-in");
+  expect(screen.queryByText("https://evil.example/login?token=secret")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Open authentication page" })).not.toBeInTheDocument();
+});
+
+it("deletes the active session before closing on explicit cancel", async () => {
+  const onClose = vi.fn();
+  const user = userEvent.setup();
+  render(<AgentAuthDialog agent="codex" onClose={onClose} onAuthenticated={vi.fn()} />);
+
+  await screen.findByText("Waiting for browser sign-in");
+  await user.click(screen.getByRole("button", { name: "Cancel authentication" }));
+  await waitFor(() => expect(api.cancelAdminAiAgentAuthSession).toHaveBeenCalledWith("session-1"));
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+it("cancels the old session and starts a fresh run when the agent changes", async () => {
+  api.startAdminAiAgentAuth.mockResolvedValueOnce(waitingForUser).mockResolvedValueOnce({
+    ...waitingForUser,
+    agent: "claude",
+    verification_url: "https://claude.com/login?test=1",
+  });
+  const view = render(<AgentAuthDialog agent="codex" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
+  await screen.findByText("Waiting for browser sign-in");
+
+  view.rerender(<AgentAuthDialog agent="claude" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
+  await waitFor(() => expect(api.startAdminAiAgentAuth).toHaveBeenLastCalledWith("claude"));
+  expect(api.cancelAdminAiAgentAuthSession).toHaveBeenCalledWith("session-1");
 });
