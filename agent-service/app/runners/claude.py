@@ -13,7 +13,7 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
-from ..schemas import AgentName, AuthState, RunnerCapabilities, RunnerModelCapabilities
+from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
 from .probes import CliMetadataProbe
 
@@ -77,6 +77,7 @@ class ClaudeRunner(AgentRunner):
             installed=installed,
             version=await self._metadata.version() if installed else None,
             auth_state=AuthState.UNKNOWN,
+            auth_mode=AuthMode.BROWSER_LINK,
             models=[
                 RunnerModelCapabilities(
                     model_id=model_id,

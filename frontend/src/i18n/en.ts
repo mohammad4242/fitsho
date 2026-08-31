@@ -545,6 +545,7 @@ const en = {
         agentInstalled: "Installed",
         agentUnavailable: "Unavailable",
         auth: { unknown: "Auth unknown", authenticated: "Authenticated", unauthenticated: "Not authenticated" },
+        authMode: { unknown: "Auth method unknown", browser_link: "Browser link", manual: "Manual only" },
         testAgent: "Test Agent",
         agentTestRequiresSelection: "Select an Agent Service agent and model first.",
         agentService: {
@@ -558,8 +559,10 @@ const en = {
           notInstalled: "Not installed",
           version: "Version",
           authentication: "Authentication",
+          authenticationMethod: "Authentication method",
           authenticate: "Authenticate",
           reauthenticate: "Re-authenticate",
+          browserAuthUnavailable: "Browser authentication is unavailable for this runner.",
           selectedAgent: "Selected agent",
           selectedModel: "Selected model",
           none: "None",

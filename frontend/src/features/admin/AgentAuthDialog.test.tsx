@@ -91,6 +91,24 @@ it("clears authorization input immediately and sends it only to the active sessi
   await waitFor(() => expect(api.submitAdminAiAgentAuthInput).toHaveBeenCalledWith("session-1", "AUTH-CODE"));
 });
 
+it("keeps the Antigravity browser link visible while waiting for its authorization code", async () => {
+  const antigravitySession: AdminAiAgentAuthSession = {
+    ...waitingForUser,
+    agent: "antigravity",
+    verification_url: "https://accounts.google.com/o/oauth2/v2/auth?state=opaque",
+    user_code: null,
+    status: "waiting_for_input",
+    input_label: "authorization code",
+  };
+  api.startAdminAiAgentAuth.mockResolvedValue(antigravitySession);
+
+  render(<AgentAuthDialog agent="antigravity" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
+
+  expect(await screen.findByText(antigravitySession.verification_url!)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Open authentication page" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Authorization code")).toBeInTheDocument();
+});
+
 it("polls until authenticated, notifies once, and stops at the terminal state", async () => {
   vi.useFakeTimers();
   const onAuthenticated = vi.fn();

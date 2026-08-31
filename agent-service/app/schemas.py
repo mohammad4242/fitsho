@@ -48,6 +48,12 @@ class AuthState(StrEnum):
     UNAUTHENTICATED = "unauthenticated"
 
 
+class AuthMode(StrEnum):
+    UNKNOWN = "unknown"
+    BROWSER_LINK = "browser_link"
+    MANUAL = "manual"
+
+
 class RunnerModelCapabilities(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -66,6 +72,7 @@ class RunnerCapabilities(BaseModel):
     installed: bool
     version: str | None = None
     auth_state: AuthState = AuthState.UNKNOWN
+    auth_mode: AuthMode = AuthMode.UNKNOWN
     models: list[RunnerModelCapabilities] = Field(default_factory=list)
 
 

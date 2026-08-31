@@ -59,7 +59,8 @@ export function AgentServicePanel({
         {agentNames.map((agent) => {
           const runner = runnerByAgent.get(agent) ?? unavailableRunner(agent);
           const label = t(`admin.aiSettings.agents.${agent}`);
-          const authAction = runner.auth_state === "authenticated"
+          const authSupported = runner.auth_mode === "browser_link";
+          const authAction = runner.auth_state === "authenticated" && authSupported
             ? t("admin.aiSettings.agentService.reauthenticate")
             : t("admin.aiSettings.agentService.authenticate");
           return (
@@ -94,16 +95,23 @@ export function AgentServicePanel({
                   <dt>{t("admin.aiSettings.agentService.authentication")}</dt>
                   <dd>{t(`admin.aiSettings.auth.${runner.auth_state}`)}</dd>
                 </div>
+                <div>
+                  <dt>{t("admin.aiSettings.agentService.authenticationMethod")}</dt>
+                  <dd>{t(`admin.aiSettings.authMode.${runner.auth_mode}`)}</dd>
+                </div>
               </dl>
               <button
                 className="admin-agent-card__auth"
                 type="button"
-                disabled={!runner.installed || loading || unavailable}
+                disabled={!runner.installed || !authSupported || loading || unavailable}
                 onClick={() => onAuthenticate(agent)}
                 aria-label={`${authAction} ${label}`}
               >
                 {authAction}
               </button>
+              {runner.installed && !authSupported && <p className="admin-agent-card__auth-note" role="note">
+                {t("admin.aiSettings.agentService.browserAuthUnavailable")}
+              </p>}
             </article>
           );
         })}
@@ -145,6 +153,7 @@ function unavailableRunner(agent: AdminAiAgentName): AdminAiAgentRunnerCapabilit
     installed: false,
     version: null,
     auth_state: "unknown",
+    auth_mode: "unknown",
     models: [],
   };
 }

@@ -545,6 +545,7 @@ const fa = {
         agentInstalled: "نصب‌شده",
         agentUnavailable: "در دسترس نیست",
         auth: { unknown: "احراز هویت نامشخص", authenticated: "احراز هویت‌شده", unauthenticated: "احراز هویت‌نشده" },
+        authMode: { unknown: "روش احراز هویت نامشخص", browser_link: "لینک مرورگر", manual: "فقط دستی" },
         testAgent: "تست Agent",
         agentTestRequiresSelection: "ابتدا عامل و مدل Agent Service را انتخاب کنید.",
         agentService: {
@@ -558,8 +559,10 @@ const fa = {
           notInstalled: "نصب نشده",
           version: "نسخه",
           authentication: "احراز هویت",
+          authenticationMethod: "روش احراز هویت",
           authenticate: "احراز هویت",
           reauthenticate: "احراز هویت دوباره",
+          browserAuthUnavailable: "احراز هویت مرورگری برای این عامل در دسترس نیست.",
           selectedAgent: "عامل انتخاب‌شده",
           selectedModel: "مدل انتخاب‌شده",
           none: "ندارد",

@@ -159,6 +159,7 @@ class AgentServiceRunnerCapability(BaseModel):
     installed: bool
     version: str | None = Field(default=None, max_length=120)
     auth_state: Literal["unknown", "authenticated", "unauthenticated"] = "unknown"
+    auth_mode: Literal["unknown", "browser_link", "manual"] = "unknown"
     models: list[AgentServiceModelCapability] = Field(default_factory=list)
 
 

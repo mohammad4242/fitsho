@@ -10,6 +10,7 @@ def test_capabilities_accept_runner_parameter_fields_from_agent_service() -> Non
                     "installed": True,
                     "version": "1.1.22",
                     "auth_state": "authenticated",
+                    "auth_mode": "browser_link",
                     "models": [
                         {
                             "model_id": "gemini-test",
@@ -26,4 +27,5 @@ def test_capabilities_accept_runner_parameter_fields_from_agent_service() -> Non
     )
 
     assert response.runners[0].models[0].model_id == "gemini-test"
+    assert response.runners[0].auth_mode == "browser_link"
     assert "supports_temperature" not in response.runners[0].models[0].model_dump()

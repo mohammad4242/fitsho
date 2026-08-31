@@ -60,6 +60,7 @@ def test_capabilities_are_owned_by_runners_and_do_not_run_generation(tmp_path: P
                 "installed": True,
                 "version": None,
                 "auth_state": "unknown",
+                "auth_mode": "unknown",
                 "models": [
                     {
                         "model_id": "fake-model",
@@ -86,6 +87,9 @@ def test_default_registry_has_no_invented_models(tmp_path: Path) -> None:
     runners = {runner["agent"]: runner for runner in response.json()["runners"]}
     assert set(runners) == {"antigravity", "codex", "claude"}
     assert runners["antigravity"]["version"] == "1.1.22"
+    assert runners["antigravity"]["auth_mode"] == "browser_link"
+    assert runners["codex"]["auth_mode"] == "browser_link"
+    assert runners["claude"]["auth_mode"] == "browser_link"
     assert runners["codex"]["version"] == "codex-cli 0.151.0"
     assert runners["claude"]["version"] == "2.1.220 (Claude Code)"
     assert all(runner["installed"] is True for runner in runners.values())
@@ -120,6 +124,7 @@ def test_capability_probe_failure_is_reported_without_a_500(tmp_path: Path) -> N
             "installed": False,
             "version": None,
             "auth_state": "unknown",
+            "auth_mode": "unknown",
             "models": [],
         }
     ]

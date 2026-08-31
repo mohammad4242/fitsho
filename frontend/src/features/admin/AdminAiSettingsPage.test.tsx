@@ -367,6 +367,7 @@ it("switches to Agent Service, loads capabilities, and filters body models", asy
       installed: true,
       version: "1.1.22",
       auth_state: "authenticated",
+      auth_mode: "browser_link",
       models: [
         { model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true },
         { model_id: "image-only", supports_text_input: true, supports_image_input: true, supports_structured_output: false },
@@ -398,6 +399,7 @@ it("starts Agent authentication without a model", async () => {
     installed: true,
     version: "0.151.0",
     auth_state: "unauthenticated",
+    auth_mode: "browser_link",
     models: [],
   }] });
   api.startAdminAiAgentAuth.mockResolvedValue({
@@ -432,6 +434,7 @@ it("refreshes capabilities after auth success without changing routing or enable
     installed: true,
     version: "0.151.0",
     auth_state: "unauthenticated",
+    auth_mode: "browser_link",
     models: [],
   }] });
   api.startAdminAiAgentAuth.mockResolvedValue({
@@ -456,7 +459,7 @@ it("refreshes capabilities after auth success without changing routing or enable
 
 it("hides API-only controls and disables unsupported tuning in Agent mode", async () => {
   api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
-    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated",
+    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated", auth_mode: "browser_link",
     models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
   }] });
   const user = userEvent.setup();
@@ -482,6 +485,7 @@ it("filters Agent Service models for workout text and structured output", async 
       installed: true,
       version: "0.151.0",
       auth_state: "authenticated",
+      auth_mode: "browser_link",
       models: [
         { model_id: "text-structured", supports_text_input: true, supports_image_input: false, supports_structured_output: true },
         { model_id: "text-only", supports_text_input: true, supports_image_input: false, supports_structured_output: false },
@@ -513,6 +517,7 @@ it("filters Agent Service food-photo models by image and structured capabilities
       installed: true,
       version: "2.1.220",
       auth_state: "authenticated",
+      auth_mode: "browser_link",
       models: [
         { model_id: "food-vision", supports_text_input: true, supports_image_input: true, supports_structured_output: true },
         { model_id: "food-image-only", supports_text_input: true, supports_image_input: true, supports_structured_output: false },
@@ -531,7 +536,7 @@ it("filters Agent Service food-photo models by image and structured capabilities
 it("tests the selected Agent and shows its safe failure without leaking details", async () => {
   api.getAdminAiTaskConfigs.mockResolvedValue([{ ...bodyConfig, credential: { configured: true, masked: "********cret" } }]);
   api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
-    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated",
+    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated", auth_mode: "browser_link",
     models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
   }] });
   api.testAdminAiAgentService.mockResolvedValue({
@@ -561,7 +566,7 @@ it("saves Agent Service routing without sending or replacing the stored API key"
     credential: { configured: true, masked: "********cret" },
   }]);
   api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
-    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated",
+    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated", auth_mode: "browser_link",
     models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
   }] });
   api.saveAdminAiTaskConfig.mockResolvedValue({

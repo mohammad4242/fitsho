@@ -378,6 +378,7 @@ export type AdminAiAgentRunnerCapability = {
   installed: boolean;
   version: string | null;
   auth_state: "unknown" | "authenticated" | "unauthenticated";
+  auth_mode: "unknown" | "browser_link" | "manual";
   models: AdminAiAgentModelCapability[];
 };
 

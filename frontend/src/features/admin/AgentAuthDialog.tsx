@@ -22,7 +22,7 @@ const terminalStatuses: ReadonlySet<AdminAiAgentAuthStatus> = new Set([
   "expired",
 ]);
 const authHosts: Record<AdminAiAgentName, string | null> = {
-  antigravity: null,
+  antigravity: "accounts.google.com",
   codex: "auth.openai.com",
   claude: "claude.com",
 };
@@ -258,8 +258,8 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
           <p className="admin-agent-auth-dialog__status" role="status">
             {status ? t(`admin.aiSettings.agentAuth.status.${status}`) : t("admin.aiSettings.agentAuth.starting")}
           </p>
-          {status === "waiting_for_user" && <>
-            <p>{t("admin.aiSettings.agentAuth.waitingForUser")}</p>
+          {(status === "waiting_for_user" || status === "waiting_for_input") && <>
+            {status === "waiting_for_user" && <p>{t("admin.aiSettings.agentAuth.waitingForUser")}</p>}
             {safeUrl && <div className="admin-agent-auth-dialog__url">
               <code dir="ltr">{safeUrl}</code>
               <div>
@@ -278,8 +278,7 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
                 {t("admin.aiSettings.agentAuth.copyCode")}
               </button>
             </div>}
-          </>}
-          {status === "waiting_for_input" && <form onSubmit={handleSubmitInput} className="admin-agent-auth-dialog__input-form">
+            {status === "waiting_for_input" && <form onSubmit={handleSubmitInput} className="admin-agent-auth-dialog__input-form">
             <label htmlFor="agent-auth-input">
               {getInputLabel(session.input_label, t)}
               <input
@@ -293,7 +292,8 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
             <button type="submit" disabled={!canSubmitInput || submitting || canceling}>
               {t("admin.aiSettings.agentAuth.continue")}
             </button>
-          </form>}
+            </form>}
+          </>}
           {status === "authenticated" && <p className="admin-ai-settings-message">{t("admin.aiSettings.agentAuth.success")}</p>}
         </div>}
 
