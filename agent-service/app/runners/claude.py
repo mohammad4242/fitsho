@@ -297,7 +297,7 @@ class ClaudeRunner(AgentRunner):
             return RunnerError("rate_limited", "runner rate limit reached")
         if re.search(
             r"unauthori[sz]ed|authentication failed|not authenticated|login required|"
-            r"permission denied|access denied|forbidden|invalid api key",
+            r"not logged in|permission denied|access denied|forbidden|invalid api key",
             text,
         ):
             return RunnerError("unauthorized", "runner authorization failed")

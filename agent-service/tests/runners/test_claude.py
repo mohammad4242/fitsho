@@ -162,6 +162,26 @@ def test_provider_errors_map_to_safe_codes(
     assert stderr not in str(error.value)
 
 
+def test_not_logged_in_json_result_maps_to_unauthorized(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.runners.claude as claude
+
+    stdout = json.dumps(
+        {
+            "is_error": True,
+            "subtype": "success",
+            "result": "Not logged in · Please run /login",
+        }
+    )
+    monkeypatch.setattr(claude, "run_process", fake_process(stdout, returncode=1))
+
+    with pytest.raises(RunnerError) as error:
+        run(ClaudeRunner(workspace=tmp_path).run(make_request()))
+
+    assert error.value.code == "unauthorized"
+
+
 def test_timeout_maps_to_safe_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import app.runners.claude as claude
 
