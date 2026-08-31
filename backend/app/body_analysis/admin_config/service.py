@@ -24,6 +24,7 @@ from app.body_analysis.admin_config.models import (
     AITaskConfig,
 )
 from app.body_analysis.admin_config.schemas import (
+    AgentServiceAuthActiveCancellationResponse,
     AgentServiceAuthInputRequest,
     AgentServiceAuthSessionResponse,
     AgentServiceAuthStartRequest,
@@ -539,6 +540,29 @@ async def start_agent_service_auth(
         preserve_auth_errors=True,
     )
     return _validate_agent_auth_response(response_payload)
+
+
+async def cancel_active_agent_service_auth(
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+    payload: AgentServiceAuthStartRequest,
+) -> AgentServiceAuthActiveCancellationResponse:
+    response_payload = await _agent_service_json(
+        client,
+        settings=settings,
+        method="POST",
+        path="/v1/auth/cancel-active",
+        json_body={"agent": payload.agent.value},
+        preserve_auth_errors=True,
+    )
+    try:
+        return AgentServiceAuthActiveCancellationResponse.model_validate(response_payload)
+    except ValidationError as error:
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+        ) from error
 
 
 async def get_agent_service_auth(

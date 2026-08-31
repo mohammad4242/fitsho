@@ -222,6 +222,13 @@ class AgentServiceAuthStartRequest(BaseModel):
     agent: AIAgentName
 
 
+class AgentServiceAuthActiveCancellationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AIAgentName
+    canceled: bool
+
+
 class AgentServiceAuthInputRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

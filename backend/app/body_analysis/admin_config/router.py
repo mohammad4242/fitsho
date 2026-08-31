@@ -11,6 +11,7 @@ from app.auth.dependencies import AppSettings, DatabaseSession
 from app.body_analysis.admin_config.crypto import CredentialEncryptionError
 from app.body_analysis.admin_config.enums import AIProviderName, AITaskType
 from app.body_analysis.admin_config.schemas import (
+    AgentServiceAuthActiveCancellationResponse,
     AgentServiceAuthInputRequest,
     AgentServiceAuthSessionResponse,
     AgentServiceAuthStartRequest,
@@ -28,6 +29,7 @@ from app.body_analysis.admin_config.schemas import (
 from app.body_analysis.admin_config.service import (
     AgentServiceAuthError,
     AIConfigError,
+    cancel_active_agent_service_auth,
     cancel_agent_service_auth,
     credential_status,
     get_agent_service_auth,
@@ -267,6 +269,30 @@ async def start_agent_authentication(
 ) -> AgentServiceAuthSessionResponse:
     try:
         return await start_agent_service_auth(
+            client=_agent_client(request),
+            settings=settings,
+            payload=payload,
+        )
+    except AIConfigError as error:
+        raise _agent_not_configured(error) from None
+    except AgentServiceAuthError as error:
+        raise _agent_auth_error(error) from None
+    except AIProviderError as error:
+        raise _agent_provider_error(error) from None
+
+
+@router.post(
+    "/agent-service/auth/cancel-active",
+    response_model=AgentServiceAuthActiveCancellationResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def cancel_active_agent_authentication(
+    payload: AgentServiceAuthStartRequest,
+    request: Request,
+    settings: AppSettings,
+) -> AgentServiceAuthActiveCancellationResponse:
+    try:
+        return await cancel_active_agent_service_auth(
             client=_agent_client(request),
             settings=settings,
             payload=payload,

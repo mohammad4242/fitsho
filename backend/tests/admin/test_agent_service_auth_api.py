@@ -158,6 +158,46 @@ def test_agent_auth_proxy_accepts_antigravity_google_oauth_url(
     assert response.json()["input_label"] == "authorization code"
 
 
+def test_cancel_active_agent_auth_proxy_is_admin_origin_protected_and_safe(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    path = "/api/v1/admin/ai/agent-service/auth/cancel-active"
+    assert client.post(path, json={"agent": "codex"}).status_code == 401
+    _register(client, "cancel-active-member@example.com")
+    assert client.post(path, json={"agent": "codex"}).status_code == 403
+    _admin(client, db, "cancel-active-admin@example.com")
+    test_settings.agent_service_token = TOKEN
+    seen: list[tuple[str, str, bytes]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path, request.content))
+        assert request.headers["authorization"] == f"Bearer {TOKEN}"
+        assert request.method == "POST"
+        assert request.url.path.endswith("/v1/auth/cancel-active")
+        assert request.content == b'{"agent":"codex"}'
+        canceled = len(seen) == 1
+        return httpx.Response(200, json={"agent": "codex", "canceled": canceled})
+
+    replacement = _mock_agent_service(client, httpx.MockTransport(handler))
+    try:
+        without_origin = client.post(path, json={"agent": "codex"})
+        canceled = client.post(path, headers=ORIGIN, json={"agent": "codex"})
+        repeated = client.post(path, headers=ORIGIN, json={"agent": "codex"})
+    finally:
+        _restore_agent_service(client, replacement)
+
+    assert without_origin.status_code == 403
+    assert canceled.status_code == 200
+    assert canceled.json() == {"agent": "codex", "canceled": True}
+    assert repeated.status_code == 200
+    assert repeated.json() == {"agent": "codex", "canceled": False}
+    assert [method for method, _path, _body in seen] == ["POST", "POST"]
+    assert "9001" not in canceled.text
+    assert "token" not in canceled.text.lower()
+
+
 def test_agent_auth_proxy_maps_safe_downstream_errors_without_internal_details(
     client: TestClient,
     db: Session,
