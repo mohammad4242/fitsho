@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from app.auth.base import AuthCommand
-from app.auth.process import AuthProcess, AuthProcessError, safe_auth_environment
+from app.auth.process import AuthProcess, safe_auth_environment
 from app.process import ProcessTimeoutError, run_process
 
 
@@ -190,14 +190,66 @@ def test_auth_process_uses_exec_not_shell_and_bounds_output(
     assert exec_calls
 
 
-def test_auth_process_rejects_pty_until_a_real_pty_flow_is_supported(
+def test_auth_process_supports_pty_output_and_termination(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(AuthProcessError, match="PTY"):
-        AuthProcess(
-            AuthCommand("agy", (), use_pty=True),
+    output: list[str] = []
+
+    async def collect(text: str) -> None:
+        output.append(text)
+
+    async def scenario() -> None:
+        process = AuthProcess(
+            AuthCommand(
+                sys.executable,
+                ("-c", "import time; print('READY', flush=True); time.sleep(60)"),
+                use_pty=True,
+            ),
             workspace=tmp_path,
-            environment={},
-            max_output_bytes=32,
-            output_callback=lambda _: asyncio.sleep(0),
+            environment={"PATH": os.environ["PATH"]},
+            max_output_bytes=4096,
+            output_callback=collect,
         )
+        await process.start()
+        await asyncio.sleep(0.05)
+        assert process.is_running
+        assert "READY" in "".join(output)
+        await process.terminate()
+        assert not process.is_running
+
+    run(scenario())
+
+
+def test_auth_process_merges_only_fixed_command_environment_for_pty(
+    tmp_path: Path,
+) -> None:
+    output: list[str] = []
+
+    async def collect(text: str) -> None:
+        output.append(text)
+
+    async def scenario() -> None:
+        process = AuthProcess(
+            AuthCommand(
+                sys.executable,
+                (
+                    "-c",
+                    "import os; print(os.environ.get('SSH_CONNECTION')); "
+                    "print(os.environ.get('SSH_TTY', '').startswith('/dev/pts/'))",
+                ),
+                use_pty=True,
+                environment=(("SSH_CONNECTION", "sandbox 0 sandbox 0"),),
+            ),
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"], "AGENT_SERVICE_TOKEN": "secret"},
+            max_output_bytes=4096,
+            output_callback=collect,
+        )
+        await process.start()
+        result = await process.wait()
+        assert result.returncode == 0
+
+    run(scenario())
+    assert "sandbox 0 sandbox 0" in "".join(output)
+    assert "True" in "".join(output)
+    assert "secret" not in "".join(output)

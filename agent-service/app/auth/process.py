@@ -109,6 +109,11 @@ class AuthProcess:
                 master_fd, slave_fd = pty.openpty()
                 self._configure_pty(master_fd)
                 self._pty_master_fd = master_fd
+                process_environment = {
+                    **self.environment,
+                    **dict(self.command.environment),
+                }
+                process_environment.setdefault("SSH_TTY", os.ttyname(slave_fd))
                 self._process = await asyncio.create_subprocess_exec(
                     self.command.executable,
                     *self.command.args,
@@ -116,7 +121,7 @@ class AuthProcess:
                     stdout=slave_fd,
                     stderr=slave_fd,
                     cwd=self.workspace,
-                    env=self.environment,
+                    env=process_environment,
                     start_new_session=True,
                 )
             else:

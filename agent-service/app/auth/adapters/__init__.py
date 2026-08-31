@@ -24,6 +24,10 @@ _SUCCESS_PATTERN = re.compile(
     r"(?i)\b(?:login|authentication)\s+successful\b|"
     r"\bsuccessfully\s+(?:logged|signed)\s+in\b"
 )
+_INPUT_PROMPT_PATTERN = re.compile(
+    r"(?i)\b(?:enter|paste|input|provide)\s+(?:the\s+)?"
+    r"(?:authorization\s+|verification\s+|device\s+|user\s+)?code\b"
+)
 _FAILURE_PATTERN = re.compile(
     r"(?i)\b(?:login|authentication|authorization)\s+(?:failed|cancelled|canceled)\b|"
     r"\bnot\s+(?:logged|authenticated)\s+in\b"
@@ -42,6 +46,7 @@ def parse_browser_handoff(
     *,
     allowed_hosts: frozenset[str],
     include_user_code: bool,
+    input_label: str | None = None,
 ) -> ParsedAuthUpdate:
     clean_text = strip_ansi(text)
     verification_url: str | None = None
@@ -77,6 +82,15 @@ def parse_browser_handoff(
         return ParsedAuthUpdate(authenticated=True)
     if _FAILURE_PATTERN.search(clean_text):
         return _safe_failure()
+    if input_label is not None and verification_url is not None and _INPUT_PROMPT_PATTERN.search(
+        clean_text
+    ):
+        return ParsedAuthUpdate(
+            verification_url=verification_url,
+            user_code=user_code,
+            needs_input=True,
+            input_label=input_label,
+        )
     if verification_url is not None or user_code is not None:
         return ParsedAuthUpdate(verification_url=verification_url, user_code=user_code)
     return ParsedAuthUpdate()

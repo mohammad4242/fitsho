@@ -10,6 +10,7 @@ class AuthCommand:
     executable: str
     args: tuple[str, ...]
     use_pty: bool
+    environment: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)

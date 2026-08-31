@@ -48,6 +48,11 @@ class FakeAuthAdapter:
         return AuthSessionStatus.AUTHENTICATED if returncode == 0 else AuthSessionStatus.FAILED
 
 
+class ManualOnlyAuthAdapter(FakeAuthAdapter):
+    agent = AgentName.ANTIGRAVITY
+    manual_auth_only = True
+
+
 def make_client(tmp_path: Path, script_body: str | None = None) -> tuple[TestClient, AuthManager]:
     script = tmp_path / "fake-auth.py"
     script.write_text(
@@ -139,20 +144,29 @@ def test_auth_input_is_only_accepted_for_an_existing_waiting_process(
 
 
 def test_manual_only_agent_returns_safe_capability_boundary(tmp_path: Path) -> None:
-    settings = Settings(agent_service_token=SecretStr(TOKEN), agent_workspace_root=tmp_path)
-    client = TestClient(create_app(settings))
-    response = client.post(
-        "/v1/auth/start",
-        headers={"Authorization": f"Bearer {TOKEN}"},
-        json={"agent": "antigravity"},
+    script = tmp_path / "manual-auth.py"
+    script.write_text("import time\ntime.sleep(60)\n", encoding="utf-8")
+    manager = AuthManager(
+        {AgentName.ANTIGRAVITY: ManualOnlyAuthAdapter(script)},
+        workspace=tmp_path,
     )
+    settings = Settings(agent_service_token=SecretStr(TOKEN), agent_workspace_root=tmp_path)
+    try:
+        client = TestClient(create_app(settings, auth_manager=manager))
+        response = client.post(
+            "/v1/auth/start",
+            headers={"Authorization": f"Bearer {TOKEN}"},
+            json={"agent": "antigravity"},
+        )
 
-    assert response.status_code == 409
-    assert response.json()["error"] == {
-        "code": "auth_manual_only",
-        "message": "authentication is unavailable",
-        "request_id": response.json()["error"]["request_id"],
-    }
+        assert response.status_code == 409
+        assert response.json()["error"] == {
+            "code": "auth_manual_only",
+            "message": "authentication is unavailable",
+            "request_id": response.json()["error"]["request_id"],
+        }
+    finally:
+        run(manager.shutdown())
 
 
 def test_auth_start_poll_duplicate_and_cancel_use_safe_contract(tmp_path: Path) -> None:
