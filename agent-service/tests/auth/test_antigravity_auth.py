@@ -80,6 +80,20 @@ def test_antigravity_parser_requests_only_fixed_google_oauth_menu_selection() ->
     assert handoff.verification_url is None
 
 
+def test_antigravity_parser_reports_rejected_authorization_code() -> None:
+    adapter = AntigravityAuthAdapter()
+
+    handoff = adapter.parse_output(
+        "After authenticating, copy the code displayed in the browser and paste it below:\n"
+        "authorization code...\n"
+        "Got an error: token exchange failed: oauth2: invalid_grant Malformed auth code."
+    )
+
+    assert handoff.failed is True
+    assert handoff.needs_input is False
+    assert handoff.safe_error_message == "authentication failed"
+
+
 def test_antigravity_parser_fails_closed_for_unapproved_or_insecure_urls() -> None:
     adapter = AntigravityAuthAdapter()
     for text in (

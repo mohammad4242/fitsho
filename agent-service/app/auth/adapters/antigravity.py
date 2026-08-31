@@ -1,13 +1,15 @@
+import re
 from collections.abc import Mapping
 from pathlib import Path
 
 from ...schemas import AgentName
 from ..base import AuthCommand, ParsedAuthUpdate
-from ..schemas import AuthInputLabel, AuthSessionStatus
+from ..schemas import AuthInputLabel, AuthSafeErrorMessage, AuthSessionStatus
 from . import parse_browser_handoff
 
 ANTIGRAVITY_AUTH_HOSTS = frozenset({"accounts.google.com"})
 _GOOGLE_OAUTH_MENU_MARKER = "select login method:"
+_OAUTH_FAILURE_PATTERN = re.compile(r"(?i)\btoken\s+exchange\s+failed\b")
 
 
 class AntigravityAuthAdapter:
@@ -39,6 +41,11 @@ class AntigravityAuthAdapter:
         token_path.unlink(missing_ok=True)
 
     def parse_output(self, text: str) -> ParsedAuthUpdate:
+        if _OAUTH_FAILURE_PATTERN.search(text):
+            return ParsedAuthUpdate(
+                failed=True,
+                safe_error_message=AuthSafeErrorMessage.FAILED.value,
+            )
         update = parse_browser_handoff(
             text,
             allowed_hosts=ANTIGRAVITY_AUTH_HOSTS,
