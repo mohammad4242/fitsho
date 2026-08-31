@@ -100,6 +100,13 @@ class ErrorCode(StrEnum):
     INVALID_OUTPUT = "invalid_output"
     MODEL_NOT_FOUND = "model_not_found"
     PROVIDER_UNAVAILABLE = "provider_unavailable"
+    AUTH_IN_PROGRESS = "auth_in_progress"
+    AUTH_SESSION_NOT_FOUND = "auth_session_not_found"
+    AUTH_SESSION_EXPIRED = "auth_session_expired"
+    AUTH_INPUT_NOT_EXPECTED = "auth_input_not_expected"
+    AUTH_INPUT_INVALID = "auth_input_invalid"
+    AUTH_UNAVAILABLE = "auth_unavailable"
+    AUTH_MANUAL_ONLY = "auth_manual_only"
 
 
 class ErrorDetail(BaseModel):

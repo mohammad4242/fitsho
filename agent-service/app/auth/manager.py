@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol
@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 
-from ..schemas import AgentName
+from ..schemas import AgentName, AuthState
 from .base import AgentAuthAdapter, AuthCommand
 from .process import (
     AuthOutputCallback,
@@ -41,6 +41,9 @@ class AuthProcessFactory(Protocol):
     ) -> AuthProcess: ...
 
 
+AuthStateCallback = Callable[[AgentName, AuthState], None]
+
+
 class AuthManager:
     def __init__(
         self,
@@ -51,6 +54,7 @@ class AuthManager:
         max_output_bytes: int = 65_536,
         environment: Mapping[str, str] | None = None,
         process_factory: AuthProcessFactory | None = None,
+        state_callback: AuthStateCallback | None = None,
     ) -> None:
         if ttl_seconds <= 0:
             raise ValueError("ttl_seconds must be positive")
@@ -62,6 +66,7 @@ class AuthManager:
         self.max_output_bytes = max_output_bytes
         self.environment = safe_auth_environment(environment)
         self.process_factory = process_factory or AuthProcess
+        self.state_callback = state_callback
         self._sessions: dict[UUID, AuthSession] = {}
         self._active: dict[AgentName, UUID] = {}
         self._lock = asyncio.Lock()
@@ -124,6 +129,9 @@ class AuthManager:
                                 AuthSessionStatus.FAILED,
                                 AuthSafeErrorMessage.FAILED.value,
                             )
+                        if session.is_terminal:
+                            self._notify_state(session)
+                            self._release_active(session)
                     process = process_holder[0]
                     if session.is_terminal and process is not None and process.is_running:
                         if not termination_scheduled[0]:
@@ -146,6 +154,7 @@ class AuthManager:
                     AuthSessionStatus.FAILED,
                     AuthSafeErrorMessage.UNAVAILABLE.value,
                 )
+                self._notify_state(session)
                 del self._active[agent]
                 return session.view()
             asyncio.create_task(self._monitor(session, adapter, process, parser_buffer))
@@ -221,6 +230,7 @@ class AuthManager:
                             AuthSessionStatus.FAILED,
                             AuthSafeErrorMessage.UNAVAILABLE.value,
                         )
+                        self._notify_state(session)
                         self._release_active(session)
                 raise AuthManagerError(
                     "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
@@ -290,6 +300,7 @@ class AuthManager:
                         AuthSessionStatus.FAILED,
                         AuthSafeErrorMessage.UNAVAILABLE.value,
                     )
+                    self._notify_state(session)
                     self._release_active(session)
             parser_buffer[0] = ""
             return
@@ -313,6 +324,7 @@ class AuthManager:
                     AuthSessionStatus.FAILED,
                     AuthSafeErrorMessage.FAILED.value,
                 )
+            self._notify_state(session)
             self._release_active(session)
 
     @staticmethod
@@ -322,3 +334,13 @@ class AuthManager:
     def _release_active(self, session: AuthSession) -> None:
         if self._active.get(session.agent) == session.session_id:
             del self._active[session.agent]
+
+    def _notify_state(self, session: AuthSession) -> None:
+        if self.state_callback is None:
+            return
+        state = {
+            AuthSessionStatus.AUTHENTICATED: AuthState.AUTHENTICATED,
+            AuthSessionStatus.FAILED: AuthState.UNAUTHENTICATED,
+        }.get(session.status)
+        if state is not None:
+            self.state_callback(session.agent, state)

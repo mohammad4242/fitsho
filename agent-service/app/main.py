@@ -1,13 +1,24 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
+from .auth.adapters.antigravity import AntigravityAuthAdapter
+from .auth.adapters.claude import ClaudeAuthAdapter
+from .auth.adapters.codex import CodexAuthAdapter
+from .auth.manager import AuthManager, AuthManagerError
+from .auth.schemas import (
+    AuthInputRequest,
+    AuthSessionView,
+    AuthStartRequest,
+)
 from .concurrency import ConcurrencyController
 from .config import Settings, get_settings
 from .errors import AgentServiceError, handle_service_error
@@ -16,6 +27,7 @@ from .runners.registry import RunnerRegistry
 from .schemas import (
     AgentGenerationInput,
     AgentGenerationOutput,
+    AgentName,
     CapabilitiesResponse,
     ErrorCode,
     ErrorDetail,
@@ -32,13 +44,35 @@ def create_app(
     settings: Settings | None = None,
     registry: RunnerRegistry | None = None,
     concurrency: ConcurrencyController | None = None,
+    auth_manager: AuthManager | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Fitsho Agent Service")
     effective_settings = settings or get_settings()
-    if settings is not None:
-        app.dependency_overrides[get_settings] = lambda: settings
 
     runner_registry = registry or RunnerRegistry.from_settings(effective_settings)
+    effective_auth_manager = auth_manager or AuthManager(
+        {
+            AgentName.ANTIGRAVITY: AntigravityAuthAdapter(
+                effective_settings.agent_antigravity_executable
+            ),
+            AgentName.CODEX: CodexAuthAdapter(effective_settings.agent_codex_executable),
+            AgentName.CLAUDE: ClaudeAuthAdapter(effective_settings.agent_claude_executable),
+        },
+        workspace=Path(effective_settings.agent_workspace_root),
+        ttl_seconds=effective_settings.agent_auth_session_ttl_seconds,
+        max_output_bytes=effective_settings.agent_auth_max_output_bytes,
+        state_callback=runner_registry.set_auth_state,
+    )
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            await effective_auth_manager.shutdown()
+
+    app = FastAPI(title="Fitsho Agent Service", lifespan=lifespan)
+    if settings is not None:
+        app.dependency_overrides[get_settings] = lambda: settings
     controller = concurrency or ConcurrencyController(
         global_limit=effective_settings.agent_global_max_concurrency,
         runner_limits={
@@ -59,6 +93,7 @@ def create_app(
         ),
     )
     app.state.agent_service = agent_service
+    app.state.auth_manager = effective_auth_manager
 
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -101,6 +136,22 @@ def create_app(
     async def service_error_handler(request: Request, exc: AgentServiceError) -> JSONResponse:
         request.state.error_code = exc.code.value
         return await handle_service_error(request, exc)
+
+    @app.exception_handler(AuthManagerError)
+    async def auth_error_handler(request: Request, exc: AuthManagerError) -> JSONResponse:
+        try:
+            code = ErrorCode(exc.code)
+        except ValueError:
+            code = ErrorCode.AUTH_UNAVAILABLE
+        request.state.error_code = code.value
+        payload = ErrorEnvelope(
+            error=ErrorDetail(
+                code=code,
+                message=exc.safe_message,
+                request_id=request.state.request_id,
+            )
+        )
+        return JSONResponse(status_code=exc.status_code, content=payload.model_dump(mode="json"))
 
     @app.exception_handler(HTTPException)
     async def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
@@ -170,6 +221,50 @@ def create_app(
     @app.get("/v1/capabilities", response_model=CapabilitiesResponse)
     async def capabilities(_: None = Depends(require_internal_auth)) -> CapabilitiesResponse:
         return CapabilitiesResponse(runners=await agent_service.capabilities())
+
+    @app.post("/v1/auth/start", response_model=AuthSessionView)
+    async def auth_start(
+        request: Request,
+        payload: AuthStartRequest,
+        _: None = Depends(require_internal_auth),
+    ) -> AuthSessionView:
+        request.state.agent = payload.agent.value
+        request.state.task_kind = "auth"
+        return await effective_auth_manager.start(payload.agent)
+
+    @app.get("/v1/auth/{session_id}", response_model=AuthSessionView)
+    async def auth_status(
+        request: Request,
+        session_id: UUID,
+        _: None = Depends(require_internal_auth),
+    ) -> AuthSessionView:
+        request.state.task_kind = "auth"
+        view = await effective_auth_manager.get(session_id)
+        request.state.agent = view.agent.value
+        return view
+
+    @app.post("/v1/auth/{session_id}/input", response_model=AuthSessionView)
+    async def auth_input(
+        request: Request,
+        session_id: UUID,
+        payload: AuthInputRequest,
+        _: None = Depends(require_internal_auth),
+    ) -> AuthSessionView:
+        request.state.task_kind = "auth"
+        view = await effective_auth_manager.submit_input(session_id, payload.value)
+        request.state.agent = view.agent.value
+        return view
+
+    @app.delete("/v1/auth/{session_id}", response_model=AuthSessionView)
+    async def auth_cancel(
+        request: Request,
+        session_id: UUID,
+        _: None = Depends(require_internal_auth),
+    ) -> AuthSessionView:
+        request.state.task_kind = "auth"
+        view = await effective_auth_manager.cancel(session_id)
+        request.state.agent = view.agent.value
+        return view
 
     @app.post("/v1/test", response_model=TestOutput)
     async def test_runner(
