@@ -135,6 +135,11 @@ class AgentServiceModelCapability(BaseModel):
     supports_text_input: bool
     supports_image_input: bool
     supports_structured_output: bool
+    # Agent Service exposes these runner-parameter flags for future UI support.
+    # Backend v1 accepts them at the boundary but deliberately keeps them out of
+    # the public admin contract until each runner is verified and wired.
+    supports_temperature: bool = Field(default=False, exclude=True)
+    supports_max_output_tokens: bool = Field(default=False, exclude=True)
 
 
 class AgentServiceRunnerCapability(BaseModel):

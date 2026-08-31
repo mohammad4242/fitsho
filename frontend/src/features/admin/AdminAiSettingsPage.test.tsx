@@ -381,6 +381,21 @@ it("switches to Agent Service, loads capabilities, and filters body models", asy
   expect(screen.queryByRole("button", { name: "Refresh models" })).not.toBeInTheDocument();
 });
 
+it("hides API-only controls and disables unsupported tuning in Agent mode", async () => {
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
+    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated",
+    models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
+  }] });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("Agent Service"));
+  expect(screen.queryByLabelText("Cost ceiling per request")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Provider-routing restrictions")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Temperature")).toBeDisabled();
+  expect(screen.getByLabelText("Maximum output tokens")).toBeDisabled();
+});
+
 it("filters Agent Service models for workout text and structured output", async () => {
   const workoutConfig: AdminAiTaskConfig = {
     ...bodyConfig,
