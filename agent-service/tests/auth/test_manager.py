@@ -51,6 +51,35 @@ class FakeAuthAdapter:
         )
 
 
+class FakePtyAuthAdapter:
+    agent = AgentName.ANTIGRAVITY
+    manual_auth_only = False
+
+    def __init__(self, script: Path) -> None:
+        self.script = script
+
+    def command(self) -> AuthCommand:
+        return AuthCommand(sys.executable, (str(self.script),), use_pty=True)
+
+    def allowed_auth_hosts(self) -> frozenset[str]:
+        return frozenset({"accounts.google.com"})
+
+    def parse_output(self, text: str) -> ParsedAuthUpdate:
+        if "AUTHENTICATED" in text:
+            return ParsedAuthUpdate(authenticated=True)
+        if "READY" in text:
+            return ParsedAuthUpdate(
+                verification_url="https://accounts.google.com/o/oauth2/auth?state=opaque",
+                needs_input=True,
+                input_label="authorization code",
+            )
+        return ParsedAuthUpdate()
+
+    def classify_exit(self, returncode: int, final_text: str) -> AuthSessionStatus:
+        del final_text
+        return AuthSessionStatus.AUTHENTICATED if returncode == 0 else AuthSessionStatus.FAILED
+
+
 def write_script(tmp_path: Path, body: str) -> Path:
     script = tmp_path / "fake-auth.py"
     script.write_text(body, encoding="utf-8")
@@ -93,6 +122,36 @@ def test_manager_starts_one_safe_session_and_rejects_duplicate(tmp_path: Path) -
             await manager.start(AgentName.CODEX)
         await manager.cancel(view.session_id)
         assert (await manager.get(view.session_id)).status is AuthSessionStatus.CANCELED
+        await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_exposes_pty_browser_handoff_and_completes_with_code(tmp_path: Path) -> None:
+    script = write_script(
+        tmp_path,
+        "import sys\n"
+        "print('READY', flush=True)\n"
+        "if sys.stdin.readline().strip() == 'CODE':\n"
+        "    print('AUTHENTICATED', flush=True)\n",
+    )
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: FakePtyAuthAdapter(script)},
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"]},
+        )
+        view = await manager.start(AgentName.ANTIGRAVITY)
+        await asyncio.sleep(0.05)
+        waiting = await manager.get(view.session_id)
+        assert waiting.status is AuthSessionStatus.WAITING_FOR_INPUT
+        assert waiting.verification_url == "https://accounts.google.com/o/oauth2/auth?state=opaque"
+        assert waiting.input_label == "authorization code"
+        verifying = await manager.submit_input(view.session_id, "CODE")
+        assert verifying.status is AuthSessionStatus.VERIFYING
+        await asyncio.sleep(0.05)
+        assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
         await manager.shutdown()
 
     run(scenario())
