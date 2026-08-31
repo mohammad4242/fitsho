@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -27,6 +28,13 @@ def test_log_record_redacts_sensitive_runner_data() -> None:
         "error_code": "provider_unavailable", "input_bytes": 42, "image_count": 1,
         "input_tokens": 3, "output_tokens": 5,
     }
+
+
+def test_agent_service_logger_emits_info_in_runtime() -> None:
+    from app.observability import _LOGGER
+
+    assert _LOGGER.isEnabledFor(logging.INFO)
+    assert _LOGGER.handlers
 
 
 def test_http_logging_is_json_and_contains_only_request_metrics(caplog) -> None:  # type: ignore[no-untyped-def]

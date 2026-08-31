@@ -6,6 +6,11 @@ from collections.abc import Mapping
 from typing import Any
 
 _LOGGER = logging.getLogger("fitsho.agent_service")
+_LOGGER.setLevel(logging.INFO)
+if not _LOGGER.handlers:
+    _stream_handler = logging.StreamHandler()
+    _stream_handler.setFormatter(logging.Formatter("%(message)s"))
+    _LOGGER.addHandler(_stream_handler)
 _ALLOWED_FIELDS = frozenset(
     {
         "request_id",
