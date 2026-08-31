@@ -53,6 +53,21 @@ def test_nonzero_process_returns_captured_output_without_raising(tmp_path: Path)
     assert result.stderr == "err\n"
 
 
+def test_process_can_run_with_an_explicit_non_inherited_environment(tmp_path: Path) -> None:
+    script = "import os; print(os.environ.get('AGENT_SERVICE_TOKEN', 'missing'))"
+    result = run(
+        run_process(
+            [sys.executable, "-c", script],
+            workspace=tmp_path,
+            timeout_seconds=2,
+            env={"PATH": os.environ["PATH"], "AGENT_CHILD_MARKER": "ok"},
+            inherit_environment=False,
+        )
+    )
+
+    assert result.stdout.strip() == "missing"
+
+
 def test_timeout_terminates_process_group_and_does_not_leave_child_running(tmp_path: Path) -> None:
     pid_file = tmp_path / "child.pid"
     script = (

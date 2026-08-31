@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr, ValidationError
@@ -27,15 +29,33 @@ def test_capabilities_rejects_malformed_or_wrong_token(header: str) -> None:
     assert TOKEN not in response.text
 
 
-def test_capabilities_accepts_correct_token_and_is_empty() -> None:
+def test_capabilities_accepts_correct_token_without_inventing_models() -> None:
     response = client().get("/v1/capabilities", headers={"Authorization": f"Bearer {TOKEN}"})
     assert response.status_code == 200
-    assert response.json() == {"runners": []}
+    body = response.json()
+    assert len(body["runners"]) == 1
+    assert body["runners"][0]["agent"] == "antigravity"
+    assert body["runners"][0]["models"] == []
 
 
 def test_config_rejects_short_token() -> None:
     with pytest.raises(ValidationError):
         Settings(agent_service_token=SecretStr("too-short"))
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"agent_global_max_concurrency": 0},
+        {"agent_antigravity_max_concurrency": 0},
+        {"agent_max_images": 0},
+        {"agent_max_file_bytes": 0},
+        {"agent_max_total_bytes": 0},
+    ],
+)
+def test_config_rejects_invalid_resource_limits(kwargs: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        Settings(agent_service_token=SecretStr(TOKEN), **kwargs)
 
 
 def test_error_does_not_echo_token() -> None:

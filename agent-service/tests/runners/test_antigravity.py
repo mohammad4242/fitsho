@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 
 from app.process import ProcessResult, ProcessTimeoutError
-from app.runners.antigravity import AntigravityRunner, RunnerError
-from app.runners.base import RunnerRequest
+from app.runners.antigravity import AntigravityRunner
+from app.runners.base import RunnerError, RunnerRequest
 from app.schemas import AgentName
 
 
@@ -129,6 +129,26 @@ def test_run_parses_structured_output_and_uses_exact_model_argv(
     assert "--dangerously-skip-permissions" not in command
     assert "shell" not in kwargs
     assert kwargs["workspace"] == tmp_path
+
+
+def test_runner_does_not_pass_agent_service_secrets_to_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        captured.update(kwargs)
+        return ProcessResult(0, success_output(structured=True), "")
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setenv("AGENT_SERVICE_TOKEN", "super-secret")
+    monkeypatch.setattr(antigravity, "run_process", fake_run_process)
+    run(AntigravityRunner(workspace=tmp_path).run(make_request()))
+
+    child_env = captured["env"]
+    assert "AGENT_SERVICE_TOKEN" not in child_env
+    assert captured["inherit_environment"] is False
 
 
 def test_run_parses_json_response_and_uses_elapsed_duration_when_outer_duration_invalid(

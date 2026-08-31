@@ -1,5 +1,6 @@
 import json
 import math
+import os
 import re
 import shutil
 import tempfile
@@ -11,20 +12,35 @@ from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
 from ..schemas import AgentName, AuthState, RunnerCapabilities, RunnerModelCapabilities
-from .base import AgentRunner, RunnerRequest, RunnerResult
-
-
-class RunnerError(RuntimeError):
-    """A runner failure with a stable code and a safe user-facing message."""
-
-    def __init__(self, code: str, safe_message: str) -> None:
-        super().__init__(safe_message)
-        self.code = code
-        self.safe_message = safe_message
+from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
 
 
 class AntigravityRunner(AgentRunner):
     name = AgentName.ANTIGRAVITY
+    _SAFE_ENVIRONMENT_KEYS = frozenset(
+        {
+            "PATH",
+            "HOME",
+            "USER",
+            "LANG",
+            "LC_ALL",
+            "TERM",
+            "TMPDIR",
+            "XDG_CONFIG_HOME",
+            "XDG_DATA_HOME",
+            "XDG_CACHE_HOME",
+            "DBUS_SESSION_BUS_ADDRESS",
+            "DISPLAY",
+            "NO_PROXY",
+            "no_proxy",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "SSL_CERT_FILE",
+            "SSL_CERT_DIR",
+        }
+    )
 
     def __init__(
         self,
@@ -104,6 +120,8 @@ class AntigravityRunner(AgentRunner):
                 command,
                 workspace=workspace,
                 timeout_seconds=request.timeout_seconds,
+                env=self._subprocess_environment(),
+                inherit_environment=False,
             )
         except ProcessTimeoutError as exc:
             raise RunnerError("timeout", "runner timed out") from exc
@@ -161,6 +179,14 @@ class AntigravityRunner(AgentRunner):
         if not workspace.is_dir():
             raise RunnerError("invalid_request", "workspace is invalid")
         return workspace
+
+    @classmethod
+    def _subprocess_environment(cls) -> dict[str, str]:
+        return {
+            key: value
+            for key, value in os.environ.items()
+            if key in cls._SAFE_ENVIRONMENT_KEYS
+        }
 
     def _image_names(self, image_paths: tuple[Path, ...], workspace: Path) -> list[str]:
         if image_paths and not self.supports_image_input:

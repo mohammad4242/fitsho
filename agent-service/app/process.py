@@ -28,13 +28,18 @@ async def run_process(
     timeout_seconds: float,
     input_text: str | None = None,
     env: Mapping[str, str] | None = None,
+    inherit_environment: bool = True,
 ) -> ProcessResult:
     if not command:
         raise ValueError("command must not be empty")
     if timeout_seconds <= 0:
         raise ValueError("timeout must be positive")
 
-    process_environment = None if env is None else {**os.environ, **env}
+    process_environment: dict[str, str] | None
+    if env is None:
+        process_environment = None if inherit_environment else {}
+    else:
+        process_environment = {**os.environ, **env} if inherit_environment else dict(env)
     try:
         process = await asyncio.create_subprocess_exec(
             *command,

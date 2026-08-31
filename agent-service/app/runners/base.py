@@ -5,6 +5,15 @@ from typing import Any, Protocol
 from ..schemas import AgentName, RunnerCapabilities
 
 
+class RunnerError(RuntimeError):
+    """A runner failure with a stable code and safe user-facing message."""
+
+    def __init__(self, code: str, safe_message: str) -> None:
+        super().__init__(safe_message)
+        self.code = code
+        self.safe_message = safe_message
+
+
 @dataclass(frozen=True)
 class RunnerRequest:
     model_id: str
