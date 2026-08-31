@@ -50,9 +50,9 @@ from app.workouts.ai_coach import (
     select_ai_coach_candidates,
 )
 from app.workouts.ai_coach_provider import (
+    AiCoachProvider,
     AiCoachRecommendation,
     AiCoachRecommendationRequest,
-    OpenRouterAiCoachProvider,
 )
 from app.workouts.body_analysis_resolver import (
     BodyAnalysisInfluenceResolver,
@@ -241,7 +241,7 @@ class WorkoutGenerationService:
         self,
         db: Session,
         *,
-        ai_coach_provider: OpenRouterAiCoachProvider | None = None,
+        ai_coach_provider: AiCoachProvider | None = None,
         settings: WorkoutGenerationSettings,
         ruleset: ProgramRuleset = RULESET,
         body_analysis_resolver: BodyAnalysisInfluenceResolver | None = None,

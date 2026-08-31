@@ -5,6 +5,7 @@ from app.body_analysis.providers.models import (
     StructuredGenerationResponse,
 )
 from app.workouts.ai_coach_provider import (
+    AiCoachProvider,
     AiCoachRecommendationRequest,
     OpenRouterAiCoachProvider,
 )
@@ -56,3 +57,7 @@ def test_openrouter_ai_coach_accepts_only_a_supplied_candidate_and_day() -> None
     assert recommendation.program_explanation_fa == "با زمان و سطح فعلی شما هماهنگ است."
     assert recommendation.day_explanations[0].day_number == 1
     assert recommendation.model_id == "openrouter/test-model"
+
+
+def test_openrouter_name_is_a_transitional_alias() -> None:
+    assert OpenRouterAiCoachProvider is AiCoachProvider

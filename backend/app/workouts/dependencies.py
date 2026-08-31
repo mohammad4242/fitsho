@@ -4,21 +4,21 @@ import httpx
 from fastapi import Depends, Request
 from sqlalchemy import select
 
+from app.ai.task_provider import build_task_provider
 from app.auth.dependencies import DatabaseSession
 from app.auth.models import User
-from app.body_analysis.admin_config.enums import AIRoutingPolicy, AITaskType
+from app.body_analysis.admin_config.enums import AIExecutionBackend, AITaskType
 from app.body_analysis.admin_config.models import AITaskConfig
 from app.body_analysis.admin_config.service import (
     AIConfigError,
     decrypted_key,
-    openrouter_provider,
 )
 from app.body_analysis.providers import ProviderRoutingPreferences
 from app.config import Settings, get_settings
 from app.exercises.dependencies import require_completed_profile
 from app.profile.enums import WorkoutGenerationMethod
 from app.profile.service import get_profile
-from app.workouts.ai_coach_provider import OpenRouterAiCoachProvider
+from app.workouts.ai_coach_provider import AiCoachProvider
 from app.workouts.service import WorkoutGenerationService, WorkoutGenerationSettings
 
 
@@ -31,7 +31,7 @@ def get_workout_generation_service(
     method = get_profile(db, user.id).profile.workout_generation_method
     if method is None:
         raise RuntimeError("Completed fitness profile required")
-    ai_coach_provider: OpenRouterAiCoachProvider | None = None
+    ai_coach_provider: AiCoachProvider | None = None
     provider_name = "fitsho_domain"
     model_id = "program_engine_v1"
     prompt_version = "none"
@@ -44,40 +44,41 @@ def get_workout_generation_service(
         task = db.scalar(
             select(AITaskConfig).where(AITaskConfig.task_type == AITaskType.WORKOUT_PLAN_GENERATION)
         )
-        if task is None or not task.enabled or not task.primary_model_id:
+        if task is None or not task.enabled:
             raise RuntimeError("AI Coach is not configured")
-        client = request.app.state.ai_http_client
-        if not isinstance(client, httpx.AsyncClient):
-            raise RuntimeError("Workout HTTP client is unavailable")
         try:
-            key = decrypted_key(db, provider=task.provider, settings=settings)
-            policies = tuple(AIRoutingPolicy(item) for item in task.routing_restrictions)
+            backend = AIExecutionBackend(task.execution_backend)
+            client_name = (
+                "ai_http_client" if backend is AIExecutionBackend.API else "agent_http_client"
+            )
+            client = getattr(request.app.state, client_name, None)
+            if not isinstance(client, httpx.AsyncClient):
+                raise ValueError("Workout HTTP client is unavailable")
+            key = (
+                decrypted_key(db, provider=task.provider, settings=settings)
+                if backend is AIExecutionBackend.API
+                else None
+            )
+            configured = build_task_provider(
+                task,
+                settings=settings,
+                http_client=client,
+                agent_http_client=(
+                    client if backend is AIExecutionBackend.AGENT_SERVICE else None
+                ),
+                api_key=key,
+            )
         except (AIConfigError, ValueError) as error:
             raise RuntimeError("AI Coach is not configured") from error
-        ai_coach_provider = OpenRouterAiCoachProvider(
-            openrouter_provider(
-                client,
-                api_key=key,
-                settings=settings,
-                timeout_seconds=task.timeout_seconds,
-            )
-        )
-        provider_name = task.provider.value
-        model_id = task.primary_model_id
+        ai_coach_provider = AiCoachProvider(configured.provider)
+        provider_name = configured.provider_name
+        model_id = configured.primary_model_id
         prompt_version = settings.workout_prompt_version
         generation_policy_version = settings.workout_policy_version
-        ai_coach_fallback_models = tuple(task.fallback_model_ids)
+        ai_coach_fallback_models = configured.fallback_model_ids
         ai_coach_temperature = task.temperature
         ai_coach_max_output_tokens = task.max_output_tokens
-        ai_coach_preferences = ProviderRoutingPreferences(
-            data_collection=(
-                "deny" if AIRoutingPolicy.DENY_PROVIDER_DATA_COLLECTION in policies else None
-            ),
-            zdr=True if AIRoutingPolicy.ZERO_DATA_RETENTION in policies else None,
-            require_parameters=(
-                True if AIRoutingPolicy.REQUIRE_SUPPORTED_PARAMETERS in policies else None
-            ),
-        )
+        ai_coach_preferences = configured.routing_preferences
     return WorkoutGenerationService(
         db,
         ai_coach_provider=ai_coach_provider,
