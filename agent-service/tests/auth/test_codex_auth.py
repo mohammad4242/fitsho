@@ -24,6 +24,22 @@ def test_codex_parser_strips_ansi_and_exposes_only_safe_handoff_fields() -> None
     assert "private" not in repr(update)
 
 
+def test_codex_parser_extracts_one_time_code_printed_after_prompt() -> None:
+    adapter = CodexAuthAdapter()
+    update = adapter.parse_output(
+        "1. Open https://auth.openai.com/codex/device?state=opaque\n"
+        "2. Enter this one-time code (expires in 15 minutes)\n"
+        "   \x1b[90mABCD-EFGHI\x1b[0m\n"
+        "Continue only if you started this login in Codex."
+    )
+
+    assert update.verification_url == "https://auth.openai.com/codex/device?state=opaque"
+    assert update.user_code == "ABCD-EFGHI"
+    assert update.needs_input is False
+    assert update.input_label is None
+    assert update.failed is False
+
+
 def test_codex_parser_fails_closed_for_unapproved_or_insecure_urls() -> None:
     adapter = CodexAuthAdapter()
     for text in (

@@ -21,6 +21,10 @@ _CODE_PATTERNS = (
         r"(?:user\s+|device\s+|verification\s+|authorization\s+)?code\s*[:=]\s*"
         r"([A-Za-z0-9][A-Za-z0-9._-]{3,63})\b"
     ),
+    re.compile(
+        r"(?im)^\s*(?:\d+[.)]\s*)?enter\s+this\s+one[- ]time\s+code\b[^\r\n]*\r?\n"
+        r"\s*([A-Za-z0-9]{4,5}(?:-[A-Za-z0-9]{4,5})?)\s*$"
+    ),
 )
 _SAFE_CODE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{3,63}$")
 _SUCCESS_PATTERN = re.compile(
