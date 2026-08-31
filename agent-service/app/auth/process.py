@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import fcntl
 import os
+import pty
 import signal
+import struct
+import termios
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -76,8 +81,6 @@ class AuthProcess:
             raise ValueError("auth executable must not be empty")
         if max_output_bytes <= 0:
             raise ValueError("max_output_bytes must be positive")
-        if command.use_pty:
-            raise AuthProcessError("PTY authentication is not supported by this adapter")
         self.command = command
         self.workspace = workspace
         self.environment = dict(environment)
@@ -85,6 +88,7 @@ class AuthProcess:
         self.output_callback = output_callback
         self._process: asyncio.subprocess.Process | None = None
         self._monitor_task: asyncio.Task[AuthProcessResult] | None = None
+        self._pty_master_fd: int | None = None
         self._stdout = bytearray()
         self._stderr = bytearray()
         self._output_size = 0
@@ -98,26 +102,58 @@ class AuthProcess:
     async def start(self) -> None:
         if self._process is not None:
             raise AuthProcessError("authentication process already started")
+        slave_fd: int | None = None
         try:
             self.workspace.mkdir(parents=True, exist_ok=True, mode=0o700)
-            self._process = await asyncio.create_subprocess_exec(
-                self.command.executable,
-                *self.command.args,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=self.workspace,
-                env=self.environment,
-                start_new_session=True,
-            )
+            if self.command.use_pty:
+                master_fd, slave_fd = pty.openpty()
+                self._configure_pty(master_fd)
+                self._pty_master_fd = master_fd
+                self._process = await asyncio.create_subprocess_exec(
+                    self.command.executable,
+                    *self.command.args,
+                    stdin=slave_fd,
+                    stdout=slave_fd,
+                    stderr=slave_fd,
+                    cwd=self.workspace,
+                    env=self.environment,
+                    start_new_session=True,
+                )
+            else:
+                self._process = await asyncio.create_subprocess_exec(
+                    self.command.executable,
+                    *self.command.args,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=self.workspace,
+                    env=self.environment,
+                    start_new_session=True,
+                )
         except (OSError, ValueError) as exc:
+            self._close_pty_master()
             raise AuthProcessError("authentication process could not be started") from exc
+        finally:
+            if slave_fd is not None:
+                try:
+                    os.close(slave_fd)
+                except OSError:
+                    pass
         self._monitor_task = asyncio.create_task(self._monitor())
 
     async def send_input(self, value: str) -> None:
         if not value.isprintable() or not value.strip():
             raise AuthProcessError("authentication input is invalid")
         process = self._process
+        if self.command.use_pty:
+            master_fd = self._pty_master_fd
+            if process is None or process.returncode is not None or master_fd is None:
+                raise AuthProcessError("authentication process is not running")
+            try:
+                await self._write_pty(master_fd, value.encode("utf-8") + b"\n")
+            except (BrokenPipeError, ConnectionError, OSError) as exc:
+                raise AuthProcessError("authentication process is not accepting input") from exc
+            return
         if process is None or process.returncode is not None or process.stdin is None:
             raise AuthProcessError("authentication process is not running")
         try:
@@ -143,6 +179,8 @@ class AuthProcess:
 
     async def _monitor(self) -> AuthProcessResult:
         process = self._process
+        if self.command.use_pty:
+            return await self._monitor_pty()
         if process is None or process.stdout is None or process.stderr is None:
             raise AuthProcessError("authentication process is not ready")
         stdout_reader = asyncio.create_task(self._read_stream(process.stdout, self._stdout))
@@ -175,6 +213,90 @@ class AuthProcess:
             self._output_size += len(accepted)
             await self.output_callback(accepted.decode("utf-8", errors="replace"))
 
+    async def _monitor_pty(self) -> AuthProcessResult:
+        process = self._process
+        master_fd = self._pty_master_fd
+        if process is None or master_fd is None:
+            raise AuthProcessError("authentication process is not ready")
+        reader_task = asyncio.create_task(self._drain_pty(master_fd))
+        try:
+            returncode = await process.wait()
+            await reader_task
+            final_text = bytes(self._stdout).decode("utf-8", errors="replace")
+            return AuthProcessResult(returncode, final_text, self._output_truncated)
+        except asyncio.CancelledError:
+            reader_task.cancel()
+            await asyncio.gather(reader_task, return_exceptions=True)
+            await self._stop_process()
+            raise
+        finally:
+            self._close_pty_master()
+
+    async def _drain_pty(self, master_fd: int) -> None:
+        while True:
+            chunk = await self._read_pty_chunk(master_fd)
+            if not chunk:
+                return
+            remaining = self.max_output_bytes - self._output_size
+            accepted = chunk[: max(0, remaining)]
+            if len(accepted) < len(chunk):
+                self._output_truncated = True
+            if not accepted:
+                continue
+            self._stdout.extend(accepted)
+            self._output_size += len(accepted)
+            await self.output_callback(accepted.decode("utf-8", errors="replace"))
+
+    @staticmethod
+    def _configure_pty(master_fd: int) -> None:
+        os.set_blocking(master_fd, False)
+        fcntl.ioctl(master_fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+
+    async def _read_pty_chunk(self, master_fd: int) -> bytes:
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[bytes] = loop.create_future()
+
+        def on_readable() -> None:
+            try:
+                chunk = os.read(master_fd, 4096)
+            except BlockingIOError:
+                return
+            except OSError as exc:
+                if exc.errno == errno.EIO:
+                    chunk = b""
+                elif not future.done():
+                    future.set_exception(exc)
+                else:
+                    return
+            if not future.done():
+                future.set_result(chunk)
+
+        loop.add_reader(master_fd, on_readable)
+        try:
+            return await future
+        finally:
+            loop.remove_reader(master_fd)
+
+    async def _write_pty(self, master_fd: int, data: bytes) -> None:
+        loop = asyncio.get_running_loop()
+        offset = 0
+        while offset < len(data):
+            try:
+                offset += os.write(master_fd, data[offset:])
+                continue
+            except BlockingIOError:
+                writable: asyncio.Future[None] = loop.create_future()
+
+                def on_writable(future: asyncio.Future[None] = writable) -> None:
+                    if not future.done():
+                        future.set_result(None)
+
+                loop.add_writer(master_fd, on_writable)
+                try:
+                    await writable
+                finally:
+                    loop.remove_writer(master_fd)
+
     async def _stop_process(self) -> None:
         process = self._process
         if process is None:
@@ -196,3 +318,14 @@ class AuthProcess:
             except ProcessLookupError:
                 pass
             await process.wait()
+        self._close_pty_master()
+
+    def _close_pty_master(self) -> None:
+        master_fd = self._pty_master_fd
+        self._pty_master_fd = None
+        if master_fd is None:
+            return
+        try:
+            os.close(master_fd)
+        except OSError:
+            pass
