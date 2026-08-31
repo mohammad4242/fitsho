@@ -42,6 +42,11 @@ def test_antigravity_reports_non_empty_saved_oauth_credentials(tmp_path: Path) -
     token_path.parent.mkdir(parents=True)
     token_path.write_text("credential", encoding="utf-8")
     assert adapter.has_saved_credentials({"HOME": str(tmp_path)}) is True
+    marker = adapter.saved_credentials_marker({"HOME": str(tmp_path)})
+    assert marker is not None
+
+    token_path.write_text("updated-credential", encoding="utf-8")
+    assert adapter.saved_credentials_marker({"HOME": str(tmp_path)}) != marker
 
     token_path.write_text("", encoding="utf-8")
     assert adapter.has_saved_credentials({"HOME": str(tmp_path)}) is False

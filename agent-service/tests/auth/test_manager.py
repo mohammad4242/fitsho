@@ -95,10 +95,30 @@ class CredentialCompletingPtyAuthAdapter(FakePtyAuthAdapter):
     def __init__(self, script: Path) -> None:
         super().__init__(script)
         self.credentials_ready = False
+        self.credential_generation = 0
+        self.prompt_consumed = False
+
+    def parse_output(self, text: str) -> ParsedAuthUpdate:
+        if "AUTHENTICATED" in text:
+            return ParsedAuthUpdate(authenticated=True)
+        if not self.prompt_consumed and ("Open " in text or "READY" in text):
+            self.prompt_consumed = True
+            return ParsedAuthUpdate(
+                verification_url="https://accounts.google.com/o/oauth2/auth?state=opaque",
+                needs_input=True,
+                input_label="authorization code",
+            )
+        return ParsedAuthUpdate()
 
     def has_saved_credentials(self, environment: dict[str, str]) -> bool:
         del environment
         return self.credentials_ready
+
+    def saved_credentials_marker(self, environment: dict[str, str]) -> tuple[int, int, int] | None:
+        del environment
+        if not self.credentials_ready:
+            return None
+        return (1, self.credential_generation, 1)
 
 
 def write_script(tmp_path: Path, body: str) -> Path:
@@ -210,6 +230,44 @@ def test_manager_completes_when_saved_credentials_appear_after_code_submission(
             process = manager._sessions[view.session_id].process  # noqa: SLF001
             assert process is not None
             assert not process.is_running
+        finally:
+            await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_waits_for_a_new_saved_credential_marker(tmp_path: Path) -> None:
+    script = write_script(
+        tmp_path,
+        "import time\n"
+        "print('READY', flush=True)\n"
+        "time.sleep(60)\n",
+    )
+    adapter = CredentialCompletingPtyAuthAdapter(script)
+    adapter.credentials_ready = True
+    adapter.credential_generation = 1
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: adapter},
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"]},
+        )
+        try:
+            view = await manager.start(AgentName.ANTIGRAVITY)
+            await asyncio.sleep(0.05)
+            assert (
+                await manager.get(view.session_id)
+            ).status is AuthSessionStatus.WAITING_FOR_INPUT
+
+            verifying = await manager.submit_input(view.session_id, "CODE")
+            assert verifying.status is AuthSessionStatus.VERIFYING
+            await asyncio.sleep(0.35)
+            assert (await manager.get(view.session_id)).status is AuthSessionStatus.VERIFYING
+
+            adapter.credential_generation = 2
+            await asyncio.sleep(0.35)
+            assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
         finally:
             await manager.shutdown()
 

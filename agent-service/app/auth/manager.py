@@ -43,6 +43,8 @@ class AuthProcessFactory(Protocol):
 
 AuthStateCallback = Callable[[AgentName, AuthState], None]
 _AUTH_CREDENTIAL_POLL_INTERVAL_SECONDS = 0.25
+AuthCredentialMarker = tuple[int, int, int] | None
+AuthCredentialMarkerReader = Callable[[Mapping[str, str]], AuthCredentialMarker]
 
 
 class AuthManager:
@@ -255,6 +257,8 @@ class AuthManager:
         process: AuthProcess | None = None
         expired = False
         credential_checker: Callable[[Mapping[str, str]], bool] | None = None
+        credential_marker_reader: AuthCredentialMarkerReader | None = None
+        credential_marker_before: AuthCredentialMarker = None
         async with self._lock:
             session = self._sessions.get(session_id)
             if session is None:
@@ -283,11 +287,15 @@ class AuthManager:
                         credential_checker = cast(
                             Callable[[Mapping[str, str]], bool], has_saved_credentials
                         )
+                    saved_credentials_marker = getattr(adapter, "saved_credentials_marker", None)
+                    if callable(saved_credentials_marker):
+                        credential_marker_reader = cast(
+                            AuthCredentialMarkerReader, saved_credentials_marker
+                        )
                         try:
-                            if credential_checker(self.environment):
-                                credential_checker = None
+                            credential_marker_before = credential_marker_reader(self.environment)
                         except (OSError, TypeError, ValueError):
-                            pass
+                            credential_marker_before = None
                 session.mark_verifying()
         if expired:
             if process is not None:
@@ -313,9 +321,15 @@ class AuthManager:
                 ) from exc
             finally:
                 del validated
-            if credential_checker is not None:
+            if credential_checker is not None or credential_marker_reader is not None:
                 asyncio.create_task(
-                    self._monitor_saved_credentials(session, process, credential_checker)
+                    self._monitor_saved_credentials(
+                        session,
+                        process,
+                        credential_checker,
+                        credential_marker_reader,
+                        credential_marker_before,
+                    )
                 )
         elif process is not None:
             await process.terminate()
@@ -328,7 +342,9 @@ class AuthManager:
         self,
         session: AuthSession,
         process: AuthProcess,
-        credential_checker: Callable[[Mapping[str, str]], bool],
+        credential_checker: Callable[[Mapping[str, str]], bool] | None,
+        credential_marker_reader: AuthCredentialMarkerReader | None,
+        credential_marker_before: AuthCredentialMarker,
     ) -> None:
         while process.is_running:
             async with self._lock:
@@ -344,9 +360,21 @@ class AuthManager:
                 await self._terminate_auth_process(process)
                 return
 
-            try:
-                credentials_ready = credential_checker(self.environment)
-            except (OSError, TypeError, ValueError):
+            if credential_marker_reader is not None:
+                try:
+                    credential_marker_after = credential_marker_reader(self.environment)
+                except (OSError, TypeError, ValueError):
+                    credential_marker_after = None
+                credentials_ready = (
+                    credential_marker_after is not None
+                    and credential_marker_after != credential_marker_before
+                )
+            elif credential_checker is not None:
+                try:
+                    credentials_ready = credential_checker(self.environment)
+                except (OSError, TypeError, ValueError):
+                    credentials_ready = False
+            else:
                 credentials_ready = False
             if credentials_ready:
                 should_terminate = False
