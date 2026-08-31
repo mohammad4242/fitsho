@@ -1,4 +1,5 @@
 from pathlib import Path
+from time import perf_counter
 from typing import Annotated
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from starlette.exceptions import HTTPException
 from .concurrency import ConcurrencyController
 from .config import Settings, get_settings
 from .errors import AgentServiceError, handle_service_error
+from .observability import emit_log
 from .runners.registry import RunnerRegistry
 from .schemas import (
     AgentGenerationInput,
@@ -61,17 +63,49 @@ def create_app(
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):  # type: ignore[no-untyped-def]
         request.state.request_id = str(uuid4())
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request.state.request_id
-        return response
+        started = perf_counter()
+        response = None
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            content_length = request.headers.get("content-length")
+            try:
+                input_bytes = max(0, int(content_length)) if content_length is not None else None
+            except ValueError:
+                input_bytes = None
+            telemetry = {
+                "request_id": request.state.request_id,
+                "endpoint": request.url.path,
+                "duration_ms": round((perf_counter() - started) * 1000, 3),
+                "status": response.status_code if response is not None else "error",
+                "input_bytes": input_bytes,
+            }
+            for field in (
+                "agent",
+                "model",
+                "task_kind",
+                "image_count",
+                "input_tokens",
+                "output_tokens",
+                "error_code",
+            ):
+                value = getattr(request.state, field, None)
+                if value is not None:
+                    telemetry[field] = value
+            emit_log(telemetry)
+            if response is not None:
+                response.headers["X-Request-ID"] = request.state.request_id
 
     @app.exception_handler(AgentServiceError)
     async def service_error_handler(request: Request, exc: AgentServiceError) -> JSONResponse:
+        request.state.error_code = exc.code.value
         return await handle_service_error(request, exc)
 
     @app.exception_handler(HTTPException)
     async def http_error_handler(request: Request, exc: HTTPException) -> JSONResponse:
         if exc.status_code == 401:
+            request.state.error_code = ErrorCode.UNAUTHORIZED.value
             payload = ErrorEnvelope(
                 error=ErrorDetail(
                     code=ErrorCode.UNAUTHORIZED,
@@ -89,6 +123,7 @@ def create_app(
             if 400 <= exc.status_code < 500
             else ErrorCode.PROVIDER_UNAVAILABLE
         )
+        request.state.error_code = code.value
         payload = ErrorEnvelope(
             error=ErrorDetail(
                 code=code,
@@ -106,6 +141,7 @@ def create_app(
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
         del exc
+        request.state.error_code = ErrorCode.INVALID_REQUEST.value
         payload = ErrorEnvelope(
             error=ErrorDetail(
                 code=ErrorCode.INVALID_REQUEST,
@@ -117,6 +153,7 @@ def create_app(
 
     @app.exception_handler(Exception)
     async def unexpected_error_handler(request: Request, _error: Exception) -> JSONResponse:
+        request.state.error_code = ErrorCode.PROVIDER_UNAVAILABLE.value
         payload = ErrorEnvelope(
             error=ErrorDetail(
                 code=ErrorCode.PROVIDER_UNAVAILABLE,
@@ -140,6 +177,9 @@ def create_app(
         payload: TestRequest,
         _: None = Depends(require_internal_auth),
     ) -> TestOutput:
+        request.state.agent = payload.agent.value
+        request.state.model = payload.model_id
+        request.state.task_kind = "test"
         return await agent_service.test(payload, request.state.request_id)
 
     @app.post("/v1/generate", response_model=AgentGenerationOutput)
@@ -148,7 +188,13 @@ def create_app(
         payload: AgentGenerationInput,
         _: None = Depends(require_internal_auth),
     ) -> AgentGenerationOutput:
-        return await agent_service.generate(payload, request.state.request_id)
+        request.state.agent = payload.agent.value
+        request.state.model = payload.model_id
+        request.state.task_kind = "generate"
+        result = await agent_service.generate(payload, request.state.request_id)
+        request.state.input_tokens = result.input_tokens
+        request.state.output_tokens = result.output_tokens
+        return result
 
     @app.post("/v1/analyze-images", response_model=AgentGenerationOutput)
     async def analyze_images(
@@ -161,7 +207,14 @@ def create_app(
             payload = AgentGenerationInput.model_validate_json(metadata)
         except (ValueError, TypeError) as exc:
             raise AgentServiceError(ErrorCode.INVALID_REQUEST, "invalid metadata", 422) from exc
-        return await agent_service.analyze_images(payload, images, request.state.request_id)
+        request.state.agent = payload.agent.value
+        request.state.model = payload.model_id
+        request.state.task_kind = "analyze_images"
+        request.state.image_count = len(images)
+        result = await agent_service.analyze_images(payload, images, request.state.request_id)
+        request.state.input_tokens = result.input_tokens
+        request.state.output_tokens = result.output_tokens
+        return result
 
     return app
 
