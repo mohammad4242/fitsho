@@ -10,7 +10,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.body_analysis.admin_config.crypto import CredentialCipher
-from app.body_analysis.admin_config.enums import AIAuditAction, AIProviderName, AITaskType
+from app.body_analysis.admin_config.enums import (
+    AIAuditAction,
+    AIExecutionBackend,
+    AIProviderName,
+    AITaskType,
+)
 from app.body_analysis.admin_config.models import (
     AIAuditEvent,
     AIModelCatalogEntry,
@@ -30,6 +35,13 @@ from app.config import Settings
 
 class AIConfigError(ValueError):
     pass
+
+
+_AGENT_SERVICE_TASKS = {
+    AITaskType.WORKOUT_PLAN_GENERATION,
+    AITaskType.BODY_PHOTO_ANALYSIS,
+    AITaskType.FOOD_PHOTO_ESTIMATION,
+}
 
 
 def credential_status(credential: AIProviderCredential | None) -> CredentialStatus:
@@ -63,6 +75,9 @@ def config_detail(
         return AITaskConfigDetail(
             task_type=task_type,
             provider=AIProviderName.OPENROUTER,
+            execution_backend=AIExecutionBackend.API,
+            agent_name=None,
+            agent_model_id=None,
             enabled=False,
             primary_model_id=None,
             fallback_model_ids=[],
@@ -81,6 +96,9 @@ def config_detail(
     return AITaskConfigDetail(
         task_type=config.task_type,
         provider=config.provider,
+        execution_backend=config.execution_backend,
+        agent_name=config.agent_name,
+        agent_model_id=config.agent_model_id,
         enabled=config.enabled,
         primary_model_id=config.primary_model_id,
         fallback_model_ids=list(config.fallback_model_ids),
@@ -106,6 +124,7 @@ def save_task_config(
     actor: User,
     settings: Settings,
 ) -> AITaskConfigDetail:
+    config = db.scalar(select(AITaskConfig).where(AITaskConfig.task_type == task_type))
     credential = get_credential(db, payload.provider)
     credential_changed = False
     if payload.api_key is not None:
@@ -127,28 +146,53 @@ def save_task_config(
             credential.updated_by_user_id = actor.id
         credential_changed = True
 
-    if payload.enabled and credential is None:
-        raise AIConfigError("A provider credential is required before enabling this task")
-    if payload.enabled and payload.primary_model_id is None:
-        raise AIConfigError("A primary model is required before enabling this task")
-    if payload.primary_model_id is not None or payload.fallback_model_ids:
+    def effective(field: str, default: Any = None) -> Any:
+        if field in payload.model_fields_set:
+            return getattr(payload, field)
+        return getattr(config, field, default)
+
+    execution_backend = effective("execution_backend", AIExecutionBackend.API)
+    agent_name = effective("agent_name")
+    agent_model_id = effective("agent_model_id")
+    primary_model_id = effective("primary_model_id")
+    fallback_model_ids = effective("fallback_model_ids", [])
+
+    if payload.enabled and execution_backend == AIExecutionBackend.AGENT_SERVICE:
+        if task_type not in _AGENT_SERVICE_TASKS:
+            raise AIConfigError("Agent service is not supported for this AI task")
+        if agent_name is None or agent_model_id is None:
+            raise AIConfigError("Agent name and model are required before enabling this task")
+    elif payload.enabled:
+        if credential is None:
+            raise AIConfigError("A provider credential is required before enabling this task")
+        if primary_model_id is None:
+            raise AIConfigError("A primary model is required before enabling this task")
+
+    should_validate_api_models = execution_backend == AIExecutionBackend.API and (
+        "primary_model_id" in payload.model_fields_set
+        or "fallback_model_ids" in payload.model_fields_set
+        or (payload.enabled and primary_model_id is not None)
+    )
+    if should_validate_api_models and (primary_model_id is not None or fallback_model_ids):
         _validate_selected_models(
             db,
             task_type=task_type,
             provider=payload.provider,
-            model_ids=[payload.primary_model_id, *payload.fallback_model_ids],
+            model_ids=[primary_model_id, *fallback_model_ids],
         )
 
-    config = db.scalar(select(AITaskConfig).where(AITaskConfig.task_type == task_type))
     if config is None:
         config = AITaskConfig(task_type=task_type, provider=payload.provider)
         db.add(config)
     changed_fields: list[str] = []
     values: dict[str, Any] = {
         "provider": payload.provider,
+        "execution_backend": execution_backend,
+        "agent_name": agent_name,
+        "agent_model_id": agent_model_id,
         "enabled": payload.enabled,
-        "primary_model_id": payload.primary_model_id,
-        "fallback_model_ids": list(payload.fallback_model_ids),
+        "primary_model_id": primary_model_id,
+        "fallback_model_ids": list(fallback_model_ids),
         "temperature": payload.temperature,
         "max_output_tokens": payload.max_output_tokens,
         "timeout_seconds": payload.timeout_seconds,

@@ -13,6 +13,17 @@ class AIProviderName(StrEnum):
     OPENROUTER = "openrouter"
 
 
+class AIExecutionBackend(StrEnum):
+    API = "api"
+    AGENT_SERVICE = "agent_service"
+
+
+class AIAgentName(StrEnum):
+    ANTIGRAVITY = "antigravity"
+    CODEX = "codex"
+    CLAUDE = "claude"
+
+
 class AIRoutingPolicy(StrEnum):
     DENY_PROVIDER_DATA_COLLECTION = "deny_provider_data_collection"
     ZERO_DATA_RETENTION = "zero_data_retention"

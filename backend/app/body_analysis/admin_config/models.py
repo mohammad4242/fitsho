@@ -21,7 +21,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.body_analysis.admin_config.enums import AIAuditAction, AIProviderName, AITaskType
+from app.body_analysis.admin_config.enums import (
+    AIAgentName,
+    AIAuditAction,
+    AIExecutionBackend,
+    AIProviderName,
+    AITaskType,
+)
 from app.database.base import Base
 
 
@@ -98,6 +104,30 @@ class AITaskConfig(Base):
         ),
         nullable=False,
     )
+    execution_backend: Mapped[AIExecutionBackend] = mapped_column(
+        Enum(
+            AIExecutionBackend,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_ai_task_configs_execution_backend_values",
+        ),
+        nullable=False,
+        default=AIExecutionBackend.API,
+        server_default="api",
+    )
+    agent_name: Mapped[AIAgentName | None] = mapped_column(
+        Enum(
+            AIAgentName,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_ai_task_configs_agent_name_values",
+        )
+    )
+    agent_model_id: Mapped[str | None] = mapped_column(String(300))
     primary_model_id: Mapped[str | None] = mapped_column(String(300))
     fallback_model_ids: Mapped[list[str]] = mapped_column(
         JSON, default=list, server_default=text("'[]'::json"), nullable=False

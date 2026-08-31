@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -10,8 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
-from app.body_analysis.admin_config.enums import AITaskType
-from app.body_analysis.admin_config.models import AIAuditEvent, AIProviderCredential
+from app.body_analysis.admin_config.enums import AIAgentName, AITaskType
+from app.body_analysis.admin_config.models import (
+    AIAuditEvent,
+    AIModelCatalogEntry,
+    AIProviderCredential,
+)
 from app.body_analysis.admin_config.schemas import AITaskConfigUpdate
 from app.config import Settings
 from app.main import create_app
@@ -121,6 +126,9 @@ def test_admin_lists_all_supported_ai_task_configs(client: TestClient, db: Sessi
         "food_photo_estimation",
         "food_price_search",
     }
+    assert all(item["execution_backend"] == "api" for item in response.json())
+    assert all(item["agent_name"] is None for item in response.json())
+    assert all(item["agent_model_id"] is None for item in response.json())
 
 
 def test_openrouter_client_is_independent_from_zen_client(test_settings: Settings) -> None:
@@ -362,3 +370,173 @@ def test_selected_models_are_validated_even_when_task_is_disabled(
     assert missing_fallback.status_code == 422
     assert "catalog" in missing_fallback.text.lower()
     assert malformed_fallback.status_code == 422
+
+
+def test_enabled_api_config_still_requires_a_credential(client: TestClient, db: Session) -> None:
+    _admin(client, db)
+    response = client.put(
+        "/api/v1/admin/ai/task-configs/workout_plan_generation",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "api",
+            "primary_model_id": "vendor/text-model",
+        },
+    )
+    assert response.status_code == 422
+    assert "credential" in response.text.lower()
+
+
+@pytest.mark.parametrize(
+    ("payload", "missing"),
+    [
+        ({"agent_model_id": "gpt-5-codex"}, "name"),
+        ({"agent_name": "codex"}, "model"),
+    ],
+)
+def test_agent_service_config_requires_each_agent_field(
+    client: TestClient,
+    db: Session,
+    payload: dict[str, str],
+    missing: str,
+) -> None:
+    _admin(client, db)
+    response = client.put(
+        "/api/v1/admin/ai/task-configs/workout_plan_generation",
+        headers=ORIGIN,
+        json={"enabled": True, "execution_backend": "agent_service", **payload},
+    )
+    assert response.status_code == 422
+    assert missing in response.text.lower()
+
+
+def test_agent_service_config_exposes_routing(client: TestClient, db: Session) -> None:
+    _admin(client, db)
+    saved = client.put(
+        "/api/v1/admin/ai/task-configs/workout_plan_generation",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "agent_service",
+            "agent_name": AIAgentName.CODEX,
+            "agent_model_id": "gpt-5-codex",
+        },
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["execution_backend"] == "agent_service"
+    assert saved.json()["agent_name"] == "codex"
+    assert saved.json()["agent_model_id"] == "gpt-5-codex"
+
+
+def test_agent_service_does_not_require_api_credential_or_catalog(
+    client: TestClient, db: Session
+) -> None:
+    _admin(client, db)
+    response = client.put(
+        "/api/v1/admin/ai/task-configs/body_photo_analysis",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "agent_service",
+            "agent_name": "antigravity",
+            "agent_model_id": "vision-agent",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_agent_service_rejects_unsupported_task(client: TestClient, db: Session) -> None:
+    _admin(client, db)
+    response = client.put(
+        "/api/v1/admin/ai/task-configs/progress_comparison",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "agent_service",
+            "agent_name": "claude",
+            "agent_model_id": "claude-sonnet",
+        },
+    )
+    assert response.status_code == 422
+    assert "not supported" in response.text.lower()
+
+
+def test_agent_service_rejects_a_blank_model_id(client: TestClient, db: Session) -> None:
+    _admin(client, db)
+    response = client.put(
+        "/api/v1/admin/ai/task-configs/body_photo_analysis",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "agent_service",
+            "agent_name": "antigravity",
+            "agent_model_id": "   ",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_switching_api_to_agent_and_back_preserves_both_sides(
+    client: TestClient, db: Session, test_settings: Settings
+) -> None:
+    _admin(client, db)
+    test_settings.ai_credential_encryption_key = Fernet.generate_key().decode()
+    credential = client.put(
+        "/api/v1/admin/ai/task-configs/workout_plan_generation",
+        headers=ORIGIN,
+        json={
+            "enabled": False,
+            "api_key": "sk-openrouter-secret",
+            "replace_credential": True,
+        },
+    )
+    assert credential.status_code == 200, credential.text
+    db.add(
+        AIModelCatalogEntry(
+            provider="openrouter",
+            model_id="vendor/text-model",
+            display_name="Text Model",
+            provider_family="vendor",
+            supports_text_input=True,
+            supports_image_input=False,
+            supports_structured_output=True,
+            context_length=32_000,
+            input_price_per_token=None,
+            output_price_per_token=None,
+            refreshed_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
+    api_saved = client.put(
+        "/api/v1/admin/ai/task-configs/workout_plan_generation",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "api",
+            "primary_model_id": "vendor/text-model",
+        },
+    )
+    assert api_saved.status_code == 200, api_saved.text
+
+    agent_saved = client.put(
+        "/api/v1/admin/ai/task-configs/workout_plan_generation",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "agent_service",
+            "agent_name": "claude",
+            "agent_model_id": "saved-agent-model",
+        },
+    )
+    assert agent_saved.status_code == 200, agent_saved.text
+    assert agent_saved.json()["primary_model_id"] == "vendor/text-model"
+
+    api_restored = client.put(
+        "/api/v1/admin/ai/task-configs/workout_plan_generation",
+        headers=ORIGIN,
+        json={"enabled": True, "execution_backend": "api"},
+    )
+    assert api_restored.status_code == 200, api_restored.text
+    assert api_restored.json()["primary_model_id"] == "vendor/text-model"
+    assert api_restored.json()["agent_name"] == "claude"
+    assert api_restored.json()["agent_model_id"] == "saved-agent-model"

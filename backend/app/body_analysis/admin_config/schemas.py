@@ -2,9 +2,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, model_validator
 
-from app.body_analysis.admin_config.enums import AIProviderName, AIRoutingPolicy, AITaskType
+from app.body_analysis.admin_config.enums import (
+    AIAgentName,
+    AIExecutionBackend,
+    AIProviderName,
+    AIRoutingPolicy,
+    AITaskType,
+)
 
 
 class CredentialStatus(BaseModel):
@@ -12,10 +18,18 @@ class CredentialStatus(BaseModel):
     masked: str | None
 
 
+AgentModelId = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
+]
+
+
 class AITaskConfigUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider: AIProviderName = AIProviderName.OPENROUTER
+    execution_backend: AIExecutionBackend = AIExecutionBackend.API
+    agent_name: AIAgentName | None = None
+    agent_model_id: AgentModelId | None = None
     enabled: bool = False
     api_key: SecretStr | None = Field(default=None, repr=False)
     replace_credential: bool = False
@@ -49,6 +63,9 @@ class AITaskConfigUpdate(BaseModel):
 class AITaskConfigDetail(BaseModel):
     task_type: AITaskType
     provider: AIProviderName
+    execution_backend: AIExecutionBackend
+    agent_name: AIAgentName | None
+    agent_model_id: str | None
     enabled: bool
     primary_model_id: str | None
     fallback_model_ids: list[str]
