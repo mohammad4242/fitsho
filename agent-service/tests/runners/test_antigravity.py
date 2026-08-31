@@ -85,6 +85,33 @@ def test_capabilities_default_to_text_and_no_image_support(tmp_path: Path) -> No
     assert capabilities.models[0].supports_structured_output is True
 
 
+def test_capabilities_discover_models_when_configuration_is_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "agy"
+    executable.write_text("#!/bin/sh\nexit 0\n")
+    executable.chmod(executable.stat().st_mode | os.X_OK)
+
+    async def fake_models(command: list[str], **kwargs: Any) -> ProcessResult:
+        del kwargs
+        assert command == [str(executable), "models"]
+        return ProcessResult(
+            0,
+            "gemini-3.7-flash-high  Gemini 3.7 Flash (High)\n",
+            "",
+        )
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setattr(antigravity, "run_process", fake_models)
+    capabilities = run(
+        AntigravityRunner(workspace=tmp_path, executable=str(executable)).capabilities()
+    )
+
+    assert capabilities.profiles is not None
+    assert capabilities.profiles[0].profile_id == "antigravity-gemini-3.7-flash-high"
+
+
 def test_capabilities_mark_missing_executable_uninstalled(tmp_path: Path) -> None:
     capabilities = run(
         AntigravityRunner(

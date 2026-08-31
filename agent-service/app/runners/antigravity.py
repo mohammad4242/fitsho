@@ -11,6 +11,10 @@ from typing import Any, cast
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
+from ..profiles import (
+    AgentModelProfile,
+    antigravity_profiles_from_output,
+)
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
 from .probes import CliMetadataProbe
@@ -63,21 +67,48 @@ class AntigravityRunner(AgentRunner):
 
     async def capabilities(self) -> RunnerCapabilities:
         installed = self._is_installed()
+        version = await self._metadata.version() if installed else None
+        profiles = await self._profiles(version) if installed else ()
         return RunnerCapabilities(
             agent=self.name,
             installed=installed,
-            version=await self._metadata.version() if installed else None,
+            version=version,
             auth_state=AuthState.UNKNOWN,
             auth_mode=AuthMode.BROWSER_LINK,
             models=[
                 RunnerModelCapabilities(
-                    model_id=model_id,
+                    model_id=profile.model_id,
                     supports_text_input=True,
                     supports_image_input=self.supports_image_input,
                     supports_structured_output=True,
                 )
-                for model_id in self.configured_models
+                for profile in profiles
             ],
+            profiles=list(profiles),
+        )
+
+    async def _profiles(self, version: str | None) -> tuple[AgentModelProfile, ...]:
+        if self.configured_models:
+            return tuple(
+                _configured_profile(model_id, version, self.supports_image_input)
+                for model_id in self.configured_models
+            )
+        try:
+            result = await run_process(
+                [self.executable, "models"],
+                workspace=self._workspace_path(),
+                timeout_seconds=15,
+                env=self._subprocess_environment(),
+                inherit_environment=False,
+            )
+        except (ProcessExecutionError, ProcessTimeoutError, OSError, ValueError):
+            return ()
+        if result.returncode != 0:
+            return ()
+        return antigravity_profiles_from_output(
+            result.stdout,
+            version=version,
+            supports_image_input=self.supports_image_input,
         )
 
     async def probe_auth_state(self) -> AuthState:
@@ -93,6 +124,13 @@ class AntigravityRunner(AgentRunner):
         return shutil.which(self.executable) is not None
 
     async def run(self, request: RunnerRequest) -> RunnerResult:
+        if request.effort is not None and request.effort not in {
+            "low",
+            "medium",
+            "high",
+            "thinking",
+        }:
+            raise RunnerError("invalid_request", "reasoning effort is invalid")
         workspace = self._workspace_path()
         image_names = self._image_names(request.image_paths, workspace)
         started = time.perf_counter()
@@ -289,3 +327,19 @@ class AntigravityRunner(AgentRunner):
             and math.isfinite(value)
             and value >= 0
         )
+
+
+def _configured_profile(
+    model_id: str, version: str | None, supports_image_input: bool
+) -> AgentModelProfile:
+    # Configured IDs are still parsed through the same stable profile boundary.
+    from ..profiles import _effort_from_model_id, _profile
+
+    return _profile(
+        agent=AgentName.ANTIGRAVITY,
+        model_id=model_id,
+        display_name=model_id,
+        effort=_effort_from_model_id(model_id),
+        version=version,
+        supports_image_input=supports_image_input,
+    )

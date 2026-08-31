@@ -13,6 +13,7 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
+from ..profiles import claude_profiles
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
 from .probes import CliMetadataProbe
@@ -72,10 +73,16 @@ class ClaudeRunner(AgentRunner):
 
     async def capabilities(self) -> RunnerCapabilities:
         installed = self._is_installed()
+        version = await self._metadata.version() if installed else None
+        profiles = claude_profiles(
+            version=version,
+            configured_models=self.configured_models,
+            supports_image_input=self.supports_image_input,
+        ) if installed else ()
         return RunnerCapabilities(
             agent=self.name,
             installed=installed,
-            version=await self._metadata.version() if installed else None,
+            version=version,
             auth_state=AuthState.UNKNOWN,
             auth_mode=AuthMode.BROWSER_LINK,
             models=[
@@ -87,6 +94,7 @@ class ClaudeRunner(AgentRunner):
                 )
                 for model_id in self.configured_models
             ],
+            profiles=list(profiles),
         )
 
     async def probe_auth_state(self) -> AuthState:
@@ -118,6 +126,13 @@ class ClaudeRunner(AgentRunner):
         )
 
     async def run(self, request: RunnerRequest) -> RunnerResult:
+        if request.effort is not None and request.effort not in {
+            "low",
+            "medium",
+            "high",
+            "thinking",
+        }:
+            raise RunnerError("invalid_request", "reasoning effort is invalid")
         started = time.perf_counter()
         workspace = self._workspace_path()
         try:
@@ -210,7 +225,7 @@ class ClaudeRunner(AgentRunner):
             serialized_schema = json.dumps(response_schema, ensure_ascii=False)
         except (TypeError, ValueError) as exc:
             raise RunnerError("invalid_request", "request could not be prepared") from exc
-        return [
+        command = [
             self.executable,
             "--print",
             "--output-format",
@@ -224,6 +239,12 @@ class ClaudeRunner(AgentRunner):
             serialized_schema,
             "-",
         ]
+        if request.effort is not None:
+            if request.effort not in {"low", "medium", "high", "thinking"}:
+                raise RunnerError("invalid_request", "reasoning effort is invalid")
+            effort = "high" if request.effort == "thinking" else request.effort
+            command[2:2] = ["--effort", effort]
+        return command
 
     def _prompt(self, request: RunnerRequest, image_paths: Iterable[Path]) -> str:
         try:

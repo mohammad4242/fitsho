@@ -10,6 +10,7 @@ from PIL import Image, UnidentifiedImageError
 
 from .concurrency import ConcurrencyController, ConcurrencyLimitError
 from .errors import AgentServiceError
+from .profiles import AgentModelProfile, ResolvedProfile, legacy_profile
 from .runners.base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
 from .runners.registry import RunnerRegistry
 from .schemas import (
@@ -66,9 +67,15 @@ class AgentService:
 
     async def test(self, request: TestRequest, request_id: str) -> TestOutput:
         runner = self._runner(request.agent)
-        await self._check_capability(runner, request.agent, request.model_id, image=False)
-        runner_request = RunnerRequest(
+        resolved = await self._resolve_profile(
+            runner,
+            request.agent,
+            profile_id=request.profile_id,
             model_id=request.model_id,
+        )
+        await self._check_capability(resolved.profile, request.agent, image=False)
+        runner_request = RunnerRequest(
+            model_id=resolved.model_id,
             system_prompt="Return a JSON object with ok set to true.",
             input_payload={"ok": True},
             response_schema=_TEST_SCHEMA,
@@ -76,6 +83,7 @@ class AgentService:
             temperature=0,
             max_output_tokens=32,
             timeout_seconds=30,
+            effort=(resolved.effort.value if resolved.effort is not None else None),
         )
         try:
             result = await self._run(request.agent, runner_request, request_id)
@@ -87,7 +95,8 @@ class AgentService:
         return TestOutput(
             ok=bool(result.payload.get("ok")),
             agent=request.agent,
-            model_id=request.model_id,
+            model_id=resolved.model_id,
+            profile_id=request.profile_id,
             request_id=request_id,
             duration_seconds=result.duration_seconds,
         )
@@ -97,10 +106,16 @@ class AgentService:
     ) -> AgentGenerationOutput:
         self._validate_schema(request.response_schema)
         runner = self._runner(request.agent)
-        await self._check_capability(runner, request.agent, request.model_id, image=False)
-        runner_request = self._runner_request(request)
+        resolved = await self._resolve_profile(
+            runner,
+            request.agent,
+            profile_id=request.profile_id,
+            model_id=request.model_id,
+        )
+        await self._check_capability(resolved.profile, request.agent, image=False)
+        runner_request = self._runner_request(request, resolved=resolved)
         result = await self._run(request.agent, runner_request, request_id)
-        return self._output(request, result, request_id)
+        return self._output(request, result, request_id, profile_id=request.profile_id)
 
     async def analyze_images(
         self,
@@ -114,7 +129,13 @@ class AgentService:
             )
         self._validate_schema(request.response_schema)
         runner = self._runner(request.agent)
-        await self._check_capability(runner, request.agent, request.model_id, image=True)
+        resolved = await self._resolve_profile(
+            runner,
+            request.agent,
+            profile_id=request.profile_id,
+            model_id=request.model_id,
+        )
+        await self._check_capability(resolved.profile, request.agent, image=True)
         try:
             async with self.concurrency.slot(request.agent.value):
                 async with RequestWorkspace(root=self.workspace_root) as workspace:
@@ -140,7 +161,9 @@ class AgentService:
                                 ErrorCode.INVALID_REQUEST, "invalid image", 422
                             ) from exc
                         image_paths.append(image_path)
-                    runner_request = self._runner_request(request, tuple(image_paths))
+                    runner_request = self._runner_request(
+                        request, tuple(image_paths), resolved=resolved
+                    )
                     if workspace.path is None:
                         raise AgentServiceError(
                             ErrorCode.PROVIDER_UNAVAILABLE, "provider is unavailable", 503
@@ -157,7 +180,7 @@ class AgentService:
             raise AgentServiceError(
                 ErrorCode.PROVIDER_UNAVAILABLE, "provider is unavailable", 503
             ) from exc
-        return self._output(request, result, request_id)
+        return self._output(request, result, request_id, profile_id=request.profile_id)
 
     async def _run(
         self, agent: AgentName, request: RunnerRequest, request_id: str
@@ -249,21 +272,65 @@ class AgentService:
                 ErrorCode.PROVIDER_UNAVAILABLE, "provider is unavailable", 503
             ) from exc
 
-    async def _check_capability(
-        self, runner: AgentRunner, agent: AgentName, model_id: str, *, image: bool
-    ) -> None:
+    async def _resolve_profile(
+        self,
+        runner: AgentRunner,
+        agent: AgentName,
+        *,
+        profile_id: str | None,
+        model_id: str | None,
+    ) -> ResolvedProfile:
         capabilities = await self._runner_capabilities(runner)
         if not capabilities.installed:
             raise AgentServiceError(ErrorCode.PROVIDER_UNAVAILABLE, "provider is unavailable", 503)
         if capabilities.agent is not agent:
             raise AgentServiceError(ErrorCode.INVALID_REQUEST, "agent is not configured", 422)
-        model = next((item for item in capabilities.models if item.model_id == model_id), None)
-        if model is None:
-            raise AgentServiceError(ErrorCode.MODEL_NOT_FOUND, "model was not found", 404)
+        if profile_id is not None:
+            profiles = capabilities.profiles or []
+            profile = next((item for item in profiles if item.profile_id == profile_id), None)
+            if profile is None:
+                raise AgentServiceError(ErrorCode.MODEL_NOT_FOUND, "model was not found", 404)
+            if model_id is not None and model_id != profile.model_id:
+                raise AgentServiceError(
+                    ErrorCode.INVALID_REQUEST, "profile does not match model", 422
+                )
+            return ResolvedProfile(
+                profile=profile, model_id=profile.model_id, effort=profile.effort
+            )
+
+        if model_id is None:
+            raise AgentServiceError(ErrorCode.INVALID_REQUEST, "model was not provided", 422)
+        profiles = [item for item in (capabilities.profiles or []) if item.model_id == model_id]
+        if len(profiles) > 1:
+            raise AgentServiceError(
+                ErrorCode.INVALID_REQUEST, "a profile is required for this model", 422
+            )
+        if profiles:
+            profile = profiles[0]
+        else:
+            model = next((item for item in capabilities.models if item.model_id == model_id), None)
+            if model is None:
+                raise AgentServiceError(ErrorCode.MODEL_NOT_FOUND, "model was not found", 404)
+            profile = legacy_profile(
+                agent,
+                model_id,
+                version=capabilities.version,
+                supports_text_input=model.supports_text_input,
+                supports_image_input=model.supports_image_input,
+                supports_structured_output=model.supports_structured_output,
+            )
+        return ResolvedProfile(profile=profile, model_id=profile.model_id, effort=profile.effort)
+
+    @staticmethod
+    async def _check_capability(
+        profile: AgentModelProfile, agent: AgentName, *, image: bool
+    ) -> None:
+        if profile.agent is not agent:
+            raise AgentServiceError(ErrorCode.INVALID_REQUEST, "agent is not configured", 422)
         if (
-            not model.supports_text_input
-            or not model.supports_structured_output
-            or (image and not model.supports_image_input)
+            not profile.supports_text_input
+            or not profile.supports_structured_output
+            or (image and not profile.supports_image_input)
         ):
             raise AgentServiceError(
                 ErrorCode.INVALID_REQUEST, "requested capability is unavailable", 422
@@ -283,10 +350,13 @@ class AgentService:
 
     @staticmethod
     def _runner_request(
-        request: AgentGenerationInput, image_paths: tuple[Path, ...] = ()
+        request: AgentGenerationInput,
+        image_paths: tuple[Path, ...] = (),
+        *,
+        resolved: ResolvedProfile,
     ) -> RunnerRequest:
         return RunnerRequest(
-            model_id=request.model_id,
+            model_id=resolved.model_id,
             system_prompt=request.system_prompt,
             input_payload=request.input_payload,
             response_schema=request.response_schema,
@@ -295,16 +365,22 @@ class AgentService:
             max_output_tokens=request.max_output_tokens,
             timeout_seconds=request.timeout_seconds,
             image_paths=image_paths,
+            effort=(resolved.effort.value if resolved.effort is not None else None),
         )
 
     @staticmethod
     def _output(
-        request: AgentGenerationInput, result: RunnerResult, request_id: str
+        request: AgentGenerationInput,
+        result: RunnerResult,
+        request_id: str,
+        *,
+        profile_id: str | None,
     ) -> AgentGenerationOutput:
         return AgentGenerationOutput(
             payload=result.payload,
             agent=request.agent,
             model_id=result.model_id,
+            profile_id=profile_id,
             request_id=request_id,
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,

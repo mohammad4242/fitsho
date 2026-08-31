@@ -24,6 +24,7 @@ def test_generation_contract_matches_the_backend_boundary() -> None:
     assert request_fields == {
         "agent",
         "model_id",
+        "profile_id",
         "system_prompt",
         "input_payload",
         "response_schema",
@@ -36,6 +37,7 @@ def test_generation_contract_matches_the_backend_boundary() -> None:
         "payload",
         "agent",
         "model_id",
+        "profile_id",
         "request_id",
         "input_tokens",
         "output_tokens",
@@ -66,6 +68,7 @@ def test_runner_contract_matches_the_frozen_protocol() -> None:
         "max_output_tokens",
         "timeout_seconds",
         "image_paths",
+        "effort",
     ]
     assert [field.name for field in fields(RunnerResult)] == [
         "payload",

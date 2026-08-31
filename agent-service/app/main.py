@@ -288,7 +288,7 @@ def create_app(
         _: None = Depends(require_internal_auth),
     ) -> TestOutput:
         request.state.agent = payload.agent.value
-        request.state.model = payload.model_id
+        request.state.model = payload.model_id or payload.profile_id
         request.state.task_kind = "test"
         return await agent_service.test(payload, request.state.request_id)
 

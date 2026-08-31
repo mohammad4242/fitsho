@@ -25,6 +25,8 @@ class RunnerRequest:
     max_output_tokens: int
     timeout_seconds: float
     image_paths: tuple[Path, ...] = ()
+    # Set only by Agent Service's allow-listed profile resolver.
+    effort: str | None = None
 
 
 @dataclass(frozen=True)

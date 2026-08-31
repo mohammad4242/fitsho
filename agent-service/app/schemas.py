@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 NonBlankText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 ModelId = Annotated[
@@ -16,11 +16,41 @@ class AgentName(StrEnum):
     CLAUDE = "claude"
 
 
+class AgentTaskKind(StrEnum):
+    WORKOUT_PLAN_GENERATION = "workout_plan_generation"
+    BODY_PHOTO_ANALYSIS = "body_photo_analysis"
+    FOOD_PHOTO_ESTIMATION = "food_photo_estimation"
+    FOOD_PRICE_SEARCH = "food_price_search"
+
+
+class ReasoningEffort(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    THINKING = "thinking"
+
+
+class AgentModelProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    profile_id: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{1,180}$")
+    agent: AgentName
+    display_name: str = Field(min_length=1, max_length=300)
+    model_id: str = Field(min_length=1, max_length=300)
+    effort: ReasoningEffort | None = None
+    task_kinds: tuple[AgentTaskKind, ...] = Field(min_length=1, max_length=4)
+    fingerprint: str = Field(pattern=r"^[a-f0-9]{16,64}$")
+    supports_text_input: bool = True
+    supports_image_input: bool = False
+    supports_structured_output: bool = True
+
+
 class AgentGenerationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     agent: AgentName
     model_id: ModelId
+    profile_id: str | None = Field(default=None, min_length=1, max_length=200)
     system_prompt: Annotated[NonBlankText, StringConstraints(max_length=50_000)]
     input_payload: dict[str, Any]
     response_schema: dict[str, Any]
@@ -36,6 +66,7 @@ class AgentGenerationOutput(BaseModel):
     payload: dict[str, Any]
     agent: AgentName
     model_id: ModelId
+    profile_id: str | None = Field(default=None, exclude_if=lambda value: value is None)
     request_id: NonBlankText
     input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
@@ -74,6 +105,9 @@ class RunnerCapabilities(BaseModel):
     auth_state: AuthState = AuthState.UNKNOWN
     auth_mode: AuthMode = AuthMode.UNKNOWN
     models: list[RunnerModelCapabilities] = Field(default_factory=list)
+    profiles: list[AgentModelProfile] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class CapabilitiesResponse(BaseModel):
@@ -86,7 +120,14 @@ class TestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     agent: AgentName
-    model_id: ModelId
+    model_id: ModelId | None = None
+    profile_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def require_model_or_profile(self) -> "TestRequest":
+        if self.model_id is None and self.profile_id is None:
+            raise ValueError("model_id or profile_id is required")
+        return self
 
 
 class TestOutput(BaseModel):
@@ -95,6 +136,7 @@ class TestOutput(BaseModel):
     ok: bool
     agent: AgentName
     model_id: ModelId
+    profile_id: str | None = Field(default=None, exclude_if=lambda value: value is None)
     request_id: NonBlankText
     duration_seconds: float = Field(ge=0)
 

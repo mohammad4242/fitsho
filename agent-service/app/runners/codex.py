@@ -11,6 +11,7 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
+from ..profiles import codex_profiles
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
 from .probes import CliMetadataProbe
@@ -68,10 +69,16 @@ class CodexRunner(AgentRunner):
 
     async def capabilities(self) -> RunnerCapabilities:
         installed = self._is_installed()
+        version = await self._metadata.version() if installed else None
+        profiles = codex_profiles(
+            version=version,
+            configured_models=self.configured_models,
+            supports_image_input=self.supports_image_input,
+        ) if installed else ()
         return RunnerCapabilities(
             agent=self.name,
             installed=installed,
-            version=await self._metadata.version() if installed else None,
+            version=version,
             auth_state=AuthState.UNKNOWN,
             auth_mode=AuthMode.BROWSER_LINK,
             models=[
@@ -83,6 +90,7 @@ class CodexRunner(AgentRunner):
                 )
                 for model_id in self.configured_models
             ],
+            profiles=list(profiles),
         )
 
     async def probe_auth_state(self) -> AuthState:
@@ -109,6 +117,8 @@ class CodexRunner(AgentRunner):
         return AuthState.UNKNOWN
 
     async def run(self, request: RunnerRequest) -> RunnerResult:
+        if request.effort is not None and request.effort not in {"low", "medium", "high"}:
+            raise RunnerError("invalid_request", "reasoning effort is invalid")
         started = time.perf_counter()
         workspace = self._workspace_path()
         schema_path = workspace / "schema.json"
@@ -230,9 +240,12 @@ class CodexRunner(AgentRunner):
             "--output-last-message",
             str(output_path),
             "--json",
-            "-m",
-            request.model_id,
         ]
+        if request.effort is not None:
+            if request.effort not in {"low", "medium", "high"}:
+                raise RunnerError("invalid_request", "reasoning effort is invalid")
+            command.extend(["-c", f'model_reasoning_effort="{request.effort}"'])
+        command.extend(["-m", request.model_id])
         for image_path in image_paths:
             command.extend(["--image", str(image_path)])
         command.append("-")

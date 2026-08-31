@@ -18,7 +18,10 @@ def run[T](coro: Coroutine[Any, Any, T]) -> T:
 
 
 def make_request(
-    *, image_paths: tuple[Path, ...] = (), response_schema: dict[str, Any] | None = None
+    *,
+    image_paths: tuple[Path, ...] = (),
+    response_schema: dict[str, Any] | None = None,
+    effort: str | None = None,
 ) -> RunnerRequest:
     return RunnerRequest(
         model_id="claude-sonnet-4-20250514",
@@ -30,6 +33,7 @@ def make_request(
         max_output_tokens=300,
         timeout_seconds=4,
         image_paths=image_paths,
+        effort=effort,
     )
 
 
@@ -243,3 +247,22 @@ def test_images_are_rejected_without_process_by_default(
         run(ClaudeRunner(workspace=tmp_path).run(make_request(image_paths=(Path("photo.jpg"),))))
 
     assert error.value.code == "invalid_request"
+
+
+def test_thinking_profile_uses_claude_effort_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del kwargs
+        calls.append(command)
+        return ProcessResult(0, '{"result":{"answer":"ok"}}', "")
+
+    import app.runners.claude as claude
+
+    monkeypatch.setattr(claude, "run_process", fake_run_process)
+    run(ClaudeRunner(workspace=tmp_path).run(make_request(effort="thinking")))
+
+    assert "--effort" in calls[0]
+    assert calls[0][calls[0].index("--effort") + 1] == "high"

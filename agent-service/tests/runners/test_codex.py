@@ -18,7 +18,10 @@ def run[T](coro: Coroutine[Any, Any, T]) -> T:
 
 
 def make_request(
-    *, image_paths: tuple[Path, ...] = (), response_schema: dict[str, Any] | None = None
+    *,
+    image_paths: tuple[Path, ...] = (),
+    response_schema: dict[str, Any] | None = None,
+    effort: str | None = None,
 ) -> RunnerRequest:
     return RunnerRequest(
         model_id="gpt-5-codex",
@@ -30,6 +33,7 @@ def make_request(
         max_output_tokens=300,
         timeout_seconds=4,
         image_paths=image_paths,
+        effort=effort,
     )
 
 
@@ -114,6 +118,27 @@ def test_run_uses_exact_safe_codex_contract_and_schema_output_files(
     assert kwargs["inherit_environment"] is False
     assert "shell" not in kwargs
     assert "--dangerously-bypass-approvals-and-sandbox" not in command
+
+
+def test_high_effort_profile_uses_codex_reasoning_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del kwargs
+        calls.append(command)
+        output_path = Path(command[command.index("--output-last-message") + 1])
+        output_path.write_text('{"answer":"ok"}', encoding="utf-8")
+        return ProcessResult(0, "", "")
+
+    import app.runners.codex as codex
+
+    monkeypatch.setattr(codex, "run_process", fake_run_process)
+    run(CodexRunner(workspace=tmp_path).run(make_request(effort="high")))
+
+    assert '-c' in calls[0]
+    assert 'model_reasoning_effort="high"' in calls[0]
 
 
 def test_jsonl_fallback_parses_message_and_usage(
