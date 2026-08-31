@@ -2,6 +2,7 @@ import json
 import logging
 from pathlib import Path
 
+from _pytest.logging import LogCaptureFixture
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -37,7 +38,7 @@ def test_agent_service_logger_emits_info_in_runtime() -> None:
     assert _LOGGER.handlers
 
 
-def test_http_logging_is_json_and_contains_only_request_metrics(caplog) -> None:  # type: ignore[no-untyped-def]
+def test_http_logging_is_json_and_contains_only_request_metrics(caplog: LogCaptureFixture) -> None:
     app = create_app(Settings(agent_service_token=SecretStr("a" * 32)))
     with caplog.at_level("INFO", logger="fitsho.agent_service"):
         response = TestClient(app).get("/healthz")
@@ -53,8 +54,8 @@ def test_http_logging_is_json_and_contains_only_request_metrics(caplog) -> None:
 
 
 def test_generation_logging_includes_safe_agent_model_and_usage(
-    tmp_path: Path, caplog
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, caplog: LogCaptureFixture
+) -> None:
     class FakeRunner:
         name = AgentName.ANTIGRAVITY
 
