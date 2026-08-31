@@ -40,6 +40,16 @@ class AntigravityAuthAdapter:
         token_path = Path(home) / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
         token_path.unlink(missing_ok=True)
 
+    def has_saved_credentials(self, environment: Mapping[str, str]) -> bool:
+        home = environment.get("HOME")
+        if not home:
+            return False
+        token_path = Path(home) / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+        try:
+            return token_path.is_file() and token_path.stat().st_size > 0
+        except OSError:
+            return False
+
     def parse_output(self, text: str) -> ParsedAuthUpdate:
         if _OAUTH_FAILURE_PATTERN.search(text):
             return ParsedAuthUpdate(

@@ -33,6 +33,20 @@ def test_antigravity_clears_only_its_saved_oauth_token_for_reauthentication(
     assert unrelated.read_text(encoding="utf-8") == "keep"
 
 
+def test_antigravity_reports_non_empty_saved_oauth_credentials(tmp_path: Path) -> None:
+    adapter = AntigravityAuthAdapter()
+
+    assert adapter.has_saved_credentials({"HOME": str(tmp_path)}) is False
+
+    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("credential", encoding="utf-8")
+    assert adapter.has_saved_credentials({"HOME": str(tmp_path)}) is True
+
+    token_path.write_text("", encoding="utf-8")
+    assert adapter.has_saved_credentials({"HOME": str(tmp_path)}) is False
+
+
 def test_antigravity_parser_exposes_only_google_url_and_code_prompt() -> None:
     adapter = AntigravityAuthAdapter()
     handoff = adapter.parse_output(

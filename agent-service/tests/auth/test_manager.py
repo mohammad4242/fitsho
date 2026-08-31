@@ -91,6 +91,16 @@ class ResettablePtyAuthAdapter(FakePtyAuthAdapter):
         self.reset_environments.append(environment)
 
 
+class CredentialCompletingPtyAuthAdapter(FakePtyAuthAdapter):
+    def __init__(self, script: Path) -> None:
+        super().__init__(script)
+        self.credentials_ready = False
+
+    def has_saved_credentials(self, environment: dict[str, str]) -> bool:
+        del environment
+        return self.credentials_ready
+
+
 def write_script(tmp_path: Path, body: str) -> Path:
     script = tmp_path / "fake-auth.py"
     script.write_text(body, encoding="utf-8")
@@ -164,6 +174,44 @@ def test_manager_exposes_pty_browser_handoff_and_completes_with_code(tmp_path: P
         await asyncio.sleep(0.05)
         assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
         await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_completes_when_saved_credentials_appear_after_code_submission(
+    tmp_path: Path,
+) -> None:
+    script = write_script(
+        tmp_path,
+        "import time\n"
+        "print('READY', flush=True)\n"
+        "time.sleep(60)\n",
+    )
+    adapter = CredentialCompletingPtyAuthAdapter(script)
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: adapter},
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"]},
+        )
+        try:
+            view = await manager.start(AgentName.ANTIGRAVITY)
+            await asyncio.sleep(0.05)
+            waiting = await manager.get(view.session_id)
+            assert waiting.status is AuthSessionStatus.WAITING_FOR_INPUT
+
+            verifying = await manager.submit_input(view.session_id, "CODE")
+            assert verifying.status is AuthSessionStatus.VERIFYING
+            adapter.credentials_ready = True
+
+            await asyncio.sleep(0.4)
+            assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
+            process = manager._sessions[view.session_id].process  # noqa: SLF001
+            assert process is not None
+            assert not process.is_running
+        finally:
+            await manager.shutdown()
 
     run(scenario())
 

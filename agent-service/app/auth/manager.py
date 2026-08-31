@@ -42,6 +42,7 @@ class AuthProcessFactory(Protocol):
 
 
 AuthStateCallback = Callable[[AgentName, AuthState], None]
+_AUTH_CREDENTIAL_POLL_INTERVAL_SECONDS = 0.25
 
 
 class AuthManager:
@@ -253,6 +254,7 @@ class AuthManager:
 
         process: AuthProcess | None = None
         expired = False
+        credential_checker: Callable[[Mapping[str, str]], bool] | None = None
         async with self._lock:
             session = self._sessions.get(session_id)
             if session is None:
@@ -274,6 +276,18 @@ class AuthManager:
                     raise AuthManagerError(
                         "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
                     )
+                adapter = self.adapters.get(session.agent)
+                if adapter is not None:
+                    has_saved_credentials = getattr(adapter, "has_saved_credentials", None)
+                    if callable(has_saved_credentials):
+                        credential_checker = cast(
+                            Callable[[Mapping[str, str]], bool], has_saved_credentials
+                        )
+                        try:
+                            if credential_checker(self.environment):
+                                credential_checker = None
+                        except (OSError, TypeError, ValueError):
+                            pass
                 session.mark_verifying()
         if expired:
             if process is not None:
@@ -299,12 +313,59 @@ class AuthManager:
                 ) from exc
             finally:
                 del validated
+            if credential_checker is not None:
+                asyncio.create_task(
+                    self._monitor_saved_credentials(session, process, credential_checker)
+                )
         elif process is not None:
             await process.terminate()
             raise AuthManagerError(
                 "auth_session_expired", 410, AuthSafeErrorMessage.EXPIRED
             )
         return await self.get(session_id)
+
+    async def _monitor_saved_credentials(
+        self,
+        session: AuthSession,
+        process: AuthProcess,
+        credential_checker: Callable[[Mapping[str, str]], bool],
+    ) -> None:
+        while process.is_running:
+            async with self._lock:
+                if not session.is_active or session.status is not AuthSessionStatus.VERIFYING:
+                    return
+                if self._is_expired(session):
+                    session.mark_terminal(AuthSessionStatus.EXPIRED)
+                    self._release_active(session)
+                    expired = True
+                else:
+                    expired = False
+            if expired:
+                await self._terminate_auth_process(process)
+                return
+
+            try:
+                credentials_ready = credential_checker(self.environment)
+            except (OSError, TypeError, ValueError):
+                credentials_ready = False
+            if credentials_ready:
+                should_terminate = False
+                async with self._lock:
+                    if not session.is_active or session.status is not AuthSessionStatus.VERIFYING:
+                        return
+                    if self._is_expired(session):
+                        session.mark_terminal(AuthSessionStatus.EXPIRED)
+                        self._release_active(session)
+                        should_terminate = True
+                    else:
+                        session.mark_terminal(AuthSessionStatus.AUTHENTICATED)
+                        self._notify_state(session)
+                        self._release_active(session)
+                        should_terminate = True
+                if should_terminate:
+                    await self._terminate_auth_process(process)
+                    return
+            await asyncio.sleep(_AUTH_CREDENTIAL_POLL_INTERVAL_SECONDS)
 
     async def cancel(self, session_id: UUID) -> AuthSessionView:
         process: AuthProcess | None = None
