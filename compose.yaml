@@ -28,6 +28,7 @@ services:
       - fitsho_agent_home:/home/agent
     cap_drop:
       - ALL
+    read_only: true
     security_opt:
       - no-new-privileges:true
     pids_limit: 256
@@ -56,6 +57,9 @@ services:
       MEDIA_MAX_BYTES: "20971520"
       MEDIA_MAX_VIDEO_BYTES: "67108864"
       MEDIA_MAX_VIDEO_DURATION_SECONDS: "20"
+      BODY_PHOTO_STORAGE_ROOT: /var/lib/fitsho/private/body-photos
+      FOOD_PHOTO_STORAGE_ROOT: /var/lib/fitsho/private/food-photos
+      NUTRITION_LAB_STORAGE_ROOT: /var/lib/fitsho/private/nutrition-labs
       AGENT_SERVICE_BASE_URL: http://agent-service:9001
       AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
       NO_PROXY: agent-service,db,localhost,127.0.0.1
@@ -63,6 +67,9 @@ services:
       - "8001:8000"
     volumes:
       - ./backend/var/media:/var/lib/fitsho/media
+      - ./backend/var/private/body-photos:/var/lib/fitsho/private/body-photos
+      - ./backend/var/private/food-photos:/var/lib/fitsho/private/food-photos
+      - ./backend/var/private/nutrition-labs:/var/lib/fitsho/private/nutrition-labs
       - fitsho_exercise_media:/var/lib/fitsho/media-legacy:ro
       - ./backend/var/media-migration:/app/var/media-migration
       - ./backend/var/media-migration-source:/var/lib/fitsho/media-migration-source:ro

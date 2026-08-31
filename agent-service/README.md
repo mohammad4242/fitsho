@@ -20,6 +20,12 @@ docker compose up -d db agent-service backend
 `http://agent-service:9001`. If its token is absent, the Agent Service exits;
 the backend remains able to start and use API-mode providers.
 
+The Agent Service container is non-root, read-only apart from its persistent
+`/home/agent` volume and request-scoped `/tmp`. It has no Docker socket,
+database, backend source, or Fitsho private-media mount. The backend keeps
+body photos, food photos, and nutrition-lab uploads in separate persistent
+bind mounts under `backend/var/private/`.
+
 ## One-time CLI login
 
 Authentication is performed manually inside the running container. Credentials
