@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
+from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -10,6 +11,9 @@ from app.auth.dependencies import AppSettings, DatabaseSession
 from app.body_analysis.admin_config.crypto import CredentialEncryptionError
 from app.body_analysis.admin_config.enums import AIProviderName, AITaskType
 from app.body_analysis.admin_config.schemas import (
+    AgentServiceAuthInputRequest,
+    AgentServiceAuthSessionResponse,
+    AgentServiceAuthStartRequest,
     AgentServiceCapabilitiesResponse,
     AgentServiceTestRequest,
     AgentServiceTestResponse,
@@ -22,14 +26,19 @@ from app.body_analysis.admin_config.schemas import (
     ProviderTestResponse,
 )
 from app.body_analysis.admin_config.service import (
+    AgentServiceAuthError,
     AIConfigError,
+    cancel_agent_service_auth,
     credential_status,
+    get_agent_service_auth,
     get_agent_service_capabilities,
     get_credential,
     list_models,
     list_task_configs,
     refresh_model_catalog,
     save_task_config,
+    start_agent_service_auth,
+    submit_agent_service_auth_input,
     test_agent_service,
     test_provider_connection,
 )
@@ -66,6 +75,23 @@ def _agent_provider_error(error: AIProviderError) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_502_BAD_GATEWAY,
         detail={"code": error.code.value, "message": error.safe_message},
+    )
+
+
+def _agent_auth_error(error: AgentServiceAuthError) -> HTTPException:
+    return HTTPException(
+        status_code=error.status_code,
+        detail={"code": error.code, "message": error.safe_message},
+    )
+
+
+def _agent_not_configured(error: AIConfigError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "code": "AGENT_SERVICE_NOT_CONFIGURED",
+            "message": "The Agent Service is not configured.",
+        },
     )
 
 
@@ -227,3 +253,100 @@ async def test_agent_service_connection(
         settings=settings,
         payload=payload,
     )
+
+
+@router.post(
+    "/agent-service/auth/start",
+    response_model=AgentServiceAuthSessionResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def start_agent_authentication(
+    payload: AgentServiceAuthStartRequest,
+    request: Request,
+    settings: AppSettings,
+) -> AgentServiceAuthSessionResponse:
+    try:
+        return await start_agent_service_auth(
+            client=_agent_client(request),
+            settings=settings,
+            payload=payload,
+        )
+    except AIConfigError as error:
+        raise _agent_not_configured(error) from None
+    except AgentServiceAuthError as error:
+        raise _agent_auth_error(error) from None
+    except AIProviderError as error:
+        raise _agent_provider_error(error) from None
+
+
+@router.get(
+    "/agent-service/auth/{session_id}",
+    response_model=AgentServiceAuthSessionResponse,
+)
+async def read_agent_authentication(
+    session_id: UUID,
+    request: Request,
+    settings: AppSettings,
+) -> AgentServiceAuthSessionResponse:
+    try:
+        return await get_agent_service_auth(
+            client=_agent_client(request),
+            settings=settings,
+            session_id=str(session_id),
+        )
+    except AIConfigError as error:
+        raise _agent_not_configured(error) from None
+    except AgentServiceAuthError as error:
+        raise _agent_auth_error(error) from None
+    except AIProviderError as error:
+        raise _agent_provider_error(error) from None
+
+
+@router.post(
+    "/agent-service/auth/{session_id}/input",
+    response_model=AgentServiceAuthSessionResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def submit_agent_authentication_input(
+    session_id: UUID,
+    payload: AgentServiceAuthInputRequest,
+    request: Request,
+    settings: AppSettings,
+) -> AgentServiceAuthSessionResponse:
+    try:
+        return await submit_agent_service_auth_input(
+            client=_agent_client(request),
+            settings=settings,
+            session_id=str(session_id),
+            payload=payload,
+        )
+    except AIConfigError as error:
+        raise _agent_not_configured(error) from None
+    except AgentServiceAuthError as error:
+        raise _agent_auth_error(error) from None
+    except AIProviderError as error:
+        raise _agent_provider_error(error) from None
+
+
+@router.delete(
+    "/agent-service/auth/{session_id}",
+    response_model=AgentServiceAuthSessionResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def cancel_agent_authentication(
+    session_id: UUID,
+    request: Request,
+    settings: AppSettings,
+) -> AgentServiceAuthSessionResponse:
+    try:
+        return await cancel_agent_service_auth(
+            client=_agent_client(request),
+            settings=settings,
+            session_id=str(session_id),
+        )
+    except AIConfigError as error:
+        raise _agent_not_configured(error) from None
+    except AgentServiceAuthError as error:
+        raise _agent_auth_error(error) from None
+    except AIProviderError as error:
+        raise _agent_provider_error(error) from None

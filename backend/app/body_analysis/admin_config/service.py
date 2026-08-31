@@ -24,6 +24,9 @@ from app.body_analysis.admin_config.models import (
     AITaskConfig,
 )
 from app.body_analysis.admin_config.schemas import (
+    AgentServiceAuthInputRequest,
+    AgentServiceAuthSessionResponse,
+    AgentServiceAuthStartRequest,
     AgentServiceCapabilitiesResponse,
     AgentServiceTestRequest,
     AgentServiceTestResponse,
@@ -40,6 +43,14 @@ from app.config import Settings
 
 class AIConfigError(ValueError):
     pass
+
+
+class AgentServiceAuthError(Exception):
+    def __init__(self, code: str, status_code: int, safe_message: str) -> None:
+        super().__init__(safe_message)
+        self.code = code
+        self.status_code = status_code
+        self.safe_message = safe_message
 
 
 _AGENT_SERVICE_TASKS = {
@@ -66,6 +77,15 @@ _AGENT_SERVICE_ERROR_CODES = {
     "invalid_output": ProviderErrorCode.INVALID_OUTPUT,
     "model_not_found": ProviderErrorCode.MODEL_NOT_FOUND,
     "provider_unavailable": ProviderErrorCode.PROVIDER_UNAVAILABLE,
+}
+_AGENT_AUTH_ERRORS: dict[str, tuple[int, str]] = {
+    "auth_in_progress": (409, "Authentication is already in progress."),
+    "auth_session_not_found": (404, "The authentication session was not found."),
+    "auth_session_expired": (410, "The authentication session has expired."),
+    "auth_input_not_expected": (409, "Authentication input is not expected."),
+    "auth_input_invalid": (422, "Authentication input is invalid."),
+    "auth_unavailable": (503, "Authentication is temporarily unavailable."),
+    "auth_manual_only": (409, "This Agent requires manual authentication."),
 }
 
 
@@ -315,6 +335,7 @@ async def _agent_service_json(
     method: str,
     path: str,
     json_body: dict[str, object] | None = None,
+    preserve_auth_errors: bool = False,
 ) -> dict[str, Any]:
     base_url = settings.agent_service_base_url.strip().rstrip("/")
     if not base_url:
@@ -344,6 +365,8 @@ async def _agent_service_json(
             _AGENT_SAFE_MESSAGES[ProviderErrorCode.PROVIDER_UNAVAILABLE],
         ) from error
     if response.status_code >= 400:
+        if preserve_auth_errors:
+            raise _agent_service_auth_http_error(response)
         raise _agent_service_http_error(response)
     try:
         payload = response.json()
@@ -360,6 +383,23 @@ async def _agent_service_json(
             provider_status_code=response.status_code,
         )
     return payload
+
+
+def _agent_service_auth_http_error(response: httpx.Response) -> Exception:
+    code_name: str | None = None
+    try:
+        body = response.json()
+    except (TypeError, ValueError):
+        body = None
+    if isinstance(body, Mapping):
+        error = body.get("error")
+        if isinstance(error, Mapping) and isinstance(error.get("code"), str):
+            code_name = error["code"]
+    error_details = _AGENT_AUTH_ERRORS.get(code_name or "")
+    if error_details is None:
+        return _agent_service_http_error(response)
+    status_code, safe_message = error_details
+    return AgentServiceAuthError(code_name or "auth_unavailable", status_code, safe_message)
 
 
 def _agent_service_http_error(response: httpx.Response) -> AIProviderError:
@@ -472,6 +512,83 @@ async def test_agent_service(
         checked_at=checked_at,
         duration_seconds=result.duration_seconds,
     )
+
+
+def _validate_agent_auth_response(payload: dict[str, Any]) -> AgentServiceAuthSessionResponse:
+    try:
+        return AgentServiceAuthSessionResponse.model_validate(payload)
+    except ValidationError as error:
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+        ) from error
+
+
+async def start_agent_service_auth(
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+    payload: AgentServiceAuthStartRequest,
+) -> AgentServiceAuthSessionResponse:
+    response_payload = await _agent_service_json(
+        client,
+        settings=settings,
+        method="POST",
+        path="/v1/auth/start",
+        json_body={"agent": payload.agent.value},
+        preserve_auth_errors=True,
+    )
+    return _validate_agent_auth_response(response_payload)
+
+
+async def get_agent_service_auth(
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+    session_id: str,
+) -> AgentServiceAuthSessionResponse:
+    response_payload = await _agent_service_json(
+        client,
+        settings=settings,
+        method="GET",
+        path=f"/v1/auth/{session_id}",
+        preserve_auth_errors=True,
+    )
+    return _validate_agent_auth_response(response_payload)
+
+
+async def submit_agent_service_auth_input(
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+    session_id: str,
+    payload: AgentServiceAuthInputRequest,
+) -> AgentServiceAuthSessionResponse:
+    response_payload = await _agent_service_json(
+        client,
+        settings=settings,
+        method="POST",
+        path=f"/v1/auth/{session_id}/input",
+        json_body={"value": payload.value},
+        preserve_auth_errors=True,
+    )
+    return _validate_agent_auth_response(response_payload)
+
+
+async def cancel_agent_service_auth(
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+    session_id: str,
+) -> AgentServiceAuthSessionResponse:
+    response_payload = await _agent_service_json(
+        client,
+        settings=settings,
+        method="DELETE",
+        path=f"/v1/auth/{session_id}",
+        preserve_auth_errors=True,
+    )
+    return _validate_agent_auth_response(response_payload)
 
 
 async def test_provider_connection(

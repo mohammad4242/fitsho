@@ -1,8 +1,18 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from app.body_analysis.admin_config.enums import (
     AIAgentName,
@@ -175,3 +185,105 @@ class AgentServiceTestResponse(BaseModel):
     duration_seconds: float | None = Field(default=None, ge=0)
     error_code: str | None = None
     safe_error_message: str | None = None
+
+
+AgentAuthStatus = Literal[
+    "starting",
+    "waiting_for_user",
+    "waiting_for_input",
+    "verifying",
+    "authenticated",
+    "failed",
+    "canceled",
+    "expired",
+]
+AgentAuthInputLabel = Literal["authorization code", "verification code", "device code"]
+AgentAuthSafeErrorMessage = Literal[
+    "authentication failed",
+    "authentication expired",
+    "authentication was canceled",
+    "authentication is unavailable",
+    "authentication input is invalid",
+    "authentication is already in progress",
+    "authentication session was not found",
+]
+
+_AGENT_AUTH_HOSTS = {
+    AIAgentName.CODEX: "auth.openai.com",
+    AIAgentName.CLAUDE: "claude.com",
+}
+
+
+class AgentServiceAuthStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AIAgentName
+
+
+class AgentServiceAuthInputRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: str = Field(min_length=1, max_length=4096, repr=False)
+
+    @field_validator("value")
+    @classmethod
+    def validate_value(cls, value: str) -> str:
+        if not value.isprintable() or not value.strip():
+            raise ValueError("Authentication input must be printable")
+        return value
+
+
+class AgentServiceAuthSessionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: UUID
+    agent: AIAgentName
+    status: AgentAuthStatus
+    verification_url: str | None = Field(default=None, max_length=4096)
+    user_code: str | None = Field(default=None, min_length=1, max_length=256)
+    input_label: AgentAuthInputLabel | None = None
+    expires_at: datetime
+    safe_error_message: AgentAuthSafeErrorMessage | None = None
+
+    @field_validator("verification_url")
+    @classmethod
+    def validate_verification_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not value.isprintable():
+            raise ValueError("Verification URL must be printable")
+        try:
+            parsed = urlsplit(value)
+            hostname = parsed.hostname
+            port = parsed.port
+        except ValueError as error:
+            raise ValueError("Verification URL is invalid") from error
+        if (
+            parsed.scheme.lower() != "https"
+            or hostname is None
+            or parsed.username is not None
+            or parsed.password is not None
+            or (port is not None and not 1 <= port <= 65535)
+        ):
+            raise ValueError("Verification URL must be an HTTPS URL without credentials")
+        return value
+
+    @field_validator("user_code")
+    @classmethod
+    def validate_user_code(cls, value: str | None) -> str | None:
+        if value is not None and (not value.isprintable() or not value.strip()):
+            raise ValueError("User code must be printable")
+        return value
+
+    @model_validator(mode="after")
+    def validate_agent_auth_host(self) -> "AgentServiceAuthSessionResponse":
+        if self.verification_url is None:
+            return self
+        try:
+            hostname = urlsplit(self.verification_url).hostname
+        except ValueError as error:
+            raise ValueError("Verification URL is invalid") from error
+        expected_host = _AGENT_AUTH_HOSTS.get(self.agent)
+        if expected_host is None or hostname is None or hostname.lower() != expected_host:
+            raise ValueError("Verification URL host is not approved")
+        return self
