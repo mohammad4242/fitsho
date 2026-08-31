@@ -200,7 +200,7 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
     event.preventDefault();
     const current = activeSession.current;
     if (!current || current.status !== "waiting_for_input" || !canSubmitInput || submitting) return;
-    const value = inputValue;
+    const value = normalizeAuthInput(agent, current.input_label, inputValue);
     const runId = runVersion.current;
     const responseId = ++requestVersion.current;
     setInputValue("");
@@ -361,6 +361,17 @@ function isSafeDisplayText(value: string, maxLength: number): boolean {
 function getInputLabel(value: string | null, t: (key: string) => string): string {
   const key = value ? inputLabelKeys[value] : undefined;
   return key ? t(`admin.aiSettings.agentAuth.inputLabels.${key}`) : t("admin.aiSettings.agentAuth.input");
+}
+
+function normalizeAuthInput(
+  agent: AdminAiAgentName,
+  inputLabel: string | null,
+  value: string,
+): string {
+  if (agent === "antigravity" && inputLabel === "authorization code") {
+    return value.replace(/\s+/g, "");
+  }
+  return value;
 }
 
 function toSafeAuthError(error: unknown, t: (key: string) => string): string {

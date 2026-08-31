@@ -105,6 +105,25 @@ it("clears authorization input immediately and sends it only to the active sessi
   await waitFor(() => expect(api.submitAdminAiAgentAuthInput).toHaveBeenCalledWith("session-1", "AUTH-CODE"));
 });
 
+it("removes copied whitespace from Antigravity authorization codes", async () => {
+  const waitingForInput: AdminAiAgentAuthSession = {
+    ...waitingForUser,
+    status: "waiting_for_input",
+    verification_url: null,
+    user_code: null,
+    input_label: "authorization code",
+  };
+  api.startAdminAiAgentAuth.mockResolvedValue(waitingForInput);
+  api.submitAdminAiAgentAuthInput.mockResolvedValue({ ...waitingForInput, status: "verifying" });
+  render(<AgentAuthDialog agent="antigravity" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
+
+  const input = await screen.findByLabelText("Authorization code");
+  fireEvent.change(input, { target: { value: "AUTH CODE" } });
+  fireEvent.submit(input.closest("form")!);
+
+  await waitFor(() => expect(api.submitAdminAiAgentAuthInput).toHaveBeenCalledWith("session-1", "AUTHCODE"));
+});
+
 it("keeps the Antigravity browser link visible while waiting for its authorization code", async () => {
   const antigravitySession: AdminAiAgentAuthSession = {
     ...waitingForUser,
