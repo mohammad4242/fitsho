@@ -43,6 +43,8 @@ _SAFE_EXACT_KEYS = frozenset(
         "XDG_CACHE_HOME",
     }
 )
+_AUTH_PTY_ROWS = 40
+_AUTH_PTY_COLUMNS = 4096
 
 
 class AuthProcessError(RuntimeError):
@@ -275,7 +277,13 @@ class AuthProcess:
     @staticmethod
     def _configure_pty(master_fd: int) -> None:
         os.set_blocking(master_fd, False)
-        fcntl.ioctl(master_fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+        # Antigravity prints a long Google OAuth URL in remote mode. A narrow
+        # PTY makes its renderer insert line breaks into query parameters.
+        fcntl.ioctl(
+            master_fd,
+            termios.TIOCSWINSZ,
+            struct.pack("HHHH", _AUTH_PTY_ROWS, _AUTH_PTY_COLUMNS, 0, 0),
+        )
 
     async def _read_pty_chunk(self, master_fd: int) -> bytes:
         loop = asyncio.get_running_loop()

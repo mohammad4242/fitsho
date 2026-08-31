@@ -202,7 +202,12 @@ def test_auth_process_supports_pty_output_and_termination(
         process = AuthProcess(
             AuthCommand(
                 sys.executable,
-                ("-c", "import time; print('READY', flush=True); time.sleep(60)"),
+                (
+                    "-c",
+                    "import os, time; "
+                    "print(f'WIDTH={os.get_terminal_size().columns}', flush=True); "
+                    "time.sleep(60)",
+                ),
                 use_pty=True,
             ),
             workspace=tmp_path,
@@ -213,7 +218,7 @@ def test_auth_process_supports_pty_output_and_termination(
         await process.start()
         await asyncio.sleep(0.05)
         assert process.is_running
-        assert "READY" in "".join(output)
+        assert "WIDTH=4096" in "".join(output)
         await process.terminate()
         assert not process.is_running
 
