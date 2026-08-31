@@ -5,6 +5,7 @@ from ..config import Settings
 from ..schemas import AgentName, AuthState, RunnerCapabilities
 from .antigravity import AntigravityRunner
 from .base import AgentRunner
+from .codex import CodexRunner
 
 
 class RunnerRegistry:
@@ -20,25 +21,42 @@ class RunnerRegistry:
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "RunnerRegistry":
-        runner = AntigravityRunner(
+        antigravity = AntigravityRunner(
             workspace=Path(settings.agent_workspace_root),
             executable=settings.agent_antigravity_executable,
             configured_models=settings.agent_antigravity_models,
             supports_image_input=settings.agent_antigravity_supports_image_input,
         )
-        executable = settings.agent_antigravity_executable
-        configured_models = settings.agent_antigravity_models
-        supports_image_input = settings.agent_antigravity_supports_image_input
+        codex = CodexRunner(
+            workspace=Path(settings.agent_workspace_root),
+            executable=settings.agent_codex_executable,
+            configured_models=settings.agent_codex_models,
+            supports_image_input=settings.agent_codex_supports_image_input,
+        )
 
-        def workspace_runner(workspace: Path) -> AgentRunner:
+        def antigravity_workspace_runner(workspace: Path) -> AgentRunner:
             return AntigravityRunner(
                 workspace=workspace,
-                executable=executable,
-                configured_models=configured_models,
-                supports_image_input=supports_image_input,
+                executable=settings.agent_antigravity_executable,
+                configured_models=settings.agent_antigravity_models,
+                supports_image_input=settings.agent_antigravity_supports_image_input,
             )
 
-        return cls((runner,), {AgentName.ANTIGRAVITY: workspace_runner})
+        def codex_workspace_runner(workspace: Path) -> AgentRunner:
+            return CodexRunner(
+                workspace=workspace,
+                executable=settings.agent_codex_executable,
+                configured_models=settings.agent_codex_models,
+                supports_image_input=settings.agent_codex_supports_image_input,
+            )
+
+        return cls(
+            (antigravity, codex),
+            {
+                AgentName.ANTIGRAVITY: antigravity_workspace_runner,
+                AgentName.CODEX: codex_workspace_runner,
+            },
+        )
 
     def get(self, agent: AgentName) -> AgentRunner | None:
         return self._runners.get(agent)

@@ -84,7 +84,14 @@ def test_default_registry_has_no_invented_models(tmp_path: Path) -> None:
             "version": None,
             "auth_state": "unknown",
             "models": [],
-        }
+        },
+        {
+            "agent": "codex",
+            "installed": True,
+            "version": None,
+            "auth_state": "unknown",
+            "models": [],
+        },
     ]
 
 

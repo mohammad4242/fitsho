@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     agent_antigravity_executable: str = "agy"
     agent_antigravity_models: tuple[str, ...] = ()
     agent_antigravity_supports_image_input: bool = False
+    agent_codex_executable: str = "codex"
+    agent_codex_models: tuple[str, ...] = ()
+    agent_codex_supports_image_input: bool = False
+    agent_codex_max_concurrency: int = Field(default=2, ge=1, le=64)
 
     @field_validator("agent_service_token")
     @classmethod

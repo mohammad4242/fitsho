@@ -33,8 +33,8 @@ def test_capabilities_accepts_correct_token_without_inventing_models() -> None:
     response = client().get("/v1/capabilities", headers={"Authorization": f"Bearer {TOKEN}"})
     assert response.status_code == 200
     body = response.json()
-    assert len(body["runners"]) == 1
-    assert body["runners"][0]["agent"] == "antigravity"
+    assert {runner["agent"] for runner in body["runners"]} == {"antigravity", "codex"}
+    assert all(runner["models"] == [] for runner in body["runners"])
     assert body["runners"][0]["models"] == []
 
 
