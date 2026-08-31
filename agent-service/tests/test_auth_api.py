@@ -185,3 +185,35 @@ def test_auth_start_poll_duplicate_and_cancel_use_safe_contract(tmp_path: Path) 
         assert client.get(f"/v1/auth/{body['session_id']}", headers=headers).status_code == 200
     finally:
         run(manager.shutdown())
+
+
+def test_auth_telemetry_uses_only_non_sensitive_fields(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    records: list[dict[str, object]] = []
+    monkeypatch.setattr("app.main.emit_log", lambda fields: records.append(dict(fields)))
+    client, manager = make_client(tmp_path)
+    try:
+        headers = {"Authorization": f"Bearer {TOKEN}"}
+        started = client.post("/v1/auth/start", headers=headers, json={"agent": "codex"})
+        session_id = started.json()["session_id"]
+        client.get(f"/v1/auth/{session_id}", headers=headers)
+        client.delete(f"/v1/auth/{session_id}", headers=headers)
+
+        auth_records = [
+            record
+            for record in records
+            if str(record.get("endpoint", "")).startswith("/v1/auth/")
+        ]
+        assert auth_records
+        allowed = {"request_id", "endpoint", "agent", "status", "duration_ms", "error_code"}
+        for record in auth_records:
+            assert set(record) <= allowed
+        serialized = str(auth_records)
+        assert "https://auth.openai.com" not in serialized
+        assert "ABCD-EFGH" not in serialized
+        assert "AGENT_SERVICE_TOKEN" not in serialized
+        assert "PRIVATE-CLI-OUTPUT" not in serialized
+    finally:
+        run(manager.shutdown())

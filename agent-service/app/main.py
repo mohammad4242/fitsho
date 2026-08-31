@@ -109,14 +109,14 @@ def create_app(
                 input_bytes = max(0, int(content_length)) if content_length is not None else None
             except ValueError:
                 input_bytes = None
+            is_auth_endpoint = request.url.path.startswith("/v1/auth/")
             telemetry = {
                 "request_id": request.state.request_id,
                 "endpoint": request.url.path,
                 "duration_ms": round((perf_counter() - started) * 1000, 3),
                 "status": response.status_code if response is not None else "error",
-                "input_bytes": input_bytes,
             }
-            for field in (
+            telemetry_fields = ("agent", "error_code") if is_auth_endpoint else (
                 "agent",
                 "model",
                 "task_kind",
@@ -124,7 +124,10 @@ def create_app(
                 "input_tokens",
                 "output_tokens",
                 "error_code",
-            ):
+            )
+            if not is_auth_endpoint:
+                telemetry["input_bytes"] = input_bytes
+            for field in telemetry_fields:
                 value = getattr(request.state, field, None)
                 if value is not None:
                     telemetry[field] = value
