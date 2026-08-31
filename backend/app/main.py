@@ -42,12 +42,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         async with (
             httpx.AsyncClient(
                 timeout=zen_timeout,
-                proxy=active_settings.opencode_zen_proxy_url,
+                proxy=active_settings.opencode_zen_proxy_url or None,
                 trust_env=False,
             ) as zen_client,
             httpx.AsyncClient(
                 timeout=ai_timeout,
-                proxy=active_settings.openrouter_proxy_url,
+                proxy=active_settings.openrouter_proxy_url or None,
                 trust_env=False,
             ) as ai_client,
             httpx.AsyncClient(timeout=food_price_timeout, trust_env=False) as food_price_client,

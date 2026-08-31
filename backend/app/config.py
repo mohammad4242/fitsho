@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -88,6 +88,15 @@ class Settings(BaseSettings):
     openrouter_timeout_seconds: float = Field(default=45.0, gt=0, le=180)
     openrouter_proxy_url: str | None = Field(default=None, max_length=500, repr=False)
     ai_model_catalog_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+
+    @field_validator("opencode_zen_proxy_url", "openrouter_proxy_url", mode="before")
+    @classmethod
+    def normalize_empty_proxy_urls(cls, value: object) -> str | None:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return None if value is None else str(value)
+
     workout_prompt_version: str = "v1"
     workout_policy_version: str = "v1"
     workout_catalog_programming_version: str = "v1"
