@@ -25,6 +25,7 @@ class ParsedAuthUpdate:
 
 class AgentAuthAdapter(Protocol):
     agent: AgentName
+    manual_auth_only: bool
 
     def command(self) -> AuthCommand: ...
 

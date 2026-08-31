@@ -93,6 +93,10 @@ class AuthManager:
                 raise AuthManagerError(
                     "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
                 )
+            if adapter.manual_auth_only:
+                raise AuthManagerError(
+                    "auth_manual_only", 409, AuthSafeErrorMessage.UNAVAILABLE
+                )
             session = AuthSession(
                 session_id=uuid4(),
                 agent=agent,
