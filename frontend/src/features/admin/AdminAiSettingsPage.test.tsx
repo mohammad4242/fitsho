@@ -394,6 +394,7 @@ it("hides API-only controls and disables unsupported tuning in Agent mode", asyn
   expect(screen.queryByLabelText("Provider-routing restrictions")).not.toBeInTheDocument();
   expect(screen.getByLabelText("Temperature")).toBeDisabled();
   expect(screen.getByLabelText("Maximum output tokens")).toBeDisabled();
+  expect(screen.getByText("Temperature and maximum output controls are managed by the selected CLI.")).toBeInTheDocument();
 });
 
 it("filters Agent Service models for workout text and structured output", async () => {

@@ -568,6 +568,7 @@ const en = {
         enabled: "Enabled",
         temperature: "Temperature",
         maxTokens: "Maximum output tokens",
+        agentTuningUnsupported: "Temperature and maximum output controls are managed by the selected CLI.",
         timeout: "Timeout seconds",
         confidence: "Minimum confidence",
         cost: "Cost ceiling per request",

@@ -568,6 +568,7 @@ const fa = {
         enabled: "فعال",
         temperature: "دما",
         maxTokens: "حداکثر توکن خروجی",
+        agentTuningUnsupported: "تنظیم دما و حداکثر خروجی توسط CLI انتخاب‌شده مدیریت می‌شود.",
         timeout: "مهلت درخواست به ثانیه",
         confidence: "حداقل اطمینان پذیرفته‌شده",
         cost: "سقف هزینهٔ هر درخواست",
