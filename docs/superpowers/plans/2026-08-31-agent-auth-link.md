@@ -4,7 +4,7 @@
 
 **Goal:** Make the Antigravity auth button show the real `agy` browser URL through the existing secure Backend → Agent Service path, without exposing a terminal.
 
-**Architecture:** Add a standard-library PTY mode to the existing in-memory auth process, enable it only for the Antigravity adapter, and parse the bounded ANSI-cleaned stream into the existing safe auth session contract. Add a capability flag so the admin panel represents browser-link auth correctly while preserving Codex/Claude behavior.
+**Architecture:** Add a standard-library PTY mode to the existing in-memory auth process, enable it only for the Antigravity adapter, and parse the bounded ANSI-cleaned stream into the existing safe auth session contract. Fixed Remote/SSH marker variables travel on the immutable `AuthCommand` and are merged after the safe environment allowlist. Add a capability flag so the admin panel represents browser-link auth correctly while preserving Codex/Claude behavior.
 
 **Tech Stack:** Python 3.12, asyncio, `pty`/`termios`, FastAPI, Pydantic, pytest, React 19, TypeScript, Vitest.
 
@@ -58,7 +58,7 @@
 - Test: `agent-service/tests/auth/test_manager.py`
 
 **Interfaces:**
-- Consume `AuthCommand`, `AuthOutputCallback`, and `AuthProcessResult`.
+- Consume `AuthCommand(executable, args, use_pty, environment)`, `AuthOutputCallback`, and `AuthProcessResult`.
 - Produce `AuthProcess.start`, `send_input`, `wait`, and `terminate` behavior for both pipe and PTY modes.
 
 - [ ] **Step 1: Implement PTY start**
@@ -66,7 +66,9 @@
   Use `pty.openpty()` and `asyncio.create_subprocess_exec` with the slave fd
   attached to stdin/stdout/stderr, `start_new_session=True`, and no shell. Keep
   the master fd in the parent, set it non-blocking for reads, and close the
-  slave fd after spawn. Preserve the existing pipe path unchanged.
+  slave fd after spawn. Merge only the command’s fixed environment tuple into
+  the manager’s safe environment and set the actual PTY path for `SSH_TTY`.
+  Preserve the existing pipe path unchanged.
 
 - [ ] **Step 2: Implement bounded PTY monitoring and input**
 
@@ -118,9 +120,10 @@
 
 - [ ] **Step 3: Implement the adapter**
 
-  Set `manual_auth_only=False`, return `AuthCommand("agy", (), use_pty=True)`,
-  provide fixed `SSH_CONNECTION`/`SSH_CLIENT`/`SSH_TTY` markers through the
-  process environment hook, and reuse the shared parser with the observed
+  Set `manual_auth_only=False`, return `AuthCommand("agy", (), use_pty=True,
+  environment=(("SSH_CONNECTION", "sandbox 0 sandbox 0"),
+  ("SSH_CLIENT", "sandbox 0 0"))),` and let the PTY set its actual
+  `SSH_TTY`. Reuse the shared parser with the observed
   `accounts.google.com` allowlist. Map the documented browser-code prompt to
   `AuthInputLabel.AUTHORIZATION_CODE`; never forward arbitrary prompt text.
 
