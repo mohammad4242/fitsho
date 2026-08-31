@@ -183,6 +183,30 @@ it("routes agent authentication through the backend with bounded payloads", asyn
   expect(fetchMock.mock.calls.flat().join(" ")).not.toContain("9001");
 });
 
+it("requests a fresh Antigravity login only when reauthentication is explicit", async () => {
+  const session = {
+    session_id: "session-2",
+    agent: "antigravity" as const,
+    status: "starting" as const,
+    verification_url: null,
+    user_code: null,
+    input_label: null,
+    expires_at: "2026-08-31T12:10:00Z",
+    safe_error_message: null,
+  };
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(session));
+
+  await expect(startAdminAiAgentAuth("antigravity", { forceReauth: true })).resolves.toEqual(session);
+
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/admin/ai/agent-service/auth/start",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ agent: "antigravity", force_reauth: true }),
+    }),
+  );
+});
+
 it("cancels the active agent authentication through the backend", async () => {
   const fetchMock = vi.spyOn(globalThis, "fetch")
     .mockResolvedValue(jsonResponse({ agent: "codex", canceled: true }));

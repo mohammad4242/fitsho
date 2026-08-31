@@ -220,6 +220,7 @@ class AgentServiceAuthStartRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     agent: AIAgentName
+    force_reauth: bool = False
 
 
 class AgentServiceAuthActiveCancellationResponse(BaseModel):

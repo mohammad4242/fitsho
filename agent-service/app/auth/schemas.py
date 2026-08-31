@@ -39,6 +39,7 @@ class AuthStartRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     agent: AgentName
+    force_reauth: bool = False
 
 
 class AuthActiveCancellationResponse(BaseModel):

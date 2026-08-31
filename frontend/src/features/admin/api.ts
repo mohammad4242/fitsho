@@ -408,10 +408,15 @@ export function testAdminAiAgentService(
 
 export function startAdminAiAgentAuth(
   agent: AdminAiAgentName,
+  options: { forceReauth?: boolean } = {},
 ): Promise<AdminAiAgentAuthSession> {
+  const body = {
+    agent,
+    ...(options.forceReauth ? { force_reauth: true } : {}),
+  };
   return request<AdminAiAgentAuthSession>("/api/v1/admin/ai/agent-service/auth/start", {
     method: "POST",
-    body: JSON.stringify({ agent }),
+    body: JSON.stringify(body),
   });
 }
 

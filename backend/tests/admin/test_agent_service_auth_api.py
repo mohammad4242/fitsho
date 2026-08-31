@@ -158,6 +158,43 @@ def test_agent_auth_proxy_accepts_antigravity_google_oauth_url(
     assert response.json()["input_label"] == "authorization code"
 
 
+def test_agent_auth_proxy_forwards_antigravity_force_reauth(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _admin(client, db, "force-reauth-admin@example.com")
+    test_settings.agent_service_token = TOKEN
+    session_id = str(uuid4())
+    payload = _session_payload(session_id, status="starting")
+    payload.update(
+        {
+            "agent": "antigravity",
+            "verification_url": "https://accounts.google.com/o/oauth2/auth?state=opaque",
+            "user_code": None,
+            "input_label": "authorization code",
+        }
+    )
+    seen: list[bytes] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.content)
+        return httpx.Response(200, json=payload)
+
+    replacement = _mock_agent_service(client, httpx.MockTransport(handler))
+    try:
+        response = client.post(
+            "/api/v1/admin/ai/agent-service/auth/start",
+            headers=ORIGIN,
+            json={"agent": "antigravity", "force_reauth": True},
+        )
+    finally:
+        _restore_agent_service(client, replacement)
+
+    assert response.status_code == 200, response.text
+    assert seen == [b'{"agent":"antigravity","force_reauth":true}']
+
+
 def test_cancel_active_agent_auth_proxy_is_admin_origin_protected_and_safe(
     client: TestClient,
     db: Session,

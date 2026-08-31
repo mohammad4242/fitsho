@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from app.auth.adapters.antigravity import AntigravityAuthAdapter
 from app.auth.schemas import AuthInputLabel, AuthSessionStatus
 
@@ -14,6 +16,21 @@ def test_antigravity_uses_hidden_remote_browser_auth_flow() -> None:
         ("SSH_CLIENT", "sandbox 0 0"),
     )
     assert adapter.allowed_auth_hosts() == frozenset({"accounts.google.com"})
+
+
+def test_antigravity_clears_only_its_saved_oauth_token_for_reauthentication(
+    tmp_path: Path,
+) -> None:
+    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("credential", encoding="utf-8")
+    unrelated = tmp_path / "unrelated.txt"
+    unrelated.write_text("keep", encoding="utf-8")
+
+    AntigravityAuthAdapter().clear_saved_credentials({"HOME": str(tmp_path)})
+
+    assert not token_path.exists()
+    assert unrelated.read_text(encoding="utf-8") == "keep"
 
 
 def test_antigravity_parser_exposes_only_google_url_and_code_prompt() -> None:

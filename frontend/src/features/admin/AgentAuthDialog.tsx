@@ -148,7 +148,9 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
     const start = async () => {
       const responseId = ++requestVersion.current;
       try {
-        const next = await startAdminAiAgentAuth(agent);
+        const next = agent === "antigravity"
+          ? await startAdminAiAgentAuth(agent, { forceReauth: true })
+          : await startAdminAiAgentAuth(agent);
         if (!isCurrent()) {
           void cancelAdminAiAgentAuthSession(next.session_id).catch(() => undefined);
           return;

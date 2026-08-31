@@ -536,7 +536,10 @@ async def start_agent_service_auth(
         settings=settings,
         method="POST",
         path="/v1/auth/start",
-        json_body={"agent": payload.agent.value},
+        json_body={
+            "agent": payload.agent.value,
+            **({"force_reauth": True} if payload.force_reauth else {}),
+        },
         preserve_auth_errors=True,
     )
     return _validate_agent_auth_response(response_payload)

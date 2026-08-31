@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from pathlib import Path
+
 from ...schemas import AgentName
 from ..base import AuthCommand, ParsedAuthUpdate
 from ..schemas import AuthInputLabel, AuthSessionStatus
@@ -27,6 +30,13 @@ class AntigravityAuthAdapter:
 
     def allowed_auth_hosts(self) -> frozenset[str]:
         return ANTIGRAVITY_AUTH_HOSTS
+
+    def clear_saved_credentials(self, environment: Mapping[str, str]) -> None:
+        home = environment.get("HOME")
+        if not home:
+            return
+        token_path = Path(home) / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+        token_path.unlink(missing_ok=True)
 
     def parse_output(self, text: str) -> ParsedAuthUpdate:
         update = parse_browser_handoff(

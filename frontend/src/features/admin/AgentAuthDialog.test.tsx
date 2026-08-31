@@ -138,6 +138,7 @@ it("keeps the Antigravity browser link visible while waiting for its authorizati
   render(<AgentAuthDialog agent="antigravity" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
 
   expect(await screen.findByText(antigravitySession.verification_url!)).toBeInTheDocument();
+  expect(api.startAdminAiAgentAuth).toHaveBeenCalledWith("antigravity", { forceReauth: true });
   expect(screen.getByRole("button", { name: "Open authentication page" })).toBeInTheDocument();
   expect(screen.getByLabelText("Authorization code")).toBeInTheDocument();
 });

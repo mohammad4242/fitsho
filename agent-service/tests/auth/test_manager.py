@@ -82,6 +82,15 @@ class FakePtyAuthAdapter:
         return AuthSessionStatus.AUTHENTICATED if returncode == 0 else AuthSessionStatus.FAILED
 
 
+class ResettablePtyAuthAdapter(FakePtyAuthAdapter):
+    def __init__(self, script: Path) -> None:
+        super().__init__(script)
+        self.reset_environments: list[dict[str, str]] = []
+
+    def clear_saved_credentials(self, environment: dict[str, str]) -> None:
+        self.reset_environments.append(environment)
+
+
 def write_script(tmp_path: Path, body: str) -> Path:
     script = tmp_path / "fake-auth.py"
     script.write_text(body, encoding="utf-8")
@@ -157,6 +166,29 @@ def test_manager_exposes_pty_browser_handoff_and_completes_with_code(tmp_path: P
         await manager.shutdown()
 
     run(scenario())
+
+
+def test_manager_force_reauth_clears_saved_credentials_before_start(tmp_path: Path) -> None:
+    script = write_script(tmp_path, "import time\nprint('READY', flush=True)\ntime.sleep(60)\n")
+    adapter = ResettablePtyAuthAdapter(script)
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: adapter},
+            workspace=tmp_path,
+            environment={"HOME": str(tmp_path), "PATH": os.environ["PATH"]},
+        )
+        try:
+            view = await manager.start(AgentName.ANTIGRAVITY, force_reauth=True)
+            assert view.status in {
+                AuthSessionStatus.STARTING,
+                AuthSessionStatus.WAITING_FOR_USER,
+            }
+        finally:
+            await manager.shutdown()
+
+    run(scenario())
+    assert adapter.reset_environments == [{"HOME": str(tmp_path), "PATH": os.environ["PATH"]}]
 
 
 def test_manager_cancels_active_pty_auth_with_escape_and_releases_slot(tmp_path: Path) -> None:

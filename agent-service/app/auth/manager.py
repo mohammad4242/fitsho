@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -71,7 +71,7 @@ class AuthManager:
         self._active: dict[AgentName, UUID] = {}
         self._lock = asyncio.Lock()
 
-    async def start(self, agent: AgentName) -> AuthSessionView:
+    async def start(self, agent: AgentName, *, force_reauth: bool = False) -> AuthSessionView:
         if not isinstance(agent, AgentName):
             raise AuthManagerError(
                 "auth_unavailable", 422, AuthSafeErrorMessage.UNAVAILABLE
@@ -102,6 +102,20 @@ class AuthManager:
                 raise AuthManagerError(
                     "auth_manual_only", 409, AuthSafeErrorMessage.UNAVAILABLE
                 )
+            if force_reauth:
+                clear_saved_credentials = getattr(adapter, "clear_saved_credentials", None)
+                if not callable(clear_saved_credentials):
+                    raise AuthManagerError(
+                        "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
+                    )
+                try:
+                    cast(Callable[[Mapping[str, str]], None], clear_saved_credentials)(
+                        self.environment
+                    )
+                except OSError as exc:
+                    raise AuthManagerError(
+                        "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
+                    ) from exc
             session = AuthSession(
                 session_id=uuid4(),
                 agent=agent,

@@ -234,7 +234,7 @@ def create_app(
     ) -> AuthSessionView:
         request.state.agent = payload.agent.value
         request.state.task_kind = "auth"
-        return await effective_auth_manager.start(payload.agent)
+        return await effective_auth_manager.start(payload.agent, force_reauth=payload.force_reauth)
 
     @app.post("/v1/auth/cancel-active", response_model=AuthActiveCancellationResponse)
     async def auth_cancel_active(
