@@ -167,6 +167,23 @@ class AuthProcess:
         except (BrokenPipeError, ConnectionError, OSError) as exc:
             raise AuthProcessError("authentication process is not accepting input") from exc
 
+    async def press_enter(self) -> None:
+        """Send the fixed Enter action requested by an adapter's safe prompt parser."""
+
+        process = self._process
+        master_fd = self._pty_master_fd
+        if (
+            not self.command.use_pty
+            or process is None
+            or process.returncode is not None
+            or master_fd is None
+        ):
+            raise AuthProcessError("authentication process is not running")
+        try:
+            await self._write_pty(master_fd, b"\r")
+        except (BrokenPipeError, ConnectionError, OSError) as exc:
+            raise AuthProcessError("authentication process is not accepting input") from exc
+
     async def wait(self) -> AuthProcessResult:
         task = self._monitor_task
         if task is None:

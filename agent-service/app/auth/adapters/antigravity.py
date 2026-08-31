@@ -4,6 +4,7 @@ from ..schemas import AuthInputLabel, AuthSessionStatus
 from . import parse_browser_handoff
 
 ANTIGRAVITY_AUTH_HOSTS = frozenset({"accounts.google.com"})
+_GOOGLE_OAUTH_MENU_MARKER = "select login method:"
 
 
 class AntigravityAuthAdapter:
@@ -28,12 +29,20 @@ class AntigravityAuthAdapter:
         return ANTIGRAVITY_AUTH_HOSTS
 
     def parse_output(self, text: str) -> ParsedAuthUpdate:
-        return parse_browser_handoff(
+        update = parse_browser_handoff(
             text,
             allowed_hosts=ANTIGRAVITY_AUTH_HOSTS,
             include_user_code=False,
             input_label=AuthInputLabel.AUTHORIZATION_CODE.value,
         )
+        if (
+            not update.verification_url
+            and not update.failed
+            and not update.authenticated
+            and _GOOGLE_OAUTH_MENU_MARKER in text.lower()
+        ):
+            return ParsedAuthUpdate(press_enter=True)
+        return update
 
     def classify_exit(self, returncode: int, final_text: str) -> AuthSessionStatus:
         del final_text

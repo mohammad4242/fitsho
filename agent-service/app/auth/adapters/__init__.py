@@ -7,6 +7,9 @@ from ..base import ParsedAuthUpdate
 from ..schemas import AuthSafeErrorMessage
 
 _ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+_ANSI_OSC8_PREFIX = re.compile(r"\x1b\]8;[^\x1b\x07]*?;")
+_ANSI_OSC8_SUFFIX = re.compile(r"\x1b\]8;;(?:\x07|\x1b\\)")
+_TERMINAL_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _URL_PATTERN = re.compile(r"(?i)\b(?:https?|ftp)://[^\s<>\"]+")
 _CODE_PATTERNS = (
     re.compile(
@@ -28,6 +31,7 @@ _INPUT_PROMPT_PATTERN = re.compile(
     r"(?i)\b(?:enter|paste|input|provide)\s+(?:the\s+)?"
     r"(?:authorization\s+|verification\s+|device\s+|user\s+)?code\b"
 )
+_CODE_INPUT_MARKER = re.compile(r"(?i)\b(?:authorization|verification|device)\s+code\b")
 _FAILURE_PATTERN = re.compile(
     r"(?i)\b(?:login|authentication|authorization)\s+(?:failed|cancelled|canceled)\b|"
     r"\bnot\s+(?:logged|authenticated)\s+in\b"
@@ -38,7 +42,9 @@ CLAUDE_AUTH_HOSTS = frozenset({"claude.com"})
 
 
 def strip_ansi(text: str) -> str:
-    return _ANSI_ESCAPE.sub("", text)
+    without_links = _ANSI_OSC8_SUFFIX.sub("", _ANSI_OSC8_PREFIX.sub("", text))
+    without_escape = _ANSI_ESCAPE.sub("", without_links)
+    return _TERMINAL_CONTROL.sub("", without_escape)
 
 
 def parse_browser_handoff(
@@ -82,8 +88,10 @@ def parse_browser_handoff(
         return ParsedAuthUpdate(authenticated=True)
     if _FAILURE_PATTERN.search(clean_text):
         return _safe_failure()
-    if input_label is not None and verification_url is not None and _INPUT_PROMPT_PATTERN.search(
-        clean_text
+    if (
+        input_label is not None
+        and verification_url is not None
+        and (_INPUT_PROMPT_PATTERN.search(clean_text) or _CODE_INPUT_MARKER.search(clean_text))
     ):
         return ParsedAuthUpdate(
             verification_url=verification_url,

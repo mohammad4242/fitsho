@@ -43,7 +43,8 @@ agy 1.1.22
 `AuthManager` remains the lifecycle owner. The Antigravity adapter starts
 `agy` with no user-controlled arguments, enables the PTY process implementation,
 and supplies the provider's SSH marker so the CLI selects its documented remote
-URL flow. The PTY output is bounded, ANSI-normalized, and parsed in memory.
+URL flow. It presses one fixed Enter action after detecting the default Google
+OAuth menu. The PTY output is bounded, ANSI-normalized, and parsed in memory.
 
 ## Security contract
 

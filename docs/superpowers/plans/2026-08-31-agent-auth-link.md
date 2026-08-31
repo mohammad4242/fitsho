@@ -124,7 +124,8 @@
   environment=(("SSH_CONNECTION", "sandbox 0 sandbox 0"),
   ("SSH_CLIENT", "sandbox 0 0"))),` and let the PTY set its actual
   `SSH_TTY`. Reuse the shared parser with the observed
-  `accounts.google.com` allowlist. Map the documented browser-code prompt to
+  `accounts.google.com` allowlist. Detect the fixed Google OAuth menu and send
+  one Enter action; map the documented browser-code prompt to
   `AuthInputLabel.AUTHORIZATION_CODE`; never forward arbitrary prompt text.
 
 - [ ] **Step 4: Run adapter and manager tests**

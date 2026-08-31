@@ -22,6 +22,7 @@ class ParsedAuthUpdate:
     authenticated: bool = False
     failed: bool = False
     safe_error_message: str | None = None
+    press_enter: bool = False
 
 
 class AgentAuthAdapter(Protocol):

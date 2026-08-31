@@ -67,12 +67,14 @@ class FakePtyAuthAdapter:
     def parse_output(self, text: str) -> ParsedAuthUpdate:
         if "AUTHENTICATED" in text:
             return ParsedAuthUpdate(authenticated=True)
-        if "READY" in text:
+        if "Open " in text or "READY" in text:
             return ParsedAuthUpdate(
                 verification_url="https://accounts.google.com/o/oauth2/auth?state=opaque",
                 needs_input=True,
                 input_label="authorization code",
             )
+        if "Select login method" in text:
+            return ParsedAuthUpdate(press_enter=True)
         return ParsedAuthUpdate()
 
     def classify_exit(self, returncode: int, final_text: str) -> AuthSessionStatus:
@@ -151,6 +153,40 @@ def test_manager_exposes_pty_browser_handoff_and_completes_with_code(tmp_path: P
         verifying = await manager.submit_input(view.session_id, "CODE")
         assert verifying.status is AuthSessionStatus.VERIFYING
         await asyncio.sleep(0.05)
+        assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
+        await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_selects_antigravity_google_oauth_without_terminal_input(
+    tmp_path: Path,
+) -> None:
+    script = write_script(
+        tmp_path,
+        "import sys\n"
+        "print('Select login method:', flush=True)\n"
+        "if sys.stdin.readline().strip() != '':\n"
+        "    raise SystemExit(2)\n"
+        "print('Open https://accounts.google.com/o/oauth2/auth?state=opaque', flush=True)\n"
+        "print('After authenticating, paste the code below:', flush=True)\n"
+        "if sys.stdin.readline().strip() == 'CODE':\n"
+        "    print('AUTHENTICATED', flush=True)\n",
+    )
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: FakePtyAuthAdapter(script)},
+            workspace=tmp_path,
+        )
+        view = await manager.start(AgentName.ANTIGRAVITY)
+        await asyncio.sleep(0.1)
+        waiting = await manager.get(view.session_id)
+        assert waiting.status is AuthSessionStatus.WAITING_FOR_INPUT
+        assert waiting.verification_url == "https://accounts.google.com/o/oauth2/auth?state=opaque"
+        verifying = await manager.submit_input(view.session_id, "CODE")
+        assert verifying.status is AuthSessionStatus.VERIFYING
+        await asyncio.sleep(0.1)
         assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
         await manager.shutdown()
 

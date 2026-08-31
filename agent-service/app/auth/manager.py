@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from pydantic import ValidationError
 
 from ..schemas import AgentName, AuthState
-from .base import AgentAuthAdapter, AuthCommand
+from .base import AgentAuthAdapter, AuthCommand, ParsedAuthUpdate
 from .process import (
     AuthOutputCallback,
     AuthProcess,
@@ -113,11 +113,13 @@ class AuthManager:
             parser_buffer = [""]
             process_holder: list[AuthProcess | None] = [None]
             termination_scheduled = [False]
+            enter_scheduled = [False]
 
             async def on_output(text: str) -> None:
                 async with self._lock:
                     parser_buffer[0] = (parser_buffer[0] + text)[-self.max_output_bytes :]
                     if not session.is_terminal:
+                        update = ParsedAuthUpdate()
                         try:
                             update = adapter.parse_output(parser_buffer[0])
                             session.apply_update(
@@ -129,6 +131,15 @@ class AuthManager:
                                 AuthSessionStatus.FAILED,
                                 AuthSafeErrorMessage.FAILED.value,
                             )
+                        process = process_holder[0]
+                        if (
+                            update.press_enter
+                            and process is not None
+                            and process.is_running
+                            and not enter_scheduled[0]
+                        ):
+                            enter_scheduled[0] = True
+                            asyncio.create_task(self._press_enter(session, process))
                         if session.is_terminal:
                             self._notify_state(session)
                             self._release_active(session)
@@ -163,6 +174,20 @@ class AuthManager:
         if stale_process is not None:
             await stale_process.terminate()
         return view
+
+    async def _press_enter(self, session: AuthSession, process: AuthProcess) -> None:
+        try:
+            await process.press_enter()
+        except AuthProcessError:
+            async with self._lock:
+                if session.is_active:
+                    session.mark_terminal(
+                        AuthSessionStatus.FAILED,
+                        AuthSafeErrorMessage.UNAVAILABLE.value,
+                    )
+                    self._notify_state(session)
+                    self._release_active(session)
+            await process.terminate()
 
     async def get(self, session_id: UUID) -> AuthSessionView:
         process: AuthProcess | None = None

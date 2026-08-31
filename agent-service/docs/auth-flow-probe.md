@@ -12,22 +12,24 @@ token, or raw stdout/stderr was recorded.
 - Version: `1.1.22`
 - Help: `agy --help` exposes no `auth` or `login` subcommand. `agy auth --help`
   and `agy login --help` both returned the root help output.
-- Exact automated auth command: none observed.
-- Interactive behavior: `agy` opened an interactive terminal session and did not
-  expose a parseable HTTPS URL or user/device code during the probe. `agy
-  --prompt-interactive` is not usable without the required interactive context;
-  `agy --print probe` exited with an authentication-related failure and no URL.
-- PTY: required for the interactive CLI session, but no safe auth handoff was
-  exposed by the tested binary.
-- Allowed verification hosts: none. No hostname was allowlisted because no
-  verification URL was emitted by a supported auth command.
-- User input: no safe browser/device input contract was observed.
-- Status command: none found in help.
-- Completion/failure: unauthenticated print mode exited non-zero; the interactive
-  session remained active until the probe harness stopped it. Natural successful
-  auth and natural cancel were not attempted.
-- Capability decision: `manual_auth_only`; no automated URL parser or guessed
-  command is permitted.
+- Initial menu: an unauthenticated `agy` session opens a `Select login method`
+  menu with Google OAuth selected by default; it waits for an Enter key before
+  emitting the remote handoff.
+- Remote markers: the adapter starts the fixed `agy` command in a PTY and adds
+  `SSH_CONNECTION`, `SSH_CLIENT`, and the actual PTY path as `SSH_TTY`. No
+  user-controlled command arguments are accepted.
+- Browser flow: after the fixed Enter action, the pinned binary emitted a
+  Google OAuth URL and the `authorization code` prompt. The URL and code were
+  never recorded; the disposable smoke reported only
+  `session_status=waiting_for_input` and `url_hostname=accounts.google.com`.
+- PTY: required. The parser removes ANSI/terminal hyperlink controls, bounds the
+  stream, and accepts only HTTPS URLs on the exact `accounts.google.com` host.
+- User input: the panel sends the administrator's printable authorization code
+  only after the session reaches `waiting_for_input`.
+- Status command: none found in help. Natural successful auth and cancel were
+  not attempted because they require a real administrator account.
+- Capability decision: `browser_link`; the Admin panel shows the validated link
+  and code field without exposing a terminal or raw CLI output.
 
 ## Codex
 
@@ -72,7 +74,6 @@ token, or raw stdout/stderr was recorded.
 ## Probe gate
 
 Only the evidence above may drive the adapters. Auth URL validation is restricted
-to `auth.openai.com` for Codex and `claude.com` for Claude. Antigravity remains
-manual-only until a future pinned binary exposes a documented, machine-readable,
-safe auth handoff. Image capability remains disabled; no image smoke test was
-performed.
+to `accounts.google.com` for Antigravity, `auth.openai.com` for Codex, and
+`claude.com` for Claude. Image capability remains disabled; no image smoke test
+was performed.

@@ -20,7 +20,8 @@ def test_antigravity_parser_exposes_only_google_url_and_code_prompt() -> None:
     adapter = AntigravityAuthAdapter()
     handoff = adapter.parse_output(
         "\x1b[2KOpen https://accounts.google.com/o/oauth2/v2/auth?state=opaque\n"
-        "Continue in your browser, then enter the authorization code:\n"
+        "After authenticating, copy the code displayed in the browser and paste it below:\n"
+        "authorization code...\n"
         "private token should never be returned"
     )
 
@@ -29,6 +30,37 @@ def test_antigravity_parser_exposes_only_google_url_and_code_prompt() -> None:
     assert handoff.input_label == AuthInputLabel.AUTHORIZATION_CODE.value
     assert handoff.user_code is None
     assert "private" not in repr(handoff)
+
+
+def test_antigravity_parser_strips_terminal_hyperlink_controls_from_url() -> None:
+    adapter = AntigravityAuthAdapter()
+    handoff = adapter.parse_output(
+        "\x1b]8;id=opaque;https://accounts.google.com/o/oauth2/auth?state=opaque "
+        "Click here\x1b]8;;\x07"
+    )
+
+    assert handoff.verification_url is not None
+    assert all(ord(char) >= 0x20 for char in handoff.verification_url)
+
+
+def test_antigravity_parser_ignores_terminal_bells_around_redrawn_urls() -> None:
+    adapter = AntigravityAuthAdapter()
+    handoff = adapter.parse_output(
+        "\x07https://accounts.google.com/o/oauth2/auth?state=opaque\x07"
+    )
+
+    assert handoff.verification_url == "https://accounts.google.com/o/oauth2/auth?state=opaque"
+
+
+def test_antigravity_parser_requests_only_fixed_google_oauth_menu_selection() -> None:
+    adapter = AntigravityAuthAdapter()
+
+    handoff = adapter.parse_output(
+        "Select login method:\n> 1. Google OAuth\n2. Use a Google Cloud project"
+    )
+
+    assert handoff.press_enter is True
+    assert handoff.verification_url is None
 
 
 def test_antigravity_parser_fails_closed_for_unapproved_or_insecure_urls() -> None:

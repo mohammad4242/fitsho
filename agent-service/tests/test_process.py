@@ -253,3 +253,35 @@ def test_auth_process_merges_only_fixed_command_environment_for_pty(
     assert "sandbox 0 sandbox 0" in "".join(output)
     assert "True" in "".join(output)
     assert "secret" not in "".join(output)
+
+
+def test_auth_process_can_press_fixed_enter_in_pty_mode(tmp_path: Path) -> None:
+    output: list[str] = []
+
+    async def collect(text: str) -> None:
+        output.append(text)
+
+    async def scenario() -> None:
+        process = AuthProcess(
+            AuthCommand(
+                sys.executable,
+                (
+                    "-c",
+                    "import sys; print('MENU', flush=True); "
+                    "sys.stdin.readline(); print('DONE', flush=True)",
+                ),
+                use_pty=True,
+            ),
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"]},
+            max_output_bytes=4096,
+            output_callback=collect,
+        )
+        await process.start()
+        await asyncio.sleep(0.05)
+        await process.press_enter()
+        result = await process.wait()
+        assert result.returncode == 0
+
+    run(scenario())
+    assert "DONE" in "".join(output)
