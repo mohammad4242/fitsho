@@ -19,6 +19,7 @@ def run[T](coro: Coroutine[Any, Any, T]) -> T:
 
 class FakeAuthAdapter:
     agent = AgentName.CODEX
+    manual_auth_only = False
 
     def __init__(self, script: Path) -> None:
         self.script = script
