@@ -16,9 +16,9 @@ import {
   testAdminAiProvider,
 } from "./api";
 import { AiModelSelector } from "./AiModelSelector";
+import { AgentServicePanel } from "./AgentServicePanel";
 import type {
   AdminAiCatalogModel,
-  AdminAiAgentName,
   AdminAiAgentRunnerCapability,
   AdminAiTaskConfig,
   AdminAiTaskConfigUpdate,
@@ -33,7 +33,6 @@ const agentTasks: AdminAiTaskType[] = [
   "body_photo_analysis",
   "food_photo_estimation",
 ];
-const agentNames: AdminAiAgentName[] = ["antigravity", "codex", "claude"];
 
 export function AdminAiSettingsPage() {
   const { i18n, t } = useTranslation();
@@ -381,41 +380,26 @@ export function AdminAiSettingsPage() {
               />
             </label>
           </>}
-          {agentMode && <div className="admin-ai-agent-panel">
-            <label className="admin-ai-setting-field" htmlFor="ai-agent-name">
-              <span>{t("admin.aiSettings.agent")}</span>
-              <select
-                id="ai-agent-name"
-                value={config.agent_name ?? ""}
-                onChange={(event) => patchConfig({ agent_name: event.target.value as AdminAiAgentName, agent_model_id: null })}
-              >
-                <option value="" disabled>{t("admin.aiSettings.selectAgent")}</option>
-                {agentNames.map((agent) => <option key={agent} value={agent}>{t(`admin.aiSettings.agents.${agent}`)}</option>)}
-              </select>
-            </label>
-            <div className="admin-ai-agent-status" role="status">
-              <strong>{t("admin.aiSettings.agentStatus")}</strong>
-              {agentCapabilitiesLoading && <span>{t("admin.aiSettings.agentLoading")}</span>}
-              {!agentCapabilitiesLoading && agentCapabilitiesError && <span className="form-error">{t("admin.aiSettings.agentUnavailable")}</span>}
-              {!agentCapabilitiesLoading && !agentCapabilitiesError && selectedRunner && <span>
-                {selectedRunner.installed ? t("admin.aiSettings.agentInstalled") : t("admin.aiSettings.agentUnavailable")}
-                {` · ${t(`admin.aiSettings.auth.${selectedRunner.auth_state}`)}`}
-                {selectedRunner.version ? ` · ${selectedRunner.version}` : ""}
-              </span>}
-              {!agentCapabilitiesLoading && !agentCapabilitiesError && !selectedRunner && <span>{t("admin.aiSettings.agentUnavailable")}</span>}
-            </div>
-          </div>}
+          {agentMode && <AgentServicePanel
+            runners={agentCapabilities}
+            loading={agentCapabilitiesLoading}
+            unavailable={agentCapabilitiesError}
+            selectedAgent={selectedAgent}
+            selectedModelId={config.agent_model_id}
+            onSelectAgent={(agent) => patchConfig({ agent_name: agent, agent_model_id: null })}
+            onAuthenticate={() => undefined}
+            onTest={handleConnectionTest}
+            testDisabled={busy !== null || !targetAgentIsReady(config)}
+          />}
           <dl className="admin-ai-observability">
             <div><dt>{t("admin.aiSettings.lastConnection")}</dt><dd>{config.last_successful_connection_test_at ?? "—"}</dd></div>
             <div><dt>{t("admin.aiSettings.lastCatalogRefresh")}</dt><dd>{config.last_model_catalog_refresh_at ?? "—"}</dd></div>
             <div><dt>{t("admin.aiSettings.lastError")}</dt><dd>{config.last_error_code ?? "—"}{config.last_error_message ? ` — ${config.last_error_message}` : ""}</dd></div>
           </dl>
-          <div className="admin-ai-settings-actions">
-            <button type="button" disabled={busy !== null || (agentMode && !targetAgentIsReady(config))} onClick={handleConnectionTest}>
-              {agentMode ? t("admin.aiSettings.testAgent") : t("admin.aiSettings.test")}
-            </button>
-            {!agentMode && <button type="button" disabled={busy !== null || !config.credential.configured} onClick={handleRefresh}>{t("admin.aiSettings.refresh")}</button>}
-          </div>
+          {!agentMode && <div className="admin-ai-settings-actions">
+            <button type="button" disabled={busy !== null} onClick={handleConnectionTest}>{t("admin.aiSettings.test")}</button>
+            <button type="button" disabled={busy !== null || !config.credential.configured} onClick={handleRefresh}>{t("admin.aiSettings.refresh")}</button>
+          </div>}
           {feedbackOperation !== "save" && message && <p className="admin-ai-provider-feedback admin-ai-settings-message" role="status">{message}</p>}
           {feedbackOperation !== "save" && error && <p className="admin-ai-provider-feedback form-error" role="alert">{error}</p>}
         </section>
