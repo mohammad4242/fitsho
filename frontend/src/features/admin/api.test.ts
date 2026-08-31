@@ -17,6 +17,7 @@ import {
   restoreAdminNutritionProgram,
   startAdminAiAgentAuth,
   submitAdminAiAgentAuthInput,
+  cancelAdminAiAgentAuthActive,
   cancelAdminAiAgentAuthSession,
   uploadAdminMealImage,
   updateAdminAiRouting,
@@ -180,6 +181,25 @@ it("routes agent authentication through the backend with bounded payloads", asyn
     expect.objectContaining({ method: "DELETE" }),
   );
   expect(fetchMock.mock.calls.flat().join(" ")).not.toContain("9001");
+});
+
+it("cancels the active agent authentication through the backend", async () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch")
+    .mockResolvedValue(jsonResponse({ agent: "codex", canceled: true }));
+
+  await expect(cancelAdminAiAgentAuthActive("codex")).resolves.toEqual({
+    agent: "codex",
+    canceled: true,
+  });
+
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/v1/admin/ai/agent-service/auth/cancel-active",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ agent: "codex" }),
+      credentials: "include",
+    }),
+  );
 });
 
 it("reads recent AI generation failures", async () => {

@@ -573,6 +573,8 @@ const en = {
           title: "Authenticate {{agent}}",
           close: "Close",
           cancel: "Cancel authentication",
+          cancelPrevious: "Cancel previous authentication",
+          cancellingPrevious: "Cancelling previous authentication…",
           starting: "Starting authentication…",
           waitingForUser: "Complete authentication in the browser, then keep this dialog open.",
           continue: "Continue",

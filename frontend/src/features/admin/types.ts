@@ -292,6 +292,11 @@ export type AdminAiAgentAuthSession = {
   safe_error_message: string | null;
 };
 
+export type AdminAiAgentAuthCancellation = {
+  agent: AdminAiAgentName;
+  canceled: boolean;
+};
+
 export type AdminAiCredentialStatus = {
   configured: boolean;
   masked: string | null;

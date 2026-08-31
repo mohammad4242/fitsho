@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { ApiError } from "../../shared/apiClient";
 import {
+  cancelAdminAiAgentAuthActive,
   cancelAdminAiAgentAuthSession,
   getAdminAiAgentAuthSession,
   startAdminAiAgentAuth,
@@ -63,6 +64,7 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
   const [inputValue, setInputValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [startErrorCode, setStartErrorCode] = useState<string | null>(null);
   const runVersion = useRef(0);
   const requestVersion = useRef(0);
   const latestResponseVersion = useRef(0);
@@ -110,6 +112,7 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
     setCanceling(false);
     setInputValue("");
     setError(null);
+    setStartErrorCode(null);
     setCopyFeedback(null);
     let disposed = false;
 
@@ -151,11 +154,13 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
           return;
         }
         applySession(next, runId, responseId);
+        setStartErrorCode(null);
         setLoading(false);
         schedulePoll();
       } catch (requestError: unknown) {
         if (isCurrent()) {
           setLoading(false);
+          setStartErrorCode(requestError instanceof ApiError ? requestError.code : null);
           setError(toSafeAuthError(requestError, t));
         }
       }
@@ -232,6 +237,21 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
     }
   }
 
+  async function handleCancelActive() {
+    if (canceling) return;
+    const runId = runVersion.current;
+    setCanceling(true);
+    try {
+      await cancelAdminAiAgentAuthActive(agent);
+      if (runVersion.current === runId) onClose();
+    } catch (requestError: unknown) {
+      if (runVersion.current === runId) {
+        setCanceling(false);
+        setError(toSafeAuthError(requestError, t));
+      }
+    }
+  }
+
   return (
     <div className="admin-agent-auth-backdrop">
       <section
@@ -254,6 +274,15 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
 
         {loading && <p role="status">{t("admin.aiSettings.agentAuth.starting")}</p>}
         {error && <p className="form-error" role="alert">{error}</p>}
+        {startErrorCode === "auth_in_progress" && <button
+          type="button"
+          onClick={() => void handleCancelActive()}
+          disabled={canceling}
+        >
+          {canceling
+            ? t("admin.aiSettings.agentAuth.cancellingPrevious")
+            : t("admin.aiSettings.agentAuth.cancelPrevious")}
+        </button>}
         {copyFeedback && <p role="status">{copyFeedback}</p>}
 
         {session && <div className="admin-agent-auth-dialog__content">

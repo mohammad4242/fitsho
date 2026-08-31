@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   startAdminAiAgentAuth: vi.fn(),
   getAdminAiAgentAuthSession: vi.fn(),
   submitAdminAiAgentAuthInput: vi.fn(),
+  cancelAdminAiAgentAuthActive: vi.fn(),
   cancelAdminAiAgentAuthSession: vi.fn(),
 }));
 
@@ -35,6 +36,7 @@ beforeEach(() => {
   api.startAdminAiAgentAuth.mockResolvedValue(waitingForUser);
   api.getAdminAiAgentAuthSession.mockResolvedValue(waitingForUser);
   api.submitAdminAiAgentAuthInput.mockResolvedValue(waitingForUser);
+  api.cancelAdminAiAgentAuthActive.mockResolvedValue({ agent: "codex", canceled: true });
   api.cancelAdminAiAgentAuthSession.mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
@@ -201,6 +203,23 @@ it("shows a translated safe error instead of a downstream message", async () => 
   const alert = await screen.findByRole("alert");
   expect(alert).toHaveTextContent("Authentication is temporarily unavailable.");
   expect(alert).not.toHaveTextContent("raw downstream token or stderr");
+});
+
+it("offers to cancel the previous auth when the agent reports one in progress", async () => {
+  const onClose = vi.fn();
+  const user = userEvent.setup();
+  api.startAdminAiAgentAuth.mockRejectedValue(
+    new ApiError(409, "private downstream details", null, "auth_in_progress"),
+  );
+  render(<AgentAuthDialog agent="codex" onClose={onClose} onAuthenticated={vi.fn()} />);
+
+  const cancelPrevious = await screen.findByRole("button", { name: "Cancel previous authentication" });
+  expect(screen.getByRole("alert")).toHaveTextContent("Authentication is already in progress for this Agent.");
+  await user.click(cancelPrevious);
+
+  await waitFor(() => expect(api.cancelAdminAiAgentAuthActive).toHaveBeenCalledWith("codex"));
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(api.startAdminAiAgentAuth).toHaveBeenCalledTimes(1);
 });
 
 it("does not render or open a verification URL outside the agent allowlist", async () => {

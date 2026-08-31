@@ -18,6 +18,7 @@ import type {
   AdminAiCatalogRefresh,
   AdminAiCatalogResponse,
   AdminAiAgentAuthSession,
+  AdminAiAgentAuthCancellation,
   AdminAiAgentName,
   AdminAiAgentServiceCapabilities,
   AdminAiAgentServiceTest,
@@ -412,6 +413,18 @@ export function startAdminAiAgentAuth(
     method: "POST",
     body: JSON.stringify({ agent }),
   });
+}
+
+export function cancelAdminAiAgentAuthActive(
+  agent: AdminAiAgentName,
+): Promise<AdminAiAgentAuthCancellation> {
+  return request<AdminAiAgentAuthCancellation>(
+    "/api/v1/admin/ai/agent-service/auth/cancel-active",
+    {
+      method: "POST",
+      body: JSON.stringify({ agent }),
+    },
+  );
 }
 
 export function getAdminAiAgentAuthSession(

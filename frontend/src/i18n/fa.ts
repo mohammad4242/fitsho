@@ -573,6 +573,8 @@ const fa = {
           title: "احراز هویت {{agent}}",
           close: "بستن",
           cancel: "لغو احراز هویت",
+          cancelPrevious: "لغو احراز هویت قبلی",
+          cancellingPrevious: "در حال لغو احراز هویت قبلی…",
           starting: "شروع احراز هویت…",
           waitingForUser: "احراز هویت را در مرورگر کامل کنید و این پنجره را باز نگه دارید.",
           continue: "ادامه",
