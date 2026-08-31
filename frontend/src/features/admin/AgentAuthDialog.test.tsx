@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
@@ -51,7 +52,7 @@ it("starts auth, renders safe URL and code, and opens/copies only on explicit ac
   const onClose = vi.fn();
   render(<AgentAuthDialog agent="codex" onClose={onClose} onAuthenticated={vi.fn()} />);
 
-  expect(api.startAdminAiAgentAuth).toHaveBeenCalledWith("codex");
+  await waitFor(() => expect(api.startAdminAiAgentAuth).toHaveBeenCalledWith("codex"));
   expect(await screen.findByRole("dialog", { name: "Authenticate Codex" })).toBeInTheDocument();
   expect(screen.getByText("ABCD-EFGH")).toBeInTheDocument();
   expect(screen.getByText("https://auth.openai.com/device?test=1")).toBeInTheDocument();
@@ -68,6 +69,17 @@ it("starts auth, renders safe URL and code, and opens/copies only on explicit ac
   await user.click(screen.getByRole("button", { name: "Copy code" }));
   expect(await screen.findByText("Code copied")).toBeInTheDocument();
   openSpy.mockRestore();
+});
+
+it("starts only one auth session when React StrictMode replays the effect", async () => {
+  render(
+    <StrictMode>
+      <AgentAuthDialog agent="antigravity" onClose={vi.fn()} onAuthenticated={vi.fn()} />
+    </StrictMode>,
+  );
+
+  await waitFor(() => expect(screen.getByText("Waiting for browser sign-in")).toBeInTheDocument());
+  expect(api.startAdminAiAgentAuth).toHaveBeenCalledTimes(1);
 });
 
 it("clears authorization input immediately and sends it only to the active session", async () => {

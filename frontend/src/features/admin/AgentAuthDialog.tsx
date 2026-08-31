@@ -161,7 +161,9 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
       }
     };
 
-    void start();
+    queueMicrotask(() => {
+      if (isCurrent()) void start();
+    });
     return () => {
       disposed = true;
       runVersion.current += 1;
