@@ -238,7 +238,9 @@ def test_manager_expires_and_terminates_pending_process(tmp_path: Path) -> None:
         view = await manager.start(AgentName.CODEX)
         await asyncio.sleep(0.15)
         assert (await manager.get(view.session_id)).status is AuthSessionStatus.EXPIRED
-        assert not manager._sessions[view.session_id].process.is_running  # noqa: SLF001
+        process = manager._sessions[view.session_id].process  # noqa: SLF001
+        assert process is not None
+        assert not process.is_running
         await manager.shutdown()
 
     run(scenario())
