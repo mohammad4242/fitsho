@@ -71,6 +71,20 @@ def _restore_openrouter(client: TestClient, replacement: httpx.AsyncClient) -> N
     asyncio.run(replacement.aclose())
 
 
+def _mock_agent_service(client: TestClient, handler: httpx.MockTransport) -> httpx.AsyncClient:
+    original = client.app.state.agent_http_client
+    replacement = httpx.AsyncClient(transport=handler)
+    client.app.state.agent_http_client = replacement
+    client.app.state._test_original_agent_http_client = original
+    return replacement
+
+
+def _restore_agent_service(client: TestClient, replacement: httpx.AsyncClient) -> None:
+    client.app.state.agent_http_client = client.app.state._test_original_agent_http_client
+    del client.app.state._test_original_agent_http_client
+    asyncio.run(replacement.aclose())
+
+
 def _catalog_response(request: httpx.Request) -> httpx.Response:
     assert request.headers["authorization"] == "Bearer sk-openrouter-secret"
     if request.url.path.endswith("/auth/key"):
@@ -540,3 +554,219 @@ def test_switching_api_to_agent_and_back_preserves_both_sides(
     assert api_restored.json()["primary_model_id"] == "vendor/text-model"
     assert api_restored.json()["agent_name"] == "claude"
     assert api_restored.json()["agent_model_id"] == "saved-agent-model"
+
+
+def test_agent_service_capabilities_require_admin_and_normalize_runner_metadata(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    assert client.get("/api/v1/admin/ai/agent-service/capabilities").status_code == 401
+    _register(client, "task-agent-member@example.com")
+    assert client.get("/api/v1/admin/ai/agent-service/capabilities").status_code == 403
+    _admin(client, db)
+    test_settings.agent_service_token = "agent-service-test-token-with-32-bytes-123"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/v1/capabilities"
+        assert request.headers["authorization"] == (
+            "Bearer agent-service-test-token-with-32-bytes-123"
+        )
+        return httpx.Response(
+            200,
+            json={
+                "runners": [
+                    {
+                        "agent": "antigravity",
+                        "installed": True,
+                        "version": "1.1.22",
+                        "auth_state": "authenticated",
+                        "models": [
+                            {
+                                "model_id": "gemini-2.5-pro",
+                                "supports_text_input": True,
+                                "supports_image_input": True,
+                                "supports_structured_output": True,
+                            }
+                        ],
+                    },
+                    {
+                        "agent": "codex",
+                        "installed": False,
+                        "version": None,
+                        "auth_state": "unauthenticated",
+                        "models": [],
+                    },
+                ]
+            },
+        )
+
+    replacement = _mock_agent_service(client, httpx.MockTransport(handler))
+    try:
+        response = client.get("/api/v1/admin/ai/agent-service/capabilities")
+    finally:
+        _restore_agent_service(client, replacement)
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "runners": [
+            {
+                "agent": "antigravity",
+                "installed": True,
+                "version": "1.1.22",
+                "auth_state": "authenticated",
+                "models": [
+                    {
+                        "model_id": "gemini-2.5-pro",
+                        "supports_text_input": True,
+                        "supports_image_input": True,
+                        "supports_structured_output": True,
+                    }
+                ],
+            },
+            {
+                "agent": "codex",
+                "installed": False,
+                "version": None,
+                "auth_state": "unauthenticated",
+                "models": [],
+            },
+        ]
+    }
+
+
+def test_agent_service_capabilities_map_unavailable_to_safe_error(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _admin(client, db)
+    test_settings.agent_service_token = "agent-service-test-token-with-32-bytes-123"
+    replacement = _mock_agent_service(
+        client,
+        httpx.MockTransport(
+            lambda _request: httpx.Response(
+                503,
+                json={
+                    "error": {
+                        "code": "provider_unavailable",
+                        "message": "internal credential secret",
+                        "request_id": "internal-request-id",
+                    }
+                },
+            )
+        ),
+    )
+    try:
+        response = client.get("/api/v1/admin/ai/agent-service/capabilities")
+    finally:
+        _restore_agent_service(client, replacement)
+
+    assert response.status_code == 502
+    assert "internal credential secret" not in response.text
+    assert "agent-service-test-token" not in response.text
+    assert "internal-request-id" not in response.text
+
+
+def test_agent_service_capabilities_fail_closed_without_internal_token(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _admin(client, db)
+
+    response = client.get("/api/v1/admin/ai/agent-service/capabilities")
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "AGENT_SERVICE_NOT_CONFIGURED"
+    assert "token" not in response.text.lower()
+
+
+def test_agent_service_test_requires_trusted_origin_and_forwards_selection(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _admin(client, db)
+    test_settings.agent_service_token = "agent-service-test-token-with-32-bytes-123"
+    seen: list[dict[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/v1/test"
+        assert request.headers["authorization"] == (
+            "Bearer agent-service-test-token-with-32-bytes-123"
+        )
+        seen.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "ok": True,
+                "agent": "antigravity",
+                "model_id": "gemini-2.5-pro",
+                "request_id": "service-request-id",
+                "duration_seconds": 0.2,
+            },
+        )
+
+    replacement = _mock_agent_service(client, httpx.MockTransport(handler))
+    try:
+        without_origin = client.post(
+            "/api/v1/admin/ai/agent-service/test",
+            json={"agent": "antigravity", "model_id": "gemini-2.5-pro"},
+        )
+        response = client.post(
+            "/api/v1/admin/ai/agent-service/test",
+            headers=ORIGIN,
+            json={"agent": "antigravity", "model_id": "gemini-2.5-pro"},
+        )
+    finally:
+        _restore_agent_service(client, replacement)
+
+    assert without_origin.status_code == 403
+    assert response.status_code == 200, response.text
+    assert response.json()["ok"] is True
+    assert response.json()["agent"] == "antigravity"
+    assert response.json()["model_id"] == "gemini-2.5-pro"
+    assert "service-request-id" not in response.text
+    assert "agent-service-test-token" not in response.text
+    assert seen == [{"agent": "antigravity", "model_id": "gemini-2.5-pro"}]
+
+
+def test_agent_service_test_returns_safe_failure_without_internal_details(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _admin(client, db)
+    test_settings.agent_service_token = "agent-service-test-token-with-32-bytes-123"
+    replacement = _mock_agent_service(
+        client,
+        httpx.MockTransport(
+            lambda _request: httpx.Response(
+                401,
+                json={
+                    "error": {
+                        "code": "unauthorized",
+                        "message": "token should never be shown",
+                        "request_id": "private-request-id",
+                    }
+                },
+            )
+        ),
+    )
+    try:
+        response = client.post(
+            "/api/v1/admin/ai/agent-service/test",
+            headers=ORIGIN,
+            json={"agent": "claude", "model_id": "claude-sonnet"},
+        )
+    finally:
+        _restore_agent_service(client, replacement)
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is False
+    assert response.json()["error_code"] == "unauthorized"
+    assert "token should never be shown" not in response.text
+    assert "private-request-id" not in response.text
+    assert "agent-service-test-token" not in response.text

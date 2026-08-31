@@ -10,6 +10,9 @@ from app.auth.dependencies import AppSettings, DatabaseSession
 from app.body_analysis.admin_config.crypto import CredentialEncryptionError
 from app.body_analysis.admin_config.enums import AIProviderName, AITaskType
 from app.body_analysis.admin_config.schemas import (
+    AgentServiceCapabilitiesResponse,
+    AgentServiceTestRequest,
+    AgentServiceTestResponse,
     AITaskConfigDetail,
     AITaskConfigUpdate,
     ModelCatalogRefreshResponse,
@@ -21,11 +24,13 @@ from app.body_analysis.admin_config.schemas import (
 from app.body_analysis.admin_config.service import (
     AIConfigError,
     credential_status,
+    get_agent_service_capabilities,
     get_credential,
     list_models,
     list_task_configs,
     refresh_model_catalog,
     save_task_config,
+    test_agent_service,
     test_provider_connection,
 )
 from app.body_analysis.providers import AIProviderError
@@ -42,6 +47,26 @@ def _client(request: Request) -> httpx.AsyncClient:
     if not isinstance(client, httpx.AsyncClient):
         raise RuntimeError("AI HTTP client is unavailable")
     return client
+
+
+def _agent_client(request: Request) -> httpx.AsyncClient:
+    client = getattr(request.app.state, "agent_http_client", None)
+    if not isinstance(client, httpx.AsyncClient):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "AGENT_SERVICE_UNAVAILABLE",
+                "message": "The Agent Service is temporarily unavailable.",
+            },
+        )
+    return client
+
+
+def _agent_provider_error(error: AIProviderError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail={"code": error.code.value, "message": error.safe_message},
+    )
 
 
 def _unprocessable(error: Exception) -> HTTPException:
@@ -159,4 +184,46 @@ async def refresh_models(
         provider=AIProviderName.OPENROUTER,
         model_count=count,
         refreshed_at=refreshed_at,
+    )
+
+
+@router.get(
+    "/agent-service/capabilities",
+    response_model=AgentServiceCapabilitiesResponse,
+)
+async def read_agent_service_capabilities(
+    request: Request,
+    settings: AppSettings,
+) -> AgentServiceCapabilitiesResponse:
+    try:
+        return await get_agent_service_capabilities(
+            client=_agent_client(request),
+            settings=settings,
+        )
+    except AIConfigError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "code": "AGENT_SERVICE_NOT_CONFIGURED",
+                "message": "The Agent Service is not configured.",
+            },
+        ) from error
+    except AIProviderError as error:
+        raise _agent_provider_error(error) from None
+
+
+@router.post(
+    "/agent-service/test",
+    response_model=AgentServiceTestResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def test_agent_service_connection(
+    payload: AgentServiceTestRequest,
+    request: Request,
+    settings: AppSettings,
+) -> AgentServiceTestResponse:
+    return await test_agent_service(
+        client=_agent_client(request),
+        settings=settings,
+        payload=payload,
     )

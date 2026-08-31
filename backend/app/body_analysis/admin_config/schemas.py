@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, model_validator
 
@@ -126,3 +126,47 @@ class ModelCatalogRefreshResponse(BaseModel):
     provider: AIProviderName
     model_count: int
     refreshed_at: datetime
+
+
+class AgentServiceModelCapability(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: AgentModelId
+    supports_text_input: bool
+    supports_image_input: bool
+    supports_structured_output: bool
+
+
+class AgentServiceRunnerCapability(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AIAgentName
+    installed: bool
+    version: str | None = Field(default=None, max_length=120)
+    auth_state: Literal["unknown", "authenticated", "unauthenticated"] = "unknown"
+    models: list[AgentServiceModelCapability] = Field(default_factory=list)
+
+
+class AgentServiceCapabilitiesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    runners: list[AgentServiceRunnerCapability]
+
+
+class AgentServiceTestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AIAgentName
+    model_id: AgentModelId
+
+
+class AgentServiceTestResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    agent: AIAgentName
+    model_id: AgentModelId
+    checked_at: datetime
+    duration_seconds: float | None = Field(default=None, ge=0)
+    error_code: str | None = None
+    safe_error_message: str | None = None
