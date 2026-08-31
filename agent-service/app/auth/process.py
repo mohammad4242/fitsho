@@ -195,7 +195,10 @@ class AuthProcess:
         await self._stop_process()
         if task is not None and task is not asyncio.current_task():
             try:
-                await asyncio.shield(task)
+                await asyncio.wait_for(asyncio.shield(task), timeout=1.0)
+            except TimeoutError:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
             except asyncio.CancelledError:
                 pass
 
