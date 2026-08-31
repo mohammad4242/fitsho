@@ -16,6 +16,29 @@ services:
       timeout: 5s
       retries: 10
 
+  agent-service:
+    build:
+      context: ./agent-service
+    environment:
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
+      AGENT_WORKSPACE_ROOT: /tmp/fitsho-agent
+    expose:
+      - "9001"
+    volumes:
+      - fitsho_agent_home:/home/agent
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9001/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -33,6 +56,9 @@ services:
       MEDIA_MAX_BYTES: "20971520"
       MEDIA_MAX_VIDEO_BYTES: "67108864"
       MEDIA_MAX_VIDEO_DURATION_SECONDS: "20"
+      AGENT_SERVICE_BASE_URL: http://agent-service:9001
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
+      NO_PROXY: agent-service,db,localhost,127.0.0.1
     ports:
       - "8001:8000"
     volumes:
@@ -51,3 +77,4 @@ services:
 volumes:
   fitsho_postgres_data:
   fitsho_exercise_media:
+  fitsho_agent_home:
