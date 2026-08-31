@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.config import Settings
+from app.main import create_app
 
 PRODUCTION_AUTH_DELIVERY = {
     "email_provider": "smtp",
@@ -157,6 +161,37 @@ def test_settings_redact_zen_api_key_in_repr() -> None:
     assert settings.workout_max_candidates == 80
     assert settings.workout_max_request_bytes == 262144
     assert settings.workout_warmup_minutes == 5
+
+
+def test_agent_service_settings_normalize_and_redact_token() -> None:
+    settings = Settings(agent_service_token="  agent-service-token-for-tests  ")
+
+    assert settings.agent_service_token is not None
+    assert settings.agent_service_token.get_secret_value() == "agent-service-token-for-tests"
+    assert settings.agent_service_connect_timeout_seconds == 5.0
+    assert settings.agent_service_max_image_bytes == 8 * 1024 * 1024
+    assert "agent-service-token-for-tests" not in repr(settings)
+
+
+def test_blank_agent_service_token_keeps_api_mode_available() -> None:
+    settings = Settings(agent_service_token="   ")
+
+    assert settings.agent_service_token is None
+
+
+def test_app_lifespan_owns_a_dedicated_agent_service_client(tmp_path: Path) -> None:
+    settings = Settings(
+        app_env="test",
+        cookie_secure=False,
+        session_cookie_name="fitsho_session",
+        media_root=tmp_path / "media",
+    )
+    app = create_app(settings)
+
+    with TestClient(app):
+        assert app.state.agent_http_client.is_closed is False
+
+    assert app.state.agent_http_client.is_closed is True
 
 
 def test_settings_accept_an_explicit_zen_proxy_url() -> None:

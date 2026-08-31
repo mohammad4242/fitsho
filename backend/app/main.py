@@ -38,6 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         zen_timeout = httpx.Timeout(active_settings.opencode_zen_timeout_seconds)
         ai_timeout = httpx.Timeout(active_settings.openrouter_timeout_seconds)
+        agent_timeout = httpx.Timeout(active_settings.agent_service_connect_timeout_seconds)
         food_price_timeout = httpx.Timeout(active_settings.food_price_provider_timeout_seconds)
         async with (
             httpx.AsyncClient(
@@ -50,10 +51,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 proxy=active_settings.openrouter_proxy_url,
                 trust_env=False,
             ) as ai_client,
+            httpx.AsyncClient(timeout=agent_timeout, trust_env=False) as agent_client,
             httpx.AsyncClient(timeout=food_price_timeout, trust_env=False) as food_price_client,
         ):
             app.state.zen_http_client = zen_client
             app.state.ai_http_client = ai_client
+            app.state.agent_http_client = agent_client
             app.state.food_price_http_client = food_price_client
             background_tasks: list[asyncio.Task[None]] = []
             if active_settings.app_env != "test":

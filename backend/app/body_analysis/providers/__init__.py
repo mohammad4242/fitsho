@@ -1,3 +1,4 @@
+from app.body_analysis.providers.agent_service import AgentServiceProvider
 from app.body_analysis.providers.models import (
     AIProviderError,
     ImageInput,
@@ -16,6 +17,7 @@ from app.body_analysis.providers.protocol import AIProvider
 __all__ = [
     "AIProvider",
     "AIProviderError",
+    "AgentServiceProvider",
     "ImageInput",
     "ModelCapabilities",
     "ModelCapabilityFilter",
