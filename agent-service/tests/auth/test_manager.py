@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from app.auth.adapters.antigravity import AntigravityAuthAdapter
 from app.auth.base import AuthCommand, ParsedAuthUpdate
 from app.auth.manager import AuthManager, AuthManagerError
 from app.auth.schemas import AuthSessionStatus
@@ -230,6 +231,49 @@ def test_manager_completes_when_saved_credentials_appear_after_code_submission(
             process = manager._sessions[view.session_id].process  # noqa: SLF001
             assert process is not None
             assert not process.is_running
+        finally:
+            await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_keeps_antigravity_verifying_after_pty_echoes_the_code(
+    tmp_path: Path,
+) -> None:
+    script = write_script(
+        tmp_path,
+        "import sys, time\n"
+        "print('Open https://accounts.google.com/o/oauth2/auth?state=opaque', flush=True)\n"
+        "print('After authenticating, paste the authorization code below:', flush=True)\n"
+        "sys.stdin.readline()\n"
+        "time.sleep(60)\n",
+    )
+    adapter = AntigravityAuthAdapter(executable=sys.executable)
+    adapter.command = lambda: AuthCommand(  # type: ignore[method-assign]
+        sys.executable,
+        (str(script),),
+        use_pty=True,
+    )
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: adapter},
+            workspace=tmp_path,
+            environment={"HOME": str(tmp_path), "PATH": os.environ["PATH"]},
+        )
+        try:
+            view = await manager.start(AgentName.ANTIGRAVITY)
+            await asyncio.sleep(0.05)
+            assert (
+                await manager.get(view.session_id)
+            ).status is AuthSessionStatus.WAITING_FOR_INPUT
+
+            submitted = await manager.submit_input(view.session_id, "CODE")
+            assert submitted.status is AuthSessionStatus.VERIFYING
+            await asyncio.sleep(0.05)
+            assert (
+                await manager.get(view.session_id)
+            ).status is AuthSessionStatus.VERIFYING
         finally:
             await manager.shutdown()
 

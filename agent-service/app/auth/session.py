@@ -85,6 +85,9 @@ class AuthSession:
         elif update.authenticated:
             next_status = AuthSessionStatus.AUTHENTICATED
             safe_error_message = None
+        elif self.status is AuthSessionStatus.VERIFYING:
+            next_status = AuthSessionStatus.VERIFYING
+            input_label = None
         elif update.needs_input:
             if input_label is None:
                 raise ValueError("authentication input label is required")
