@@ -5,6 +5,7 @@ from ..config import Settings
 from ..schemas import AgentName, AuthState, RunnerCapabilities
 from .antigravity import AntigravityRunner
 from .base import AgentRunner
+from .claude import ClaudeRunner
 from .codex import CodexRunner
 
 
@@ -33,6 +34,12 @@ class RunnerRegistry:
             configured_models=settings.agent_codex_models,
             supports_image_input=settings.agent_codex_supports_image_input,
         )
+        claude = ClaudeRunner(
+            workspace=Path(settings.agent_workspace_root),
+            executable=settings.agent_claude_executable,
+            configured_models=settings.agent_claude_models,
+            supports_image_input=settings.agent_claude_supports_image_input,
+        )
 
         def antigravity_workspace_runner(workspace: Path) -> AgentRunner:
             return AntigravityRunner(
@@ -50,11 +57,20 @@ class RunnerRegistry:
                 supports_image_input=settings.agent_codex_supports_image_input,
             )
 
+        def claude_workspace_runner(workspace: Path) -> AgentRunner:
+            return ClaudeRunner(
+                workspace=workspace,
+                executable=settings.agent_claude_executable,
+                configured_models=settings.agent_claude_models,
+                supports_image_input=settings.agent_claude_supports_image_input,
+            )
+
         return cls(
-            (antigravity, codex),
+            (antigravity, codex, claude),
             {
                 AgentName.ANTIGRAVITY: antigravity_workspace_runner,
                 AgentName.CODEX: codex_workspace_runner,
+                AgentName.CLAUDE: claude_workspace_runner,
             },
         )
 

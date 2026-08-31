@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     agent_codex_models: tuple[str, ...] = ()
     agent_codex_supports_image_input: bool = False
     agent_codex_max_concurrency: int = Field(default=2, ge=1, le=64)
+    agent_claude_executable: str = "claude"
+    agent_claude_models: tuple[str, ...] = ()
+    agent_claude_supports_image_input: bool = False
+    agent_claude_max_concurrency: int = Field(default=2, ge=1, le=64)
 
     @field_validator("agent_service_token")
     @classmethod

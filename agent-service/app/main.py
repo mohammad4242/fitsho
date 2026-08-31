@@ -41,6 +41,8 @@ def create_app(
         global_limit=effective_settings.agent_global_max_concurrency,
         runner_limits={
             "antigravity": effective_settings.agent_antigravity_max_concurrency,
+            "codex": effective_settings.agent_codex_max_concurrency,
+            "claude": effective_settings.agent_claude_max_concurrency,
         },
         queue_wait_seconds=effective_settings.agent_queue_wait_seconds,
     )
