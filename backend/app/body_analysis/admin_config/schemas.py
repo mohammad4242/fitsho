@@ -210,6 +210,7 @@ AgentAuthSafeErrorMessage = Literal[
 ]
 
 _AGENT_AUTH_HOSTS = {
+    AIAgentName.ANTIGRAVITY: "accounts.google.com",
     AIAgentName.CODEX: "auth.openai.com",
     AIAgentName.CLAUDE: "claude.com",
 }

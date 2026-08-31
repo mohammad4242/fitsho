@@ -122,6 +122,42 @@ def test_agent_auth_routes_proxy_through_backend_and_require_admin_origin(
     assert [method for method, _path, _body in seen] == ["POST", "GET", "POST", "DELETE"]
 
 
+def test_agent_auth_proxy_accepts_antigravity_google_oauth_url(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _admin(client, db)
+    test_settings.agent_service_token = TOKEN
+    session_id = str(uuid4())
+    payload = _session_payload(session_id, status="waiting_for_input")
+    payload.update(
+        {
+            "agent": "antigravity",
+            "verification_url": "https://accounts.google.com/o/oauth2/auth?state=opaque",
+            "user_code": None,
+            "input_label": "authorization code",
+        }
+    )
+    replacement = _mock_agent_service(
+        client,
+        httpx.MockTransport(lambda _request: httpx.Response(200, json=payload)),
+    )
+    try:
+        response = client.post(
+            "/api/v1/admin/ai/agent-service/auth/start",
+            headers=ORIGIN,
+            json={"agent": "antigravity"},
+        )
+    finally:
+        _restore_agent_service(client, replacement)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["agent"] == "antigravity"
+    assert response.json()["verification_url"].startswith("https://accounts.google.com/")
+    assert response.json()["input_label"] == "authorization code"
+
+
 def test_agent_auth_proxy_maps_safe_downstream_errors_without_internal_details(
     client: TestClient,
     db: Session,
