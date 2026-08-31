@@ -26,22 +26,44 @@ database, backend source, or Fitsho private-media mount. The backend keeps
 body photos, food photos, and nutrition-lab uploads in separate persistent
 bind mounts under `backend/var/private/`.
 
-## One-time CLI login
+## Preferred admin login
 
-Authentication is performed manually inside the running container. Credentials
-are stored in the named `fitsho_agent_home` volume and are not part of the
-image:
+Use **Admin → AI Settings → Agent Service → Agent → Authenticate**. The browser
+calls the Fitsho Backend, and only the Backend calls this internal service. The
+Agent Service starts the pinned CLI and returns only a validated HTTPS login
+URL, a bounded user code, a fixed input label, and a safe status. It never
+returns a credential, token, raw CLI output, or raw CLI error.
+
+Keep the dialog open while completing the browser or device flow. If the CLI
+requests a code, enter it in the dialog; the value is sent to the existing
+process and is cleared from the UI immediately after submit. Authentication is
+independent from model selection.
+
+The authentication session is in memory and temporary. Its default TTL is 600
+seconds and its output is bounded. Restarting the service cancels active auth
+sessions and kills/reaps their processes. A completed provider credential
+remains only in the persistent `fitsho_agent_home` HOME volume. It is not stored
+in PostgreSQL, the Backend response, Frontend storage, logs, or the image.
+
+After restart, a provider with no reliable non-quota status probe may show
+`Unknown` until the next safe status probe or Admin Test. Credential-file
+existence is never treated as authentication success.
+
+## Break-glass CLI login
+
+Use direct CLI login only when the Admin UI flow is unavailable. These commands
+match the pinned image behavior:
 
 ```bash
 docker compose exec agent-service agy
 docker compose exec agent-service codex login
-docker compose exec agent-service claude
+docker compose exec agent-service claude auth login
 ```
 
-Complete each provider's browser or device flow, then exit the interactive
-session. Do not put subscription credentials or API keys in `compose.yaml`,
+Antigravity has no verified `login` subcommand in the pinned image and remains
+manual-only. Do not put subscription credentials or API keys in `compose.yaml`,
 the image, or PostgreSQL. Removing `fitsho_agent_home` intentionally removes
-these saved sessions.
+the saved provider sessions.
 
 ## Contract smoke check
 
