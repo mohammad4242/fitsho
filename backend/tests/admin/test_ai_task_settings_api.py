@@ -582,6 +582,7 @@ def test_agent_service_capabilities_require_admin_and_normalize_runner_metadata(
                         "installed": True,
                         "version": "1.1.22",
                         "auth_state": "authenticated",
+                        "auth_mode": "unknown",
                         "models": [
                             {
                                 "model_id": "gemini-2.5-pro",
@@ -596,6 +597,7 @@ def test_agent_service_capabilities_require_admin_and_normalize_runner_metadata(
                         "installed": False,
                         "version": None,
                         "auth_state": "unauthenticated",
+                        "auth_mode": "unknown",
                         "models": [],
                     },
                 ]
@@ -616,6 +618,7 @@ def test_agent_service_capabilities_require_admin_and_normalize_runner_metadata(
                 "installed": True,
                 "version": "1.1.22",
                 "auth_state": "authenticated",
+                "auth_mode": "unknown",
                 "models": [
                     {
                         "model_id": "gemini-2.5-pro",
@@ -630,6 +633,7 @@ def test_agent_service_capabilities_require_admin_and_normalize_runner_metadata(
                 "installed": False,
                 "version": None,
                 "auth_state": "unauthenticated",
+                "auth_mode": "unknown",
                 "models": [],
             },
         ]
