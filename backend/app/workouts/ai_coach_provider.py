@@ -59,7 +59,7 @@ class AiCoachRecommendation:
     output_tokens: int | None
 
 
-class OpenRouterAiCoachProvider:
+class AiCoachProvider:
     def __init__(self, provider: StructuredTextProvider) -> None:
         self._provider = provider
 
@@ -137,11 +137,20 @@ def _workout_provider_error(error: AIProviderError) -> WorkoutProviderError:
         OpenRouterErrorCode.CONNECTION_FAILURE: ProviderErrorCode.CONNECTION_FAILURE,
         OpenRouterErrorCode.UNAUTHORIZED: ProviderErrorCode.UNAUTHORIZED,
         OpenRouterErrorCode.RATE_LIMITED: ProviderErrorCode.RATE_LIMITED,
+        OpenRouterErrorCode.PROVIDER_UNAVAILABLE: ProviderErrorCode.PROVIDER_UNAVAILABLE,
+        OpenRouterErrorCode.MALFORMED_RESPONSE: ProviderErrorCode.MALFORMED_RESPONSE,
         OpenRouterErrorCode.REFUSAL: ProviderErrorCode.REFUSAL,
         OpenRouterErrorCode.INVALID_OUTPUT: ProviderErrorCode.INVALID_OUTPUT,
+        # Workout APIs do not expose request/model configuration details.
+        OpenRouterErrorCode.INVALID_REQUEST: ProviderErrorCode.PROVIDER_UNAVAILABLE,
+        OpenRouterErrorCode.MODEL_NOT_FOUND: ProviderErrorCode.PROVIDER_UNAVAILABLE,
     }
     return WorkoutProviderError(
         codes.get(error.code, ProviderErrorCode.PROVIDER_UNAVAILABLE),
         error.safe_message,
         provider_status_code=error.provider_status_code,
     )
+
+
+# Transitional name retained for existing workout dependencies and callers.
+OpenRouterAiCoachProvider = AiCoachProvider

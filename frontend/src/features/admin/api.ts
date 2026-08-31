@@ -17,6 +17,9 @@ import type {
   AdminAiRoutingUpdate,
   AdminAiCatalogRefresh,
   AdminAiCatalogResponse,
+  AdminAiAgentName,
+  AdminAiAgentServiceCapabilities,
+  AdminAiAgentServiceTest,
   AdminAiProviderTest,
   AdminAiTaskConfig,
   AdminAiTaskConfigUpdate,
@@ -382,6 +385,22 @@ export function testAdminAiProvider(apiKey?: string): Promise<AdminAiProviderTes
 export function refreshAdminAiModels(): Promise<AdminAiCatalogRefresh> {
   return request<AdminAiCatalogRefresh>("/api/v1/admin/ai/models/refresh", {
     method: "POST",
+  });
+}
+
+export function getAdminAiAgentServiceCapabilities(): Promise<AdminAiAgentServiceCapabilities> {
+  return request<AdminAiAgentServiceCapabilities>(
+    "/api/v1/admin/ai/agent-service/capabilities",
+  );
+}
+
+export function testAdminAiAgentService(
+  agent: AdminAiAgentName,
+  modelId: string,
+): Promise<AdminAiAgentServiceTest> {
+  return request<AdminAiAgentServiceTest>("/api/v1/admin/ai/agent-service/test", {
+    method: "POST",
+    body: JSON.stringify({ agent, model_id: modelId }),
   });
 }
 

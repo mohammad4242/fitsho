@@ -268,6 +268,9 @@ export type AdminAiTaskType =
   | "food_photo_estimation"
   | "food_price_search";
 
+export type AdminAiExecutionBackend = "api" | "agent_service";
+export type AdminAiAgentName = "antigravity" | "codex" | "claude";
+
 export type AdminAiCredentialStatus = {
   configured: boolean;
   masked: string | null;
@@ -276,6 +279,9 @@ export type AdminAiCredentialStatus = {
 export type AdminAiTaskConfig = {
   task_type: AdminAiTaskType;
   provider: "openrouter";
+  execution_backend: AdminAiExecutionBackend;
+  agent_name: AdminAiAgentName | null;
+  agent_model_id: string | null;
   enabled: boolean;
   primary_model_id: string | null;
   fallback_model_ids: string[];
@@ -306,7 +312,7 @@ export type AdminAiTaskConfigUpdate = Omit<
 };
 
 export type AdminAiCatalogModel = {
-  provider: "openrouter";
+  provider: string;
   model_id: string;
   display_name: string;
   provider_family: string;
@@ -337,6 +343,35 @@ export type AdminAiCatalogRefresh = {
   provider: "openrouter";
   model_count: number;
   refreshed_at: string;
+};
+
+export type AdminAiAgentModelCapability = {
+  model_id: string;
+  supports_text_input: boolean;
+  supports_image_input: boolean;
+  supports_structured_output: boolean;
+};
+
+export type AdminAiAgentRunnerCapability = {
+  agent: AdminAiAgentName;
+  installed: boolean;
+  version: string | null;
+  auth_state: "unknown" | "authenticated" | "unauthenticated";
+  models: AdminAiAgentModelCapability[];
+};
+
+export type AdminAiAgentServiceCapabilities = {
+  runners: AdminAiAgentRunnerCapability[];
+};
+
+export type AdminAiAgentServiceTest = {
+  ok: boolean;
+  agent: AdminAiAgentName;
+  model_id: string;
+  checked_at: string;
+  duration_seconds: number | null;
+  error_code: string | null;
+  safe_error_message: string | null;
 };
 
 export type TrainingTemplateMethod = "standard" | "superset" | "drop_set";

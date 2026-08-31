@@ -86,6 +86,12 @@ class Settings(BaseSettings):
     ai_credential_encryption_key: SecretStr | None = Field(default=None, repr=False)
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_timeout_seconds: float = Field(default=45.0, gt=0, le=180)
+    agent_service_base_url: str = "http://agent-service:9001"
+    agent_service_token: SecretStr | None = Field(default=None, repr=False)
+    agent_service_connect_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
+    agent_service_max_image_bytes: int = Field(
+        default=8 * 1024 * 1024, ge=1024, le=64 * 1024 * 1024
+    )
     openrouter_proxy_url: str | None = Field(default=None, max_length=500, repr=False)
     ai_model_catalog_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
 
@@ -124,6 +130,18 @@ class Settings(BaseSettings):
     food_price_provider_base_url: str | None = Field(default=None, max_length=500, repr=False)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("agent_service_token", mode="before")
+    @classmethod
+    def normalize_agent_service_token(cls, value: object) -> SecretStr | None:
+        if isinstance(value, SecretStr):
+            value = value.get_secret_value()
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Agent Service token must be text")
+        token = value.strip()
+        return SecretStr(token) if token else None
 
     @property
     def allowed_frontend_origins(self) -> tuple[str, ...]:

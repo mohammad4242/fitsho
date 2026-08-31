@@ -1,0 +1,116 @@
+from enum import StrEnum
+from typing import Annotated, Any
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+NonBlankText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+ModelId = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=300),
+]
+
+
+class AgentName(StrEnum):
+    ANTIGRAVITY = "antigravity"
+    CODEX = "codex"
+    CLAUDE = "claude"
+
+
+class AgentGenerationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AgentName
+    model_id: ModelId
+    system_prompt: Annotated[NonBlankText, StringConstraints(max_length=50_000)]
+    input_payload: dict[str, Any]
+    response_schema: dict[str, Any]
+    schema_name: str = Field(pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    temperature: float = Field(ge=0, le=2)
+    max_output_tokens: int = Field(ge=1, le=65_536)
+    timeout_seconds: float = Field(gt=0, le=600)
+
+
+class AgentGenerationOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    payload: dict[str, Any]
+    agent: AgentName
+    model_id: ModelId
+    request_id: NonBlankText
+    input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    duration_seconds: float = Field(ge=0)
+
+
+class AuthState(StrEnum):
+    UNKNOWN = "unknown"
+    AUTHENTICATED = "authenticated"
+    UNAUTHENTICATED = "unauthenticated"
+
+
+class RunnerModelCapabilities(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: ModelId
+    supports_text_input: bool
+    supports_image_input: bool
+    supports_structured_output: bool
+    supports_temperature: bool = False
+    supports_max_output_tokens: bool = False
+
+
+class RunnerCapabilities(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AgentName
+    installed: bool
+    version: str | None = None
+    auth_state: AuthState = AuthState.UNKNOWN
+    models: list[RunnerModelCapabilities] = Field(default_factory=list)
+
+
+class CapabilitiesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    runners: list[RunnerCapabilities]
+
+
+class TestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AgentName
+    model_id: ModelId
+
+
+class TestOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    agent: AgentName
+    model_id: ModelId
+    request_id: NonBlankText
+    duration_seconds: float = Field(ge=0)
+
+
+class ErrorCode(StrEnum):
+    TIMEOUT = "timeout"
+    UNAUTHORIZED = "unauthorized"
+    RATE_LIMITED = "rate_limited"
+    INVALID_REQUEST = "invalid_request"
+    INVALID_OUTPUT = "invalid_output"
+    MODEL_NOT_FOUND = "model_not_found"
+    PROVIDER_UNAVAILABLE = "provider_unavailable"
+
+
+class ErrorDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: ErrorCode
+    message: NonBlankText
+    request_id: NonBlankText
+
+
+class ErrorEnvelope(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    error: ErrorDetail

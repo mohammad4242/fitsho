@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 import httpx
-from pydantic import SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
 from app.body_analysis.admin_config.crypto import CredentialCipher
-from app.body_analysis.admin_config.enums import AIAuditAction, AIProviderName, AITaskType
+from app.body_analysis.admin_config.enums import (
+    AIAuditAction,
+    AIExecutionBackend,
+    AIProviderName,
+    AITaskType,
+)
 from app.body_analysis.admin_config.models import (
     AIAuditEvent,
     AIModelCatalogEntry,
@@ -18,6 +24,9 @@ from app.body_analysis.admin_config.models import (
     AITaskConfig,
 )
 from app.body_analysis.admin_config.schemas import (
+    AgentServiceCapabilitiesResponse,
+    AgentServiceTestRequest,
+    AgentServiceTestResponse,
     AITaskConfigDetail,
     AITaskConfigUpdate,
     CredentialStatus,
@@ -25,11 +34,49 @@ from app.body_analysis.admin_config.schemas import (
     ProviderTestResponse,
 )
 from app.body_analysis.providers import AIProviderError, OpenRouterProvider
+from app.body_analysis.providers.models import ProviderErrorCode
 from app.config import Settings
 
 
 class AIConfigError(ValueError):
     pass
+
+
+_AGENT_SERVICE_TASKS = {
+    AITaskType.WORKOUT_PLAN_GENERATION,
+    AITaskType.BODY_PHOTO_ANALYSIS,
+    AITaskType.FOOD_PHOTO_ESTIMATION,
+}
+
+_AGENT_SAFE_MESSAGES: dict[ProviderErrorCode, str] = {
+    ProviderErrorCode.NOT_CONFIGURED: "The Agent Service is not configured.",
+    ProviderErrorCode.TIMEOUT: "The Agent Service request timed out.",
+    ProviderErrorCode.CONNECTION_FAILURE: "The Agent Service is temporarily unreachable.",
+    ProviderErrorCode.UNAUTHORIZED: "The Agent Service credential was rejected.",
+    ProviderErrorCode.RATE_LIMITED: "The Agent Service is busy. Please try again.",
+    ProviderErrorCode.PROVIDER_UNAVAILABLE: "The Agent Service is temporarily unavailable.",
+    ProviderErrorCode.INVALID_REQUEST: "The Agent Service rejected the request.",
+    ProviderErrorCode.MALFORMED_RESPONSE: "The Agent Service returned a malformed response.",
+}
+_AGENT_SERVICE_ERROR_CODES = {
+    "timeout": ProviderErrorCode.TIMEOUT,
+    "unauthorized": ProviderErrorCode.UNAUTHORIZED,
+    "rate_limited": ProviderErrorCode.RATE_LIMITED,
+    "invalid_request": ProviderErrorCode.INVALID_REQUEST,
+    "invalid_output": ProviderErrorCode.INVALID_OUTPUT,
+    "model_not_found": ProviderErrorCode.MODEL_NOT_FOUND,
+    "provider_unavailable": ProviderErrorCode.PROVIDER_UNAVAILABLE,
+}
+
+
+class _AgentServiceTestOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: Literal[True]
+    agent: str
+    model_id: str = Field(min_length=1, max_length=300)
+    request_id: str = Field(min_length=1, max_length=300)
+    duration_seconds: float = Field(ge=0)
 
 
 def credential_status(credential: AIProviderCredential | None) -> CredentialStatus:
@@ -63,6 +110,9 @@ def config_detail(
         return AITaskConfigDetail(
             task_type=task_type,
             provider=AIProviderName.OPENROUTER,
+            execution_backend=AIExecutionBackend.API,
+            agent_name=None,
+            agent_model_id=None,
             enabled=False,
             primary_model_id=None,
             fallback_model_ids=[],
@@ -81,6 +131,9 @@ def config_detail(
     return AITaskConfigDetail(
         task_type=config.task_type,
         provider=config.provider,
+        execution_backend=config.execution_backend,
+        agent_name=config.agent_name,
+        agent_model_id=config.agent_model_id,
         enabled=config.enabled,
         primary_model_id=config.primary_model_id,
         fallback_model_ids=list(config.fallback_model_ids),
@@ -106,6 +159,7 @@ def save_task_config(
     actor: User,
     settings: Settings,
 ) -> AITaskConfigDetail:
+    config = db.scalar(select(AITaskConfig).where(AITaskConfig.task_type == task_type))
     credential = get_credential(db, payload.provider)
     credential_changed = False
     if payload.api_key is not None:
@@ -127,28 +181,53 @@ def save_task_config(
             credential.updated_by_user_id = actor.id
         credential_changed = True
 
-    if payload.enabled and credential is None:
-        raise AIConfigError("A provider credential is required before enabling this task")
-    if payload.enabled and payload.primary_model_id is None:
-        raise AIConfigError("A primary model is required before enabling this task")
-    if payload.primary_model_id is not None or payload.fallback_model_ids:
+    def effective(field: str, default: Any = None) -> Any:
+        if field in payload.model_fields_set:
+            return getattr(payload, field)
+        return getattr(config, field, default)
+
+    execution_backend = effective("execution_backend", AIExecutionBackend.API)
+    agent_name = effective("agent_name")
+    agent_model_id = effective("agent_model_id")
+    primary_model_id = effective("primary_model_id")
+    fallback_model_ids = effective("fallback_model_ids", [])
+
+    if payload.enabled and execution_backend == AIExecutionBackend.AGENT_SERVICE:
+        if task_type not in _AGENT_SERVICE_TASKS:
+            raise AIConfigError("Agent service is not supported for this AI task")
+        if agent_name is None or agent_model_id is None:
+            raise AIConfigError("Agent name and model are required before enabling this task")
+    elif payload.enabled:
+        if credential is None:
+            raise AIConfigError("A provider credential is required before enabling this task")
+        if primary_model_id is None:
+            raise AIConfigError("A primary model is required before enabling this task")
+
+    should_validate_api_models = execution_backend == AIExecutionBackend.API and (
+        "primary_model_id" in payload.model_fields_set
+        or "fallback_model_ids" in payload.model_fields_set
+        or (payload.enabled and primary_model_id is not None)
+    )
+    if should_validate_api_models and (primary_model_id is not None or fallback_model_ids):
         _validate_selected_models(
             db,
             task_type=task_type,
             provider=payload.provider,
-            model_ids=[payload.primary_model_id, *payload.fallback_model_ids],
+            model_ids=[primary_model_id, *fallback_model_ids],
         )
 
-    config = db.scalar(select(AITaskConfig).where(AITaskConfig.task_type == task_type))
     if config is None:
         config = AITaskConfig(task_type=task_type, provider=payload.provider)
         db.add(config)
     changed_fields: list[str] = []
     values: dict[str, Any] = {
         "provider": payload.provider,
+        "execution_backend": execution_backend,
+        "agent_name": agent_name,
+        "agent_model_id": agent_model_id,
         "enabled": payload.enabled,
-        "primary_model_id": payload.primary_model_id,
-        "fallback_model_ids": list(payload.fallback_model_ids),
+        "primary_model_id": primary_model_id,
+        "fallback_model_ids": list(fallback_model_ids),
         "temperature": payload.temperature,
         "max_output_tokens": payload.max_output_tokens,
         "timeout_seconds": payload.timeout_seconds,
@@ -210,6 +289,188 @@ def openrouter_provider(
         base_url=settings.openrouter_base_url,
         timeout_seconds=timeout_seconds or settings.openrouter_timeout_seconds,
         app_url=settings.frontend_origin,
+    )
+
+
+def _agent_service_token(settings: Settings) -> str:
+    value: object = settings.agent_service_token
+    if isinstance(value, SecretStr):
+        value = value.get_secret_value()
+    if not isinstance(value, str) or not value.strip():
+        raise AIConfigError("Agent Service is not configured")
+    token = value.strip()
+    if settings.app_env == "production" and len(token) < 32:
+        raise AIConfigError("Agent Service credential is too weak")
+    return token
+
+
+def _agent_service_headers(settings: Settings) -> dict[str, str]:
+    return {"Authorization": f"Bearer {_agent_service_token(settings)}"}
+
+
+async def _agent_service_json(
+    client: httpx.AsyncClient,
+    *,
+    settings: Settings,
+    method: str,
+    path: str,
+    json_body: dict[str, object] | None = None,
+) -> dict[str, Any]:
+    base_url = settings.agent_service_base_url.strip().rstrip("/")
+    if not base_url:
+        raise AIConfigError("Agent Service is not configured")
+    headers = _agent_service_headers(settings)
+    try:
+        response = await client.request(
+            method,
+            f"{base_url}{path}",
+            headers=headers,
+            json=json_body,
+            timeout=httpx.Timeout(settings.agent_service_connect_timeout_seconds),
+        )
+    except httpx.TimeoutException as error:
+        raise AIProviderError(
+            ProviderErrorCode.TIMEOUT,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.TIMEOUT],
+        ) from error
+    except httpx.RequestError as error:
+        raise AIProviderError(
+            ProviderErrorCode.CONNECTION_FAILURE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.CONNECTION_FAILURE],
+        ) from error
+    except Exception as error:
+        raise AIProviderError(
+            ProviderErrorCode.PROVIDER_UNAVAILABLE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.PROVIDER_UNAVAILABLE],
+        ) from error
+    if response.status_code >= 400:
+        raise _agent_service_http_error(response)
+    try:
+        payload = response.json()
+    except (TypeError, ValueError) as error:
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+            provider_status_code=response.status_code,
+        ) from error
+    if not isinstance(payload, dict):
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+            provider_status_code=response.status_code,
+        )
+    return payload
+
+
+def _agent_service_http_error(response: httpx.Response) -> AIProviderError:
+    code_name: str | None = None
+    request_id = response.headers.get("x-request-id")
+    try:
+        body = response.json()
+    except (TypeError, ValueError):
+        body = None
+    if isinstance(body, Mapping):
+        error = body.get("error")
+        if isinstance(error, Mapping):
+            raw_code = error.get("code")
+            if isinstance(raw_code, str):
+                code_name = raw_code
+            if request_id is None and isinstance(error.get("request_id"), str):
+                request_id = error["request_id"]
+    code = _AGENT_SERVICE_ERROR_CODES.get(code_name or "")
+    if code is None:
+        if response.status_code in {401, 403}:
+            code = ProviderErrorCode.UNAUTHORIZED
+        elif response.status_code in {408, 504}:
+            code = ProviderErrorCode.TIMEOUT
+        elif response.status_code == 429:
+            code = ProviderErrorCode.RATE_LIMITED
+        elif response.status_code == 404:
+            code = ProviderErrorCode.MODEL_NOT_FOUND
+        elif 400 <= response.status_code < 500:
+            code = ProviderErrorCode.INVALID_REQUEST
+        else:
+            code = ProviderErrorCode.PROVIDER_UNAVAILABLE
+    return AIProviderError(
+        code,
+        _AGENT_SAFE_MESSAGES.get(code, "The Agent Service request failed."),
+        provider_status_code=response.status_code,
+        provider_request_id=request_id,
+    )
+
+
+async def get_agent_service_capabilities(
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+) -> AgentServiceCapabilitiesResponse:
+    payload = await _agent_service_json(
+        client,
+        settings=settings,
+        method="GET",
+        path="/v1/capabilities",
+    )
+    try:
+        return AgentServiceCapabilitiesResponse.model_validate(payload)
+    except ValidationError as error:
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+        ) from error
+
+
+async def test_agent_service(
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+    payload: AgentServiceTestRequest,
+) -> AgentServiceTestResponse:
+    checked_at = datetime.now(UTC)
+    try:
+        response_payload = await _agent_service_json(
+            client,
+            settings=settings,
+            method="POST",
+            path="/v1/test",
+            json_body={"agent": payload.agent.value, "model_id": payload.model_id},
+        )
+    except AIConfigError:
+        return AgentServiceTestResponse(
+            ok=False,
+            agent=payload.agent,
+            model_id=payload.model_id,
+            checked_at=checked_at,
+            error_code=ProviderErrorCode.NOT_CONFIGURED.value,
+            safe_error_message=_AGENT_SAFE_MESSAGES[ProviderErrorCode.NOT_CONFIGURED],
+        )
+    except AIProviderError as error:
+        return AgentServiceTestResponse(
+            ok=False,
+            agent=payload.agent,
+            model_id=payload.model_id,
+            checked_at=checked_at,
+            error_code=error.code.value,
+            safe_error_message=error.safe_message,
+        )
+    try:
+        result = _AgentServiceTestOutput.model_validate(response_payload)
+        if result.agent != payload.agent.value or result.model_id != payload.model_id:
+            raise ValueError("test response identity mismatch")
+    except (ValidationError, ValueError):
+        return AgentServiceTestResponse(
+            ok=False,
+            agent=payload.agent,
+            model_id=payload.model_id,
+            checked_at=checked_at,
+            error_code=ProviderErrorCode.MALFORMED_RESPONSE.value,
+            safe_error_message=_AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+        )
+    return AgentServiceTestResponse(
+        ok=True,
+        agent=payload.agent,
+        model_id=payload.model_id,
+        checked_at=checked_at,
+        duration_seconds=result.duration_seconds,
     )
 
 

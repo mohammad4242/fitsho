@@ -8,8 +8,10 @@ import { ApiError } from "../../shared/apiClient";
 const api = vi.hoisted(() => ({
   getAdminAiTaskConfigs: vi.fn(),
   getAdminAiTaskModels: vi.fn(),
+  getAdminAiAgentServiceCapabilities: vi.fn(),
   saveAdminAiTaskConfig: vi.fn(),
   testAdminAiProvider: vi.fn(),
+  testAdminAiAgentService: vi.fn(),
   refreshAdminAiModels: vi.fn(),
 }));
 
@@ -27,6 +29,9 @@ import type { AdminAiCatalogResponse, AdminAiTaskConfig } from "./types";
 const bodyConfig: AdminAiTaskConfig = {
   task_type: "body_photo_analysis",
   provider: "openrouter",
+  execution_backend: "api",
+  agent_name: null,
+  agent_model_id: null,
   enabled: false,
   primary_model_id: null,
   fallback_model_ids: [],
@@ -71,6 +76,7 @@ beforeEach(() => {
       },
     ],
   });
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [] });
 });
 
 it("shows the settings load error instead of staying on the loading state", async () => {
@@ -346,6 +352,186 @@ it("ignores delayed task A refresh, test, and save results after an A-to-B-to-A 
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(screen.queryByText("Settings saved")).not.toBeInTheDocument();
   expect(screen.getByRole("checkbox", { name: "Enabled" })).not.toBeChecked();
+});
+
+it("switches to Agent Service, loads capabilities, and filters body models", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([{ ...bodyConfig, credential: { configured: true, masked: "********cret" } }]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({
+    runners: [{
+      agent: "antigravity",
+      installed: true,
+      version: "1.1.22",
+      auth_state: "authenticated",
+      models: [
+        { model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true },
+        { model_id: "image-only", supports_text_input: true, supports_image_input: true, supports_structured_output: false },
+      ],
+    }],
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("Agent Service"));
+  expect(await screen.findByText("Agent Service status")).toBeInTheDocument();
+  expect(api.getAdminAiAgentServiceCapabilities).toHaveBeenCalledTimes(1);
+  await user.click(screen.getByRole("combobox", { name: "Model" }));
+  expect(await screen.findByRole("option", { name: /vision-structured/ })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: /image-only/ })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("API key")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Refresh models" })).not.toBeInTheDocument();
+});
+
+it("hides API-only controls and disables unsupported tuning in Agent mode", async () => {
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
+    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated",
+    models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
+  }] });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("Agent Service"));
+  expect(screen.queryByLabelText("Cost ceiling per request")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Provider-routing restrictions")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Temperature")).toBeDisabled();
+  expect(screen.getByLabelText("Maximum output tokens")).toBeDisabled();
+  expect(screen.getByText("Temperature and maximum output controls are managed by the selected CLI.")).toBeInTheDocument();
+});
+
+it("filters Agent Service models for workout text and structured output", async () => {
+  const workoutConfig: AdminAiTaskConfig = {
+    ...bodyConfig,
+    task_type: "workout_plan_generation",
+  };
+  api.getAdminAiTaskConfigs.mockResolvedValue([workoutConfig]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({
+    runners: [{
+      agent: "codex",
+      installed: true,
+      version: "0.151.0",
+      auth_state: "authenticated",
+      models: [
+        { model_id: "text-structured", supports_text_input: true, supports_image_input: false, supports_structured_output: true },
+        { model_id: "text-only", supports_text_input: true, supports_image_input: false, supports_structured_output: false },
+        { model_id: "image-structured", supports_text_input: false, supports_image_input: true, supports_structured_output: true },
+      ],
+    }],
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("Agent Service"));
+  await user.click(screen.getByRole("combobox", { name: "Agent" }));
+  await user.click(screen.getByRole("option", { name: "Codex" }));
+  await user.click(screen.getByRole("combobox", { name: "Model" }));
+  expect(await screen.findByRole("option", { name: /text-structured/ })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: /text-only/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: /image-structured/ })).not.toBeInTheDocument();
+});
+
+it("filters Agent Service food-photo models by image and structured capabilities", async () => {
+  const foodConfig: AdminAiTaskConfig = {
+    ...bodyConfig,
+    task_type: "food_photo_estimation",
+  };
+  api.getAdminAiTaskConfigs.mockResolvedValue([foodConfig]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({
+    runners: [{
+      agent: "claude",
+      installed: true,
+      version: "2.1.220",
+      auth_state: "authenticated",
+      models: [
+        { model_id: "food-vision", supports_text_input: true, supports_image_input: true, supports_structured_output: true },
+        { model_id: "food-image-only", supports_text_input: true, supports_image_input: true, supports_structured_output: false },
+      ],
+    }],
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("Agent Service"));
+  await user.click(screen.getByRole("combobox", { name: "Model" }));
+  expect(await screen.findByRole("option", { name: /food-vision/ })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: /food-image-only/ })).not.toBeInTheDocument();
+});
+
+it("tests the selected Agent and shows its safe failure without leaking details", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([{ ...bodyConfig, credential: { configured: true, masked: "********cret" } }]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
+    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated",
+    models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
+  }] });
+  api.testAdminAiAgentService.mockResolvedValue({
+    ok: false,
+    agent: "antigravity",
+    model_id: "vision-structured",
+    checked_at: "2026-08-03T12:00:00Z",
+    duration_seconds: null,
+    error_code: "agent_unavailable",
+    safe_error_message: "The selected Agent Service runner is unavailable.",
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("Agent Service"));
+  await user.click(screen.getByRole("combobox", { name: "Model" }));
+  await user.click(screen.getByRole("option", { name: /vision-structured/ }));
+  await user.click(screen.getByRole("button", { name: "Test Agent" }));
+  expect(api.testAdminAiAgentService).toHaveBeenCalledWith("antigravity", "vision-structured");
+  expect(await screen.findByRole("alert")).toHaveTextContent("The selected Agent Service runner is unavailable.");
+  expect(screen.queryByText(/agent-service-test-token|Bearer/i)).not.toBeInTheDocument();
+});
+
+it("saves Agent Service routing without sending or replacing the stored API key", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([{
+    ...bodyConfig,
+    credential: { configured: true, masked: "********cret" },
+  }]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
+    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated",
+    models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
+  }] });
+  api.saveAdminAiTaskConfig.mockResolvedValue({
+    ...bodyConfig,
+    execution_backend: "agent_service",
+    agent_name: "antigravity",
+    agent_model_id: "vision-structured",
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("Agent Service"));
+  await user.click(screen.getByRole("combobox", { name: "Model" }));
+  await user.click(screen.getByRole("option", { name: /vision-structured/ }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+
+  expect(api.saveAdminAiTaskConfig).toHaveBeenCalledWith(
+    "body_photo_analysis",
+    expect.objectContaining({
+      execution_backend: "agent_service",
+      agent_name: "antigravity",
+      agent_model_id: "vision-structured",
+      replace_credential: false,
+    }),
+  );
+  expect(api.saveAdminAiTaskConfig.mock.calls[0][1]).not.toHaveProperty("api_key");
+});
+
+it("restores API controls and the stored key placeholder when switching back", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([{
+    ...bodyConfig,
+    execution_backend: "agent_service",
+    agent_name: "antigravity",
+    agent_model_id: "vision-structured",
+    credential: { configured: true, masked: "********cret" },
+  }]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [] });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("API"));
+  expect(await screen.findByLabelText("API key")).toHaveAttribute("placeholder", "********cret");
+  expect(screen.getByRole("button", { name: "Refresh models" })).toBeEnabled();
 });
 
 function renderPage() {

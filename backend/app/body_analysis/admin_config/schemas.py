@@ -1,10 +1,16 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, model_validator
 
-from app.body_analysis.admin_config.enums import AIProviderName, AIRoutingPolicy, AITaskType
+from app.body_analysis.admin_config.enums import (
+    AIAgentName,
+    AIExecutionBackend,
+    AIProviderName,
+    AIRoutingPolicy,
+    AITaskType,
+)
 
 
 class CredentialStatus(BaseModel):
@@ -12,10 +18,18 @@ class CredentialStatus(BaseModel):
     masked: str | None
 
 
+AgentModelId = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
+]
+
+
 class AITaskConfigUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     provider: AIProviderName = AIProviderName.OPENROUTER
+    execution_backend: AIExecutionBackend = AIExecutionBackend.API
+    agent_name: AIAgentName | None = None
+    agent_model_id: AgentModelId | None = None
     enabled: bool = False
     api_key: SecretStr | None = Field(default=None, repr=False)
     replace_credential: bool = False
@@ -49,6 +63,9 @@ class AITaskConfigUpdate(BaseModel):
 class AITaskConfigDetail(BaseModel):
     task_type: AITaskType
     provider: AIProviderName
+    execution_backend: AIExecutionBackend
+    agent_name: AIAgentName | None
+    agent_model_id: str | None
     enabled: bool
     primary_model_id: str | None
     fallback_model_ids: list[str]
@@ -109,3 +126,52 @@ class ModelCatalogRefreshResponse(BaseModel):
     provider: AIProviderName
     model_count: int
     refreshed_at: datetime
+
+
+class AgentServiceModelCapability(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model_id: AgentModelId
+    supports_text_input: bool
+    supports_image_input: bool
+    supports_structured_output: bool
+    # Agent Service exposes these runner-parameter flags for future UI support.
+    # Backend v1 accepts them at the boundary but deliberately keeps them out of
+    # the public admin contract until each runner is verified and wired.
+    supports_temperature: bool = Field(default=False, exclude=True)
+    supports_max_output_tokens: bool = Field(default=False, exclude=True)
+
+
+class AgentServiceRunnerCapability(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AIAgentName
+    installed: bool
+    version: str | None = Field(default=None, max_length=120)
+    auth_state: Literal["unknown", "authenticated", "unauthenticated"] = "unknown"
+    models: list[AgentServiceModelCapability] = Field(default_factory=list)
+
+
+class AgentServiceCapabilitiesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    runners: list[AgentServiceRunnerCapability]
+
+
+class AgentServiceTestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AIAgentName
+    model_id: AgentModelId
+
+
+class AgentServiceTestResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    agent: AIAgentName
+    model_id: AgentModelId
+    checked_at: datetime
+    duration_seconds: float | None = Field(default=None, ge=0)
+    error_code: str | None = None
+    safe_error_message: str | None = None

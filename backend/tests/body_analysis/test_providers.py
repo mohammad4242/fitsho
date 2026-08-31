@@ -3,12 +3,16 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Coroutine
+from types import SimpleNamespace
 from typing import Any, cast
 
 import httpx
 import pytest
 
+from app.ai.task_provider import build_task_provider
+from app.body_analysis.admin_config.enums import AIExecutionBackend, AIProviderName
 from app.body_analysis.providers import (
+    AgentServiceProvider,
     AIProviderError,
     ImageInput,
     ModelCapabilityFilter,
@@ -59,6 +63,78 @@ def _completion(content: str, *, model: str = "vision-primary") -> httpx.Respons
             "usage": {"prompt_tokens": 11, "completion_tokens": 7, "cost": 0.0012},
         },
     )
+
+
+def test_task_provider_factory_preserves_api_openrouter_and_cost_accounting() -> None:
+    task = SimpleNamespace(
+        execution_backend=AIExecutionBackend.API,
+        provider=AIProviderName.OPENROUTER,
+        primary_model_id="vision-primary",
+        fallback_model_ids=["vision-fallback"],
+        routing_restrictions=[],
+        timeout_seconds=9,
+    )
+    settings = SimpleNamespace(
+        openrouter_base_url="https://openrouter.example/v1",
+        frontend_origin="http://localhost:5173",
+        openrouter_timeout_seconds=45,
+    )
+
+    async def scenario() -> None:
+        async with httpx.AsyncClient() as client:
+            configured = build_task_provider(
+                task,
+                settings=settings,
+                http_client=client,
+                agent_http_client=None,
+                api_key="test-key",
+            )
+
+        assert isinstance(configured.provider, OpenRouterProvider)
+        assert configured.provider_name == "openrouter"
+        assert configured.primary_model_id == "vision-primary"
+        assert configured.fallback_model_ids == ("vision-fallback",)
+        assert configured.supports_cost_accounting is True
+
+    _run(scenario())
+
+
+def test_task_provider_factory_uses_agent_service_without_cost_accounting() -> None:
+    task = SimpleNamespace(
+        execution_backend=AIExecutionBackend.AGENT_SERVICE,
+        provider=AIProviderName.OPENROUTER,
+        agent_name="codex",
+        agent_model_id="vision-local",
+        fallback_model_ids=["ignored-fallback"],
+        routing_restrictions=[],
+        timeout_seconds=11,
+    )
+    settings = SimpleNamespace(
+        agent_service_base_url="http://agent-service:9001",
+        agent_service_token="test-agent-token",
+        agent_service_max_image_bytes=1024 * 1024,
+        app_env="test",
+    )
+
+    async def scenario() -> None:
+        async with (
+            httpx.AsyncClient() as http_client,
+            httpx.AsyncClient() as agent_client,
+        ):
+            configured = build_task_provider(
+                task,
+                settings=settings,
+                http_client=http_client,
+                agent_http_client=agent_client,
+            )
+
+        assert isinstance(configured.provider, AgentServiceProvider)
+        assert configured.provider_name == "agent_service:codex"
+        assert configured.primary_model_id == "vision-local"
+        assert configured.fallback_model_ids == ()
+        assert configured.supports_cost_accounting is False
+
+    _run(scenario())
 
 
 def test_openrouter_catalog_normalizes_and_filters_model_capabilities() -> None:
