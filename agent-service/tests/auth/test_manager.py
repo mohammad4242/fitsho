@@ -1,0 +1,148 @@
+import asyncio
+import os
+import sys
+from collections.abc import Coroutine
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from app.auth.base import AuthCommand, ParsedAuthUpdate
+from app.auth.manager import AuthManager, AuthManagerError
+from app.auth.schemas import AuthSessionStatus
+from app.schemas import AgentName
+
+
+def run[T](coro: Coroutine[Any, Any, T]) -> T:
+    return asyncio.run(coro)
+
+
+class FakeAuthAdapter:
+    agent = AgentName.CODEX
+
+    def __init__(self, script: Path) -> None:
+        self.script = script
+
+    def command(self) -> AuthCommand:
+        return AuthCommand(sys.executable, (str(self.script),), use_pty=False)
+
+    def allowed_auth_hosts(self) -> frozenset[str]:
+        return frozenset({"auth.openai.com"})
+
+    def parse_output(self, text: str) -> ParsedAuthUpdate:
+        if "READY" in text:
+            return ParsedAuthUpdate(
+                verification_url="https://auth.openai.com/device?state=opaque",
+                user_code="ABCD-EFGH",
+            )
+        if "INPUT" in text:
+            return ParsedAuthUpdate(needs_input=True, input_label="authorization code")
+        if "AUTHENTICATED" in text:
+            return ParsedAuthUpdate(authenticated=True)
+        return ParsedAuthUpdate()
+
+    def classify_exit(self, returncode: int, final_text: str) -> AuthSessionStatus:
+        del final_text
+        return (
+            AuthSessionStatus.AUTHENTICATED
+            if returncode == 0
+            else AuthSessionStatus.FAILED
+        )
+
+
+def write_script(tmp_path: Path, body: str) -> Path:
+    script = tmp_path / "fake-auth.py"
+    script.write_text(body, encoding="utf-8")
+    return script
+
+
+def test_manager_starts_one_safe_session_and_rejects_duplicate(tmp_path: Path) -> None:
+    script_body = "\n".join(
+        [
+            "import sys",
+            "print('READY', flush=True)",
+            "for line in sys.stdin:",
+            "    if line.strip() == 'continue':",
+            "        print('AUTHENTICATED', flush=True)",
+            "        break",
+        ]
+    )
+    script = write_script(
+        tmp_path,
+        script_body,
+    )
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.CODEX: FakeAuthAdapter(script)},
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"], "AGENT_SERVICE_TOKEN": "private"},
+        )
+        view = await manager.start(AgentName.CODEX)
+        assert view.status in {
+            AuthSessionStatus.STARTING,
+            AuthSessionStatus.WAITING_FOR_USER,
+        }
+        await asyncio.sleep(0.05)
+        current = await manager.get(view.session_id)
+        assert current.status is AuthSessionStatus.WAITING_FOR_USER
+        assert current.verification_url is not None
+        assert "private" not in current.model_dump_json()
+        with pytest.raises(AuthManagerError, match="already in progress"):
+            await manager.start(AgentName.CODEX)
+        await manager.cancel(view.session_id)
+        assert (await manager.get(view.session_id)).status is AuthSessionStatus.CANCELED
+        await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_submits_input_only_to_waiting_process_and_clears_it(tmp_path: Path) -> None:
+    script = write_script(
+        tmp_path,
+        "import sys\nprint('READY', flush=True)\nline=sys.stdin.readline()\n"
+        "print('AUTHENTICATED' if line.strip() == 'continue' else 'BAD', flush=True)\n",
+    )
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.CODEX: FakeAuthAdapter(script)},
+            workspace=tmp_path,
+        )
+        view = await manager.start(AgentName.CODEX)
+        await asyncio.sleep(0.05)
+        with pytest.raises(AuthManagerError) as error:
+            await manager.submit_input(view.session_id, "unexpected")
+        assert error.value.code == "auth_input_not_expected"
+        session = manager._sessions[view.session_id]  # noqa: SLF001
+        session.apply_update(
+            ParsedAuthUpdate(needs_input=True, input_label="authorization code"),
+            allowed_hosts=frozenset({"auth.openai.com"}),
+        )
+        awaiting = await manager.get(view.session_id)
+        assert awaiting.status is AuthSessionStatus.WAITING_FOR_INPUT
+        verifying = await manager.submit_input(view.session_id, "continue")
+        assert verifying.status is AuthSessionStatus.VERIFYING
+        await asyncio.sleep(0.05)
+        assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
+        await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_expires_and_terminates_pending_process(tmp_path: Path) -> None:
+    script = write_script(tmp_path, "import time\ntime.sleep(60)\n")
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.CODEX: FakeAuthAdapter(script)},
+            workspace=tmp_path,
+            ttl_seconds=0.05,
+        )
+        view = await manager.start(AgentName.CODEX)
+        await asyncio.sleep(0.15)
+        assert (await manager.get(view.session_id)).status is AuthSessionStatus.EXPIRED
+        assert not manager._sessions[view.session_id].process.is_running  # noqa: SLF001
+        await manager.shutdown()
+
+    run(scenario())
