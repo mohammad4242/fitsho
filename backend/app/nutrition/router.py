@@ -1549,6 +1549,7 @@ async def create_food_photo_estimate(
             settings,
             request.app.state.ai_http_client,
             idempotency_key,
+            getattr(request.app.state, "agent_http_client", None),
         )
     except RateLimitExceeded as error:
         raise HTTPException(

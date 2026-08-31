@@ -18,14 +18,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.body_analysis.admin_config.enums import AIProviderName, AITaskType
+from app.ai.task_provider import build_task_provider
+from app.body_analysis.admin_config.enums import AIExecutionBackend, AITaskType
 from app.body_analysis.admin_config.models import AITaskConfig
-from app.body_analysis.admin_config.service import decrypted_key, openrouter_provider
+from app.body_analysis.admin_config.service import AIConfigError, decrypted_key
 from app.body_analysis.providers.models import (
     AIProviderError,
     ImageInput,
     ModelRoute,
-    ProviderRoutingPreferences,
     StructuredGenerationRequest,
 )
 from app.config import Settings
@@ -171,6 +171,7 @@ async def estimate_photo(
     settings: Settings,
     client: httpx.AsyncClient,
     idempotency_key: str | None = None,
+    agent_http_client: httpx.AsyncClient | None = None,
 ) -> dict[str, object]:
     if not consent:
         raise FoodPhotoError("THIRD_PARTY_PROCESSING_CONSENT_REQUIRED")
@@ -181,20 +182,34 @@ async def estimate_photo(
     config = db.scalar(
         select(AITaskConfig).where(AITaskConfig.task_type == AITaskType.FOOD_PHOTO_ESTIMATION)
     )
-    if config is None or not config.enabled or not config.primary_model_id:
+    if config is None or not config.enabled:
         raise FoodPhotoError("FOOD_PHOTO_ESTIMATION_DISABLED")
+    try:
+        backend = AIExecutionBackend(config.execution_backend)
+        selected_client = client if backend is AIExecutionBackend.API else agent_http_client
+        if not isinstance(selected_client, httpx.AsyncClient):
+            raise ValueError("AI HTTP client is unavailable")
+        key = (
+            decrypted_key(db, provider=config.provider, settings=settings)
+            if backend is AIExecutionBackend.API
+            else None
+        )
+        configured = build_task_provider(
+            config,
+            settings=settings,
+            http_client=selected_client,
+            agent_http_client=(
+                selected_client if backend is AIExecutionBackend.AGENT_SERVICE else None
+            ),
+            api_key=key,
+        )
+    except (AIConfigError, ValueError) as error:
+        raise FoodPhotoError("FOOD_PHOTO_PROVIDER_UNAVAILABLE") from error
     content = await file.read(settings.food_photo_max_bytes + 1)
     if len(content) > settings.food_photo_max_bytes:
         raise FoodPhotoError("FOOD_PHOTO_TOO_LARGE")
     normalized, mime_type = _normalize_image(content, settings.food_photo_max_pixels)
     key = _store(settings.food_photo_storage_root, normalized)
-    provider = openrouter_provider(
-        client,
-        api_key=decrypted_key(db, provider=AIProviderName.OPENROUTER, settings=settings),
-        settings=settings,
-        timeout_seconds=config.timeout_seconds,
-    )
-    preferences = set(config.routing_restrictions)
     request = StructuredGenerationRequest(
         system_prompt=(
             "Identify only visible foods and estimate portions. Return uncertainty. "
@@ -204,19 +219,15 @@ async def estimate_photo(
         response_schema=RESPONSE_SCHEMA,
         schema_name="fitsho_food_photo_estimate_v1",
         route=ModelRoute(
-            primary_model=config.primary_model_id,
-            fallback_models=tuple(config.fallback_model_ids),
+            primary_model=configured.primary_model_id,
+            fallback_models=configured.fallback_model_ids,
         ),
-        provider_preferences=ProviderRoutingPreferences(
-            data_collection="deny" if "deny_provider_data_collection" in preferences else None,
-            zdr=True if "zero_data_retention" in preferences else None,
-            require_parameters=True if "require_supported_parameters" in preferences else None,
-        ),
+        provider_preferences=configured.routing_preferences,
         temperature=config.temperature,
         max_output_tokens=config.max_output_tokens,
     )
     try:
-        result = await provider.analyze_images(
+        result = await configured.provider.analyze_images(
             request,
             images=(
                 ImageInput(
@@ -234,7 +245,7 @@ async def estimate_photo(
             category="ai",
             event_name="food_photo_estimation",
             status="error",
-            provider="openrouter",
+            provider=configured.provider_name,
             counters={"requests": 1, "errors": 1},
         )
         db.commit()
@@ -248,7 +259,7 @@ async def estimate_photo(
         byte_size=len(normalized),
         idempotency_key_hash=key_hash,
         status="estimated",
-        provider="openrouter",
+        provider=configured.provider_name,
         model_id=result.model_id,
         provider_request_id=result.provider_request_id,
         raw_estimate=output.model_dump(mode="json"),
@@ -268,14 +279,14 @@ async def estimate_photo(
         event_type="food_photo_estimated",
         resource_type="food_photo_estimate",
         resource_id=row.id,
-        metadata={"provider": "openrouter", "byte_size": len(normalized)},
+        metadata={"provider": configured.provider_name, "byte_size": len(normalized)},
     )
     record_operational_event(
         db,
         category="ai",
         event_name="food_photo_estimation",
         status="success",
-        provider="openrouter",
+        provider=configured.provider_name,
         counters={
             "requests": 1,
             "errors": 0,
