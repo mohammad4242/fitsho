@@ -774,6 +774,26 @@
 .admin-agent-service__agent-select select { width: 100%; min-width: 0; min-height: 2.45rem; padding: .55rem .7rem; border: 1px solid rgb(10 31 30 / 18%); border-radius: .65rem; color: var(--petrol-900); background: white; font: inherit; }
 .admin-agent-service__selected-values { display: flex; flex-wrap: wrap; gap: .35rem .9rem; min-width: 0; color: var(--muted); font-size: .78rem; }
 .admin-agent-service__selected-values span { min-width: 0; overflow-wrap: anywhere; }
+.admin-agent-auth-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(5 24 23 / 62%); }
+.admin-agent-auth-dialog { display: grid; width: min(100%, 38rem); max-height: min(90vh, 46rem); gap: 1rem; overflow: auto; padding: clamp(1.1rem, 3vw, 1.6rem); border: 1px solid rgb(255 255 255 / 30%); border-radius: 1.2rem; color: var(--petrol-900); background: var(--paper); box-shadow: 0 1.2rem 3rem rgb(5 24 23 / 28%); }
+.admin-agent-auth-dialog__header, .admin-agent-auth-dialog__footer { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+.admin-agent-auth-dialog__header h2, .admin-agent-auth-dialog__header p { margin: 0; }
+.admin-agent-auth-dialog__header h2 { overflow-wrap: anywhere; font-size: 1.25rem; }
+.admin-agent-auth-dialog__header > button, .admin-agent-auth-dialog__footer > button { min-height: 2.4rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: .65rem; color: var(--petrol-900); background: var(--mist-50); cursor: pointer; font: inherit; font-size: .8rem; font-weight: 800; }
+.admin-agent-auth-dialog__content { display: grid; gap: .8rem; min-width: 0; }
+.admin-agent-auth-dialog__content > p { margin: 0; line-height: 1.7; }
+.admin-agent-auth-dialog__status { padding: .65rem .8rem; border-radius: .7rem; color: var(--turquoise-dark); background: rgb(56 183 165 / 11%); font-weight: 850; }
+.admin-agent-auth-dialog__url, .admin-agent-auth-dialog__code { display: grid; gap: .6rem; min-width: 0; padding: .8rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--mist-50); }
+.admin-agent-auth-dialog__url code, .admin-agent-auth-dialog__code code { display: block; min-width: 0; overflow-wrap: anywhere; color: var(--petrol-900); font-size: .8rem; }
+.admin-agent-auth-dialog__url > div, .admin-agent-auth-dialog__code { display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; }
+.admin-agent-auth-dialog__url > div { display: flex; }
+.admin-agent-auth-dialog__url button, .admin-agent-auth-dialog__code button, .admin-agent-auth-dialog__input-form > button { min-height: 2.4rem; padding: .5rem .7rem; border: 1px solid var(--petrol-800); border-radius: .6rem; color: var(--paper); background: var(--petrol-800); cursor: pointer; font: inherit; font-size: .78rem; font-weight: 800; }
+.admin-agent-auth-dialog__input-form { display: grid; gap: .65rem; }
+.admin-agent-auth-dialog__input-form label { display: grid; gap: .35rem; color: var(--muted); font-size: .8rem; font-weight: 800; }
+.admin-agent-auth-dialog__input-form input { min-height: 2.8rem; padding: .6rem .75rem; border: 1px solid var(--line); border-radius: .65rem; color: var(--petrol-900); background: white; font: inherit; }
+.admin-agent-auth-dialog__footer { align-items: center; padding-top: .8rem; border-top: 1px solid var(--line); }
+.admin-agent-auth-dialog__footer small { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: .72rem; }
+.admin-agent-auth-dialog button:disabled { cursor: not-allowed; opacity: .5; }
 .admin-ai-setting-field select[multiple] { min-height: 7rem; }
 .admin-ai-model-selector { position: relative; min-width: 0; }.admin-ai-model-selector__trigger { display: flex; align-items: center; justify-content: space-between; gap: .75rem; width: 100%; max-width: 100%; min-width: 0; min-height: 2.7rem; padding: .65rem .8rem; border: 1px solid rgb(10 31 30 / 18%); border-radius: .7rem; color: var(--petrol-900); background: white; cursor: pointer; font: inherit; text-align: start; }.admin-ai-model-selector__trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.admin-ai-model-selector__trigger svg { flex: 0 0 auto; width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }.admin-ai-model-selector__trigger:focus-visible { outline: 3px solid rgb(56 183 165 / 28%); border-color: var(--turquoise); }
 .admin-ai-model-selector__menu { position: absolute; z-index: 5; top: calc(100% + .4rem); inset-inline: 0; display: grid; gap: .55rem; padding: .7rem; border: 1px solid rgb(22 91 84 / 18%); border-radius: .85rem; background: rgb(255 255 255 / 98%); box-shadow: 0 1rem 2.4rem rgb(10 31 30 / 18%); }.admin-ai-model-selector__menu input { box-sizing: border-box; }.admin-ai-model-selector__options { display: grid; max-height: 15rem; overflow: auto; }.admin-ai-model-selector__options button { display: grid; gap: .15rem; width: 100%; padding: .65rem; border: 0; border-radius: .6rem; color: var(--petrol-900); background: transparent; cursor: pointer; font: inherit; text-align: start; }.admin-ai-model-selector__options button:hover, .admin-ai-model-selector__options button[aria-selected="true"] { background: rgb(56 183 165 / 13%); }.admin-ai-model-selector__options small { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }.admin-ai-model-selector__options p { margin: .4rem; color: var(--muted); font-size: .85rem; }
@@ -806,6 +826,10 @@
   .admin-agent-service__selection { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
   .admin-agent-service__selected-values { display: grid; gap: .3rem; }
   .admin-agent-service__selection > button { width: 100%; }
+  .admin-agent-auth-backdrop { align-items: end; padding: .65rem; }
+  .admin-agent-auth-dialog { max-height: 94vh; border-radius: 1rem; }
+  .admin-agent-auth-dialog__url > div, .admin-agent-auth-dialog__code { align-items: stretch; flex-direction: column; }
+  .admin-agent-auth-dialog__url button, .admin-agent-auth-dialog__code button, .admin-agent-auth-dialog__input-form > button { width: 100%; }
 }
 @media (max-width: 760px) { .admin-template-card > header, .admin-template-card footer, .admin-template-day li { align-items: start; flex-direction: column; }.admin-template-day li > span { white-space: normal; } }
 @media (max-width: 760px) { .admin-program-accordion-trigger { align-items: start; }.admin-program-accordion-meta { align-items: end; flex-direction: column-reverse; }.admin-program-accordion-title { font-size: 1.2rem; }.admin-program-accordion-description { font-size: .88rem; }.admin-template-card { gap: .9rem; }.admin-template-card footer { gap: .6rem; }.admin-template-card footer span { overflow-wrap: anywhere; } }

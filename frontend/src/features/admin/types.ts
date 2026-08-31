@@ -271,6 +271,27 @@ export type AdminAiTaskType =
 export type AdminAiExecutionBackend = "api" | "agent_service";
 export type AdminAiAgentName = "antigravity" | "codex" | "claude";
 
+export type AdminAiAgentAuthStatus =
+  | "starting"
+  | "waiting_for_user"
+  | "waiting_for_input"
+  | "verifying"
+  | "authenticated"
+  | "failed"
+  | "canceled"
+  | "expired";
+
+export type AdminAiAgentAuthSession = {
+  session_id: string;
+  agent: AdminAiAgentName;
+  status: AdminAiAgentAuthStatus;
+  verification_url: string | null;
+  user_code: string | null;
+  input_label: string | null;
+  expires_at: string;
+  safe_error_message: string | null;
+};
+
 export type AdminAiCredentialStatus = {
   configured: boolean;
   masked: string | null;

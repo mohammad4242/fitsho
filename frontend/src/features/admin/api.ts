@@ -17,6 +17,7 @@ import type {
   AdminAiRoutingUpdate,
   AdminAiCatalogRefresh,
   AdminAiCatalogResponse,
+  AdminAiAgentAuthSession,
   AdminAiAgentName,
   AdminAiAgentServiceCapabilities,
   AdminAiAgentServiceTest,
@@ -402,6 +403,43 @@ export function testAdminAiAgentService(
     method: "POST",
     body: JSON.stringify({ agent, model_id: modelId }),
   });
+}
+
+export function startAdminAiAgentAuth(
+  agent: AdminAiAgentName,
+): Promise<AdminAiAgentAuthSession> {
+  return request<AdminAiAgentAuthSession>("/api/v1/admin/ai/agent-service/auth/start", {
+    method: "POST",
+    body: JSON.stringify({ agent }),
+  });
+}
+
+export function getAdminAiAgentAuthSession(
+  sessionId: string,
+): Promise<AdminAiAgentAuthSession> {
+  return request<AdminAiAgentAuthSession>(
+    `/api/v1/admin/ai/agent-service/auth/${encodeURIComponent(sessionId)}`,
+  );
+}
+
+export function submitAdminAiAgentAuthInput(
+  sessionId: string,
+  value: string,
+): Promise<AdminAiAgentAuthSession> {
+  return request<AdminAiAgentAuthSession>(
+    `/api/v1/admin/ai/agent-service/auth/${encodeURIComponent(sessionId)}/input`,
+    {
+      method: "POST",
+      body: JSON.stringify({ value }),
+    },
+  );
+}
+
+export function cancelAdminAiAgentAuthSession(sessionId: string): Promise<void> {
+  return request<void>(
+    `/api/v1/admin/ai/agent-service/auth/${encodeURIComponent(sessionId)}`,
+    { method: "DELETE" },
+  );
 }
 
 export function getAdminExercises(

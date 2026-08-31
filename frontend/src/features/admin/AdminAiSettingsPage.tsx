@@ -16,9 +16,11 @@ import {
   testAdminAiProvider,
 } from "./api";
 import { AiModelSelector } from "./AiModelSelector";
+import { AgentAuthDialog } from "./AgentAuthDialog";
 import { AgentServicePanel } from "./AgentServicePanel";
 import type {
   AdminAiCatalogModel,
+  AdminAiAgentName,
   AdminAiAgentRunnerCapability,
   AdminAiTaskConfig,
   AdminAiTaskConfigUpdate,
@@ -43,6 +45,7 @@ export function AdminAiSettingsPage() {
   const [agentCapabilities, setAgentCapabilities] = useState<AdminAiAgentRunnerCapability[]>([]);
   const [agentCapabilitiesLoading, setAgentCapabilitiesLoading] = useState(false);
   const [agentCapabilitiesError, setAgentCapabilitiesError] = useState(false);
+  const [authAgent, setAuthAgent] = useState<AdminAiAgentName | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [configsLoading, setConfigsLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -96,7 +99,7 @@ export function AdminAiSettingsPage() {
     void loadModels(selectedTask, "");
   }, [selectedTask, config?.execution_backend]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
+  function loadAgentCapabilities() {
     if (!agentMode || !agentTaskSupported) {
       setAgentCapabilitiesLoading(false);
       return;
@@ -130,7 +133,11 @@ export function AdminAiSettingsPage() {
           && taskEpoch.current === epochAtStart
         ) setAgentCapabilitiesLoading(false);
       });
-  }, [agentMode, agentTaskSupported, selectedTask]);
+  }
+
+  useEffect(() => {
+    loadAgentCapabilities();
+  }, [agentMode, agentTaskSupported, selectedTask]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadModels(task: AdminAiTaskType, query: string, epoch = taskEpoch.current) {
     if (activeTask.current !== task || taskEpoch.current !== epoch) return Promise.resolve();
@@ -280,6 +287,7 @@ export function AdminAiSettingsPage() {
     if (task !== activeTask.current) taskEpoch.current += 1;
     activeTask.current = task;
     setBusy(null);
+    setAuthAgent(null);
     setMessage(null);
     setError(null);
     setSelectedTask(task);
@@ -349,7 +357,10 @@ export function AdminAiSettingsPage() {
                 name="execution-backend"
                 value="api"
                 checked={config.execution_backend === "api"}
-                onChange={() => patchConfig({ execution_backend: "api" })}
+                onChange={() => {
+                  setAuthAgent(null);
+                  patchConfig({ execution_backend: "api" });
+                }}
               />
               {t("admin.aiSettings.apiBackend")}
             </label>
@@ -360,7 +371,10 @@ export function AdminAiSettingsPage() {
                 value="agent_service"
                 checked={config.execution_backend === "agent_service"}
                 disabled={!agentTaskSupported}
-                onChange={() => patchConfig({ execution_backend: "agent_service" })}
+                onChange={() => {
+                  setAuthAgent(null);
+                  patchConfig({ execution_backend: "agent_service" });
+                }}
               />
               {t("admin.aiSettings.agentServiceBackend")}
             </label>
@@ -387,7 +401,7 @@ export function AdminAiSettingsPage() {
             selectedAgent={selectedAgent}
             selectedModelId={config.agent_model_id}
             onSelectAgent={(agent) => patchConfig({ agent_name: agent, agent_model_id: null })}
-            onAuthenticate={() => undefined}
+            onAuthenticate={setAuthAgent}
             onTest={handleConnectionTest}
             testDisabled={busy !== null || !targetAgentIsReady(config)}
           />}
@@ -439,6 +453,11 @@ export function AdminAiSettingsPage() {
         {(feedbackOperation === "save" || feedbackOperation === null) && error && <p className="form-error" role="alert">{error}</p>}
         <div className="admin-ai-settings-actions"><button type="submit" disabled={busy !== null}>{t("admin.aiSettings.save")}</button><button type="button" disabled={busy !== null} onClick={handleDisable}>{t("admin.aiSettings.disable")}</button></div>
       </form>
+      {authAgent && <AgentAuthDialog
+        agent={authAgent}
+        onClose={() => setAuthAgent(null)}
+        onAuthenticated={loadAgentCapabilities}
+      />}
       </main>
     </div>
   );

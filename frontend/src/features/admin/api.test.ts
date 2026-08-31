@@ -8,12 +8,16 @@ import {
   getAdminAiGenerationFailures,
   getAdminAiModelTestRuns,
   getAdminAiModels,
+  getAdminAiAgentAuthSession,
   getAdminExercises,
   getAdminTrainingProgramTemplates,
   getAdminMealCatalogue,
   getAdminNutritionPrograms,
   archiveAdminNutritionProgram,
   restoreAdminNutritionProgram,
+  startAdminAiAgentAuth,
+  submitAdminAiAgentAuthInput,
+  cancelAdminAiAgentAuthSession,
   uploadAdminMealImage,
   updateAdminAiRouting,
   createAdminTrainingProgramStructure,
@@ -131,6 +135,51 @@ it("reads models and updates the global AI routing setting", async () => {
     "/api/v1/admin/ai-routing",
     expect.objectContaining({ method: "PATCH", body: JSON.stringify({ mode: "automatic" }) }),
   );
+});
+
+it("routes agent authentication through the backend with bounded payloads", async () => {
+  const session = {
+    session_id: "session-1",
+    agent: "codex" as const,
+    status: "waiting_for_user" as const,
+    verification_url: "https://auth.openai.com/device",
+    user_code: "ABCD-EFGH",
+    input_label: null,
+    expires_at: "2026-08-31T12:10:00Z",
+    safe_error_message: null,
+  };
+  const fetchMock = vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse(session))
+    .mockResolvedValueOnce(jsonResponse(session))
+    .mockResolvedValueOnce(jsonResponse({ ...session, status: "waiting_for_input", user_code: null, input_label: "Authorization code" }))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+  await expect(startAdminAiAgentAuth("codex")).resolves.toEqual(session);
+  await expect(getAdminAiAgentAuthSession("session-1")).resolves.toEqual(session);
+  await expect(submitAdminAiAgentAuthInput("session-1", "AUTH-CODE")).resolves.toMatchObject({ status: "waiting_for_input" });
+  await expect(cancelAdminAiAgentAuthSession("session-1")).resolves.toBeUndefined();
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/admin/ai/agent-service/auth/start",
+    expect.objectContaining({ method: "POST", body: JSON.stringify({ agent: "codex" }) }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/admin/ai/agent-service/auth/session-1",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    3,
+    "/api/v1/admin/ai/agent-service/auth/session-1/input",
+    expect.objectContaining({ method: "POST", body: JSON.stringify({ value: "AUTH-CODE" }) }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    4,
+    "/api/v1/admin/ai/agent-service/auth/session-1",
+    expect.objectContaining({ method: "DELETE" }),
+  );
+  expect(fetchMock.mock.calls.flat().join(" ")).not.toContain("9001");
 });
 
 it("reads recent AI generation failures", async () => {
