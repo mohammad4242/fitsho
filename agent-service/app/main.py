@@ -15,6 +15,7 @@ from .auth.adapters.claude import ClaudeAuthAdapter
 from .auth.adapters.codex import CodexAuthAdapter
 from .auth.manager import AuthManager, AuthManagerError
 from .auth.schemas import (
+    AuthActiveCancellationResponse,
     AuthInputRequest,
     AuthSessionView,
     AuthStartRequest,
@@ -234,6 +235,17 @@ def create_app(
         request.state.agent = payload.agent.value
         request.state.task_kind = "auth"
         return await effective_auth_manager.start(payload.agent)
+
+    @app.post("/v1/auth/cancel-active", response_model=AuthActiveCancellationResponse)
+    async def auth_cancel_active(
+        request: Request,
+        payload: AuthStartRequest,
+        _: None = Depends(require_internal_auth),
+    ) -> AuthActiveCancellationResponse:
+        request.state.agent = payload.agent.value
+        request.state.task_kind = "auth"
+        canceled = await effective_auth_manager.cancel_active(payload.agent)
+        return AuthActiveCancellationResponse(agent=payload.agent, canceled=canceled)
 
     @app.get("/v1/auth/{session_id}", response_model=AuthSessionView)
     async def auth_status(

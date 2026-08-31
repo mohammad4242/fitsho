@@ -186,6 +186,23 @@ class AuthProcess:
         except (BrokenPipeError, ConnectionError, OSError) as exc:
             raise AuthProcessError("authentication process is not accepting input") from exc
 
+    async def press_escape(self) -> None:
+        """Send one fixed Escape byte to leave a PTY-backed interactive screen."""
+
+        process = self._process
+        master_fd = self._pty_master_fd
+        if (
+            not self.command.use_pty
+            or process is None
+            or process.returncode is not None
+            or master_fd is None
+        ):
+            raise AuthProcessError("authentication process is not running")
+        try:
+            await self._write_pty(master_fd, b"\x1b")
+        except (BrokenPipeError, ConnectionError, OSError) as exc:
+            raise AuthProcessError("authentication process is not accepting input") from exc
+
     async def wait(self) -> AuthProcessResult:
         task = self._monitor_task
         if task is None:

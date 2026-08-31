@@ -41,6 +41,13 @@ class AuthStartRequest(BaseModel):
     agent: AgentName
 
 
+class AuthActiveCancellationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AgentName
+    canceled: bool
+
+
 class AuthInputRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

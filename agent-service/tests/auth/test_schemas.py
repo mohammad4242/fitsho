@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.auth.schemas import (
+    AuthActiveCancellationResponse,
     AuthInputRequest,
     AuthSessionStatus,
     AuthSessionView,
@@ -28,6 +29,15 @@ def test_auth_start_accepts_only_known_agent_and_forbids_extra_fields() -> None:
     assert AuthStartRequest(agent=AgentName.CLAUDE).agent is AgentName.CLAUDE
     with pytest.raises(ValidationError):
         AuthStartRequest.model_validate({"agent": "codex", "command": "codex login"})
+
+
+def test_active_cancellation_response_has_only_safe_fields() -> None:
+    response = AuthActiveCancellationResponse(agent=AgentName.ANTIGRAVITY, canceled=True)
+    assert response.model_dump(mode="json") == {"agent": "antigravity", "canceled": True}
+    with pytest.raises(ValidationError):
+        AuthActiveCancellationResponse.model_validate(
+            {"agent": "antigravity", "canceled": True, "session_id": str(uuid4())}
+        )
 
 
 def test_auth_input_has_bounded_non_empty_value_and_forbids_extra_fields() -> None:

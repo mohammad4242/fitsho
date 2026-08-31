@@ -201,6 +201,33 @@ def test_auth_start_poll_duplicate_and_cancel_use_safe_contract(tmp_path: Path) 
         run(manager.shutdown())
 
 
+def test_active_auth_cancellation_is_idempotent_and_safe(tmp_path: Path) -> None:
+    client, manager = make_client(tmp_path)
+    try:
+        headers = {"Authorization": f"Bearer {TOKEN}"}
+        started = client.post("/v1/auth/start", headers=headers, json={"agent": "codex"})
+        assert started.status_code == 200
+
+        canceled = client.post(
+            "/v1/auth/cancel-active",
+            headers=headers,
+            json={"agent": "codex"},
+        )
+        assert canceled.status_code == 200
+        assert canceled.json() == {"agent": "codex", "canceled": True}
+
+        repeated = client.post(
+            "/v1/auth/cancel-active",
+            headers=headers,
+            json={"agent": "codex"},
+        )
+        assert repeated.status_code == 200
+        assert repeated.json() == {"agent": "codex", "canceled": False}
+        assert "session_id" not in canceled.text
+    finally:
+        run(manager.shutdown())
+
+
 def test_auth_telemetry_uses_only_non_sensitive_fields(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -159,6 +159,40 @@ def test_manager_exposes_pty_browser_handoff_and_completes_with_code(tmp_path: P
     run(scenario())
 
 
+def test_manager_cancels_active_pty_auth_with_escape_and_releases_slot(tmp_path: Path) -> None:
+    escaped_marker = tmp_path / "escaped.marker"
+    script = write_script(
+        tmp_path,
+        "import os, sys, termios, time, tty\n"
+        "print('READY', flush=True)\n"
+        "fd=sys.stdin.fileno(); old=termios.tcgetattr(fd); tty.setraw(fd)\n"
+        "value=os.read(fd, 1); termios.tcsetattr(fd, termios.TCSANOW, old)\n"
+        f"open({str(escaped_marker)!r}, 'w', encoding='utf-8').write("
+        "'yes' if value == bytes([27]) else 'no')\n"
+        "time.sleep(60)\n",
+    )
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: FakePtyAuthAdapter(script)},
+            workspace=tmp_path,
+        )
+        try:
+            view = await manager.start(AgentName.ANTIGRAVITY)
+            await asyncio.sleep(0.05)
+            assert await manager.cancel_active(AgentName.ANTIGRAVITY) is True
+            assert (await manager.get(view.session_id)).status is AuthSessionStatus.CANCELED
+            process = manager._sessions[view.session_id].process  # noqa: SLF001
+            assert process is not None
+            assert not process.is_running
+            assert escaped_marker.read_text(encoding='utf-8') == 'yes'
+            assert await manager.cancel_active(AgentName.ANTIGRAVITY) is False
+        finally:
+            await manager.shutdown()
+
+    run(scenario())
+
+
 def test_manager_selects_antigravity_google_oauth_without_terminal_input(
     tmp_path: Path,
 ) -> None:

@@ -290,3 +290,41 @@ def test_auth_process_can_press_fixed_enter_in_pty_mode(tmp_path: Path) -> None:
 
     run(scenario())
     assert "DONE" in "".join(output)
+
+
+def test_auth_process_can_press_fixed_escape_in_pty_mode(tmp_path: Path) -> None:
+    output: list[str] = []
+
+    async def collect(text: str) -> None:
+        output.append(text)
+
+    async def scenario() -> None:
+        process = AuthProcess(
+            AuthCommand(
+                sys.executable,
+                (
+                    "-c",
+                    "import os, sys, termios, tty; "
+                    "fd=sys.stdin.fileno(); old=termios.tcgetattr(fd); tty.setraw(fd); "
+                    "value=os.read(fd, 1); termios.tcsetattr(fd, termios.TCSANOW, old); "
+                    "print('ESCAPED' if value == bytes([27]) else 'WRONG', flush=True)",
+                ),
+                use_pty=True,
+            ),
+            workspace=tmp_path,
+            environment={"PATH": os.environ["PATH"]},
+            max_output_bytes=4096,
+            output_callback=collect,
+        )
+        await process.start()
+        try:
+            await asyncio.sleep(0.05)
+            await process.press_escape()
+            result = await process.wait()
+            assert result.returncode == 0
+        finally:
+            if process.is_running:
+                await process.terminate()
+
+    run(scenario())
+    assert "ESCAPED" in "".join(output)

@@ -206,6 +206,29 @@ class AuthManager:
             await process.terminate()
         return view
 
+    async def cancel_active(self, agent: AgentName) -> bool:
+        process: AuthProcess | None = None
+        canceled = False
+        async with self._lock:
+            active_id = self._active.get(agent)
+            if active_id is None:
+                return False
+            session = self._sessions.get(active_id)
+            if session is None or not session.is_active:
+                del self._active[agent]
+                return False
+            process = session.process
+            if self._is_expired(session):
+                session.mark_terminal(AuthSessionStatus.EXPIRED)
+                self._release_active(session)
+            else:
+                session.mark_terminal(AuthSessionStatus.CANCELED)
+                self._release_active(session)
+                canceled = True
+        if process is not None:
+            await self._terminate_auth_process(process)
+        return canceled
+
     async def submit_input(self, session_id: UUID, value: str) -> AuthSessionView:
         try:
             validated = AuthInputRequest(value=value)
@@ -283,8 +306,18 @@ class AuthManager:
                 process = session.process
             view = session.view()
         if process is not None:
-            await process.terminate()
+            await self._terminate_auth_process(process)
         return view
+
+    @staticmethod
+    async def _terminate_auth_process(process: AuthProcess) -> None:
+        if process.command.use_pty and process.is_running:
+            try:
+                await process.press_escape()
+                await asyncio.sleep(0.01)
+            except AuthProcessError:
+                pass
+        await process.terminate()
 
     async def shutdown(self) -> None:
         async with self._lock:
