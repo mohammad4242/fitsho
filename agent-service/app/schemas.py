@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -65,6 +65,28 @@ class AgentGenerationInput(BaseModel):
         default=None,
         max_length=5,
     )
+
+
+class StoredImageReference(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    label: Annotated[str, StringConstraints(min_length=1, max_length=40)]
+    mime_type: Literal["image/jpeg", "image/png", "image/webp"]
+    storage_scope: Literal["body", "food"]
+    storage_key: Annotated[str, StringConstraints(min_length=1, max_length=500)]
+
+
+class StoredImageGenerationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    generation: AgentGenerationInput
+    images: tuple[StoredImageReference, ...] = Field(min_length=1, max_length=5)
+
+    @model_validator(mode="after")
+    def reject_multipart_metadata(self) -> "StoredImageGenerationInput":
+        if self.generation.image_labels is not None:
+            raise ValueError("stored image requests cannot contain multipart image labels")
+        return self
 
 
 class AgentGenerationOutput(BaseModel):

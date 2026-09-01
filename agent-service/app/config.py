@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 9001
     agent_workspace_root: Path = Path("/tmp/fitsho-agent")
+    agent_shared_private_media_root: Path = Path("/shared-private-media")
     agent_auth_session_ttl_seconds: float = Field(default=600.0, gt=0, le=3600)
     agent_auth_max_output_bytes: int = Field(default=65_536, ge=1024, le=1_048_576)
     agent_global_max_concurrency: int = Field(default=4, ge=1, le=64)
