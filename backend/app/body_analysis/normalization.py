@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Any
 
 from app.body_analysis.enums import (
     AnalysisLimitation,
     BodyAnalysisClassification,
+    BodyArea,
     TrainingEmphasis,
 )
 from app.body_analysis.schemas import (
+    BodyAnalysisEvidenceV4Observation,
+    BodyAnalysisEvidenceV4Payload,
     BodyAnalysisFinding,
     BodyAnalysisSummary,
     NormalizedBodyAnalysis,
@@ -72,6 +75,265 @@ def normalize_visual_physique_assessment_v3(
     if any(_MEDICAL_CLAIM_PATTERN.search(value) for value in prose):
         raise MedicalClaimError("body analysis cannot contain medical diagnostic claims")
     return VisualPhysiqueAssessmentV3.model_validate(visual.model_dump(mode="json"))
+
+
+def normalize_visual_physique_assessment_v4(
+    payload: Mapping[str, Any],
+) -> BodyAnalysisEvidenceV4Payload:
+    """Validate the provider-owned, prose-free v4 evidence contract."""
+
+    return BodyAnalysisEvidenceV4Payload.model_validate(payload)
+
+
+_V4_EVIDENCE_AREA_ORDER = (
+    BodyArea.SHOULDERS,
+    BodyArea.CHEST,
+    BodyArea.BACK,
+    BodyArea.LATS,
+    BodyArea.ARMS,
+    BodyArea.FOREARMS,
+    BodyArea.WAIST_MIDSECTION,
+    BodyArea.GLUTES,
+    BodyArea.QUADS,
+    BodyArea.HAMSTRINGS,
+    BodyArea.CALVES,
+)
+
+_V4_EVIDENCE_SCORES = {"low": 0.40, "moderate": 0.65, "high": 0.85}
+
+_V4_HIGH_EVIDENCE_REQUIRED_VIEWS: dict[BodyArea, frozenset[BodyPhotoView]] = {
+    BodyArea.SHOULDERS: frozenset({BodyPhotoView.FRONT, BodyPhotoView.BACK}),
+    BodyArea.CHEST: frozenset({BodyPhotoView.FRONT, BodyPhotoView.SIDE}),
+    BodyArea.BACK: frozenset({BodyPhotoView.SIDE, BodyPhotoView.BACK}),
+    BodyArea.LATS: frozenset({BodyPhotoView.FRONT, BodyPhotoView.BACK}),
+    BodyArea.ARMS: frozenset({BodyPhotoView.FRONT, BodyPhotoView.BACK}),
+    BodyArea.FOREARMS: frozenset({BodyPhotoView.FRONT, BodyPhotoView.SIDE}),
+    BodyArea.WAIST_MIDSECTION: frozenset({BodyPhotoView.FRONT, BodyPhotoView.SIDE}),
+    BodyArea.GLUTES: frozenset({BodyPhotoView.SIDE, BodyPhotoView.BACK}),
+    BodyArea.QUADS: frozenset({BodyPhotoView.FRONT, BodyPhotoView.SIDE}),
+    BodyArea.HAMSTRINGS: frozenset({BodyPhotoView.SIDE, BodyPhotoView.BACK}),
+    BodyArea.CALVES: frozenset({BodyPhotoView.SIDE, BodyPhotoView.BACK}),
+    BodyArea.SYMMETRY: frozenset({BodyPhotoView.FRONT, BodyPhotoView.BACK}),
+}
+
+
+def visual_assessment_v4_to_normalized(
+    assessment: BodyAnalysisEvidenceV4Payload,
+    *,
+    preflight_confidence: float = 1.0,
+    usable_views: Collection[BodyPhotoView | str] | None = None,
+) -> NormalizedBodyAnalysis:
+    """Project controlled v4 evidence into the stable 13-area engine contract."""
+
+    if not 0 <= preflight_confidence <= 1:
+        raise ValueError("preflight confidence must be between 0 and 1")
+    normalized_usable_views = (
+        {BodyPhotoView(view) for view in usable_views} if usable_views is not None else None
+    )
+    findings = [
+        _v4_observation_to_finding(observation, normalized_usable_views)
+        for area in _V4_EVIDENCE_AREA_ORDER
+        for observation in assessment.area_observations
+        if observation.area == area.value
+    ]
+    findings.append(_v4_symmetry_to_finding(assessment, normalized_usable_views))
+    findings.append(_v4_posture_finding(assessment, normalized_usable_views))
+    if len(findings) != len(BodyArea):
+        raise ValueError("v4 projection must produce all 13 normalized body areas")
+
+    confidence_ceiling = 0.85 if assessment.assessment_status == "complete" else 0.75
+    normalized_findings = tuple(findings)
+    return NormalizedBodyAnalysis(
+        schema_version="4.0",
+        overall_confidence=min(preflight_confidence, confidence_ceiling),
+        findings=normalized_findings,
+        summary=_summary_for_findings(normalized_findings),
+        requires_coach_review=True,
+        requires_doctor_review=True,
+    )
+
+
+def _v4_observation_to_finding(
+    observation: BodyAnalysisEvidenceV4Observation,
+    usable_views: set[BodyPhotoView] | None,
+) -> BodyAnalysisFinding:
+    supporting_views = tuple(observation.supporting_views)
+    _validate_v4_supporting_views(supporting_views, usable_views)
+    strength = _v4_effective_strength(
+        observation.evidence_strength,
+        observation.area,
+        supporting_views,
+    )
+    classification, severity = _v4_classification(observation.classification, strength)
+    emphasis = (
+        tuple(
+            emphasis
+            for item in observation.suggested_training_emphasis
+            for emphasis in _EMPHASIS_MAP[item]
+        )
+        if classification
+        in {BodyAnalysisClassification.MILD_LAG, BodyAnalysisClassification.CLEAR_LAG}
+        else ()
+    )
+    limitations = tuple(
+        dict.fromkeys(
+            (
+                *observation.limitation_codes,
+                *((AnalysisLimitation.VISIBILITY,)
+                  if classification is BodyAnalysisClassification.UNCERTAIN
+                  else ()),
+            )
+        )
+    )
+    return BodyAnalysisFinding(
+        body_area=BodyArea(observation.area),
+        classification=classification,
+        severity=severity,
+        confidence=_V4_EVIDENCE_SCORES[strength],
+        supporting_views=supporting_views,
+        explanation=(
+            "Structured visual evidence supports the "
+            f"{observation.classification.replace('_', ' ')} classification."
+        ),
+        limitations=limitations,
+        suggested_training_emphasis=tuple(dict.fromkeys(emphasis)),
+        medical_review_recommended=False,
+    )
+
+
+def _v4_symmetry_to_finding(
+    assessment: BodyAnalysisEvidenceV4Payload,
+    usable_views: set[BodyPhotoView] | None,
+) -> BodyAnalysisFinding:
+    symmetry = assessment.visible_symmetry
+    supporting_views = tuple(symmetry.supporting_views)
+    _validate_v4_supporting_views(supporting_views, usable_views)
+    strength = _v4_effective_strength(
+        symmetry.evidence_strength,
+        BodyArea.SYMMETRY,
+        supporting_views,
+    )
+    if symmetry.state == "uncertain" or strength == "low":
+        classification = BodyAnalysisClassification.UNCERTAIN
+        severity = None
+    elif symmetry.state == "no_clear_difference":
+        classification = BodyAnalysisClassification.NEUTRAL
+        severity = None
+    elif symmetry.state == "minor_visible_difference":
+        classification = BodyAnalysisClassification.MILD_LAG
+        severity = 0.5
+    else:
+        classification = BodyAnalysisClassification.CLEAR_LAG
+        severity = 0.75
+    limitations = (
+        (AnalysisLimitation.VISIBILITY,)
+        if classification is BodyAnalysisClassification.UNCERTAIN
+        else ()
+    )
+    return BodyAnalysisFinding(
+        body_area=BodyArea.SYMMETRY,
+        classification=classification,
+        severity=severity,
+        confidence=_V4_EVIDENCE_SCORES[strength],
+        supporting_views=supporting_views,
+        explanation=f"Structured visual evidence reports {symmetry.state.replace('_', ' ')}.",
+        limitations=limitations,
+        suggested_training_emphasis=(),
+        medical_review_recommended=False,
+    )
+
+
+def _v4_posture_finding(
+    assessment: BodyAnalysisEvidenceV4Payload,
+    usable_views: set[BodyPhotoView] | None,
+) -> BodyAnalysisFinding:
+    supporting_views = tuple(
+        view
+        for view in (BodyPhotoView.FRONT, BodyPhotoView.SIDE, BodyPhotoView.BACK)
+        if any(view in observation.supporting_views for observation in assessment.area_observations)
+    )
+    if usable_views is not None:
+        supporting_views = tuple(view for view in supporting_views if view in usable_views)
+    supporting_views = supporting_views or (BodyPhotoView.FRONT,)
+    return BodyAnalysisFinding(
+        body_area=BodyArea.VISIBLE_ALIGNMENT_OR_POSTURE,
+        classification=BodyAnalysisClassification.UNCERTAIN,
+        severity=None,
+        confidence=_V4_EVIDENCE_SCORES["low"],
+        supporting_views=supporting_views,
+        explanation="Posture is outside the v4 evidence contract.",
+        limitations=(AnalysisLimitation.VISIBILITY,),
+        suggested_training_emphasis=(),
+        medical_review_recommended=False,
+    )
+
+
+def _validate_v4_supporting_views(
+    supporting_views: tuple[BodyPhotoView, ...],
+    usable_views: set[BodyPhotoView] | None,
+) -> None:
+    if usable_views is not None and not set(supporting_views).issubset(usable_views):
+        raise ValueError("v4 evidence can reference only usable photo views")
+
+
+def _v4_effective_strength(
+    strength: str,
+    area: str | BodyArea,
+    supporting_views: tuple[BodyPhotoView, ...],
+) -> str:
+    area_key = BodyArea(area)
+    if strength == "high" and not _V4_HIGH_EVIDENCE_REQUIRED_VIEWS[area_key].issubset(
+        supporting_views
+    ):
+        return "moderate"
+    return strength
+
+
+def _v4_classification(
+    classification: str,
+    strength: str,
+) -> tuple[BodyAnalysisClassification, float | None]:
+    if classification == "not_assessable" or strength == "low":
+        return BodyAnalysisClassification.UNCERTAIN, None
+    if classification == "stronger":
+        return (
+            BodyAnalysisClassification.STRENGTH
+            if strength == "high"
+            else BodyAnalysisClassification.NEUTRAL,
+            None,
+        )
+    if classification == "balanced":
+        return BodyAnalysisClassification.NEUTRAL, None
+    if classification == "primary_priority" and strength == "high":
+        return BodyAnalysisClassification.CLEAR_LAG, 0.75
+    return BodyAnalysisClassification.MILD_LAG, 0.5
+
+
+def _summary_for_findings(
+    findings: tuple[BodyAnalysisFinding, ...],
+) -> BodyAnalysisSummary:
+    return BodyAnalysisSummary(
+        visible_strengths=tuple(
+            finding.body_area
+            for finding in findings
+            if finding.classification is BodyAnalysisClassification.STRENGTH
+        ),
+        priority_areas=tuple(
+            finding.body_area
+            for finding in findings
+            if finding.classification is BodyAnalysisClassification.CLEAR_LAG
+        ),
+        moderate_attention_areas=tuple(
+            finding.body_area
+            for finding in findings
+            if finding.classification is BodyAnalysisClassification.MILD_LAG
+        ),
+        uncertain_areas=tuple(
+            finding.body_area
+            for finding in findings
+            if finding.classification is BodyAnalysisClassification.UNCERTAIN
+        ),
+    )
 
 
 _EMPHASIS_MAP: dict[str, tuple[TrainingEmphasis, ...]] = {

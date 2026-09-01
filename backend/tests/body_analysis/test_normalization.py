@@ -13,6 +13,49 @@ from app.body_analysis.enums import (
 from app.body_analysis.normalization import MedicalClaimError, normalize_body_analysis
 from app.body_analysis.schemas import NormalizedBodyAnalysis
 
+_V4_AREAS = [
+    "shoulders",
+    "chest",
+    "back",
+    "lats",
+    "arms",
+    "forearms",
+    "waist_midsection",
+    "glutes",
+    "quads",
+    "hamstrings",
+    "calves",
+]
+
+
+def _v4_payload() -> dict[str, object]:
+    return {
+        "schema_version": "4.0",
+        "assessment_status": "complete",
+        "area_observations": [
+            {
+                "area": area,
+                "classification": "balanced",
+                "evidence_strength": "moderate",
+                "supporting_views": ["front", "side"],
+                "observation_tags": ["relative_width"],
+                "limitation_codes": [],
+                "suggested_training_emphasis": [],
+            }
+            for area in _V4_AREAS
+        ],
+        "upper_lower_balance": {
+            "state": "balanced",
+            "evidence_strength": "moderate",
+            "supporting_views": ["front", "side"],
+        },
+        "visible_symmetry": {
+            "state": "no_clear_difference",
+            "evidence_strength": "moderate",
+            "supporting_views": ["front", "back"],
+        },
+    }
+
 
 def _valid_payload() -> dict[str, object]:
     return {
@@ -185,6 +228,103 @@ def test_normalizes_schema_v3_checklist_and_projects_program_priorities() -> Non
     assert normalized.schema_version == "3.0"
     assert normalized.summary.priority_areas == (BodyArea.LATS,)
     assert normalized.findings[3].suggested_training_emphasis == ("back_width",)
+
+
+def test_normalizes_schema_v4_evidence_and_projects_posture_as_uncertain() -> None:
+    normalizer = getattr(normalization, "normalize_visual_physique_assessment_v4", None)
+    projector = getattr(normalization, "visual_assessment_v4_to_normalized", None)
+    assert normalizer is not None
+    assert projector is not None
+
+    evidence = normalizer(_v4_payload())
+    normalized = projector(
+        evidence,
+        preflight_confidence=0.97,
+        usable_views={"front", "side", "back"},
+    )
+
+    assert evidence.schema_version == "4.0"
+    assert len(evidence.area_observations) == 11
+    assert normalized.schema_version == "4.0"
+    assert normalized.overall_confidence == 0.85
+    posture = next(
+        finding
+        for finding in normalized.findings
+        if finding.body_area is BodyArea.VISIBLE_ALIGNMENT_OR_POSTURE
+    )
+    assert posture.classification is BodyAnalysisClassification.UNCERTAIN
+    assert posture.suggested_training_emphasis == ()
+
+
+def test_v4_rejects_duplicate_areas_and_free_form_fields() -> None:
+    normalizer = getattr(normalization, "normalize_visual_physique_assessment_v4", None)
+    assert normalizer is not None
+
+    duplicate = _v4_payload()
+    observations = duplicate["area_observations"]
+    assert isinstance(observations, list)
+    assert isinstance(observations[0], dict)
+    assert isinstance(observations[1], dict)
+    observations[1] = {**observations[1], "area": observations[0]["area"]}
+    with pytest.raises(ValidationError):
+        normalizer(duplicate)
+
+    extra_field = _v4_payload()
+    observations = extra_field["area_observations"]
+    assert isinstance(observations, list)
+    assert isinstance(observations[0], dict)
+    observations[0] = {**observations[0], "observation_fa": "متن آزاد"}
+    with pytest.raises(ValidationError):
+        normalizer(extra_field)
+
+
+@pytest.mark.parametrize("classification", ["stronger", "balanced", "not_assessable"])
+def test_v4_rejects_training_emphasis_on_non_actionable_classifications(
+    classification: str,
+) -> None:
+    normalizer = getattr(normalization, "normalize_visual_physique_assessment_v4", None)
+    assert normalizer is not None
+    payload = _v4_payload()
+    observations = payload["area_observations"]
+    assert isinstance(observations, list)
+    assert isinstance(observations[0], dict)
+    observations[0] = {
+        **observations[0],
+        "classification": classification,
+        "suggested_training_emphasis": ["lat_width"],
+    }
+
+    with pytest.raises(ValidationError):
+        normalizer(payload)
+
+
+def test_v4_caps_high_evidence_when_an_area_lacks_required_views() -> None:
+    normalizer = getattr(normalization, "normalize_visual_physique_assessment_v4", None)
+    projector = getattr(normalization, "visual_assessment_v4_to_normalized", None)
+    assert normalizer is not None
+    assert projector is not None
+    payload = _v4_payload()
+    observations = payload["area_observations"]
+    assert isinstance(observations, list)
+    assert isinstance(observations[3], dict)
+    observations[3] = {
+        **observations[3],
+        "classification": "primary_priority",
+        "evidence_strength": "high",
+        "supporting_views": ["back"],
+        "suggested_training_emphasis": ["lat_width"],
+    }
+
+    normalized = projector(
+        normalizer(payload),
+        preflight_confidence=1.0,
+        usable_views={"front", "side", "back"},
+    )
+    lats = next(finding for finding in normalized.findings if finding.body_area is BodyArea.LATS)
+
+    assert lats.classification is BodyAnalysisClassification.MILD_LAG
+    assert lats.confidence == 0.65
+    assert lats.suggested_training_emphasis == ("back_width",)
 
 
 def test_rejects_unrecognized_body_area() -> None:

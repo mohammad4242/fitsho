@@ -398,6 +398,154 @@ class VisualPhysiqueAssessmentV3(VisualPhysiqueAssessmentV3Payload):
     )
 
 
+BodyAnalysisEvidenceV4Status = Literal["complete", "partial"]
+BodyAnalysisEvidenceV4Classification = Literal[
+    "stronger",
+    "balanced",
+    "room_to_grow",
+    "primary_priority",
+    "not_assessable",
+]
+BodyAnalysisEvidenceV4Strength = Literal["low", "moderate", "high"]
+BodyAnalysisEvidenceV4ObservationTag = Literal[
+    "relative_width",
+    "relative_thickness",
+    "relative_prominence",
+    "side_profile",
+    "left_right_difference",
+    "visibility_limited",
+]
+BodyAnalysisEvidenceV4Area = Literal[
+    "shoulders",
+    "chest",
+    "back",
+    "lats",
+    "arms",
+    "forearms",
+    "waist_midsection",
+    "glutes",
+    "quads",
+    "hamstrings",
+    "calves",
+]
+BodyAnalysisEvidenceV4BalanceState = Literal[
+    "upper_body_dominant",
+    "lower_body_dominant",
+    "balanced",
+    "uncertain",
+]
+BodyAnalysisEvidenceV4SymmetryState = Literal[
+    "no_clear_difference",
+    "minor_visible_difference",
+    "clear_visible_difference",
+    "uncertain",
+]
+
+_V4_EVIDENCE_AREAS = frozenset(
+    {
+        "shoulders",
+        "chest",
+        "back",
+        "lats",
+        "arms",
+        "forearms",
+        "waist_midsection",
+        "glutes",
+        "quads",
+        "hamstrings",
+        "calves",
+    }
+)
+
+
+class BodyAnalysisEvidenceV4Observation(BaseModel):
+    """Evidence-only observation returned by the v4 vision provider."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    area: BodyAnalysisEvidenceV4Area
+    classification: BodyAnalysisEvidenceV4Classification
+    evidence_strength: BodyAnalysisEvidenceV4Strength
+    supporting_views: tuple[BodyPhotoView, ...] = Field(min_length=1, max_length=3)
+    observation_tags: tuple[BodyAnalysisEvidenceV4ObservationTag, ...] = Field(
+        default=(), max_length=6
+    )
+    limitation_codes: tuple[AnalysisLimitation, ...] = Field(default=(), max_length=10)
+    suggested_training_emphasis: tuple[VisualTrainingEmphasis, ...] = Field(
+        default=(), max_length=8
+    )
+
+    @model_validator(mode="after")
+    def validate_observation(self) -> BodyAnalysisEvidenceV4Observation:
+        if len(set(self.supporting_views)) != len(self.supporting_views):
+            raise ValueError("supporting views must be unique")
+        if len(set(self.observation_tags)) != len(self.observation_tags):
+            raise ValueError("observation tags must be unique")
+        if len(set(self.limitation_codes)) != len(self.limitation_codes):
+            raise ValueError("limitation codes must be unique")
+        if len(set(self.suggested_training_emphasis)) != len(
+            self.suggested_training_emphasis
+        ):
+            raise ValueError("training emphasis values must be unique")
+        if self.classification not in {"room_to_grow", "primary_priority"}:
+            if self.suggested_training_emphasis:
+                raise ValueError(
+                    "only room_to_grow and primary_priority findings can affect training emphasis"
+                )
+        return self
+
+
+class BodyAnalysisEvidenceV4UpperLowerBalance(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    state: BodyAnalysisEvidenceV4BalanceState
+    evidence_strength: BodyAnalysisEvidenceV4Strength
+    supporting_views: tuple[BodyPhotoView, ...] = Field(min_length=1, max_length=3)
+
+    @model_validator(mode="after")
+    def validate_supporting_views(self) -> BodyAnalysisEvidenceV4UpperLowerBalance:
+        if len(set(self.supporting_views)) != len(self.supporting_views):
+            raise ValueError("supporting views must be unique")
+        return self
+
+
+class BodyAnalysisEvidenceV4VisibleSymmetry(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    state: BodyAnalysisEvidenceV4SymmetryState
+    evidence_strength: BodyAnalysisEvidenceV4Strength
+    supporting_views: tuple[BodyPhotoView, ...] = Field(min_length=1, max_length=3)
+
+    @model_validator(mode="after")
+    def validate_supporting_views(self) -> BodyAnalysisEvidenceV4VisibleSymmetry:
+        if len(set(self.supporting_views)) != len(self.supporting_views):
+            raise ValueError("supporting views must be unique")
+        return self
+
+
+class BodyAnalysisEvidenceV4Payload(BaseModel):
+    """Provider-owned v4 payload containing only controlled visual evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal["4.0"]
+    assessment_status: BodyAnalysisEvidenceV4Status
+    area_observations: tuple[BodyAnalysisEvidenceV4Observation, ...] = Field(
+        min_length=11, max_length=11
+    )
+    upper_lower_balance: BodyAnalysisEvidenceV4UpperLowerBalance
+    visible_symmetry: BodyAnalysisEvidenceV4VisibleSymmetry
+
+    @model_validator(mode="after")
+    def validate_area_observations(self) -> BodyAnalysisEvidenceV4Payload:
+        areas = {observation.area for observation in self.area_observations}
+        if areas != _V4_EVIDENCE_AREAS or len(areas) != len(self.area_observations):
+            raise ValueError(
+                "area_observations must contain each v4 anatomical area exactly once"
+            )
+        return self
+
+
 def visual_physique_provider_schema() -> dict[str, Any]:
     """Return a transport schema supported by constrained-output vision providers.
 
@@ -417,6 +565,15 @@ def visual_physique_v3_provider_schema() -> dict[str, Any]:
     return cast(
         dict[str, Any],
         _relax_provider_schema(VisualPhysiqueAssessmentV3Payload.model_json_schema()),
+    )
+
+
+def visual_physique_v4_provider_schema() -> dict[str, Any]:
+    """Return the relaxed transport schema for evidence-only v4 output."""
+
+    return cast(
+        dict[str, Any],
+        _relax_provider_schema(BodyAnalysisEvidenceV4Payload.model_json_schema()),
     )
 
 

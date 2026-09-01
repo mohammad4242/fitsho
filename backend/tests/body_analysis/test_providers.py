@@ -356,6 +356,32 @@ def test_openrouter_strict_schema_requires_every_declared_property() -> None:
     assert request.response_schema["required"] == ["status"]
 
 
+def test_v4_provider_schema_is_strict_and_declares_the_evidence_contract() -> None:
+    import app.body_analysis.schemas as schemas
+
+    schema_builder = getattr(schemas, "visual_physique_v4_provider_schema", None)
+    assert schema_builder is not None
+    schema = schema_builder()
+
+    assert schema["type"] == "object"
+    assert schema["additionalProperties"] is False
+    assert set(schema["required"]) == {
+        "schema_version",
+        "assessment_status",
+        "area_observations",
+        "upper_lower_balance",
+        "visible_symmetry",
+    }
+    assert schema["properties"]["schema_version"]["const"] == "4.0"
+    assert schema["properties"]["area_observations"]["items"]["$ref"].startswith("#/$defs/")
+
+    strict_schema = OpenRouterProvider._strict_response_schema(schema)
+    assert strict_schema["additionalProperties"] is False
+    for definition in strict_schema["$defs"].values():
+        if definition.get("type") == "object":
+            assert set(definition["required"]) == set(definition["properties"])
+
+
 def test_openrouter_maps_typed_privacy_routing_preferences_to_request() -> None:
     seen: dict[str, object] = {}
 
