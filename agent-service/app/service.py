@@ -27,7 +27,7 @@ from .workspace import RequestWorkspace, WorkspaceLimits
 
 _TEST_SCHEMA: dict[str, Any] = {
     "type": "object",
-    "properties": {"ok": {"const": True}},
+    "properties": {"ok": {"type": "boolean", "const": True}},
     "required": ["ok"],
     "additionalProperties": False,
 }
