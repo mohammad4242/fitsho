@@ -12,6 +12,7 @@ from app.workouts.program_engine.session_feasibility import (
     SESSION_COUNT_CONSTRAINED_REASON,
     SessionCountStatus,
     SessionFeasibilityEvidence,
+    absolute_minimum_main_exercise_count,
     assess_session_count,
 )
 from app.workouts.program_engine.supplemental_policy import is_main_resistance_exercise
@@ -115,6 +116,63 @@ def test_incomplete_candidate_search_cannot_explain_underfilled_count() -> None:
 
     assert assessment.status is SessionCountStatus.UNPROVEN
     assert not assessment.evidence_complete
+
+
+def test_absolute_minimum_floor_is_three_for_45_and_four_for_60_minutes() -> None:
+    assert absolute_minimum_main_exercise_count(45, RULESET) == 3
+    assert absolute_minimum_main_exercise_count(60, RULESET) == 4
+
+
+def test_complete_evidence_below_absolute_minimum_remains_hard() -> None:
+    day = _day(*(_exercise(ExerciseType.COMPOUND, MuscleGroup.CHEST) for _ in range(3)))
+    evidence = SessionFeasibilityEvidence.from_day(
+        day,
+        requested_minutes=60,
+        ruleset=RULESET,
+        candidate_pool_count=3,
+        classified_candidate_count=3,
+        feasible_candidate_count=0,
+        rejection_reason_counts={"CANDIDATE_WEEKLY_HARD_VOLUME_LIMIT": 3},
+        search_exhausted=True,
+        candidate_pool_complete=True,
+    )
+
+    assessment = assess_session_count(
+        day,
+        requested_minutes=60,
+        ruleset=RULESET,
+        evidence=evidence,
+    )
+
+    assert evidence.absolute_minimum_main_exercises == 4
+    assert assessment.status is SessionCountStatus.UNPROVEN
+    assert assessment.reason_codes == ("SESSION_EXERCISE_COUNT_OUT_OF_RANGE",)
+
+
+def test_required_slot_failure_invalidates_constrained_evidence() -> None:
+    day = _day(*(_exercise(ExerciseType.COMPOUND, MuscleGroup.CHEST) for _ in range(4)))
+    evidence = SessionFeasibilityEvidence.from_day(
+        day,
+        requested_minutes=60,
+        ruleset=RULESET,
+        candidate_pool_count=3,
+        classified_candidate_count=3,
+        feasible_candidate_count=0,
+        rejection_reason_counts={"CANDIDATE_WEEKLY_HARD_VOLUME_LIMIT": 3},
+        search_exhausted=True,
+        candidate_pool_complete=True,
+        required_slots_satisfied=False,
+    )
+
+    assessment = assess_session_count(
+        day,
+        requested_minutes=60,
+        ruleset=RULESET,
+        evidence=evidence,
+    )
+
+    assert assessment.status is SessionCountStatus.UNPROVEN
+    assert not evidence.evidence_complete
 
 
 def test_core_cardio_and_warmup_are_not_main_count() -> None:

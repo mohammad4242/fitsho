@@ -17,6 +17,24 @@ from app.workouts.program_engine.supplemental_policy import main_exercise_count
 
 SESSION_COUNT_OUT_OF_RANGE_REASON = "SESSION_EXERCISE_COUNT_OUT_OF_RANGE"
 SESSION_COUNT_CONSTRAINED_REASON = "SESSION_EXERCISE_COUNT_CONSTRAINED_BY_SAFE_CAPACITY"
+ABSOLUTE_SHORT_SESSION_MINIMUM = 3
+ABSOLUTE_STANDARD_SESSION_MINIMUM = 3
+ABSOLUTE_LONG_SESSION_MINIMUM = 4
+
+_DURATION_CAPACITY_BLOCKERS = frozenset({"CANDIDATE_DURATION_HARD_MAXIMUM"})
+_HARD_VOLUME_BLOCKERS = frozenset(
+    {
+        "CANDIDATE_PER_SESSION_VOLUME_LIMIT",
+        "CANDIDATE_WEEKLY_HARD_VOLUME_LIMIT",
+    }
+)
+_RECOVERY_BLOCKER_PREFIXES = ("RECOVERY_", "CANDIDATE_RECOVERY_")
+_SEMANTIC_COHERENCE_BLOCKERS = frozenset(
+    {
+        "CANDIDATE_OUTSIDE_SESSION_FOCUS",
+        "CANDIDATE_SEMANTIC_REDUNDANCY",
+    }
+)
 
 
 class SessionCountStatus(StrEnum):
@@ -78,6 +96,8 @@ class SessionFeasibilityEvidence:
     rejection_reason_counts: tuple[tuple[str, int], ...]
     search_exhausted: bool
     candidate_pool_complete: bool
+    absolute_minimum_main_exercises: int
+    required_slots_satisfied: bool
 
     @classmethod
     def from_day(
@@ -92,6 +112,7 @@ class SessionFeasibilityEvidence:
         rejection_reason_counts: Mapping[str, int] | Sequence[tuple[str, int]],
         search_exhausted: bool,
         candidate_pool_complete: bool,
+        required_slots_satisfied: bool = True,
     ) -> SessionFeasibilityEvidence:
         policy = session_count_policy(requested_minutes, ruleset)
         if isinstance(rejection_reason_counts, Mapping):
@@ -117,6 +138,10 @@ class SessionFeasibilityEvidence:
             rejection_reason_counts=normalized_reasons,
             search_exhausted=search_exhausted,
             candidate_pool_complete=candidate_pool_complete,
+            absolute_minimum_main_exercises=absolute_minimum_main_exercise_count(
+                requested_minutes, ruleset
+            ),
+            required_slots_satisfied=required_slots_satisfied,
         )
 
     @classmethod
@@ -146,7 +171,8 @@ class SessionFeasibilityEvidence:
         return bool(
             self.candidate_pool_complete
             and self.search_exhausted
-            and self.actual_main_exercises > 0
+            and self.required_slots_satisfied
+            and self.actual_main_exercises >= self.absolute_minimum_main_exercises
             and self.actual_main_exercises < self.minimum_main_exercises
             and self.feasible_candidate_count == 0
             and self.classified_candidate_count == self.candidate_pool_count
@@ -169,6 +195,29 @@ class SessionFeasibilityEvidence:
             return (SESSION_COUNT_OUT_OF_RANGE_REASON,)
         return ()
 
+    @property
+    def duration_capacity_blocker_count(self) -> int:
+        return self._reason_count(_DURATION_CAPACITY_BLOCKERS)
+
+    @property
+    def hard_volume_blocker_count(self) -> int:
+        return self._reason_count(_HARD_VOLUME_BLOCKERS)
+
+    @property
+    def recovery_blocker_count(self) -> int:
+        return sum(
+            count
+            for reason, count in self.rejection_reason_counts
+            if reason.startswith(_RECOVERY_BLOCKER_PREFIXES)
+        )
+
+    @property
+    def semantic_coherence_blocker_count(self) -> int:
+        return self._reason_count(_SEMANTIC_COHERENCE_BLOCKERS)
+
+    def _reason_count(self, reasons: frozenset[str]) -> int:
+        return sum(count for reason, count in self.rejection_reason_counts if reason in reasons)
+
     def matches(self, day: object) -> bool:
         return self.day_index == _day_index(
             day
@@ -187,6 +236,7 @@ class SessionFeasibilityEvidence:
             "candidate_pool_count",
             "classified_candidate_count",
             "feasible_candidate_count",
+            "absolute_minimum_main_exercises",
         )
         values = tuple(value.get(field) for field in scalar_fields)
         if any(type(item) is not int or item < 0 for item in values):
@@ -207,7 +257,12 @@ class SessionFeasibilityEvidence:
             reasons.append((item[0], item[1]))
         search_exhausted = value.get("search_exhausted")
         candidate_pool_complete = value.get("candidate_pool_complete")
-        if type(search_exhausted) is not bool or type(candidate_pool_complete) is not bool:
+        required_slots_satisfied = value.get("required_slots_satisfied")
+        if (
+            type(search_exhausted) is not bool
+            or type(candidate_pool_complete) is not bool
+            or type(required_slots_satisfied) is not bool
+        ):
             return None
         parsed_values = cast(tuple[int, ...], values)
         return cls(
@@ -222,6 +277,8 @@ class SessionFeasibilityEvidence:
             rejection_reason_counts=tuple(reasons),
             search_exhausted=search_exhausted,
             candidate_pool_complete=candidate_pool_complete,
+            absolute_minimum_main_exercises=parsed_values[8],
+            required_slots_satisfied=required_slots_satisfied,
         )
 
     def as_trace(self) -> dict[str, object]:
@@ -237,6 +294,12 @@ class SessionFeasibilityEvidence:
             "rejection_reason_counts": self.rejection_reason_counts,
             "search_exhausted": self.search_exhausted,
             "candidate_pool_complete": self.candidate_pool_complete,
+            "absolute_minimum_main_exercises": self.absolute_minimum_main_exercises,
+            "required_slots_satisfied": self.required_slots_satisfied,
+            "duration_capacity_blocker_count": self.duration_capacity_blocker_count,
+            "hard_volume_blocker_count": self.hard_volume_blocker_count,
+            "recovery_blocker_count": self.recovery_blocker_count,
+            "semantic_coherence_blocker_count": self.semantic_coherence_blocker_count,
             "evidence_complete": self.evidence_complete,
             "status": self.status.value,
             "reason_codes": self.reason_codes,
@@ -249,6 +312,7 @@ class SessionCountAssessment:
     actual_main_exercises: int
     minimum_main_exercises: int
     maximum_main_exercises: int
+    absolute_minimum_main_exercises: int
     evidence_complete: bool
     reason_codes: tuple[str, ...]
 
@@ -262,6 +326,20 @@ def session_count_policy(
     return get_session_exercise_count_policy(requested_minutes, ruleset)
 
 
+def absolute_minimum_main_exercise_count(
+    requested_minutes: int,
+    ruleset: ProgramRuleset | None = None,
+) -> int:
+    """Return the hard floor below which constrained counts are never valid."""
+
+    effective_ruleset = ruleset or ProgramRuleset()
+    if requested_minutes <= effective_ruleset.short_session_minutes:
+        return ABSOLUTE_SHORT_SESSION_MINIMUM
+    if requested_minutes <= 45:
+        return ABSOLUTE_STANDARD_SESSION_MINIMUM
+    return ABSOLUTE_LONG_SESSION_MINIMUM
+
+
 def assess_session_count(
     day: object,
     *,
@@ -270,6 +348,7 @@ def assess_session_count(
     evidence: SessionFeasibilityEvidence | None = None,
 ) -> SessionCountAssessment:
     policy = session_count_policy(requested_minutes, ruleset)
+    absolute_minimum = absolute_minimum_main_exercise_count(requested_minutes, ruleset)
     actual = main_exercise_count(_exercises(day))
     if policy.contains(actual):
         status = SessionCountStatus.IN_RANGE
@@ -288,6 +367,7 @@ def assess_session_count(
         actual_main_exercises=actual,
         minimum_main_exercises=policy.minimum_main_exercises,
         maximum_main_exercises=policy.maximum_main_exercises,
+        absolute_minimum_main_exercises=absolute_minimum,
         evidence_complete=evidence_complete,
         reason_codes=reason_codes,
     )
