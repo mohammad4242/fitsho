@@ -354,6 +354,7 @@ async def _agent_service_json(
     path: str,
     json_body: dict[str, object] | None = None,
     preserve_auth_errors: bool = False,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     base_url = settings.agent_service_base_url.strip().rstrip("/")
     if not base_url:
@@ -365,7 +366,9 @@ async def _agent_service_json(
             f"{base_url}{path}",
             headers=headers,
             json=json_body,
-            timeout=httpx.Timeout(settings.agent_service_connect_timeout_seconds),
+            timeout=httpx.Timeout(
+                timeout_seconds or settings.agent_service_connect_timeout_seconds
+            ),
         )
     except httpx.TimeoutException as error:
         raise AIProviderError(
@@ -469,6 +472,7 @@ async def get_agent_service_capabilities(
         settings=settings,
         method="GET",
         path="/v1/capabilities",
+        timeout_seconds=max(30.0, settings.agent_service_connect_timeout_seconds),
     )
     try:
         capabilities = AgentServiceCapabilitiesResponse.model_validate(payload)
