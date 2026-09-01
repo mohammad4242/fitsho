@@ -2,984 +2,229 @@ from __future__ import annotations
 
 import json
 import os
-import random
 import shutil
-from dataclasses import asdict, dataclass
-from datetime import date
+import time
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import asdict
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import weasyprint
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 import app.main  # Ensure all SQLAlchemy models and relationships are registered
 from app.workout_reviews.models import WorkoutPlanReview  # Ensure models loaded
-from app.exercises.enums import Equipment, ExerciseCautionTag, MuscleGroup
+from app.config import get_settings
 from app.exercises.models import Exercise
-from app.profile.enums import (
-    ExperienceLevel,
-    FitnessGoal,
-    HomeTrainingSetup,
-    Sex,
-    TrainingCaution,
-    TrainingLocation,
+from app.workouts.benchmarks.cohort_generator import (
+    BENCHMARK_SEED,
+    FA_TRANSLATIONS,
+    ProfileSpec,
+    generate_1000_profiles,
+    validate_dataset_sanity,
 )
-from app.profile.training_compatibility import (
-    UnsupportedResistanceTrainingCombinationError,
-    require_supported_resistance_training_days,
+from app.workouts.benchmarks.benchmark_evaluator import (
+    evaluate_single_profile,
+    format_program_days,
 )
-from app.profile.training_focus import USER_SELECTABLE_PRIORITY_MUSCLES
-from app.training_templates.bodyweight_reference import load_bodyweight_template
-from app.training_templates.engine_reference import TemplateReference, load_template_references
-from app.workouts.bodyweight_routing import (
-    BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED,
-    BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED,
-    BodyweightRoutingStatus,
-    resolve_fixed_bodyweight_route,
-)
-from app.workouts.bodyweight_template_builder import (
-    BodyweightTemplateBuildError,
-    build_bodyweight_template_program,
-)
-from app.workouts.bodyweight_templates import (
-    BodyweightProgramTemplate,
-    get_bodyweight_template,
-)
-from app.workouts.candidate_selector import caution_tags_for_training_cautions
-from app.workouts.program_engine.duration_policy import (
-    calculate_main_training_minutes,
-    get_session_duration_policy,
-    get_session_exercise_count_policy,
-)
-from app.workouts.program_engine.engine import generate_program
-from app.workouts.program_engine.enums import (
-    ActivityLevel,
-    BalanceAbility,
-    Goal,
-    ImpactLimit,
-    LoadLimit,
-    MedicalClearanceStatus,
-    PhysicalJobDemand,
-    RecoveryRating,
-    TrainingExperience,
-)
-from app.workouts.program_engine.equipment import resolve_available_equipment
-from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET, ProgramRuleset
-from app.workouts.program_engine.schemas import (
-    ExerciseCandidate,
-    ProgramGenerationRequest,
-    RecentTrainingHistory,
-    WorkoutProgram,
-)
-from app.workouts.program_engine.volume_policy import session_hard_volume_cap
+from app.training_templates.engine_reference import load_template_references
 from app.workouts.service import WorkoutGenerationService
-
-FA_TRANSLATIONS = {
-    "male": "مرد",
-    "female": "زن",
-    "first_month": "ماه اول (تازه‌کار)",
-    "beginner": "مبتدی",
-    "intermediate": "متوسط",
-    "advanced": "پیشرفته",
-    "lose_weight": "کاهش وزن",
-    "gain_weight": "افزایش وزن",
-    "fat_loss": "چربی‌سوزی",
-    "build_muscle": "عضله‌سازی و هایپرتروفی",
-    "body_recomposition": "ترکیب بدنی (ریکامپ)",
-    "strength": "افزایش قدرت بیشینه",
-    "improve_fitness": "آمادگی جسمانی عمومی",
-    "maintain_weight": "تثبیت وزن",
-    "gym": "باشگاه ورزشی (تجهیزات کامل)",
-    "home": "منزل",
-    "bodyweight_only": "فقط وزن بدن (بدون تجهیزات)",
-    "dumbbells_available": "دمبل خانگی + وزن بدن",
-    "chest": "سینه",
-    "back": "پشت و زیربغل",
-    "shoulders": "سرشانه",
-    "biceps": "جلو بازو",
-    "triceps": "پشت بازو",
-    "glutes": "باسن (سرینی)",
-    "quadriceps": "چهارسر ران",
-    "hamstrings": "همسترینگ",
-    "calves": "ساق پا",
-    "abs": "شکم (عضلات شکم)",
-    "obliques": "پهلو (مورب شکمی)",
-    "lower_back": "آسیب کمر (ستون فقرات کمری)",
-    "knee": "آسیب زانو",
-    "shoulder": "آسیب شانه",
-    "neck": "محدودیت گردن",
-    "wrist": "محدودیت مچ دست",
-    "full_body": "فول بادی (Full Body)",
-    "full_body_ab": "فول بادی متناوب (Full Body A/B)",
-    "full_body_abc": "فول بادی سه روزه (Full Body A/B/C)",
-    "full_body_four": "فول بادی ۴ روزه (Full Body 4-Day)",
-    "upper_lower": "بالاتنه / پایین‌تنه (Upper/Lower)",
-    "upper_lower_full": "بالاتنه / پایین‌تنه + فول بادی",
-    "upper_lower_specialization": "بالاتنه / پایین‌تنه تخصصی (Specialization)",
-    "push_pull_legs": "پوش / پول / لگز (PPL)",
-    "push_pull_legs_upper_lower": "PPL + بالاتنه / پایین‌تنه (۵ روزه)",
-    "push_pull_legs_x2": "PPL دو بار در هفته (۶ روزه)",
-    "body_part_rotation": "چرخش بخش‌های بدن (Body Part Rotation)",
-    "dynamic_fallback": "اسپلیت پویا (Dynamic Split)",
-    "bodyweight_fixed_template": "تمپلیت ثابت وزن بدن (Fixed Bodyweight)",
-    "program_engine": "موتور تمرینی هوشمند (Program Engine)",
-    "unsupported_cohort": "کوهورت ناسازگار ورودی (Unsupported Input)",
-}
-
-PERSIAN_FIRST_NAMES_MALE = [
-    "علی", "محمد", "امیرحسین", "رضا", "حسین", "مهدی", "سجاد", "آرمین", "سینا", "نیما",
-    "کامران", "فرزاد", "بهنام", "نوید", "فرهاد", "سهراب", "داریوش", "کسری", "شایان", "مانی",
-    "پوریا", "آرش", "سامان", "میلاد", "پیمان", "احسان", "مسعود", "امید", "شهاب", "پویا",
-    "کیوان", "بابک", "افشین", "یاشار", "سام", "بهرام", "کامبیز", "سیروس", "هومن", "بیژن",
-]
-
-PERSIAN_FIRST_NAMES_FEMALE = [
-    "سارا", "مریم", "زهرا", "فاطمه", "شیدا", "بهاره", "پروانه", "سوگند", "طناز", "یاسمین",
-    "آیدا", "طاهره", "مونا", "الهام", "نگار", "رویا", "مهسا", "ساناز", "نسیم", "نیلوفر",
-    "صبا", "گلناز", "پریناز", "یلدا", "ترانه", "ستاره", "سیمین", "مینا", "سمیرا", "غزاله",
-    "شیوا", "آتوسا", "دنیا", "سحر", "مرجان", "شادی", "کتایون", "پانته‌آ", "هستی", "نسترن",
-]
-
-PERSIAN_LAST_NAMES = [
-    "احمدی", "رضایی", "کاظمی", "مرادی", "حسینی", "محمدی", "کریمی", "موسوی", "جعفری", "قاسمی",
-    "نوری", "صبوری", "محمودی", "سلطانی", "زمانی", "ابراهیمی", "فراهانی", "یوسفی", "راد", "جلالی",
-    "فتوحی", "معتمدی", "صادقی", "داوودی", "رستگار", "افشار", "اکبری", "قادری", "انصاری", "طاهری",
-    "حیدری", "نجفی", "بیات", "شریفی", "فرهادی", "جمشیدی", "صالحی", "باقری", "مظفری", "خسروی",
-    "امینی", "رحیمی", "یزدانی", "مقدم", "وفایی", "سعیدی", "عباسی", "صادقیان", "طالبی", "کمالی",
-]
+from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 
 
-@dataclass
-class ProfileSpec:
-    index: int
-    name: str
-    sex: Sex
-    birth_date: date
-    age: int
-    height_cm: int
-    weight_kg: float
-    fitness_goal: FitnessGoal
-    experience_level: ExperienceLevel
-    training_age_months: int
-    training_days_per_week: int
-    session_duration_minutes: int
-    training_location: TrainingLocation
-    home_training_setup: HomeTrainingSetup | None
-    priority_muscle: MuscleGroup | None
-    training_cautions: list[TrainingCaution]
-    plan_duration_weeks: int
-    sleep_quality: RecoveryRating
-    stress_level: RecoveryRating
-    physical_job_demand: PhysicalJobDemand
+# Global worker context for multiprocessing
+_worker_catalog = None
+_worker_refs = None
+_worker_ex_map = None
 
 
-def generate_1000_diverse_profiles(seed: int = 20260901) -> list[ProfileSpec]:
-    """Generates 1000 diverse, realistic profiles covering all Fitsho profile options and constraints."""
-    rng = random.Random(seed)
-    today = date(2026, 9, 1)
-
-    experience_levels = [
-        ExperienceLevel.FIRST_MONTH,
-        ExperienceLevel.BEGINNER,
-        ExperienceLevel.INTERMEDIATE,
-        ExperienceLevel.ADVANCED,
-    ]
-    goals = [
-        FitnessGoal.BUILD_MUSCLE,
-        FitnessGoal.FAT_LOSS,
-        FitnessGoal.BODY_RECOMPOSITION,
-        FitnessGoal.STRENGTH,
-        FitnessGoal.LOSE_WEIGHT,
-        FitnessGoal.GAIN_WEIGHT,
-        FitnessGoal.IMPROVE_FITNESS,
-    ]
-    durations = [30, 45, 60, 75, 90]
-    locations = [
-        (TrainingLocation.GYM, None),
-        (TrainingLocation.HOME, HomeTrainingSetup.BODYWEIGHT_ONLY),
-        (TrainingLocation.HOME, HomeTrainingSetup.DUMBBELLS_AVAILABLE),
-    ]
-    caution_options: list[list[TrainingCaution]] = [
-        [],
-        [TrainingCaution.LOWER_BACK],
-        [TrainingCaution.KNEE],
-        [TrainingCaution.SHOULDER],
-        [TrainingCaution.NECK],
-        [TrainingCaution.WRIST],
-        [TrainingCaution.KNEE, TrainingCaution.SHOULDER],
-        [TrainingCaution.LOWER_BACK, TrainingCaution.KNEE],
-    ]
-    priority_options: list[MuscleGroup | None] = [None] + list(USER_SELECTABLE_PRIORITY_MUSCLES)
-
-    profiles: list[ProfileSpec] = []
-
-    for i in range(1, 1001):
-        sex = Sex.MALE if (i % 2 == 1) else Sex.FEMALE
-        first_name = rng.choice(PERSIAN_FIRST_NAMES_MALE if sex == Sex.MALE else PERSIAN_FIRST_NAMES_FEMALE)
-        last_name = rng.choice(PERSIAN_LAST_NAMES)
-        name = f"{first_name} {last_name}"
-
-        exp_level = experience_levels[(i - 1) % len(experience_levels)]
-        if exp_level == ExperienceLevel.FIRST_MONTH:
-            training_age_months = 0
-            if i % 15 == 0:
-                training_days = 5  # Intentional edge case to test validation
-            else:
-                training_days = rng.choice([2, 3, 4])
-        elif exp_level == ExperienceLevel.BEGINNER:
-            training_age_months = rng.randint(1, 6)
-            if i % 20 == 0:
-                training_days = 6  # Intentional edge case
-            else:
-                training_days = rng.choice([2, 3, 4])
-        elif exp_level == ExperienceLevel.INTERMEDIATE:
-            training_age_months = rng.randint(7, 36)
-            training_days = rng.choice([2, 3, 4, 5, 6])
-        else:  # ADVANCED
-            training_age_months = rng.randint(37, 120)
-            if i % 25 == 0:
-                training_days = 2  # Intentional edge case for advanced
-            else:
-                training_days = rng.choice([3, 4, 5, 6])
-
-        age = 18 + (i * 3 + rng.randint(0, 4)) % 48
-        birth_year = today.year - age
-        birth_month = (i % 12) + 1
-        birth_day = (i % 27) + 1
-        birth_date = date(birth_year, birth_month, birth_day)
-
-        if sex == Sex.MALE:
-            height_cm = rng.randint(166, 195)
-            weight_kg = round(rng.uniform(62.0, 108.0), 1)
-        else:
-            height_cm = rng.randint(152, 178)
-            weight_kg = round(rng.uniform(48.0, 88.0), 1)
-
-        fitness_goal = goals[(i - 1) % len(goals)]
-        loc, home_setup = locations[(i - 1) % len(locations)]
-        session_duration = durations[(i - 1) % len(durations)]
-        priority_muscle = priority_options[i % len(priority_options)]
-        training_cautions = caution_options[i % len(caution_options)]
-        plan_duration_weeks = rng.choice([4, 6, 8])
-
-        sleep_quality = rng.choice([RecoveryRating.AVERAGE, RecoveryRating.GOOD, RecoveryRating.POOR])
-        stress_level = rng.choice([RecoveryRating.AVERAGE, RecoveryRating.GOOD, RecoveryRating.POOR])
-        physical_job_demand = rng.choice([PhysicalJobDemand.LOW, PhysicalJobDemand.MODERATE, PhysicalJobDemand.HIGH])
-
-        profiles.append(
-            ProfileSpec(
-                index=i,
-                name=name,
-                sex=sex,
-                birth_date=birth_date,
-                age=age,
-                height_cm=height_cm,
-                weight_kg=weight_kg,
-                fitness_goal=fitness_goal,
-                experience_level=exp_level,
-                training_age_months=training_age_months,
-                training_days_per_week=training_days,
-                session_duration_minutes=session_duration,
-                training_location=loc,
-                home_training_setup=home_setup,
-                priority_muscle=priority_muscle,
-                training_cautions=training_cautions,
-                plan_duration_weeks=plan_duration_weeks,
-                sleep_quality=sleep_quality,
-                stress_level=stress_level,
-                physical_job_demand=physical_job_demand,
-            )
-        )
-
-    return profiles
+def _init_worker(catalog, refs, ex_map):
+    global _worker_catalog, _worker_refs, _worker_ex_map
+    _worker_catalog = catalog
+    _worker_refs = refs
+    _worker_ex_map = ex_map
 
 
-def profile_to_request(spec: ProfileSpec, user_id: UUID) -> ProgramGenerationRequest:
-    equipment = resolve_available_equipment(
-        spec.training_location,
-        spec.home_training_setup,
-        None,
+def _eval_worker(profile: ProfileSpec) -> dict[str, Any]:
+    global _worker_catalog, _worker_refs, _worker_ex_map
+    return evaluate_single_profile(
+        profile,
+        _worker_catalog,
+        _worker_refs,
+        _worker_ex_map,
+        ruleset=RULESET,
     )
 
-    caution_tags = caution_tags_for_training_cautions(tuple(spec.training_cautions))
 
-    goal_mapping = {
-        FitnessGoal.FAT_LOSS: Goal.FAT_LOSS,
-        FitnessGoal.BUILD_MUSCLE: Goal.HYPERTROPHY,
-        FitnessGoal.BODY_RECOMPOSITION: Goal.BODY_RECOMPOSITION,
-        FitnessGoal.STRENGTH: Goal.STRENGTH,
-        FitnessGoal.IMPROVE_FITNESS: Goal.GENERAL_FITNESS,
-        FitnessGoal.LOSE_WEIGHT: Goal.FAT_LOSS,
-        FitnessGoal.GAIN_WEIGHT: Goal.HYPERTROPHY,
-        FitnessGoal.MAINTAIN_WEIGHT: Goal.GENERAL_FITNESS,
-    }
+def run_benchmark(max_workers: int = 16) -> tuple[list[ProfileSpec], list[dict[str, Any]], dict[str, Any]]:
+    print(f"1. Generating 1000 profiles with deterministic seed={BENCHMARK_SEED}...")
+    profiles = generate_1000_profiles(BENCHMARK_SEED)
 
-    req = ProgramGenerationRequest(
-        user_id=user_id,
-        age=spec.age,
-        biological_sex_optional=spec.sex.value,
-        height_cm=spec.height_cm,
-        weight_kg=spec.weight_kg,
-        primary_goal=goal_mapping[spec.fitness_goal],
-        secondary_goal_optional=None,
-        training_experience=TrainingExperience(spec.experience_level.value),
-        training_age_months=spec.training_age_months,
-        current_activity_level=ActivityLevel.MODERATE,
-        available_training_days=spec.training_days_per_week,
-        preferred_weekdays=(),
-        session_duration_minutes=spec.session_duration_minutes,  # type: ignore[arg-type]
-        available_equipment=equipment,
-        training_location=spec.training_location,
-        preferred_exercises=frozenset(),
-        disliked_exercises=frozenset(),
-        priority_muscles=frozenset({spec.priority_muscle} if spec.priority_muscle else set()),
-        body_analysis_influence=None,
-        injuries_and_limitations=(),
-        blocked_exercises=frozenset(),
-        blocked_movement_patterns=frozenset(),
-        blocked_caution_tags=caution_tags,
-        allowed_range_of_motion=frozenset(),
-        impact_limit=ImpactLimit.HIGH,
-        axial_load_limit=LoadLimit.HIGH,
-        overhead_limit=LoadLimit.HIGH,
-        balance_requirement=BalanceAbility.NORMAL,
-        current_pain_or_red_flags=(),
-        medical_clearance_status=MedicalClearanceStatus.NOT_REQUIRED,
-        reports_uncontrolled_medical_condition=False,
-        pregnancy_or_postpartum=False,
-        sleep_quality=spec.sleep_quality,
-        stress_level=spec.stress_level,
-        physical_job_demand=spec.physical_job_demand,
-        cardio_tolerance=ActivityLevel.MODERATE,
-        recent_training_history=RecentTrainingHistory(),
-        program_duration_weeks=spec.plan_duration_weeks,
-        seed_optional=20260901 + spec.index,
-    )
-    return req
-
-
-def analyze_program_engine_failure(result: Any, request: ProgramGenerationRequest) -> dict[str, Any]:
-    error_code = result.error_code.value if (result and result.error_code) else "UNKNOWN_ERROR"
-    errors = list(result.errors) if result else []
-    trace = (result.decision_trace or ()) if result else ()
-
-    root_cause = "UNSATISFIED_CONSTRAINT"
-    secondary_causes: list[str] = []
-    rule_file = "app/workouts/program_engine/engine.py"
-    rule_func = "generate_program()"
-    actual_val = "N/A"
-    limit_val = "N/A"
-    failing_phase = "construction_recovery"
-    exact_description_fa = "محدودیت‌های متقاطع در پروفایل، مانع از ساخت چیدمان برنامه پایدار شد."
-    engine_repair_hint_fa = "بررسی کاندیداهای تمرینی، زمان‌بندی جلسات و قوانین جایگزینی حرکات در شرایط سخت."
-
-    construction_recovery = None
-    for step in trace:
-        stage = step.get("stage")
-        if stage == "construction_recovery":
-            construction_recovery = step
-        elif stage == "safety" and step.get("status") not in ("clear", "clear_with_modifications"):
-            root_cause = "PROGRAM_REJECTED_SAFETY_STATUS"
-            rule_file = "app/workouts/program_engine/safety.py"
-            rule_func = "screen_safety()"
-            actual_val = step.get("status")
-            limit_val = "CLEAR / CLEAR_WITH_MODIFICATIONS"
-            failing_phase = "safety_screening"
-            exact_description_fa = f"موتور به دلیل تشخیص وضعیت پرخطر پزشکی ({step.get('status')}) مجوز ادامه تولید را لغو کرد."
-            engine_repair_hint_fa = "بررسی متد screen_safety و اضافه کردن استثنا یا نیازمندی تاییدیه پزشکی برای کاربر."
-        elif stage == "eligibility" and step.get("eligible_count", 0) == 0:
-            root_cause = "INSUFFICIENT_ELIGIBLE_EXERCISES"
-            rule_file = "app/workouts/program_engine/eligibility.py"
-            rule_func = "filter_eligible_exercises()"
-            actual_val = "۰ حرکت واجد شرایط"
-            limit_val = "حداقل ۱ حرکت"
-            failing_phase = "exercise_eligibility"
-            exact_description_fa = "کاتالوگ تمرینات فاقد حرکات ایمن و قابل‌اجرا با توجه به تداخل آسیب‌ها و تجهیزات است."
-            engine_repair_hint_fa = "توسعه کاتالوگ حرکات بدون تجهیزات / حرکات با دمبل که با برچسب‌های آسیب انتخاب‌شده تداخل نداشته باشند."
-
-    if root_cause == "UNSATISFIED_CONSTRAINT" and construction_recovery:
-        attempts = construction_recovery.get("attempts", ())
-        collected_reasons = []
-        for attempt in attempts:
-            attempt_reasons = attempt.get("reason_codes", ())
-            collected_reasons.extend(attempt_reasons)
-
-        duration_policy = get_session_duration_policy(request.session_duration_minutes)
-        if "SESSION_DURATION_EXCEEDED" in collected_reasons or "SESSION_DURATION_OVER_TARGET" in collected_reasons:
-            root_cause = "SESSION_DURATION_EXCEEDED"
-            actual_val = f"> {duration_policy.maximum_minutes} دقیقه"
-            limit_val = f"{duration_policy.minimum_minutes} الی {duration_policy.maximum_minutes} دقیقه"
-            exact_description_fa = (
-                f"مدت زمان جلسات از سقف مجاز ({duration_policy.maximum_minutes} دقیقه) فراتر رفت "
-                f"و موتور پس از تلاش برای کاهش ست‌ها، نتوانست زمان جلسه را در بازه مجاز حفظ کند."
-            )
-            engine_repair_hint_fa = "تنظیم دقیق‌تر فاز هرس (prune) ست‌ها یا تمرین‌های فرعی در session_duration.py."
-            rule_file = "app/workouts/program_engine/session_duration.py"
-            rule_func = "repair_session_durations()"
-            failing_phase = "session_duration_repair_and_validation"
-        elif "SEMANTIC_OPENER_CONFLICT" in collected_reasons:
-            root_cause = "SEMANTIC_OPENER_CONFLICT"
-            actual_val = "تداخل حرکت آغازین با الگوهای جلسه"
-            limit_val = "سازگاری الگوی آغازین"
-            exact_description_fa = (
-                "حرکت آغازین انتخاب‌شده برای جلسه با الگوهای اصلی یا تمرینات اولویت‌دار بعدی "
-                "تداخل ترتیبی و خستگی ساختاری ایجاد کرده و قوانین ترتیب‌بندی حرکات را نقض می‌کند."
-            )
-            engine_repair_hint_fa = "بررسی رتبه‌بندی حرکات آغازین در session_builder.py و اصلاح ترتیب انتخاب حرکات کامپاند."
-            rule_file = "app/workouts/program_engine/session_builder.py"
-            rule_func = "order_session_exercises()"
-            failing_phase = "session_exercise_sequencing"
-        elif any("FULL_BODY_COVERAGE_MISSING" in str(r) for r in collected_reasons):
-            missing_cause = next(r for r in collected_reasons if "FULL_BODY_COVERAGE_MISSING" in str(r))
-            root_cause = missing_cause
-            muscle_name = missing_cause.split(":")[-1] if ":" in missing_cause else "نامشخص"
-            actual_val = f"عدم پوشش عضله {FA_TRANSLATIONS.get(muscle_name, muscle_name)}"
-            limit_val = "پوشش تمام گروه‌های عضلانی اصلی فول‌بادی"
-            exact_description_fa = (
-                f"در ساختار فول‌بادی، به دلیل محدودیت تجهیزات یا آسیب‌های تعیین‌شده، "
-                f"امکان انتخاب هیچ تمرین ایمنی برای عضله '{FA_TRANSLATIONS.get(muscle_name, muscle_name)}' وجود نداشت."
-            )
-            engine_repair_hint_fa = "تعریف حرکات جایگزین بدون نیاز به تجهیزات برای این عضله یا مجاز کردن جایگزینی عضله همکار در شرایط اضطرار."
-            rule_file = "app/workouts/program_engine/rulesets/resistance_training_v1.py"
-            rule_func = "verify_full_body_coverage()"
-            failing_phase = "full_body_pattern_validation"
-        elif "PER_SESSION_MUSCLE_VOLUME_EXCEEDED" in collected_reasons:
-            root_cause = "PER_SESSION_MUSCLE_VOLUME_EXCEEDED"
-            cap = session_hard_volume_cap(request.training_age_months)
-            actual_val = f"> {cap} ست در هر عضله/جلسه"
-            limit_val = f"حداکثر {cap} ست مستقیم"
-            exact_description_fa = f"حجم ست‌های مستقیم برای یک عضله از سقف مجاز سابقه تمرینی کاربر ({cap} ست) تجاوز کرد."
-            engine_repair_hint_fa = "تنظیم سقف ست‌های کاندیداها یا توزیع بهتر ست‌ها بین جلسات مختلف هفته."
-            rule_file = "app/workouts/program_engine/validation.py"
-            rule_func = "validate_program()"
-            failing_phase = "session_volume_validation"
-        elif "NO_SAFE_EXERCISE_FOR_PATTERN" in collected_reasons or any("NO_SAFE_EXERCISE" in str(r) for r in collected_reasons):
-            root_cause = "NO_SAFE_EXERCISE_FOR_PATTERN"
-            actual_val = "عدم وجود حرکت مجاز"
-            limit_val = "حداقل ۱ حرکت ایمن"
-            exact_description_fa = "تلاقی آسیب‌های بدنی و تجهیزات باعث شد هیچ حرکت استانداردی برای الگوی حرکتی جلسه باقی نماند."
-            engine_repair_hint_fa = "توسعه کاتالوگ حرکات با وسایل سبک یا اصلاح برچسب‌های احتیاط در دیتابیس."
-            rule_file = "app/workouts/program_engine/session_builder.py"
-            rule_func = "build_sessions()"
-            failing_phase = "session_construction"
-        elif "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in collected_reasons:
-            root_cause = "SESSION_EXERCISE_COUNT_OUT_OF_RANGE"
-            ex_policy = get_session_exercise_count_policy(request.session_duration_minutes)
-            actual_val = "خارج از بازه استاندارد حرکات جلسه"
-            limit_val = f"{ex_policy.minimum_main_exercises} الی {ex_policy.maximum_main_exercises} حرکت اصلی در هر جلسه"
-            exact_description_fa = (
-                f"تعداد حرکات اصلی تجویزشده در جلسه خارج از بازه مجاز تعیین‌شده برای مدت زمان "
-                f"{request.session_duration_minutes} دقیقه‌ای است (حداقل {ex_policy.minimum_main_exercises} و حداکثر {ex_policy.maximum_main_exercises} حرکت). "
-                f"موتور نتوانست تعداد تمرینات را بدون نقض سایر قوانین در این بازه تنظیم کند."
-            )
-            engine_repair_hint_fa = "بررسی پالیسی get_session_exercise_count_policy یا تنظیم منطق افزودن/حذف حرکات کمکی در session_duration.py."
-            rule_file = "app/workouts/program_engine/duration_policy.py"
-            rule_func = "get_session_exercise_count_policy()"
-            failing_phase = "session_exercise_count_validation"
-        elif "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in collected_reasons or "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT" in collected_reasons:
-            root_cause = "REQUIRED_SLOT_HARD_IMPOSSIBILITY" if "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in collected_reasons else "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT"
-            actual_val = "۰ حرکت منطبق با اسلات اجباری"
-            limit_val = "حداقل ۱ حرکت ایمن و منطبق با تجهیزات"
-            exact_description_fa = (
-                "تمپلیت تمرینی جلسه دارای اسلات الزامی (Required Slot) برای یک الگوی حرکتی خاص است، "
-                "اما به دلیل تلاقی برچسب‌های آسیب یا تجهیزات محدود، هیچ تمرین مجازی در کاتالوگ برای پر کردن این اسلات وجود ندارد."
-            )
-            engine_repair_hint_fa = "انعطاف‌پذیر کردن اسلات‌های اجباری در session_builder.py هنگام تجهیزات خانگی/آسیب‌دیدگی یا گسترش کاتالوگ حرکات جایگزین."
-            rule_file = "app/workouts/program_engine/session_builder.py"
-            rule_func = "build_sessions()"
-            failing_phase = "required_slot_resolution"
-        elif "REQUESTED_TRAINING_DAYS_UNSATISFIED" in collected_reasons:
-            root_cause = "REQUESTED_TRAINING_DAYS_UNSATISFIED"
-            actual_val = f"اسپلیت {request.available_training_days} روزه"
-            limit_val = f"{request.available_training_days} روز در هفته"
-            exact_description_fa = f"موتور الگوی تقسیم معتبری برای چیدمان {request.available_training_days} روز تمرین در هفته با این شرایط نیافت."
-            engine_repair_hint_fa = "افزودن تمپلیت‌ها یا الگوهای اسپلیت جدید برای این تعداد روز در split_selector.py."
-            rule_file = "app/workouts/program_engine/split_selector.py"
-            rule_func = "rank_split_candidates()"
-            failing_phase = "split_selection"
-        else:
-            non_generic = [r for r in collected_reasons if r not in ("PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED", "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED", "UNSATISFIED_CONSTRAINT")]
-            if non_generic:
-                root_cause = non_generic[0]
-                actual_val = root_cause
-                limit_val = "ضابطه طراحی برنامه"
-                exact_description_fa = f"موتور در ارزیابی نهایی برنامه را به دلیل قانون '{root_cause}' رد کرد."
-                engine_repair_hint_fa = f"بررسی متد اعتبارسنجی مرتبط با {root_cause} در validation.py."
-                rule_file = "app/workouts/program_engine/validation.py"
-                rule_func = "validate_program()"
-                failing_phase = "validation_phase"
-
-        for r in collected_reasons:
-            if r != root_cause and r not in secondary_causes and r not in ("PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED", "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED"):
-                secondary_causes.append(r)
-
-    return {
-        "final_error_code": error_code,
-        "all_errors": errors,
-        "root_cause": root_cause,
-        "secondary_causes": secondary_causes,
-        "rule_file": rule_file,
-        "rule_func": rule_func,
-        "actual_val": actual_val,
-        "limit_val": limit_val,
-        "failing_phase": failing_phase,
-        "exact_description_fa": exact_description_fa,
-        "engine_repair_hint_fa": engine_repair_hint_fa,
-    }
-
-
-def analyze_bodyweight_template_failure(error: BodyweightTemplateBuildError) -> dict[str, Any]:
-    code = error.code
-    template_slug = error.template_slug
-    exercise_slug = error.exercise_slug or "نامشخص"
-    reasons = list(error.rejection_reason_codes)
-
-    if code == "BODYWEIGHT_PULL_UP_BAR_REQUIRED":
-        exact_description_fa = (
-            f"تمپلیت ثابت '{template_slug}' برای حرکت '{exercise_slug}' نیازمند میله بارفیکس است "
-            f"اما این وسیله در تجهیزات کاربر وجود ندارد."
-        )
-        hint = "اطمینان از وجود تجهیزات میله بارفیکس در پروفایل کاربر برای اجرای حرکات کششی عمودی."
-        failing_phase = "bodyweight_equipment_check"
-    elif code == "BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE":
-        reasons_str = "، ".join(reasons) if reasons else "تداخل با محدودیت‌های پزشکی"
-        exact_description_fa = (
-            f"حرکت '{exercise_slug}' در تمپلیت ثابت '{template_slug}' با محدودیت‌ها و آسیب‌های کاربر "
-            f"تداخل دارد ({reasons_str}) و حرکت جایگزین بدون نقض ساختار ثابت قابل تامین نیست."
-        )
-        hint = "بررسی علت تداخل آسیب یا ارائه تمپلیت سازگار بدون آسیب برای تمرینات خانگی."
-        failing_phase = "bodyweight_exercise_eligibility"
-    elif code == "PROGRAM_REJECTED_SAFETY_STATUS":
-        exact_description_fa = f"تمپلیت ثابت '{template_slug}' به دلیل تشخیص ریسک پزشکی کاربر متوقف شد."
-        hint = "بررسی غربالگری پزشکی و ارجاع کاربر به پزشک متخصص."
-        failing_phase = "safety_screening"
-    else:
-        exact_description_fa = f"تمپلیت ثابت '{template_slug}' با خطای '{code}' مواجه شد."
-        hint = "بررسی قوانین ساخت تمپلیت ثابت وزن بدن در bodyweight_template_builder.py."
-        failing_phase = "bodyweight_template_build"
-
-    return {
-        "final_error_code": code,
-        "all_errors": reasons or [code],
-        "root_cause": code,
-        "secondary_causes": [r for r in reasons if r != code],
-        "rule_file": "app/workouts/bodyweight_template_builder.py",
-        "rule_func": "build_bodyweight_template_program()",
-        "actual_val": f"حرکت {exercise_slug}",
-        "limit_val": "انطباق کامل با کاتالوگ و شرایط پزشکی",
-        "failing_phase": failing_phase,
-        "exact_description_fa": exact_description_fa,
-        "engine_repair_hint_fa": hint,
-    }
-
-
-def evaluate_single_profile(
-    spec: ProfileSpec,
-    catalog: tuple[ExerciseCandidate, ...],
-    references: tuple[TemplateReference, ...],
-    exercise_map: dict[UUID, Exercise],
-    ruleset: ProgramRuleset = RULESET,
-    db: Session | None = None,
-) -> dict[str, Any]:
-    user_uuid = uuid4()
-    equipment = resolve_available_equipment(
-        spec.training_location,
-        spec.home_training_setup,
-        None,
+    print("2. Validating dataset sanity and checking for artificial correlation/bias...")
+    sanity_report = validate_dataset_sanity(profiles)
+    print(
+        f"   Sanity check passed: {sanity_report['zero_caution_count']} healthy ({sanity_report['zero_caution_pct']:.1f}%), "
+        f"{sanity_report['one_caution_count']} 1-caution ({sanity_report['one_caution_pct']:.1f}%), "
+        f"{sanity_report['two_caution_count']} 2-cautions ({sanity_report['two_caution_pct']:.1f}%)."
     )
 
-    # 1. Routing decision
-    decision = resolve_fixed_bodyweight_route(
-        spec.training_location,
-        equipment,
-        spec.experience_level,
-        spec.training_days_per_week,
-    )
+    # Save inputs before evaluation
+    os.makedirs("/home/mohammad/project/fitsho/artifacts", exist_ok=True)
+    inputs_path = f"/home/mohammad/project/fitsho/artifacts/fitsho_1000_profiles_seed_{BENCHMARK_SEED}.json"
+    with open(inputs_path, "w", encoding="utf-8") as f:
+        json.dump([p.to_dict() for p in profiles], f, ensure_ascii=False, indent=2)
+    print(f"3. Saved 1000 input profiles BEFORE evaluation to {inputs_path}")
 
-    if decision.is_bodyweight_route:
-        generation_path = "bodyweight_fixed_template"
-
-        if decision.status is BodyweightRoutingStatus.UNSUPPORTED_LEVEL:
-            failure_info = {
-                "final_error_code": decision.error_code or BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED,
-                "all_errors": [decision.error_code or BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED],
-                "root_cause": decision.error_code or BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED,
-                "secondary_causes": [],
-                "rule_file": "app/workouts/bodyweight_routing.py",
-                "rule_func": "resolve_fixed_bodyweight_route()",
-                "actual_val": f"سطح سابقه {spec.experience_level.value}",
-                "limit_val": "تنها سطوح ماه اول و مبتدی برای تمرین فقط با وزن بدن",
-                "failing_phase": "bodyweight_route_screening",
-                "exact_description_fa": (
-                    f"کاربر سطح '{FA_TRANSLATIONS.get(spec.experience_level.value, spec.experience_level.value)}' "
-                    f"با تجهیزات فقط وزن بدن در منزل پشتیبانی نمی‌شود. تمپلیت‌های ثابت وزن بدن به سطوح ماه اول و مبتدی اختصاص دارند."
-                ),
-                "engine_repair_hint_fa": "افزودن تمپلیت‌های پیشرفته وزن بدن یا الزام کاربر متوسط/پیشرفته به داشتن دمبل یا حضور در باشگاه.",
-            }
-            return {
-                "profile": spec,
-                "status": "FAILED",
-                "generation_path": generation_path,
-                "template_slug": None,
-                "split": None,
-                "split_fa": None,
-                "days_count": 0,
-                "days": [],
-                "warnings": [],
-                "failure_info": failure_info,
-            }
-
-        if decision.status is BodyweightRoutingStatus.UNSUPPORTED_DAYS:
-            failure_info = {
-                "final_error_code": decision.error_code or BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED,
-                "all_errors": [decision.error_code or BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED],
-                "root_cause": decision.error_code or BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED,
-                "secondary_causes": [],
-                "rule_file": "app/workouts/bodyweight_routing.py",
-                "rule_func": "resolve_fixed_bodyweight_route()",
-                "actual_val": f"{spec.training_days_per_week} روز در هفته",
-                "limit_val": "۲ الی ۴ روز در هفته برای تمپلیت‌های ثابت وزن بدن",
-                "failing_phase": "bodyweight_route_screening",
-                "exact_description_fa": (
-                    f"تعداد روزهای درخواستی ({spec.training_days_per_week} روز در هفته) خارج از پوشش تمپلیت‌های ثابت وزن بدن است. "
-                    f"تمپلیت‌های ثابت برای ۲، ۳ یا ۴ روز طراحی شده‌اند."
-                ),
-                "engine_repair_hint_fa": "محدود کردن انتخاب روزها به ۲ الی ۴ روز برای کاربران تمرین فقط با وزن بدن.",
-            }
-            return {
-                "profile": spec,
-                "status": "FAILED",
-                "generation_path": generation_path,
-                "template_slug": None,
-                "split": None,
-                "split_fa": None,
-                "days_count": 0,
-                "days": [],
-                "warnings": [],
-                "failure_info": failure_info,
-            }
-
-        # Fixed template resolution
-        template_slug = decision.template_slug
-        template: BodyweightProgramTemplate | None = None
-        if db is not None:
-            template = load_bodyweight_template(db, spec.experience_level, spec.training_days_per_week)
-        if template is None:
-            template = get_bodyweight_template(spec.experience_level, spec.training_days_per_week)
-
-        if template is None:
-            failure_info = {
-                "final_error_code": BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED,
-                "all_errors": [BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED],
-                "root_cause": BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED,
-                "secondary_causes": [],
-                "rule_file": "app/workouts/bodyweight_templates.py",
-                "rule_func": "get_bodyweight_template()",
-                "actual_val": f"تمپلیت برای {spec.training_days_per_week} روز",
-                "limit_val": "تمپلیت معتبر",
-                "failing_phase": "template_lookup",
-                "exact_description_fa": "تمپلیت ثابت ثبت‌شده‌ای برای این ترکیب روز و سطح سابقه یافت نشد.",
-                "engine_repair_hint_fa": "ثبت تمپلیت ثابت مناسب در کاتالوگ.",
-            }
-            return {
-                "profile": spec,
-                "status": "FAILED",
-                "generation_path": generation_path,
-                "template_slug": template_slug,
-                "split": None,
-                "split_fa": None,
-                "days_count": 0,
-                "days": [],
-                "warnings": [],
-                "failure_info": failure_info,
-            }
-
-        req = profile_to_request(spec, user_uuid)
-        try:
-            program = build_bodyweight_template_program(
-                request=req,
-                experience_level=spec.experience_level,
-                template=template,
-                exercise_catalog=catalog,
-                ruleset=ruleset,
-            )
-            days_data = _format_program_days(program, exercise_map)
-            return {
-                "profile": spec,
-                "status": "SUCCESS",
-                "generation_path": generation_path,
-                "template_slug": template.slug,
-                "split": template.split_type.value,
-                "split_fa": FA_TRANSLATIONS.get(template.split_type.value, template.split_type.value),
-                "days_count": len(program.weekly_schedule),
-                "days": days_data,
-                "warnings": list(program.warnings),
-                "failure_info": None,
-            }
-        except BodyweightTemplateBuildError as err:
-            failure_info = analyze_bodyweight_template_failure(err)
-            return {
-                "profile": spec,
-                "status": "FAILED",
-                "generation_path": generation_path,
-                "template_slug": template.slug,
-                "split": None,
-                "split_fa": None,
-                "days_count": 0,
-                "days": [],
-                "warnings": [],
-                "failure_info": failure_info,
-            }
-
-    # 2. Normal Program Engine Route
-    generation_path = "program_engine"
-
-    # Compatibility check
-    try:
-        require_supported_resistance_training_days(
-            spec.experience_level,
-            spec.training_days_per_week,
-        )
-        compatibility_error = None
-    except UnsupportedResistanceTrainingCombinationError as err:
-        compatibility_error = str(err)
-
-    if compatibility_error:
-        failure_info = {
-            "final_error_code": "UNSUPPORTED_RESISTANCE_TRAINING_DAYS",
-            "all_errors": [compatibility_error],
-            "root_cause": "UNSUPPORTED_RESISTANCE_TRAINING_DAYS",
-            "secondary_causes": [],
-            "rule_file": "app/profile/training_compatibility.py",
-            "rule_func": "require_supported_resistance_training_days()",
-            "actual_val": f"{spec.experience_level.value} با {spec.training_days_per_week} روز در هفته",
-            "limit_val": "تطابق با ماتریس مجاز تمرین مقاومتی فیتشو",
-            "failing_phase": "input_compatibility_validation",
-            "exact_description_fa": (
-                f"سطح سابقه '{FA_TRANSLATIONS.get(spec.experience_level.value, spec.experience_level.value)}' با "
-                f"{spec.training_days_per_week} روز تمرین در هفته سازگار نیست. "
-                f"طبق قوانین پزشکی و فیزیولوژیک فیتشو، برای پیشگیری از بیش‌تمرینی و آسیب، تعداد روزهای انتخابی نامعتبر است."
-            ),
-            "engine_repair_hint_fa": "رد سریع در فرم ورود اطلاعات کاربر یا پیشنهاد اتوماتیک روزهای سازگار با سطح تجربه.",
-        }
-        return {
-            "profile": spec,
-            "status": "FAILED",
-            "generation_path": "unsupported_cohort",
-            "template_slug": None,
-            "split": None,
-            "split_fa": None,
-            "days_count": 0,
-            "days": [],
-            "warnings": [],
-            "failure_info": failure_info,
-        }
-
-    req = profile_to_request(spec, user_uuid)
-    try:
-        gen_result = generate_program(
-            req,
-            catalog,
-            ruleset,
-            reference_templates=references,
-        )
-    except Exception as e:
-        print(f"Profile #{spec.index:04d} Engine Crash: {e}")
-        gen_result = None
-
-    if gen_result and gen_result.is_success and gen_result.program:
-        prog: WorkoutProgram = gen_result.program
-        days_data = _format_program_days(prog, exercise_map)
-        return {
-            "profile": spec,
-            "status": "SUCCESS",
-            "generation_path": generation_path,
-            "template_slug": None,
-            "split": prog.split.split_type.value,
-            "split_fa": FA_TRANSLATIONS.get(prog.split.split_type.value, prog.split.split_type.value),
-            "days_count": len(prog.weekly_schedule),
-            "days": days_data,
-            "warnings": list(prog.warnings),
-            "failure_info": None,
-        }
-
-    failure_info = analyze_program_engine_failure(gen_result, req) if gen_result else {
-        "final_error_code": "CRASH_EXCEPTION",
-        "all_errors": ["ENGINE_CRASH"],
-        "root_cause": "ENGINE_CRASH",
-        "secondary_causes": [],
-        "rule_file": "engine.py",
-        "rule_func": "generate_program()",
-        "actual_val": "Crash",
-        "limit_val": "Clean execution",
-        "failing_phase": "exception",
-        "exact_description_fa": "خطای سیستمی رخ داد و برنامه تمرینی ساخته نشد.",
-        "engine_repair_hint_fa": "بررسی لاگ‌های سیستمی و خطاهای مدیریت‌نشده در engine.py.",
-    }
-    return {
-        "profile": spec,
-        "status": "FAILED",
-        "generation_path": generation_path,
-        "template_slug": None,
-        "split": None,
-        "split_fa": None,
-        "days_count": 0,
-        "days": [],
-        "warnings": [],
-        "failure_info": failure_info,
-    }
-
-
-def _format_program_days(
-    prog: WorkoutProgram,
-    exercise_map: dict[UUID, Exercise],
-) -> list[dict[str, Any]]:
-    days_data = []
-    for day in prog.weekly_schedule:
-        main_mins = calculate_main_training_minutes(day)
-        ex_list = []
-        for it in day.exercises:
-            ex_db = exercise_map.get(it.exercise_id)
-            name_fa = ex_db.name_fa if ex_db and ex_db.name_fa else it.exercise_name
-            name_en = ex_db.name_en if ex_db and ex_db.name_en else it.exercise_name
-            ex_list.append({
-                "order": it.order,
-                "name_fa": name_fa,
-                "name_en": name_en,
-                "sets": it.sets,
-                "prescription_mode": it.prescription_mode.value if hasattr(it.prescription_mode, "value") else str(it.prescription_mode),
-                "rep_min": it.rep_min,
-                "rep_max": it.rep_max,
-                "duration_min_seconds": it.duration_min_seconds,
-                "duration_max_seconds": it.duration_max_seconds,
-                "rest_seconds": it.rest_seconds,
-                "rir": it.target_rir,
-                "primary_muscle": it.primary_muscle.value if it.primary_muscle else "-",
-                "primary_muscle_fa": FA_TRANSLATIONS.get(it.primary_muscle.value, it.primary_muscle.value) if it.primary_muscle else "-",
-                "estimated_minutes": it.estimated_minutes,
-            })
-        days_data.append({
-            "day_index": day.day_index,
-            "title": day.title,
-            "focus": day.focus,
-            "estimated_duration_minutes": day.estimated_duration_minutes,
-            "main_training_minutes": main_mins,
-            "exercises": ex_list,
-        })
-    return days_data
-
-
-def evaluate_1000_profiles() -> list[dict[str, Any]]:
-    print("Loading settings and initializing session...")
+    # Load shared catalog, references, exercise names
+    print("4. Loading catalog and template references from database...")
     settings = get_settings()
     engine = create_engine(settings.database_url)
-
-    profiles = generate_1000_diverse_profiles()
-    print(f"Generated {len(profiles)} diverse test profiles.")
-
-    results: list[dict[str, Any]] = []
-
     with Session(engine) as session:
-        exercises_list = session.scalars(select(Exercise)).all()
-        exercise_map = {ex.id: ex for ex in exercises_list}
-
         service = WorkoutGenerationService(session, settings=None)
         catalog = service._load_catalog()
-        references = load_template_references(session)
-        print(f"Loaded {len(catalog)} exercises and {len(references)} templates.")
+        refs = load_template_references(session)
+        ex_list = session.scalars(select(Exercise)).all()
+        ex_map = {ex.id: {"name_fa": ex.name_fa, "name_en": ex.name_en} for ex in ex_list}
+    print(f"   Loaded {len(catalog)} exercises and {len(refs)} reference templates.")
 
-        for idx, p in enumerate(profiles, start=1):
-            res = evaluate_single_profile(
-                p,
-                catalog,
-                references,
-                exercise_map,
-                ruleset=RULESET,
-                db=session,
-            )
+    # Run parallel evaluation
+    print(f"5. Evaluating 1000 profiles using ProcessPoolExecutor with {max_workers} workers...")
+    t0 = time.time()
+    results = []
+    with ProcessPoolExecutor(
+        max_workers=max_workers,
+        initializer=_init_worker,
+        initargs=(catalog, refs, ex_map),
+    ) as executor:
+        for idx, res in enumerate(executor.map(_eval_worker, profiles), start=1):
             results.append(res)
-            if idx % 50 == 0:
-                print(f"Evaluated {idx}/1000 profiles...")
+            if idx % 100 == 0:
+                elapsed = time.time() - t0
+                print(f"   Completed {idx}/1000 profiles ({elapsed:.1f}s, {elapsed/idx:.2f}s/profile)...")
 
-    return results
+    total_time = time.time() - t0
+    print(f"   Evaluation complete in {total_time:.1f} seconds.")
+
+    # Save results
+    results_path = f"/home/mohammad/project/fitsho/artifacts/fitsho_1000_profiles_results_seed_{BENCHMARK_SEED}.json"
+    with open(results_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    print(f"6. Saved 1000 evaluation results to {results_path}")
+
+    return profiles, results, sanity_report
 
 
-def build_pdf_html(results: list[dict[str, Any]]) -> str:
+def build_persian_pdf_html(
+    profiles: list[ProfileSpec],
+    results: list[dict[str, Any]],
+    sanity_report: dict[str, Any],
+) -> str:
     total = len(results)
-    success_count = sum(1 for r in results if r["status"] == "SUCCESS")
-    failure_count = total - success_count
-    success_rate = (success_count / total) * 100 if total > 0 else 0
+    success_count = sum(1 for r in results if r["result_class"] == "SUCCESS")
+    failed_count = sum(1 for r in results if r["result_class"] == "FAILED")
+    unsupported_count = sum(1 for r in results if r["result_class"] == "UNSUPPORTED")
 
-    # Path breakdown
-    path_stats: dict[str, dict[str, int]] = {
-        "bodyweight_fixed_template": {"success": 0, "failed": 0},
-        "program_engine": {"success": 0, "failed": 0},
-        "unsupported_cohort": {"success": 0, "failed": 0},
-    }
+    assert success_count + failed_count + unsupported_count == total
 
-    engine_failures_by_code: dict[str, int] = {}
-    engine_roots_counter: dict[str, int] = {}
-    bw_failures_by_code: dict[str, int] = {}
-    bw_roots_counter: dict[str, int] = {}
+    supported_profiles = success_count + failed_count
+    coverage_rate = (supported_profiles / total) * 100
+    success_rate_supported = (success_count / supported_profiles * 100) if supported_profiles > 0 else 0
+    unsupported_rate = (unsupported_count / total) * 100
 
+    # Path stats
+    bw_succ = sum(1 for r in results if r["generation_path"] == "bodyweight_fixed_template" and r["result_class"] == "SUCCESS")
+    bw_fail = sum(1 for r in results if r["generation_path"] == "bodyweight_fixed_template" and r["result_class"] == "FAILED")
+    bw_total_supported = bw_succ + bw_fail
+    bw_success_rate = (bw_succ / bw_total_supported * 100) if bw_total_supported > 0 else 0
+
+    engine_succ = sum(1 for r in results if r["generation_path"] == "program_engine" and r["result_class"] == "SUCCESS")
+    engine_fail = sum(1 for r in results if r["generation_path"] == "program_engine" and r["result_class"] == "FAILED")
+    engine_total_supported = engine_succ + engine_fail
+    engine_success_rate = (engine_succ / engine_total_supported * 100) if engine_total_supported > 0 else 0
+
+    # Unsupported breakdown
+    unsupported_bw_level = sum(1 for r in results if r.get("unsupported_subtype") == "BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED")
+    unsupported_bw_days = sum(1 for r in results if r.get("unsupported_subtype") == "BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED")
+    unsupported_compat_days = sum(1 for r in results if r.get("unsupported_subtype") == "UNSUPPORTED_RESISTANCE_TRAINING_DAYS")
+    unsupported_safety = sum(1 for r in results if r.get("unsupported_subtype") == "EXPECTED_SAFETY_REJECTION")
+
+    # Failure causes count
+    real_failure_causes: dict[str, int] = {}
     for r in results:
-        path = r.get("generation_path", "program_engine")
-        status = r["status"]
-        if path not in path_stats:
-            path_stats[path] = {"success": 0, "failed": 0}
+        if r["result_class"] == "FAILED":
+            cause = r.get("root_cause") or r.get("final_error_code") or "UNKNOWN_FAILURE"
+            real_failure_causes[cause] = real_failure_causes.get(cause, 0) + 1
 
-        if status == "SUCCESS":
-            path_stats[path]["success"] += 1
-        else:
-            path_stats[path]["failed"] += 1
-            finfo = r.get("failure_info")
-            if finfo:
-                code = finfo.get("final_error_code", "UNKNOWN")
-                root = finfo.get("root_cause", "UNKNOWN")
-                if path == "bodyweight_fixed_template":
-                    bw_failures_by_code[code] = bw_failures_by_code.get(code, 0) + 1
-                    bw_roots_counter[root] = bw_roots_counter.get(root, 0) + 1
-                elif path == "program_engine":
-                    engine_failures_by_code[code] = engine_failures_by_code.get(code, 0) + 1
-                    engine_roots_counter[root] = engine_roots_counter.get(root, 0) + 1
+    top_failure_causes = sorted(real_failure_causes.items(), key=lambda x: x[1], reverse=True)
 
-    bw_total = path_stats["bodyweight_fixed_template"]["success"] + path_stats["bodyweight_fixed_template"]["failed"]
-    bw_succ = path_stats["bodyweight_fixed_template"]["success"]
-    bw_succ_rate = (bw_succ / bw_total * 100) if bw_total > 0 else 0
+    # Cohort breakdown: Location/Setup
+    cohort_gym_succ = sum(1 for r in results if r["profile"]["training_location"] == "gym" and r["result_class"] == "SUCCESS")
+    cohort_gym_fail = sum(1 for r in results if r["profile"]["training_location"] == "gym" and r["result_class"] == "FAILED")
+    cohort_gym_total = cohort_gym_succ + cohort_gym_fail
 
-    engine_total = path_stats["program_engine"]["success"] + path_stats["program_engine"]["failed"]
-    engine_succ = path_stats["program_engine"]["success"]
-    engine_succ_rate = (engine_succ / engine_total * 100) if engine_total > 0 else 0
+    cohort_db_succ = sum(1 for r in results if r["profile"]["training_location"] == "home" and r["profile"]["home_training_setup"] == "dumbbells_available" and r["result_class"] == "SUCCESS")
+    cohort_db_fail = sum(1 for r in results if r["profile"]["training_location"] == "home" and r["profile"]["home_training_setup"] == "dumbbells_available" and r["result_class"] == "FAILED")
+    cohort_db_total = cohort_db_succ + cohort_db_fail
 
-    unsupported_total = path_stats["unsupported_cohort"]["failed"]
+    # Cohort breakdown: Experience Level (supported only)
+    level_stats: dict[str, dict[str, int]] = {}
+    for lvl in ["first_month", "beginner", "intermediate", "advanced"]:
+        s = sum(1 for r in results if r["profile"]["experience_level"] == lvl and r["result_class"] == "SUCCESS")
+        f = sum(1 for r in results if r["profile"]["experience_level"] == lvl and r["result_class"] == "FAILED")
+        level_stats[lvl] = {"success": s, "failed": f, "total": s + f}
 
-    top_engine_failed_rules = sorted(engine_roots_counter.items(), key=lambda x: x[1], reverse=True)
-    top_bw_failed_rules = sorted(bw_roots_counter.items(), key=lambda x: x[1], reverse=True)
+    # Caution breakdown (supported only)
+    c0_s = sum(1 for r in results if len(r["profile"]["training_cautions"]) == 0 and r["result_class"] == "SUCCESS")
+    c0_f = sum(1 for r in results if len(r["profile"]["training_cautions"]) == 0 and r["result_class"] == "FAILED")
+    c1_s = sum(1 for r in results if len(r["profile"]["training_cautions"]) == 1 and r["result_class"] == "SUCCESS")
+    c1_f = sum(1 for r in results if len(r["profile"]["training_cautions"]) == 1 and r["result_class"] == "FAILED")
+    c2_s = sum(1 for r in results if len(r["profile"]["training_cautions"]) >= 2 and r["result_class"] == "SUCCESS")
+    c2_f = sum(1 for r in results if len(r["profile"]["training_cautions"]) >= 2 and r["result_class"] == "FAILED")
+
+    # Fixed bodyweight breakdown:
+    bw_days_stats: dict[str, dict[str, int]] = {}
+    for lvl in ["first_month", "beginner"]:
+        for d in [2, 3, 4]:
+            key = f"{lvl}_{d}d"
+            s = sum(
+                1 for r in results
+                if r["generation_path"] == "bodyweight_fixed_template"
+                and r["profile"]["experience_level"] == lvl
+                and r["profile"]["training_days_per_week"] == d
+                and r["result_class"] == "SUCCESS"
+            )
+            f = sum(
+                1 for r in results
+                if r["generation_path"] == "bodyweight_fixed_template"
+                and r["profile"]["experience_level"] == lvl
+                and r["profile"]["training_days_per_week"] == d
+                and r["result_class"] == "FAILED"
+            )
+            bw_days_stats[key] = {"success": s, "failed": f, "total": s + f}
 
     css = """
     @page {
         size: A4 portrait;
-        margin: 12mm 12mm 14mm 12mm;
+        margin: 10mm 10mm 12mm 10mm;
         @bottom-left {
-            content: "گزارش آزمون و عیب‌یابی ۱۰۰۰ پروفایل موتور تمرینی Fitsho";
+            content: "بنچ‌مارک ۱۰۰۰ پروفایل سیستم تمرینی Fitsho (Seed: 20260902)";
             font-family: 'Vazirmatn', sans-serif;
-            font-size: 7.5pt;
+            font-size: 7pt;
             color: #557069;
         }
         @bottom-right {
             content: "صفحه " counter(page) " از " counter(pages);
             font-family: 'Vazirmatn', sans-serif;
-            font-size: 7.5pt;
+            font-size: 7pt;
             color: #557069;
         }
     }
     * { box-sizing: border-box; }
     body {
         font-family: 'Vazirmatn', 'DejaVu Sans', sans-serif;
-        font-size: 8pt;
-        line-height: 1.5;
+        font-size: 7.5pt;
+        line-height: 1.45;
         direction: rtl;
         text-align: right;
         color: #112824;
@@ -988,17 +233,17 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
     .header-box {
         background: linear-gradient(135deg, #074e43 0%, #0d6e5e 100%);
         color: #ffffff;
-        padding: 14px 18px;
+        padding: 12px 16px;
         border-radius: 6px;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
     }
     .header-title {
-        font-size: 15pt;
+        font-size: 14pt;
         font-weight: bold;
-        margin: 0 0 4px 0;
+        margin: 0 0 3px 0;
     }
     .header-subtitle {
-        font-size: 8.5pt;
+        font-size: 8pt;
         opacity: 0.92;
         margin: 0;
     }
@@ -1006,25 +251,26 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
         background: #f2f9f7;
         border: 1px solid #c2e2da;
         border-radius: 6px;
-        padding: 10px 14px;
-        margin-bottom: 14px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
         page-break-inside: avoid;
     }
     .summary-stats {
         display: flex;
         justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 10px;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 8px;
         border-bottom: 1px dashed #afd5cb;
-        padding-bottom: 8px;
+        padding-bottom: 6px;
     }
     .stat-badge {
         display: inline-block;
         background: #ffffff;
         border: 1px solid #afd5cb;
-        border-radius: 5px;
-        padding: 4px 8px;
-        font-size: 8pt;
+        border-radius: 4px;
+        padding: 3px 7px;
+        font-size: 7.5pt;
     }
     .stat-badge strong {
         color: #0d6e5e;
@@ -1035,59 +281,64 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
     .stat-badge.error strong {
         color: #c92a2a;
     }
+    .stat-badge.unsupported strong {
+        color: #d97706;
+    }
+    .main-metrics-banner {
+        background: #ffffff;
+        border: 2px solid #0d6e5e;
+        border-radius: 5px;
+        padding: 8px 12px;
+        margin: 8px 0;
+        display: flex;
+        justify-content: space-around;
+        text-align: center;
+    }
+    .main-metric-item {
+        flex: 1;
+    }
+    .main-metric-val {
+        font-size: 13pt;
+        font-weight: bold;
+        color: #074e43;
+    }
+    .main-metric-lbl {
+        font-size: 7.2pt;
+        color: #475569;
+    }
+    table.data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 7.2pt;
+        margin: 8px 0;
+    }
+    table.data-table th {
+        background: #0d6e5e;
+        color: #ffffff;
+        padding: 5px 8px;
+        text-align: right;
+        font-weight: bold;
+        border: 1px solid #074e43;
+    }
+    table.data-table td {
+        padding: 4px 8px;
+        border: 1px solid #cbd5e1;
+    }
     .audit-box {
         background: #ffffff;
         border-right: 4px solid #0d6e5e;
         border-radius: 4px;
-        padding: 8px 12px;
-        font-size: 8pt;
-        line-height: 1.6;
-        color: #203833;
-    }
-    .path-stats-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 8pt;
-        margin: 10px 0;
-    }
-    .path-stats-table th {
-        background: #0d6e5e;
-        color: #ffffff;
         padding: 6px 10px;
-        text-align: right;
-        font-weight: bold;
-    }
-    .path-stats-table td {
-        padding: 5px 10px;
-        border: 1px solid #cbd5e1;
-    }
-    .analytics-table-wrap {
-        display: flex;
-        gap: 12px;
-        margin-top: 10px;
-    }
-    .analytics-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 7.5pt;
-        margin-bottom: 0;
-    }
-    .analytics-table th {
-        background: #e6f3ef;
-        color: #085a4c;
-        padding: 4px 8px;
-        border: 1px solid #cbd5e1;
-        font-weight: bold;
-    }
-    .analytics-table td {
-        padding: 4px 8px;
-        border: 1px solid #cbd5e1;
+        font-size: 7.2pt;
+        line-height: 1.5;
+        color: #203833;
+        margin: 6px 0;
     }
     .user-section {
         page-break-inside: avoid;
         border: 1px solid #cee0dc;
-        border-radius: 6px;
-        margin-bottom: 12px;
+        border-radius: 5px;
+        margin-bottom: 10px;
         background: #ffffff;
         overflow: hidden;
     }
@@ -1097,24 +348,27 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
     .user-section.failed-section {
         border-right: 5px solid #c92a2a;
     }
+    .user-section.unsupported-section {
+        border-right: 5px solid #d97706;
+    }
     .user-header {
         background: #eef6f4;
         border-bottom: 1px solid #cee0dc;
-        padding: 6px 12px;
+        padding: 5px 10px;
         display: flex;
         justify-content: space-between;
         align-items: center;
     }
     .user-title {
-        font-size: 9.5pt;
+        font-size: 8.8pt;
         font-weight: bold;
         color: #074e43;
         margin: 0;
     }
     .status-badge {
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: 7.5pt;
+        padding: 2px 7px;
+        border-radius: 3px;
+        font-size: 7pt;
         font-weight: bold;
     }
     .status-badge.success {
@@ -1127,139 +381,129 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
         color: #991b1b;
         border: 1px solid #fca5a5;
     }
+    .status-badge.unsupported {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fcd34d;
+    }
     .path-badge {
         background: #e0f2fe;
         color: #0369a1;
         border: 1px solid #bae6fd;
-        padding: 2px 6px;
+        padding: 1px 5px;
         border-radius: 3px;
-        font-size: 7.2pt;
-        margin-left: 6px;
+        font-size: 6.8pt;
+        margin-left: 5px;
     }
     .profile-grid {
-        padding: 8px 12px;
+        padding: 6px 10px;
         background: #fbfdfc;
         border-bottom: 1px solid #e2ece9;
-        font-size: 7.5pt;
+        font-size: 7.2pt;
     }
     .profile-row {
         display: flex;
         flex-wrap: wrap;
-        margin-bottom: 3px;
-    }
-    .profile-row:last-child {
-        margin-bottom: 0;
-    }
-    .profile-item {
-        flex: 1 1 33.33%;
         margin-bottom: 2px;
     }
+    .profile-item {
+        flex: 1;
+        min-width: 140px;
+    }
     .profile-label {
-        color: #4a6862;
+        color: #557069;
         font-weight: bold;
     }
     .profile-value {
         color: #112824;
     }
     .days-container {
-        padding: 8px 12px;
+        padding: 6px 10px;
+        background: #ffffff;
     }
     .program-overview-bar {
-        background: #f2f9f7;
-        border: 1px solid #c2e2da;
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        padding: 4px 8px;
         border-radius: 4px;
-        padding: 5px 10px;
-        margin-bottom: 8px;
-        font-size: 7.8pt;
-        color: #085a4c;
+        margin-bottom: 6px;
+        color: #065f46;
+        font-size: 7.2pt;
     }
     .day-block {
-        margin-bottom: 8px;
-        border: 1px solid #dce8e5;
-        border-radius: 5px;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        margin-bottom: 6px;
         overflow: hidden;
     }
-    .day-block:last-child {
-        margin-bottom: 0;
-    }
     .day-title-bar {
-        background: #eef6f4;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
         padding: 4px 8px;
-        border-bottom: 1px solid #dce8e5;
-        font-size: 8pt;
-        font-weight: bold;
-        color: #085a4c;
         display: flex;
         justify-content: space-between;
+        font-weight: bold;
+        color: #1e293b;
+        font-size: 7.2pt;
     }
-    .exercise-table {
+    table.exercise-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 7.5pt;
+        font-size: 7pt;
     }
-    .exercise-table th {
-        background: #f6faf8;
-        color: #3e5b56;
+    table.exercise-table th {
+        background: #f1f5f9;
+        color: #475569;
+        padding: 3px 6px;
         text-align: right;
+        border-bottom: 1px solid #cbd5e1;
+        font-weight: bold;
+    }
+    table.exercise-table td {
         padding: 3px 6px;
-        border-bottom: 1px solid #dce8e5;
-        font-weight: 600;
+        border-bottom: 1px solid #f1f5f9;
     }
-    .exercise-table td {
-        padding: 3px 6px;
-        border-bottom: 1px solid #edf4f2;
-        vertical-align: middle;
-    }
-    .exercise-table tr:last-child td {
-        border-bottom: none;
-    }
-    .exercise-table tr:nth-child(even) {
-        background-color: #fafcfb;
-    }
-    .ex-num {
+    td.ex-num {
         width: 20px;
-        font-weight: bold;
-        color: #0d6e5e;
         text-align: center;
+        color: #64748b;
     }
-    .ex-name {
+    td.ex-name {
         font-weight: bold;
-        color: #132a26;
+        color: #0f172a;
     }
     .fail-detail-box {
-        padding: 10px 14px;
-        background: #fff8f8;
-        border-top: 1px solid #fed7d7;
-        font-size: 7.8pt;
+        padding: 8px 10px;
+        background: #fffafa;
     }
     .fail-header-line {
-        font-size: 8.5pt;
-        font-weight: bold;
-        color: #991b1b;
-        margin-bottom: 6px;
         display: flex;
         justify-content: space-between;
+        margin-bottom: 4px;
+        font-weight: bold;
+        color: #991b1b;
+        font-size: 7.2pt;
     }
     .fail-desc {
-        background: #ffffff;
+        background: #fef2f2;
         border: 1px solid #fecaca;
-        border-right: 3px solid #dc2626;
         border-radius: 4px;
-        padding: 6px 10px;
+        padding: 5px 8px;
         margin-bottom: 6px;
         color: #7f1d1d;
-        line-height: 1.55;
+        line-height: 1.45;
+        font-size: 7.2pt;
     }
     .fail-meta-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 4px 8px;
-        font-size: 7.2pt;
+        gap: 3px 6px;
+        font-size: 7pt;
         background: #ffffff;
         border: 1px solid #f3e8e8;
-        padding: 6px 8px;
+        padding: 5px 8px;
         border-radius: 4px;
-        margin-bottom: 6px;
+        margin-bottom: 5px;
     }
     .fail-meta-item span.lbl {
         color: #7f1d1d;
@@ -1272,9 +516,22 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
         background: #fffbeb;
         border: 1px dashed #fcd34d;
         border-radius: 4px;
+        padding: 4px 7px;
+        color: #92400e;
+        font-size: 7pt;
+    }
+    .unsupported-box {
+        padding: 8px 10px;
+        background: #fffdf5;
+    }
+    .unsupported-desc {
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        border-radius: 4px;
         padding: 5px 8px;
         color: #92400e;
         font-size: 7.2pt;
+        line-height: 1.45;
     }
     code {
         font-family: monospace;
@@ -1291,31 +548,57 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
-<title>گزارش جامع ارزیابی و عیب‌یابی ۱۰۰۰ پروفایل موتور تمرینی Fitsho</title>
+<title>گزارش علمی و عینی ارزیابی ۱۰۰۰ پروفایل سیستم تمرینی Fitsho</title>
 <style>{css}</style>
 </head>
 <body>
 
 <div class="header-box">
-    <div class="header-title">گزارش آزمون و عیب‌یابی کلان (Benchmark) ۱۰۰۰ پروفایل موتور تمرین Fitsho</div>
-    <div class="header-subtitle">تفکیک دقیق مسیرهای تولید (تمپلیت‌های ثابت وزن بدن vs موتور برنامه‌ریزی هوشمند) | تاریخ: ۱۴۰۵/۰۶/۱۲ (2026-09-02)</div>
+    <div class="header-title">گزارش علمی و تجدیدپذیر بنچ‌مارک ۱۰۰۰ پروفایل سیستم تمرین Fitsho</div>
+    <div class="header-subtitle">ارزیابی عینی و بدون اریب موتور تمرین با تفکیک مسیرها و جداسازی کوهورت پشتیبانی‌نشده | Seed: {BENCHMARK_SEED} | تاریخ: ۱۴۰۵/۰۶/۱۲</div>
 </div>
 
 <div class="summary-card">
     <div class="summary-stats">
-        <span class="stat-badge">تعداد کل پروفایل‌ها: <strong>{total}</strong></span>
-        <span class="stat-badge success">برنامه‌های موفق: <strong>{success_count} ({success_rate:.1f}٪)</strong></span>
-        <span class="stat-badge error">برنامه‌های ناموفق: <strong>{failure_count} ({(100 - success_rate):.1f}٪)</strong></span>
-        <span class="stat-badge">انطباق مسیر: <strong>۱۰۰٪ مطابق با معماری پروداکشن</strong></span>
+        <span class="stat-badge">کل پروفایل‌ها: <strong>{total}</strong></span>
+        <span class="stat-badge success">موفق (SUCCESS): <strong>{success_count}</strong></span>
+        <span class="stat-badge error">ناموفق واقعی (FAILED): <strong>{failed_count}</strong></span>
+        <span class="stat-badge unsupported">پشتیبانی‌نشده عمدی (UNSUPPORTED): <strong>{unsupported_count} ({unsupported_rate:.1f}٪)</strong></span>
     </div>
 
-    <table class="path-stats-table">
+    <div class="main-metrics-banner">
+        <div class="main-metric-item">
+            <div class="main-metric-val">{success_rate_supported:.2f}٪</div>
+            <div class="main-metric-lbl">نرخ موفقیت کاربران پشتیبانی‌شده (Supported Success Rate)</div>
+        </div>
+        <div class="main-metric-item">
+            <div class="main-metric-val">{engine_success_rate:.2f}٪</div>
+            <div class="main-metric-lbl">نرخ موفقیت موتور تمرین نرمال (Normal Program Engine)</div>
+        </div>
+        <div class="main-metric-item">
+            <div class="main-metric-val">{bw_success_rate:.2f}٪</div>
+            <div class="main-metric-lbl">نرخ موفقیت تمپلیت‌های ثابت وزن بدن (Fixed Bodyweight)</div>
+        </div>
+        <div class="main-metric-item">
+            <div class="main-metric-val">{coverage_rate:.2f}٪</div>
+            <div class="main-metric-lbl">نرخ پوشش قرارداد محصول (Product Coverage Rate)</div>
+        </div>
+    </div>
+
+    <div class="audit-box">
+        <strong>قواعد تفکیک ریاضی ارزیابی (Ground-Truth Contract):</strong><br>
+        • <strong>کاربران پشتیبانی‌شده ({supported_profiles} نفر):</strong> مجموعاً {success_count} نفر با موفقیت برنامه دریافت کردند ({success_rate_supported:.2f}٪) و {failed_count} نفر با خطای واقعی موتور مواجه شدند.<br>
+        • <strong>جداسازی کوهورت پشتیبانی‌نشده ({unsupported_count} نفر):</strong> این {unsupported_count} پروفایل (شامل کاربران سطح متوسط/پیشرفته فقط وزن بدن، روزهای ناسازگار فیزیولوژیک و ارجاع‌های غربالگری ایمنی) طبق قرارداد مصوب فیتشو عمداً خارج از مخرج محاسبه موفقیت قرار گرفته‌اند تا نرخ موفقیت واقعی بدون اریب محاسبه شود.
+    </div>
+
+    <h3 style="font-size: 8.5pt; color: #074e43; margin: 8px 0 4px 0;">۱. تفکیک نتایج بر اساس مسیر تولید برنامه (Generation Route)</h3>
+    <table class="data-table">
         <thead>
             <tr>
-                <th>مسیر تولید برنامه (Generation Route)</th>
-                <th style="width: 100px; text-align: center;">موفق (Success)</th>
-                <th style="width: 100px; text-align: center;">ناموفق (Failed)</th>
-                <th style="width: 90px; text-align: center;">مجموع</th>
+                <th>مسیر تولید برنامه</th>
+                <th style="width: 80px; text-align: center;">موفق</th>
+                <th style="width: 80px; text-align: center;">ناموفق واقعی</th>
+                <th style="width: 80px; text-align: center;">مجموع پشتیبانی‌شده</th>
                 <th style="width: 90px; text-align: center;">درصد موفقیت</th>
             </tr>
         </thead>
@@ -1323,106 +606,205 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
             <tr>
                 <td><strong>تمپلیت‌های ثابت وزن بدن (Fixed Bodyweight Templates)</strong></td>
                 <td style="text-align: center; color: #166534; font-weight: bold;">{bw_succ}</td>
-                <td style="text-align: center; color: #991b1b; font-weight: bold;">{path_stats["bodyweight_fixed_template"]["failed"]}</td>
-                <td style="text-align: center; font-weight: bold;">{bw_total}</td>
-                <td style="text-align: center; font-weight: bold;">{bw_succ_rate:.1f}٪</td>
+                <td style="text-align: center; color: #991b1b; font-weight: bold;">{bw_fail}</td>
+                <td style="text-align: center; font-weight: bold;">{bw_total_supported}</td>
+                <td style="text-align: center; font-weight: bold;">{bw_success_rate:.2f}٪</td>
             </tr>
             <tr>
-                <td><strong>موتور تمرین هوشمند (Normal Program Engine)</strong></td>
+                <td><strong>موتور تمرینی هوشمند (Normal Program Engine)</strong></td>
                 <td style="text-align: center; color: #166534; font-weight: bold;">{engine_succ}</td>
-                <td style="text-align: center; color: #991b1b; font-weight: bold;">{path_stats["program_engine"]["failed"]}</td>
-                <td style="text-align: center; font-weight: bold;">{engine_total}</td>
-                <td style="text-align: center; font-weight: bold;">{engine_succ_rate:.1f}٪</td>
+                <td style="text-align: center; color: #991b1b; font-weight: bold;">{engine_fail}</td>
+                <td style="text-align: center; font-weight: bold;">{engine_total_supported}</td>
+                <td style="text-align: center; font-weight: bold;">{engine_success_rate:.2f}٪</td>
             </tr>
-            <tr>
-                <td><strong>کوهورت ناسازگار ورودی (Unsupported Input Cohort)</strong></td>
-                <td style="text-align: center;">۰</td>
-                <td style="text-align: center; color: #991b1b; font-weight: bold;">{unsupported_total}</td>
-                <td style="text-align: center; font-weight: bold;">{unsupported_total}</td>
-                <td style="text-align: center;">۰.۰٪</td>
+            <tr style="background: #fffbeb;">
+                <td><strong>کوهورت پشتیبانی‌نشده عمدی (خارج از مخرج نرخ موفقیت)</strong></td>
+                <td style="text-align: center;">-</td>
+                <td style="text-align: center;">-</td>
+                <td style="text-align: center; font-weight: bold;">{unsupported_count}</td>
+                <td style="text-align: center; color: #d97706; font-weight: bold;">رد عمدی ({unsupported_rate:.1f}٪)</td>
             </tr>
         </tbody>
     </table>
 
-    <div class="audit-box">
-        <strong>خلاصه معماری مسیرهای تولید و نتایج ارزیابی:</strong><br>
-        • <strong>مسیر تمپلیت‌های ثابت وزن بدن:</strong> طبق قوانین قطعی معماری فیتشو، کاربران خانگی با فقط وزن بدن در سطوح ماه اول و مبتدی مستقیماً از ۶ تمپلیت ثابت طراحی‌شده بهره‌مند می‌شوند و هیچ‌گاه وارد موتور داینامیک نمی‌گردند.<br>
-        • <strong>تحلیل عملکرد واقعی موتور نرمال:</strong> با حذف خطاهای کاذب ناشی از ارسال کاربران وزن بدن به موتور دینامیک، اکنون میزان موفقیت واقعی موتور در باشگاه و منزل با دمبل شفاف و بدون اریب است.
+    <div style="display: flex; gap: 10px; margin-top: 6px;">
+        <div style="flex: 1;">
+            <h3 style="font-size: 8.5pt; color: #074e43; margin: 4px 0;">۲. علل اصلی شکست در موتور تمرینی (Top Failure Causes)</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>علت ریشه‌ای خطا (Root Cause)</th>
+                        <th style="width: 50px; text-align: center;">تعداد</th>
+                        <th style="width: 60px; text-align: center;">سهم از شکست‌ها</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(f"<tr><td><code>{k}</code></td><td style='text-align: center; font-weight: bold;'>{v}</td><td style='text-align: center;'>{v/failed_count*100:.1f}٪</td></tr>" for k, v in top_failure_causes[:8]) if failed_count > 0 else "<tr><td colspan='3' style='text-align:center;'>بدون خطای شکست</td></tr>"}
+                </tbody>
+            </table>
+        </div>
+        <div style="flex: 1;">
+            <h3 style="font-size: 8.5pt; color: #074e43; margin: 4px 0;">۳. تفکیک کوهورت پشتیبانی‌نشده (Unsupported Breakdown)</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>دلیل عدم پشتیبانی طبق قرارداد محصول</th>
+                        <th style="width: 50px; text-align: center;">تعداد</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>وزن بدن خانگی + سطوح متوسط و پیشرفته</td><td style="text-align: center; font-weight: bold;">{unsupported_bw_level}</td></tr>
+                    <tr><td>روزهای ناسازگار برای تمپلیت وزن بدن (غیر از ۲، ۳، ۴ روز)</td><td style="text-align: center; font-weight: bold;">{unsupported_bw_days}</td></tr>
+                    <tr><td>روزهای ناسازگار با سابقه در ماتریس مقاومت</td><td style="text-align: center; font-weight: bold;">{unsupported_compat_days}</td></tr>
+                    <tr><td>ارجاع پزشکی در غربالگری ایمنی (قرمزی علائم / بارداری / عدم کنترل)</td><td style="text-align: center; font-weight: bold;">{unsupported_safety}</td></tr>
+                    <tr style="font-weight: bold; background: #f1f5f9;"><td>مجموع کاربران پشتیبانی‌نشده عمدی</td><td style="text-align: center;">{unsupported_count}</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="analytics-table-wrap">
-        <div style="flex: 1;">
-            <table class="analytics-table">
-                <thead>
-                    <tr>
-                        <th colspan="3" style="text-align: center; background: #0d6e5e; color: #fff;">علل خطای موتور تمرین هوشمند (Normal Engine)</th>
-                    </tr>
-                    <tr>
-                        <th>علت ریشه‌ای خطا</th>
-                        <th style="width: 50px; text-align: center;">تعداد</th>
-                        <th style="width: 50px; text-align: center;">درصد</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {"".join(f"<tr><td><code>{k}</code></td><td style='text-align: center; font-weight: bold;'>{v}</td><td style='text-align: center;'>{v/engine_total*100:.1f}٪</td></tr>" for k, v in top_engine_failed_rules[:6])}
-                </tbody>
-            </table>
-        </div>
-        <div style="flex: 1;">
-            <table class="analytics-table">
-                <thead>
-                    <tr>
-                        <th colspan="3" style="text-align: center; background: #0369a1; color: #fff;">علل رد در تمپلیت‌های ثابت وزن بدن (Fixed BW)</th>
-                    </tr>
-                    <tr>
-                        <th>علت ریشه‌ای خطا</th>
-                        <th style="width: 50px; text-align: center;">تعداد</th>
-                        <th style="width: 50px; text-align: center;">درصد</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {"".join(f"<tr><td><code>{k}</code></td><td style='text-align: center; font-weight: bold;'>{v}</td><td style='text-align: center;'>{v/bw_total*100:.1f}٪</td></tr>" for k, v in top_bw_failed_rules[:6]) if top_bw_failed_rules else "<tr><td colspan='3' style='text-align:center;'>بدون خطا</td></tr>"}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <h3 style="font-size: 8.5pt; color: #074e43; margin: 8px 0 4px 0;">۴. تفکیک نرخ موفقیت بر اساس محیط تمرین، سطح تجربه و آسیب‌ها (Supported Cohorts)</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>متغیر کوهورت</th>
+                <th style="width: 90px; text-align: center;">کل پشتیبانی‌شده</th>
+                <th style="width: 80px; text-align: center;">موفق</th>
+                <th style="width: 80px; text-align: center;">ناموفق</th>
+                <th style="width: 90px; text-align: center;">درصد موفقیت</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>باشگاه ورزشی (GYM)</strong></td>
+                <td style="text-align: center;">{cohort_gym_total}</td>
+                <td style="text-align: center; color: #166534; font-weight: bold;">{cohort_gym_succ}</td>
+                <td style="text-align: center; color: #991b1b;">{cohort_gym_fail}</td>
+                <td style="text-align: center; font-weight: bold;">{(cohort_gym_succ / cohort_gym_total * 100) if cohort_gym_total > 0 else 0:.2f}٪</td>
+            </tr>
+            <tr>
+                <td><strong>منزل + دمبل (HOME + DUMBBELLS)</strong></td>
+                <td style="text-align: center;">{cohort_db_total}</td>
+                <td style="text-align: center; color: #166534; font-weight: bold;">{cohort_db_succ}</td>
+                <td style="text-align: center; color: #991b1b;">{cohort_db_fail}</td>
+                <td style="text-align: center; font-weight: bold;">{(cohort_db_succ / cohort_db_total * 100) if cohort_db_total > 0 else 0:.2f}٪</td>
+            </tr>
+            <tr>
+                <td><strong>منزل + فقط وزن بدن (HOME + BODYWEIGHT)</strong></td>
+                <td style="text-align: center;">{bw_total_supported}</td>
+                <td style="text-align: center; color: #166534; font-weight: bold;">{bw_succ}</td>
+                <td style="text-align: center; color: #991b1b;">{bw_fail}</td>
+                <td style="text-align: center; font-weight: bold;">{bw_success_rate:.2f}٪</td>
+            </tr>
+            <tr style="background: #f8fafc;">
+                <td>سطح: ماه اول (First Month)</td>
+                <td style="text-align: center;">{level_stats['first_month']['total']}</td>
+                <td style="text-align: center;">{level_stats['first_month']['success']}</td>
+                <td style="text-align: center;">{level_stats['first_month']['failed']}</td>
+                <td style="text-align: center; font-weight: bold;">{(level_stats['first_month']['success'] / level_stats['first_month']['total'] * 100) if level_stats['first_month']['total'] > 0 else 0:.2f}٪</td>
+            </tr>
+            <tr style="background: #f8fafc;">
+                <td>سطح: مبتدی (Beginner)</td>
+                <td style="text-align: center;">{level_stats['beginner']['total']}</td>
+                <td style="text-align: center;">{level_stats['beginner']['success']}</td>
+                <td style="text-align: center;">{level_stats['beginner']['failed']}</td>
+                <td style="text-align: center; font-weight: bold;">{(level_stats['beginner']['success'] / level_stats['beginner']['total'] * 100) if level_stats['beginner']['total'] > 0 else 0:.2f}٪</td>
+            </tr>
+            <tr style="background: #f8fafc;">
+                <td>سطح: متوسط (Intermediate)</td>
+                <td style="text-align: center;">{level_stats['intermediate']['total']}</td>
+                <td style="text-align: center;">{level_stats['intermediate']['success']}</td>
+                <td style="text-align: center;">{level_stats['intermediate']['failed']}</td>
+                <td style="text-align: center; font-weight: bold;">{(level_stats['intermediate']['success'] / level_stats['intermediate']['total'] * 100) if level_stats['intermediate']['total'] > 0 else 0:.2f}٪</td>
+            </tr>
+            <tr style="background: #f8fafc;">
+                <td>سطح: پیشرفته (Advanced)</td>
+                <td style="text-align: center;">{level_stats['advanced']['total']}</td>
+                <td style="text-align: center;">{level_stats['advanced']['success']}</td>
+                <td style="text-align: center;">{level_stats['advanced']['failed']}</td>
+                <td style="text-align: center; font-weight: bold;">{(level_stats['advanced']['success'] / level_stats['advanced']['total'] * 100) if level_stats['advanced']['total'] > 0 else 0:.2f}٪</td>
+            </tr>
+            <tr>
+                <td>کاربران بدون آسیب (۰ محدودیت)</td>
+                <td style="text-align: center;">{c0_s + c0_f}</td>
+                <td style="text-align: center;">{c0_s}</td>
+                <td style="text-align: center;">{c0_f}</td>
+                <td style="text-align: center; font-weight: bold;">{(c0_s / (c0_s + c0_f) * 100) if (c0_s + c0_f) > 0 else 0:.2f}٪</td>
+            </tr>
+            <tr>
+                <td>کاربران دارای ۱ آسیب فیزیکی</td>
+                <td style="text-align: center;">{c1_s + c1_f}</td>
+                <td style="text-align: center;">{c1_s}</td>
+                <td style="text-align: center;">{c1_f}</td>
+                <td style="text-align: center; font-weight: bold;">{(c1_s / (c1_s + c1_f) * 100) if (c1_s + c1_f) > 0 else 0:.2f}٪</td>
+            </tr>
+            <tr>
+                <td>کاربران دارای ۲ آسیب همزمان</td>
+                <td style="text-align: center;">{c2_s + c2_f}</td>
+                <td style="text-align: center;">{c2_s}</td>
+                <td style="text-align: center;">{c2_f}</td>
+                <td style="text-align: center; font-weight: bold;">{(c2_s / (c2_s + c2_f) * 100) if (c2_s + c2_f) > 0 else 0:.2f}٪</td>
+            </tr>
+        </tbody>
+    </table>
 </div>
 
-<h2 style="font-size: 10.5pt; color: #074e43; border-bottom: 2px solid #0d6e5e; padding-bottom: 4px; margin: 16px 0 10px 0;">
-    کارنامه تفصیلی ۱۰۰۰ پروفایل کاربر به همراه مسیر تولید، ساختار برنامه و علت دقیق خطاها
+<h2 style="font-size: 10pt; color: #074e43; border-bottom: 2px solid #0d6e5e; padding-bottom: 4px; margin: 14px 0 10px 0;">
+    کارنامه تفصیلی ۱۰۰۰ پروفایل کاربر (خلاصه پروفایل در ابتدا، سپس برنامه تمرینی یا تشخیص رد)
 </h2>
 """
 
     for r in results:
-        p: ProfileSpec = r["profile"]
-        status = r["status"]
+        p_dict = r["profile"]
+        res_class = r["result_class"]
         gen_path = r.get("generation_path", "program_engine")
         template_slug = r.get("template_slug")
-        is_success = (status == "SUCCESS")
-        section_class = "success-section" if is_success else "failed-section"
-        badge = '<span class="status-badge success">برنامه تمرینی با موفقیت صادر شد</span>' if is_success else '<span class="status-badge fail">برنامه صادر نشد (برخورد با خطا)</span>'
+        is_success = (res_class == "SUCCESS")
+        is_unsupported = (res_class == "UNSUPPORTED")
+
+        if is_success:
+            section_class = "success-section"
+            badge = '<span class="status-badge success">برنامه صادر شد (SUCCESS)</span>'
+        elif is_unsupported:
+            section_class = "unsupported-section"
+            badge = '<span class="status-badge unsupported">پشتیبانی‌نشده عمدی (UNSUPPORTED)</span>'
+        else:
+            section_class = "failed-section"
+            badge = '<span class="status-badge fail">خطای تولید برنامه (FAILED)</span>'
 
         path_label = FA_TRANSLATIONS.get(gen_path, gen_path)
         if template_slug:
             path_label += f" · <code>{template_slug}</code>"
         path_tag = f'<span class="path-badge">{path_label}</span>'
 
-        sex_fa = FA_TRANSLATIONS.get(p.sex.value, p.sex.value)
-        goal_fa = FA_TRANSLATIONS.get(p.fitness_goal.value, p.fitness_goal.value)
-        level_fa = FA_TRANSLATIONS.get(p.experience_level.value, p.experience_level.value)
-        loc_fa = FA_TRANSLATIONS.get(p.training_location.value, p.training_location.value)
-        setup_fa = FA_TRANSLATIONS.get(p.home_training_setup.value, p.home_training_setup.value) if p.home_training_setup else "تجهیزات کامل باشگاه"
-        pri_fa = FA_TRANSLATIONS.get(p.priority_muscle.value, p.priority_muscle.value) if p.priority_muscle else "بدون اولویت اختصاصی"
-        cautions_fa = "، ".join(FA_TRANSLATIONS.get(c.value, c.value) for c in p.training_cautions) if p.training_cautions else "بدون آسیب یا محدودیت فیزیکی"
+        sex_fa = FA_TRANSLATIONS.get(p_dict["sex"], p_dict["sex"])
+        goal_fa = FA_TRANSLATIONS.get(p_dict["fitness_goal"], p_dict["fitness_goal"])
+        level_fa = FA_TRANSLATIONS.get(p_dict["experience_level"], p_dict["experience_level"])
+        loc_fa = FA_TRANSLATIONS.get(p_dict["training_location"], p_dict["training_location"])
+        setup_fa = (
+            FA_TRANSLATIONS.get(p_dict["home_training_setup"], p_dict["home_training_setup"])
+            if p_dict.get("home_training_setup")
+            else "تجهیزات کامل باشگاه"
+        )
+        pri_fa = (
+            FA_TRANSLATIONS.get(p_dict["priority_muscle"], p_dict["priority_muscle"])
+            if p_dict.get("priority_muscle")
+            else "بدون اولویت اختصاصی"
+        )
+        cautions_fa = (
+            "، ".join(FA_TRANSLATIONS.get(c, c) for c in p_dict["training_cautions"])
+            if p_dict.get("training_cautions")
+            else "بدون آسیب فیزیکی"
+        )
 
-        height_m = p.height_cm / 100.0
-        bmi = round(p.weight_kg / (height_m * height_m), 1)
+        height_m = p_dict["height_cm"] / 100.0
+        bmi = round(p_dict["weight_kg"] / (height_m * height_m), 1)
 
         html += f"""
 <div class="user-section {section_class}">
     <div class="user-header">
         <div>
-            <span class="user-title">پروفایل #{p.index:04d}: {p.name}</span>
+            <span class="user-title">پروفایل #{r['profile_id']:04d}: {p_dict['name']}</span>
             {path_tag}
         </div>
         {badge}
@@ -1430,36 +812,36 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
 
     <div class="profile-grid">
         <div class="profile-row">
-            <div class="profile-item"><span class="profile-label">سن و جنسیت:</span> <span class="profile-value">{p.age} سال · {sex_fa}</span></div>
-            <div class="profile-item"><span class="profile-label">قد، وزن و BMI:</span> <span class="profile-value">{p.height_cm} cm · {p.weight_kg} kg (BMI: {bmi})</span></div>
-            <div class="profile-item"><span class="profile-label">هدف تناسب اندام:</span> <span class="profile-value">{goal_fa}</span></div>
+            <div class="profile-item"><span class="profile-label">سن و جنسیت:</span> <span class="profile-value">{p_dict['age']} سال · {sex_fa}</span></div>
+            <div class="profile-item"><span class="profile-label">قد و وزن و BMI:</span> <span class="profile-value">{p_dict['height_cm']} cm · {p_dict['weight_kg']} kg (BMI: {bmi})</span></div>
+            <div class="profile-item"><span class="profile-label">هدف تمرینی:</span> <span class="profile-value">{goal_fa}</span></div>
         </div>
         <div class="profile-row">
-            <div class="profile-item"><span class="profile-label">سطح و سابقه تمرین:</span> <span class="profile-value">{level_fa} ({p.training_age_months} ماه سابقه)</span></div>
-            <div class="profile-item"><span class="profile-label">برنامه هفتگی و مدت:</span> <span class="profile-value">{p.training_days_per_week} روز در هفته · {p.session_duration_minutes} دقیقه</span></div>
-            <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">{loc_fa} · {setup_fa}</span></div>
+            <div class="profile-item"><span class="profile-label">سطح و سابقه:</span> <span class="profile-value">{level_fa} ({p_dict['training_age_months']} ماه)</span></div>
+            <div class="profile-item"><span class="profile-label">برنامه هفتگی:</span> <span class="profile-value">{p_dict['training_days_per_week']} روز · {p_dict['session_duration_minutes']} دقیقه</span></div>
+            <div class="profile-item"><span class="profile-label">محیط و وسایل:</span> <span class="profile-value">{loc_fa} · {setup_fa}</span></div>
         </div>
         <div class="profile-row">
-            <div class="profile-item"><span class="profile-label">عضله دارای اولویت:</span> <span class="profile-value">{pri_fa}</span></div>
-            <div class="profile-item"><span class="profile-label">طول دوره پیشنهادی:</span> <span class="profile-value">{p.plan_duration_weeks} هفته</span></div>
+            <div class="profile-item"><span class="profile-label">عضله اولویت:</span> <span class="profile-value">{pri_fa}</span></div>
+            <div class="profile-item"><span class="profile-label">طول دوره:</span> <span class="profile-value">{p_dict['plan_duration_weeks']} هفته</span></div>
             <div class="profile-item"><span class="profile-label">آسیب‌ها و محدودیت‌ها:</span> <span class="profile-value">{cautions_fa}</span></div>
         </div>
     </div>
 """
 
         if is_success:
-            split_fa = r.get("split_fa") or r.get("split")
+            split_fa = FA_TRANSLATIONS.get(r.get("split_type"), r.get("split_type") or "-")
             days_count = r.get("days_count", 0)
             html += f"""
     <div class="days-container">
         <div class="program-overview-bar">
-            <strong>ساختار برنامه:</strong> اسپلیت <strong>{split_fa}</strong> | تعداد جلسات: <strong>{days_count} جلسه در هفته</strong> | طول دوره: <strong>{p.plan_duration_weeks} هفته</strong>
+            <strong>ساختار برنامه صادرشده:</strong> اسپلیت <strong>{split_fa}</strong> | تعداد جلسات: <strong>{days_count} جلسه در هفته</strong> | دوره: <strong>{p_dict['plan_duration_weeks']} هفته</strong>
         </div>
 """
-            for day in r.get("days", []):
+            for day in r.get("program_days", []):
                 d_idx = day.get("day_index")
                 d_title = day.get("title")
-                d_dur = day.get("estimated_duration_minutes") or day.get("main_training_minutes") or p.session_duration_minutes
+                d_dur = day.get("estimated_duration_minutes") or p_dict["session_duration_minutes"]
                 d_focus = day.get("focus") or "-"
                 ex_list = day.get("exercises", [])
 
@@ -1473,7 +855,7 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
                 <thead>
                     <tr>
                         <th class="ex-num">#</th>
-                        <th>نام تمرین (بانک اطلاعاتی فیتشو)</th>
+                        <th>نام تمرین (بانک حرکات فیتشو)</th>
                         <th style="width: 80px;">عضله هدف</th>
                         <th style="width: 100px;">ست × تکرار / زمان</th>
                         <th style="width: 60px; text-align: center;">استراحت</th>
@@ -1486,8 +868,8 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
                     if it["prescription_mode"] == "reps":
                         presc_str = f"{it['sets']} ست × {it['rep_min']}–{it['rep_max']} تکرار"
                     else:
-                        d_min = it.get("duration_min_seconds") or it.get("rep_min") or 20
-                        d_max = it.get("duration_max_seconds") or it.get("rep_max") or 40
+                        d_min = it.get("duration_min_seconds") or 20
+                        d_max = it.get("duration_max_seconds") or 40
                         presc_str = f"{it['sets']} ست × {d_min}–{d_max} ثانیه"
 
                     rir_str = f"RIR {it['rir']}" if it["rir"] is not None else "-"
@@ -1495,7 +877,7 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
                     html += f"""
                     <tr>
                         <td class="ex-num">{it['order']}</td>
-                        <td class="ex-name">{it['name_fa']} <span style="color: #64748b; font-size: 6.2pt;">({it['name_en']})</span></td>
+                        <td class="ex-name">{it['name_fa']} <span style="color: #64748b; font-size: 6pt;">({it['name_en']})</span></td>
                         <td>{it['primary_muscle_fa']}</td>
                         <td>{presc_str}</td>
                         <td style="text-align: center;">{it['rest_seconds']} ثانیه</td>
@@ -1508,6 +890,20 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
         </div>
 """
             html += "    </div>"
+
+        elif is_unsupported:
+            subtype = r.get("unsupported_subtype") or "UNSUPPORTED"
+            finfo = r.get("failure_info", {})
+            html += f"""
+    <div class="unsupported-box">
+        <div class="unsupported-desc">
+            <strong>علت عدم پشتیبانی و رد عمدی طبق قرارداد فیتشو:</strong><br>
+            دسته: <code>{subtype}</code> — {finfo.get('exact_description_fa')}<br>
+            <span style="font-size: 6.8pt; color: #78350f;">(این پروفایل طبق ضوابط محصول فیتشو خارج از محدوده تحت پوشش است و در مخرج نرخ موفقیت لحاظ نمی‌شود)</span>
+        </div>
+    </div>
+"""
+
         else:
             finfo = r.get("failure_info", {})
             html += f"""
@@ -1527,7 +923,7 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
             <div class="fail-meta-item"><span class="lbl">مقدار محاسبه‌شده:</span> <span class="val">{finfo.get('actual_val')} (حد مجاز: {finfo.get('limit_val')})</span></div>
         </div>
         <div class="repair-hint">
-            🔧 <strong>راهنمای تعمیر و ارتقای موتور (Engine Repair Guideline):</strong> {finfo.get('engine_repair_hint_fa')}
+            🔧 <strong>راهنمای رفع مشکل در موتور (Diagnostic Hint):</strong> {finfo.get('engine_repair_hint_fa')}
         </div>
     </div>
 """
@@ -1542,61 +938,33 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
 
 
 def main() -> None:
-    results = evaluate_1000_profiles()
-    successes = sum(1 for r in results if r["status"] == "SUCCESS")
-    failures = len(results) - successes
-    print(f"\n1000-profile evaluation complete: {successes} succeeded, {failures} failed.")
+    profiles, results, sanity_report = run_benchmark(max_workers=16)
 
-    os.makedirs("/home/mohammad/project/fitsho/var/reports", exist_ok=True)
-    os.makedirs("/home/mohammad/project/fitsho/reports", exist_ok=True)
-
-    # Save JSON data
-    json_path = "/home/mohammad/project/fitsho/var/reports/1000_profiles_audit_data.json"
-    with open(json_path, "w", encoding="utf-8") as f:
-        json_data = []
-        for r in results:
-            p_dict = asdict(r["profile"])
-            p_dict["birth_date"] = p_dict["birth_date"].isoformat()
-            p_dict["sex"] = p_dict["sex"].value
-            p_dict["fitness_goal"] = p_dict["fitness_goal"].value
-            p_dict["experience_level"] = p_dict["experience_level"].value
-            p_dict["training_location"] = p_dict["training_location"].value
-            if p_dict["home_training_setup"]:
-                p_dict["home_training_setup"] = p_dict["home_training_setup"].value
-            if p_dict["priority_muscle"]:
-                p_dict["priority_muscle"] = p_dict["priority_muscle"].value
-            p_dict["training_cautions"] = [c.value for c in p_dict["training_cautions"]]
-            p_dict["sleep_quality"] = p_dict["sleep_quality"].value
-            p_dict["stress_level"] = p_dict["stress_level"].value
-            p_dict["physical_job_demand"] = p_dict["physical_job_demand"].value
-
-            r_clean = dict(r)
-            r_clean["profile"] = p_dict
-            json_data.append(r_clean)
-        json.dump(json_data, f, ensure_ascii=False, indent=2)
-    print(f"Saved raw JSON audit data to {json_path}")
-
-    # Build HTML
-    print("Building high-fidelity Persian HTML report for 1000 profiles...")
-    html_content = build_pdf_html(results)
+    # Build Persian HTML report
+    print("7. Building Persian HTML report with summary and per-profile workout plans...")
+    html_content = build_persian_pdf_html(profiles, results, sanity_report)
     html_path = "/home/mohammad/project/fitsho/reports/fitsho_1000_profiles_audit_report.html"
+    os.makedirs("/home/mohammad/project/fitsho/reports", exist_ok=True)
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html_content)
-    print(f"HTML saved to {html_path}")
+    print(f"   HTML saved to {html_path}")
 
-    # Render PDF
+    # Render PDF with WeasyPrint
     pdf_path = "/home/mohammad/project/fitsho/reports/fitsho_1000_profiles_audit_report.pdf"
-    print(f"Rendering PDF with WeasyPrint to {pdf_path} (this may take 1-3 minutes for 1000 profiles)...")
+    print(f"8. Rendering Persian PDF with WeasyPrint to {pdf_path} (takes ~1-2 minutes)...")
     weasyprint.HTML(string=html_content).write_pdf(pdf_path)
     size_mb = os.path.getsize(pdf_path) / (1024 * 1024)
-    print(f"PDF generated successfully at {pdf_path} ({size_mb:.2f} MB)")
+    print(f"   PDF generated successfully: {pdf_path} ({size_mb:.2f} MB)")
 
-    # Copy to root and public for easy download
+    # Copy to root and public for download
     root_pdf = "/home/mohammad/project/fitsho/fitsho_1000_profiles_audit_report.pdf"
+    pub_pdf = "/home/mohammad/project/fitsho/frontend/public/fitsho_1000_profiles_audit_report.pdf"
+    pub_html = "/home/mohammad/project/fitsho/frontend/public/fitsho_1000_profiles_audit_report.html"
+
     shutil.copy2(pdf_path, root_pdf)
-    shutil.copy2(pdf_path, "/home/mohammad/project/fitsho/frontend/public/fitsho_1000_profiles_audit_report.pdf")
-    shutil.copy2(html_path, "/home/mohammad/project/fitsho/frontend/public/fitsho_1000_profiles_audit_report.html")
-    print(f"PDF also saved to {root_pdf}")
+    shutil.copy2(pdf_path, pub_pdf)
+    shutil.copy2(html_path, pub_html)
+    print(f"   Copied PDF to {root_pdf} and {pub_pdf}")
 
 
 if __name__ == "__main__":
