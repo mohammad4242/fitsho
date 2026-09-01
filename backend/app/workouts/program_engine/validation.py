@@ -97,11 +97,11 @@ def validate_program(
             # 30-min: only the in-range 3-4 MAIN case receives this warning.
             warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
 
-        # Main training is the hard duration invariant. Add-ons are excluded.
-        if main_minutes < duration_policy.minimum_minutes:
-            errors.append("SESSION_DURATION_UNDER_TARGET")
-            errors.append("SESSION_DURATION_TARGET_UNSATISFIED")
-        elif main_minutes > duration_policy.maximum_minutes:
+        # Main training's lower target is a soft quality warning. Add-ons are
+        # excluded, while the upper target remains hard.
+        if duration_policy.below_preferred_minimum(main_minutes):
+            warnings.append("SESSION_DURATION_UNDER_TARGET")
+        elif duration_policy.exceeds_hard_maximum(main_minutes):
             errors.append("SESSION_DURATION_EXCEEDED")
             errors.append("SESSION_DURATION_OVER_TARGET")
             errors.append("SESSION_DURATION_TARGET_UNSATISFIED")

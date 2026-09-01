@@ -429,7 +429,7 @@ def repair_recovery_accessory_distribution(
                 scheduled = tuple(candidate_days)
                 if not all(
                     count_policy.contains(main_exercise_count(day.exercises))
-                    and duration_policy.contains(calculate_main_training_minutes(day))
+                    and calculate_main_training_minutes(day) <= duration_policy.maximum_minutes
                     and _within_session_hard_volume(day, request)
                     for day in scheduled
                 ):

@@ -197,8 +197,28 @@ class SessionDurationPolicy:
     minimum_minutes: int
     maximum_minutes: int
 
+    def below_preferred_minimum(self, estimated_minutes: int) -> bool:
+        """Return whether the session is below the preferred lower target."""
+        return estimated_minutes < self.minimum_minutes
+
+    def exceeds_hard_maximum(self, estimated_minutes: int) -> bool:
+        """Return whether the session exceeds the hard upper target."""
+        return estimated_minutes > self.maximum_minutes
+
+    def within_preferred_range(self, estimated_minutes: int) -> bool:
+        """Return whether the session fits the preferred diagnostic range."""
+        return not (
+            self.below_preferred_minimum(estimated_minutes)
+            or self.exceeds_hard_maximum(estimated_minutes)
+        )
+
     def contains(self, estimated_minutes: int) -> bool:
-        return self.minimum_minutes <= estimated_minutes <= self.maximum_minutes
+        """Compatibility alias for preferred-range quality diagnostics."""
+        return self.within_preferred_range(estimated_minutes)
+
+
+def under_target_message_fa(actual_minutes: int) -> str:
+    return f"برنامه اصولی با توجه به سطح و شرایط شما در {actual_minutes} دقیقه ساخته شد."
 
 
 def get_session_duration_policy(

@@ -303,11 +303,10 @@ def repair_session_durations(
         reasons.extend(capacity_trim_reasons)
         other_days = tuple(repaired) + days[day_index + 1 :]
 
-        # Main training must meet the duration policy independently of add-ons.
-        if (
-            calculate_main_training_minutes(current) < policy.minimum_minutes
-            or main_exercise_count(current.exercises) < planned_minimum_exercises
-        ):
+        # Underfill repair is structural only.  A short session with a valid
+        # MAIN exercise count is accepted as a preferred-range miss and is not
+        # padded with extra sets or exercises.
+        if main_exercise_count(current.exercises) < planned_minimum_exercises:
             reasons.append("SESSION_DURATION_UNDERFILLED")
             hard_volume_status: list[bool] = []
             current = _repair_underfill(
@@ -349,18 +348,22 @@ def repair_session_durations(
             reasons.extend(overfill_reasons)
 
         main_training_after = calculate_main_training_minutes(current)
-        # Classify outcome using the hard main-training invariant.
-        if policy.contains(main_training_after):
+        # The lower target is a soft quality signal; only the upper target is
+        # a hard duration invariant.
+        if policy.exceeds_hard_maximum(main_training_after):
+            reasons.extend(
+                ("SESSION_DURATION_OVER_TARGET", "SESSION_DURATION_TARGET_UNSATISFIED")
+            )
+        elif policy.below_preferred_minimum(main_training_after):
+            reasons.append("SESSION_DURATION_UNDER_TARGET")
+            if volume is not None and _duration_shortfall_is_hard_constrained(request, volume):
+                reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
+            elif main_exercise_count(current.exercises) < planned_minimum_exercises:
+                reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
+        else:
             if current.estimated_duration_minutes != day.estimated_duration_minutes:
                 reasons.append("SESSION_DURATION_REPAIR_APPLIED")
             reasons.append("SESSION_DURATION_TARGET_SATISFIED")
-        else:
-            reasons.append("SESSION_DURATION_TARGET_UNSATISFIED")
-            if main_training_after < policy.minimum_minutes:
-                if volume is not None and _duration_shortfall_is_hard_constrained(request, volume):
-                    reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
-                else:
-                    reasons.append("SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD")
 
         repaired.append(current)
         day_reason_codes.append(tuple(dict.fromkeys(reasons[day_reason_start:])))
@@ -420,41 +423,9 @@ def _repair_underfill(
     hard_volume_status: list[bool] | None = None,
     coherence_decisions: list[SessionCoherenceDecision] | None = None,
 ) -> WorkoutDay:
-    """Add safe main-training work until duration and structure are satisfied."""
+    """Add safe main-training work only until the structural floor is satisfied."""
     exercises = list(day.exercises)
-    while (
-        calculate_main_training_minutes_from_exercises(exercises) < policy.minimum_minutes
-        or main_exercise_count(exercises) < minimum_exercises
-    ):
-        if calculate_main_training_minutes_from_exercises(exercises) < policy.minimum_minutes:
-            set_addition = _select_set_addition(
-                day,
-                exercises,
-                request,
-                policy,
-                ruleset,
-                other_days=other_days,
-                volume=volume,
-            )
-            if set_addition is not None:
-                index, updated = set_addition
-                muscle = updated.primary_muscle
-                assert muscle is not None
-                coherence = SessionCoherence.from_workout_day(day)
-                record_coherence_decision(
-                    coherence_decisions,
-                    SessionCoherenceDecision(
-                        stage="duration_repair",
-                        muscle_requested=muscle,
-                        candidate_day=day.day_index,
-                        candidate_day_role=coherence.role_for(muscle),
-                        status="accepted",
-                        reason=_duration_coherence_reason(coherence, muscle),
-                    ),
-                )
-                exercises[index] = updated
-                day = _rebuild_day(day, tuple(exercises), ruleset)
-                continue
+    while main_exercise_count(exercises) < minimum_exercises:
         addition = _select_exercise_addition(
             day,
             exercises,
@@ -775,16 +746,7 @@ def _select_exercise_addition(
         within_hard_volume = _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
         if not within_hard_volume:
             hard_volume_rejected = True
-        if (
-            calculate_main_training_minutes_from_exercises(exercises) < policy.minimum_minutes
-            and within_hard_volume
-        ):
-            return simulated[-1]
-        if (
-            not prefer_acceptable_volume_for_minimum_fill
-            and main_exercise_count(exercises) < minimum_exercises
-            and within_hard_volume
-        ):
+        if main_exercise_count(exercises) < minimum_exercises and within_hard_volume:
             return simulated[-1]
         if _acceptable_volume_change(
             [item for day in other_days for item in day.exercises] + exercises,

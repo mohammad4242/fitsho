@@ -89,7 +89,9 @@ def _duration_fit(
     policy = get_session_duration_policy(request.session_duration_minutes)
     satisfied = 0.0
     for day in program.weekly_schedule:
-        if policy.contains(calculate_main_training_minutes(day)):
+        # This remains a preferred-range quality metric; a lower-bound miss is
+        # intentionally not a generation failure.
+        if policy.within_preferred_range(calculate_main_training_minutes(day)):
             satisfied += 1
     return _ratio(satisfied, float(len(program.weekly_schedule)))
 

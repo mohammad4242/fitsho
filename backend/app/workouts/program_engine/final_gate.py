@@ -6,6 +6,7 @@ from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
     get_session_exercise_count_policy,
+    under_target_message_fa,
 )
 from app.workouts.program_engine.enums import SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
@@ -25,6 +26,8 @@ _DURATION_CODES = frozenset(
     "SESSION_DURATION_UNDER_TARGET SESSION_DURATION_TARGET_UNSATISFIED "
     "SESSION_DURATION_EXCEEDED SESSION_DURATION_OVER_TARGET".split()
 )
+_DURATION_SOFT_CODES = frozenset({"SESSION_DURATION_UNDER_TARGET"})
+_DURATION_HARD_CODES = _DURATION_CODES - _DURATION_SOFT_CODES
 _DURATION_CONSTRAINTS = frozenset(
     "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS "
     "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD "
@@ -70,7 +73,10 @@ def evaluate_final_program(
     report: ValidationReport,
     ruleset: ProgramRuleset,
 ) -> FinalGateResult:
-    reasons = list(report.errors)
+    hard_validation_errors = tuple(
+        code for code in report.errors if code not in _DURATION_SOFT_CODES
+    )
+    reasons = list(hard_validation_errors)
     constraints = [
         code
         for code in report.warnings
@@ -78,11 +84,11 @@ def evaluate_final_program(
     ]
     checks: dict[str, object] = {
         "validation": {
-            "status": "rejected" if report.errors else "passed",
-            "reason_codes": report.errors,
+            "status": "rejected" if hard_validation_errors else "passed",
+            "reason_codes": hard_validation_errors,
             "warning_codes": report.warnings,
         },
-        "duration": {"status": "passed", "reason_codes": ()},
+        "duration": {"status": "passed", "reason_codes": (), "messages_fa": ()},
         "exercise_count": {"status": "passed", "reason_codes": ()},
         "coverage": {"status": "not_applicable", "reason_codes": ()},
         "recovery": {"status": "passed", "reason_codes": ()},
@@ -103,31 +109,39 @@ def evaluate_final_program(
             "status": "rejected",
             "reason_codes": tuple(dict.fromkeys(count_invariant_reasons)),
         }
-    invariant_duration_codes: list[str] = []
+    invariant_hard_duration_codes: list[str] = []
     for day in program.weekly_schedule:
         main_minutes = calculate_main_training_minutes(day)
-        if main_minutes < duration_policy.minimum_minutes:
-            invariant_duration_codes.extend(
-                ("SESSION_DURATION_UNDER_TARGET", "SESSION_DURATION_TARGET_UNSATISFIED")
-            )
-        elif main_minutes > duration_policy.maximum_minutes:
-            invariant_duration_codes.extend(
+        if duration_policy.exceeds_hard_maximum(main_minutes):
+            invariant_hard_duration_codes.extend(
                 (
                     "SESSION_DURATION_EXCEEDED",
                     "SESSION_DURATION_OVER_TARGET",
                     "SESSION_DURATION_TARGET_UNSATISFIED",
                 )
             )
-    duration_codes = tuple(
+    under_target_messages = tuple(
+        under_target_message_fa(calculate_main_training_minutes(day))
+        for day in program.weekly_schedule
+        if duration_policy.below_preferred_minimum(calculate_main_training_minutes(day))
+    )
+    soft_duration_codes = (
+        ("SESSION_DURATION_UNDER_TARGET",) if under_target_messages else ()
+    )
+    hard_duration_codes = tuple(
         dict.fromkeys(
             code
-            for code in (*report.errors, *report.warnings, *invariant_duration_codes)
-            if code in _DURATION_CODES
+            for code in (*report.errors, *report.warnings, *invariant_hard_duration_codes)
+            if code in _DURATION_HARD_CODES
+            and any(
+                _duration_code_applies_to_day(code, day, request, ruleset)
+                for day in program.weekly_schedule
+            )
         )
     )
     duration_evidence_codes: set[str] = set()
-    duration_evidence_complete = bool(duration_codes)
-    for duration_code in duration_codes:
+    duration_evidence_complete = bool(hard_duration_codes)
+    for duration_code in hard_duration_codes:
         affected_days = tuple(
             day
             for day in program.weekly_schedule
@@ -151,31 +165,42 @@ def evaluate_final_program(
                 if evidence_code in _DURATION_CONSTRAINTS
             )
     duration_evidence = tuple(sorted(duration_evidence_codes))
-    if duration_codes:
+    if hard_duration_codes:
         checks["duration"] = {
             "status": (
                 "constrained"
                 if (
                     duration_evidence
                     and duration_evidence_complete
-                    and not report.errors
-                    and not invariant_duration_codes
+                    and not hard_validation_errors
+                    and not invariant_hard_duration_codes
                 )
                 else "rejected"
             ),
-            "reason_codes": tuple(dict.fromkeys((*duration_evidence, *duration_codes))),
+            "reason_codes": tuple(dict.fromkeys((*duration_evidence, *hard_duration_codes))),
+            "messages_fa": under_target_messages,
         }
         if (
-            report.errors
-            or invariant_duration_codes
+            hard_validation_errors
+            or invariant_hard_duration_codes
             or not duration_evidence
             or not duration_evidence_complete
         ):
-            reasons.extend(duration_codes)
-            if not duration_evidence or not duration_evidence_complete or invariant_duration_codes:
+            reasons.extend(hard_duration_codes)
+            if (
+                not duration_evidence
+                or not duration_evidence_complete
+                or invariant_hard_duration_codes
+            ):
                 reasons.append("SESSION_DURATION_CONSTRAINT_UNEXPLAINED")
         else:
             constraints.extend(duration_evidence)
+    elif soft_duration_codes:
+        checks["duration"] = {
+            "status": "warning",
+            "reason_codes": soft_duration_codes,
+            "messages_fa": under_target_messages,
+        }
 
     coverage = _mapping(program.aggregate_metrics.get("weekly_coverage"))
     if program.split.split_type in _FULL_BODY_SPLITS or any(
@@ -340,10 +365,13 @@ def _evidence_proves_duration_code(
     policy = get_session_duration_policy(request.session_duration_minutes)
     if duration_code in {
         "SESSION_DURATION_UNDER_TARGET",
-        "SESSION_DURATION_TARGET_UNSATISFIED",
     }:
         return duration_code in reasons and main_minutes < policy.minimum_minutes
-    if duration_code in {"SESSION_DURATION_EXCEEDED", "SESSION_DURATION_OVER_TARGET"}:
+    if duration_code in {
+        "SESSION_DURATION_EXCEEDED",
+        "SESSION_DURATION_OVER_TARGET",
+        "SESSION_DURATION_TARGET_UNSATISFIED",
+    }:
         return duration_code in reasons and main_minutes > policy.maximum_minutes
     return False
 
@@ -356,11 +384,12 @@ def _duration_code_applies_to_day(
 ) -> bool:
     main_minutes = calculate_main_training_minutes(day)
     policy = get_session_duration_policy(request.session_duration_minutes)
+    if duration_code == "SESSION_DURATION_UNDER_TARGET":
+        return main_minutes < policy.minimum_minutes
     if duration_code in {
-        "SESSION_DURATION_UNDER_TARGET",
+        "SESSION_DURATION_EXCEEDED",
+        "SESSION_DURATION_OVER_TARGET",
         "SESSION_DURATION_TARGET_UNSATISFIED",
     }:
-        return main_minutes < policy.minimum_minutes
-    if duration_code in {"SESSION_DURATION_EXCEEDED", "SESSION_DURATION_OVER_TARGET"}:
         return main_minutes > policy.maximum_minutes
     return False
