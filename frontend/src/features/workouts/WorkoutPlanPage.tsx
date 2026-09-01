@@ -304,6 +304,12 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 <h2 id="workout-pending-plan-title" className="fitsho-display">{l("برنامه در انتظار تأیید مربی", "Plan awaiting coach approval")}</h2>
               </div>
             </div>
+            {pendingPlan.ai_coach_program_explanation_fa && (
+              <aside className="workout-ai-coach" aria-label={t("workoutPlan.aiCoach")}>
+                <span className="workout-ai-coach__icon" aria-hidden="true">✦</span>
+                <div><p>{t("workoutPlan.aiCoach")}</p><strong>{pendingPlan.ai_coach_program_explanation_fa}</strong></div>
+              </aside>
+            )}
             <WorkoutDays plan={pendingPlan} isEnglish={isEnglish} titleId="workout-pending-plan-title" interactive={false} />
           </section>
         )}

@@ -120,6 +120,7 @@ const pendingPlan: WorkoutPlan = {
   id: pendingVersion.id,
   status: "pending_review",
   activated_at: null,
+  ai_coach_program_explanation_fa: "توضیح هوش مصنوعی نسخه جدید",
   days: plan.days.map((day) => ({
     ...day,
     title_fa: "برنامه در انتظار تأیید",
@@ -331,6 +332,7 @@ it("keeps the active plan usable while a newer plan awaits coach approval", asyn
   expect(await screen.findByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).toBeInTheDocument();
   expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
   expect(screen.getByText("اسکوات در انتظار تأیید")).toBeInTheDocument();
+  expect(screen.getByText("توضیح هوش مصنوعی نسخه جدید")).toBeVisible();
   expect(screen.getByRole("heading", { name: "برنامه در انتظار تأیید" })).toBeInTheDocument();
   const activeSchedule = screen.getByRole("list", { name: "روزهای تمرین تو" });
   const pendingSchedule = screen.getByRole("list", { name: "برنامه در انتظار تأیید مربی" });
