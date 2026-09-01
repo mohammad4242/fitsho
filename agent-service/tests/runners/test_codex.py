@@ -27,7 +27,12 @@ def make_request(
         model_id="gpt-5-codex",
         system_prompt="Return a concise answer.",
         input_payload={"question": "hello"},
-        response_schema=response_schema or {"type": "object", "required": ["answer"]},
+        response_schema=response_schema
+        or {
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+        },
         schema_name="answer",
         temperature=0.2,
         max_output_tokens=300,
@@ -80,7 +85,9 @@ def test_run_uses_exact_safe_codex_contract_and_schema_output_files(
         output_path = Path(command[command.index("--output-last-message") + 1])
         assert schema_path == tmp_path / "schema.json"
         assert output_path == tmp_path / "output.json"
-        assert json.loads(schema_path.read_text(encoding="utf-8")) == make_request().response_schema
+        written_schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        assert written_schema["additionalProperties"] is False
+        assert written_schema["required"] == ["answer"]
         output_path.write_text(json.dumps({"answer": "ok"}), encoding="utf-8")
         return ProcessResult(0, '{"type":"turn.completed"}\n', "")
 
@@ -118,6 +125,44 @@ def test_run_uses_exact_safe_codex_contract_and_schema_output_files(
     assert kwargs["inherit_environment"] is False
     assert "shell" not in kwargs
     assert "--dangerously-bypass-approvals-and-sandbox" not in command
+
+
+def test_response_schema_is_normalized_for_codex_strict_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "answer": {"type": "string"},
+            "metadata": {
+                "type": "object",
+                "properties": {"ok": {"const": True}},
+                "required": [],
+            },
+        },
+        "required": ["answer"],
+    }
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del kwargs
+        schema_path = Path(command[command.index("--output-schema") + 1])
+        written = json.loads(schema_path.read_text(encoding="utf-8"))
+        assert written["additionalProperties"] is False
+        assert written["required"] == ["answer", "metadata"]
+        assert written["properties"]["metadata"]["additionalProperties"] is False
+        assert written["properties"]["metadata"]["required"] == ["ok"]
+        assert written["properties"]["metadata"]["properties"]["ok"]["type"] == "boolean"
+        output_path = Path(command[command.index("--output-last-message") + 1])
+        output_path.write_text(
+            json.dumps({"answer": "ok", "metadata": {"ok": True}}), encoding="utf-8"
+        )
+        return ProcessResult(0, "", "")
+
+    import app.runners.codex as codex
+
+    monkeypatch.setattr(codex, "run_process", fake_run_process)
+    result = run(CodexRunner(workspace=tmp_path).run(make_request(response_schema=schema)))
+    assert result.payload == {"answer": "ok", "metadata": {"ok": True}}
 
 
 def test_high_effort_profile_uses_codex_reasoning_config(

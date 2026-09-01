@@ -132,7 +132,7 @@ class CodexRunner(AgentRunner):
             except Exception as exc:
                 raise RunnerError("invalid_request", "response schema is invalid") from exc
 
-            _atomic_json_write(schema_path, request.response_schema)
+            _atomic_json_write(schema_path, _codex_strict_schema(request.response_schema))
             output_path.unlink(missing_ok=True)
             command = self._command(request, workspace, schema_path, output_path, image_paths)
             prompt = self._prompt(request)
@@ -395,6 +395,43 @@ class CodexRunner(AgentRunner):
         return {
             key: value for key, value in os.environ.items() if key in cls._SAFE_ENVIRONMENT_KEYS
         }
+
+
+def _codex_strict_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Adapt provider schemas to Codex's strict structured-output dialect."""
+
+    normalized = _normalize_codex_schema_node(schema)
+    if not isinstance(normalized, dict):
+        raise RunnerError("invalid_request", "response schema is invalid")
+    return normalized
+
+
+def _normalize_codex_schema_node(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_normalize_codex_schema_node(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+
+    normalized = {key: _normalize_codex_schema_node(item) for key, item in value.items()}
+    properties = normalized.get("properties")
+    if normalized.get("type") == "object" or isinstance(properties, dict):
+        normalized["additionalProperties"] = False
+        if isinstance(properties, dict):
+            normalized["required"] = list(properties)
+
+    if "const" in normalized and "type" not in normalized:
+        constant = normalized["const"]
+        if isinstance(constant, bool):
+            normalized["type"] = "boolean"
+        elif isinstance(constant, int):
+            normalized["type"] = "integer"
+        elif isinstance(constant, float):
+            normalized["type"] = "number"
+        elif isinstance(constant, str):
+            normalized["type"] = "string"
+        elif constant is None:
+            normalized["type"] = "null"
+    return normalized
 
 
 def _atomic_json_write(path: Path, payload: object) -> None:
