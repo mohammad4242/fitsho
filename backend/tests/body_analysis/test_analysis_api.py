@@ -18,6 +18,7 @@ from .test_execution_and_reviews import (
     _config,
     _Provider,
     _submitted_session,
+    _v4_config,
 )
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -40,6 +41,13 @@ def _runtime_override(client: TestClient) -> None:
     client.app.dependency_overrides[get_body_analysis_runtime] = lambda: BodyAnalysisRuntime(
         provider=_Provider(),
         config=_config(),
+    )
+
+
+def _v4_runtime_override(client: TestClient) -> None:
+    client.app.dependency_overrides[get_body_analysis_runtime] = lambda: BodyAnalysisRuntime(
+        provider=_Provider(),
+        config=_v4_config(),
     )
 
 
@@ -136,12 +144,46 @@ def test_unconfigured_analysis_returns_safe_failure_without_changing_photo_sessi
     response = client.post(
         f"/api/v1/body-photo-sessions/{photo_session.id}/analysis",
         headers=ORIGIN,
+        json={"confirm_measurements_current": True},
     )
 
     db.refresh(photo_session)
     assert response.status_code == 503
     assert response.json() == {"detail": "Body analysis is temporarily unavailable"}
     assert photo_session.state is BodyPhotoSessionState.QUEUED
+
+
+def test_v4_start_returns_structured_missing_measurement_fields(
+    client: TestClient, db: Session
+) -> None:
+    _v4_runtime_override(client)
+    email = f"missing-measurements-{uuid4()}@example.com"
+    _register(client, email)
+    owner = db.scalar(select(User).where(User.email == email))
+    assert owner is not None
+    _, photo_session = _submitted_session(db, owner)
+
+    response = client.post(
+        f"/api/v1/body-photo-sessions/{photo_session.id}/analysis",
+        headers=ORIGIN,
+        json={"confirm_measurements_current": True},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": {
+            "code": "missing_body_analysis_inputs",
+            "missing_fields": [
+                "sex",
+                "height_cm",
+                "weight_kg",
+                "shoulder_circumference_cm",
+                "waist_circumference_cm",
+                "hip_circumference_cm",
+                "fitness_goal",
+            ],
+        }
+    }
 
 
 def test_start_and_retry_do_not_disclose_another_users_photo_session(
@@ -156,7 +198,11 @@ def test_start_and_retry_do_not_disclose_another_users_photo_session(
     _logout(client)
     _register(client, f"other-{uuid4()}@example.com")
 
-    start = client.post(f"/api/v1/body-photo-sessions/{photo_session.id}/analysis", headers=ORIGIN)
+    start = client.post(
+        f"/api/v1/body-photo-sessions/{photo_session.id}/analysis",
+        headers=ORIGIN,
+        json={"confirm_measurements_current": True},
+    )
     retry = client.post(
         f"/api/v1/body-photo-sessions/{photo_session.id}/analysis/retry",
         headers=ORIGIN,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,6 +18,12 @@ from app.body_analysis.schemas import (
     VisualPhysiqueAssessment,
     VisualPhysiqueAssessmentV3,
 )
+
+
+class BodyAnalysisStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirm_measurements_current: Literal[True]
 
 
 class SpecialistReviewState(BaseModel):

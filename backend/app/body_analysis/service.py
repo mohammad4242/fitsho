@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
@@ -50,6 +51,7 @@ from app.body_analysis.schemas import (
 )
 from app.body_photos.enums import BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
+from app.profile.enums import FitnessGoal, Sex
 from app.profile.models import BodyMeasurement, UserProfile
 
 
@@ -63,6 +65,52 @@ class BodyAnalysisStateError(ValueError):
 
 class BodyAnalysisInputError(ValueError):
     pass
+
+
+class BodyAnalysisRequirementsError(BodyAnalysisInputError):
+    def __init__(self, missing_fields: tuple[str, ...]) -> None:
+        self.missing_fields = missing_fields
+        super().__init__("required body analysis inputs are missing")
+
+
+class BodyAnalysisConfirmationError(BodyAnalysisInputError):
+    pass
+
+
+class BodyAnalysisPhotoSnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    view: BodyPhotoView
+    photo_id: UUID
+    storage_key: str = Field(min_length=1, max_length=160)
+    updated_at: datetime
+
+
+class BodyAnalysisInputSnapshot(BaseModel):
+    """Immutable profile, measurement, and photo inputs captured at queue time."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    captured_at: datetime
+    confirmed_at: datetime
+    profile_updated_at: datetime
+    measurement_id: UUID
+    measurement_measured_at: datetime
+    sex: Sex
+    height_cm: int
+    weight_kg: float
+    shoulder_circumference_cm: float
+    waist_circumference_cm: float
+    hip_circumference_cm: float
+    selected_goal: FitnessGoal
+    photo_versions: tuple[BodyAnalysisPhotoSnapshot, ...] = Field(min_length=3, max_length=3)
+
+    @model_validator(mode="after")
+    def validate_photo_versions(self) -> BodyAnalysisInputSnapshot:
+        views = {photo.view for photo in self.photo_versions}
+        if views != set(BodyPhotoView):
+            raise ValueError("input snapshot must contain one photo for each view")
+        return self
 
 
 class AnalysisExecutionConfig(BaseModel):
@@ -228,6 +276,8 @@ class BodyAnalysisService:
         session_id: UUID,
         user_id: UUID,
         config: AnalysisExecutionConfig,
+        *,
+        confirm_measurements_current: bool = False,
     ) -> BodyAnalysis:
         photo_session = self._owner_photo_session(session_id, user_id, lock=True)
         if photo_session.state not in {
@@ -244,13 +294,26 @@ class BodyAnalysisService:
             return latest
         if latest is not None:
             self._assert_retry_available(photo_session.id, config)
-        return self._create_analysis(photo_session, config, replaces=latest)
+        input_snapshot = self._snapshot_for_creation(
+            photo_session,
+            config,
+            replaces=latest,
+            confirm_measurements_current=confirm_measurements_current,
+        )
+        return self._create_analysis(
+            photo_session,
+            config,
+            replaces=latest,
+            input_snapshot=input_snapshot,
+        )
 
     def retry(
         self,
         analysis_id: UUID,
         user_id: UUID,
         config: AnalysisExecutionConfig,
+        *,
+        confirm_measurements_current: bool = False,
     ) -> BodyAnalysis:
         previous = self.get_analysis(analysis_id, user_id)
         photo_session = self._owner_photo_session(previous.session_id, user_id, lock=True)
@@ -272,7 +335,176 @@ class BodyAnalysisService:
         elif latest.status is not BodyAnalysisStatus.FAILED:
             raise BodyAnalysisStateError("only failed or stale analyses can be retried")
         self._assert_retry_available(photo_session.id, config)
-        return self._create_analysis(photo_session, config, replaces=latest)
+        input_snapshot = self._snapshot_for_creation(
+            photo_session,
+            config,
+            replaces=latest,
+            confirm_measurements_current=confirm_measurements_current,
+        )
+        return self._create_analysis(
+            photo_session,
+            config,
+            replaces=latest,
+            input_snapshot=input_snapshot,
+        )
+
+    def _snapshot_for_creation(
+        self,
+        photo_session: BodyPhotoSession,
+        config: AnalysisExecutionConfig,
+        *,
+        replaces: BodyAnalysis | None,
+        confirm_measurements_current: bool,
+    ) -> BodyAnalysisInputSnapshot | None:
+        if config.schema_version != "4.0":
+            return None
+        previous_snapshot = self._snapshot_from_analysis(replaces) if replaces else None
+        if previous_snapshot is not None and self._photos_match_snapshot(
+            photo_session.id, previous_snapshot
+        ):
+            return previous_snapshot
+        if not confirm_measurements_current:
+            raise BodyAnalysisConfirmationError(
+                "current measurements must be confirmed after photo changes"
+            )
+        return self._capture_input_snapshot(photo_session)
+
+    def _capture_input_snapshot(self, photo_session: BodyPhotoSession) -> BodyAnalysisInputSnapshot:
+        captured_at = datetime.now(UTC)
+        profile = self._db.scalar(
+            select(UserProfile)
+            .where(UserProfile.user_id == photo_session.user_id)
+            .with_for_update()
+        )
+        measurement = self._db.scalar(
+            select(BodyMeasurement)
+            .where(BodyMeasurement.user_id == photo_session.user_id)
+            .order_by(BodyMeasurement.measured_at.desc(), BodyMeasurement.id.desc())
+            .with_for_update()
+        )
+        missing_fields: list[str] = []
+        if profile is None or profile.sex is None:
+            missing_fields.append("sex")
+        if profile is None or profile.height_cm is None:
+            missing_fields.append("height_cm")
+        if measurement is None:
+            missing_fields.extend(
+                (
+                    "weight_kg",
+                    "shoulder_circumference_cm",
+                    "waist_circumference_cm",
+                    "hip_circumference_cm",
+                )
+            )
+        else:
+            if measurement.weight_kg is None:
+                missing_fields.append("weight_kg")
+            if measurement.shoulder_circumference_cm is None:
+                missing_fields.append("shoulder_circumference_cm")
+            if measurement.waist_circumference_cm is None:
+                missing_fields.append("waist_circumference_cm")
+            if measurement.hip_circumference_cm is None:
+                missing_fields.append("hip_circumference_cm")
+        if profile is None or profile.fitness_goal is None:
+            missing_fields.append("fitness_goal")
+        if missing_fields:
+            raise BodyAnalysisRequirementsError(tuple(missing_fields))
+        assert profile is not None
+        assert measurement is not None
+        assert measurement.shoulder_circumference_cm is not None
+        assert measurement.waist_circumference_cm is not None
+        assert measurement.hip_circumference_cm is not None
+        return BodyAnalysisInputSnapshot(
+            captured_at=captured_at,
+            confirmed_at=captured_at,
+            profile_updated_at=profile.updated_at,
+            measurement_id=measurement.id,
+            measurement_measured_at=measurement.measured_at,
+            sex=profile.sex,
+            height_cm=profile.height_cm,
+            weight_kg=float(measurement.weight_kg),
+            shoulder_circumference_cm=float(measurement.shoulder_circumference_cm),
+            waist_circumference_cm=float(measurement.waist_circumference_cm),
+            hip_circumference_cm=float(measurement.hip_circumference_cm),
+            selected_goal=profile.fitness_goal,
+            photo_versions=tuple(
+                BodyAnalysisPhotoSnapshot(
+                    view=photo.view,
+                    photo_id=photo.id,
+                    storage_key=photo.storage_key,
+                    updated_at=photo.updated_at,
+                )
+                for photo in self._photos_for_session(photo_session.id)
+            ),
+        )
+
+    def _photos_for_session(self, session_id: UUID) -> tuple[BodyPhoto, ...]:
+        return tuple(
+            self._db.scalars(
+                select(BodyPhoto)
+                .where(BodyPhoto.session_id == session_id)
+                .order_by(BodyPhoto.view)
+            ).all()
+        )
+
+    def _photos_match_snapshot(
+        self,
+        session_id: UUID,
+        snapshot: BodyAnalysisInputSnapshot,
+    ) -> bool:
+        current = self._photos_for_session(session_id)
+        current_by_view = {
+            photo.view: (photo.id, photo.storage_key, photo.updated_at) for photo in current
+        }
+        expected_by_view = {
+            photo.view: (photo.photo_id, photo.storage_key, photo.updated_at)
+            for photo in snapshot.photo_versions
+        }
+        return current_by_view == expected_by_view
+
+    @staticmethod
+    def _snapshot_from_analysis(
+        analysis: BodyAnalysis | None,
+    ) -> BodyAnalysisInputSnapshot | None:
+        if analysis is None or not isinstance(analysis.raw_result, dict):
+            return None
+        raw_snapshot = analysis.raw_result.get("input_snapshot")
+        if not isinstance(raw_snapshot, dict):
+            return None
+        try:
+            return BodyAnalysisInputSnapshot.model_validate(raw_snapshot)
+        except ValidationError:
+            return None
+
+    @classmethod
+    def _snapshot_profile_context(
+        cls,
+        analysis: BodyAnalysis,
+    ) -> dict[str, object]:
+        snapshot = cls._snapshot_from_analysis(analysis)
+        if snapshot is None:
+            raise BodyAnalysisInputError("analysis input snapshot is missing")
+        return {
+            "selected_goal": snapshot.selected_goal.value,
+            "height_cm": snapshot.height_cm,
+            "weight_kg": snapshot.weight_kg,
+            "shoulder_circumference_cm": snapshot.shoulder_circumference_cm,
+            "waist_circumference_cm": snapshot.waist_circumference_cm,
+            "hip_circumference_cm": snapshot.hip_circumference_cm,
+        }
+
+    @staticmethod
+    def _raw_result_with(
+        body_analysis: BodyAnalysis,
+        **entries: object,
+    ) -> dict[str, object]:
+        raw_result = (
+            deepcopy(body_analysis.raw_result)
+            if isinstance(body_analysis.raw_result, dict)
+            else {}
+        )
+        raw_result.update(entries)
+        return raw_result
 
     def _assert_retry_available(
         self,
@@ -304,6 +536,7 @@ class BodyAnalysisService:
         config: AnalysisExecutionConfig,
         *,
         replaces: BodyAnalysis | None,
+        input_snapshot: BodyAnalysisInputSnapshot | None,
     ) -> BodyAnalysis:
         revision = (
             int(
@@ -327,6 +560,11 @@ class BodyAnalysisService:
             prompt_version=config.prompt_version,
             schema_version=config.schema_version,
             status=BodyAnalysisStatus.QUEUED,
+            raw_result=(
+                {"input_snapshot": input_snapshot.model_dump(mode="json")}
+                if input_snapshot is not None
+                else None
+            ),
         )
         photo_session.state = BodyPhotoSessionState.QUEUED
         self._db.add(analysis)
@@ -395,7 +633,11 @@ class BodyAnalysisService:
             response = await provider.analyze_images(
                 self._request(
                     execution_config,
-                    profile_context=self._profile_context(analysis.session.user_id),
+                    profile_context=(
+                        self._snapshot_profile_context(analysis)
+                        if execution_config.schema_version == "4.0"
+                        else self._profile_context(analysis.session.user_id)
+                    ),
                 ),
                 images=analysis_images,
             )
@@ -417,10 +659,11 @@ class BodyAnalysisService:
                     "analysis confidence is below the configured threshold"
                 )
             self._validate_response_cost(response, execution_config)
-            analysis.raw_result = {
-                "photo_validation": preflight.model_dump(mode="json"),
-                "analysis": response.payload,
-            }
+            analysis.raw_result = self._raw_result_with(
+                analysis,
+                photo_validation=preflight.model_dump(mode="json"),
+                analysis=response.payload,
+            )
             analysis.normalized_result = normalized.model_dump(mode="json")
             analysis.visual_result = visual_result
             analysis.overall_confidence = normalized.overall_confidence
@@ -680,7 +923,10 @@ class BodyAnalysisService:
         preflight: BodyPhotoPreflight,
         response: StructuredGenerationResponse,
     ) -> None:
-        analysis.raw_result = {"photo_validation": preflight.model_dump(mode="json")}
+        analysis.raw_result = self._raw_result_with(
+            analysis,
+            photo_validation=preflight.model_dump(mode="json"),
+        )
         analysis.model_id = response.model_id
         analysis.provider_request_id = response.provider_request_id
         analysis.input_tokens = response.input_tokens

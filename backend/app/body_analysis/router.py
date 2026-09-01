@@ -16,6 +16,7 @@ from app.body_analysis.api_schemas import (
     BodyAnalysisResultVersionResponse,
     BodyAnalysisReviewDetail,
     BodyAnalysisReviewHistoryResponse,
+    BodyAnalysisStartRequest,
     SpecialistReviewRequest,
     SpecialistReviewResponse,
     SpecialistReviewState,
@@ -27,7 +28,9 @@ from app.body_analysis.runtime import (
 )
 from app.body_analysis.schemas import BodyPhotoPreflight
 from app.body_analysis.service import (
+    BodyAnalysisInputError,
     BodyAnalysisNotFoundError,
+    BodyAnalysisRequirementsError,
     BodyAnalysisService,
     BodyAnalysisStateError,
     ReviewSubmission,
@@ -52,6 +55,20 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 def _not_found() -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Body analysis not found")
+
+
+def _input_error(error: BodyAnalysisInputError) -> HTTPException:
+    if isinstance(error, BodyAnalysisRequirementsError):
+        detail: object = {
+            "code": "missing_body_analysis_inputs",
+            "missing_fields": list(error.missing_fields),
+        }
+    else:
+        detail = {
+            "code": "measurement_confirmation_required",
+            "message": "Confirm that the current measurements represent this scan.",
+        }
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
 
 
 def _response(db: Session, analysis: BodyAnalysis) -> BodyAnalysisResponse:
@@ -163,12 +180,20 @@ def start_session_analysis(
     db: DatabaseSession,
     user: CurrentUser,
     runtime: BodyAnalysisRuntimeDependency,
+    payload: BodyAnalysisStartRequest,
 ) -> BodyAnalysisResponse:
     try:
         service = BodyAnalysisService(db)
-        analysis = service.queue(session_id, user.id, runtime.config)
+        analysis = service.queue(
+            session_id,
+            user.id,
+            runtime.config,
+            confirm_measurements_current=payload.confirm_measurements_current,
+        )
     except BodyAnalysisNotFoundError:
         raise _not_found() from None
+    except BodyAnalysisInputError as error:
+        raise _input_error(error) from None
     except BodyAnalysisStateError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -190,6 +215,7 @@ def retry_session_analysis(
     db: DatabaseSession,
     user: CurrentUser,
     runtime: BodyAnalysisRuntimeDependency,
+    payload: BodyAnalysisStartRequest | None = None,
 ) -> BodyAnalysisResponse:
     service = BodyAnalysisService(db)
     try:
@@ -203,9 +229,18 @@ def retry_session_analysis(
             BodyAnalysisStatus.ANALYZING,
         }:
             raise BodyAnalysisStateError("only failed or stale analyses can be retried")
-        analysis = service.retry(latest.id, user.id, runtime.config)
+        analysis = service.retry(
+            latest.id,
+            user.id,
+            runtime.config,
+            confirm_measurements_current=(
+                payload.confirm_measurements_current if payload is not None else False
+            ),
+        )
     except BodyAnalysisNotFoundError:
         raise _not_found() from None
+    except BodyAnalysisInputError as error:
+        raise _input_error(error) from None
     except BodyAnalysisStateError as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from None
     background_tasks.add_task(_execute_background, service, analysis.id, runtime)
@@ -242,6 +277,8 @@ def retry_analysis_as_admin(
         )
     except BodyAnalysisNotFoundError:
         raise _not_found() from None
+    except BodyAnalysisInputError as error:
+        raise _input_error(error) from None
     except BodyAnalysisStateError as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from None
     background_tasks.add_task(_execute_background, BodyAnalysisService(db), queued.id, runtime)

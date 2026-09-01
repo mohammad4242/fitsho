@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -43,6 +44,8 @@ from app.body_analysis.service import (
 )
 from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
+from app.profile.enums import FitnessGoal, Sex
+from app.profile.models import BodyMeasurement, UserProfile
 
 
 def _normalized_payload(*, classification: str = "clear_lag") -> dict[str, object]:
@@ -189,6 +192,230 @@ def _config() -> AnalysisExecutionConfig:
         schema_version="1.0",
         max_output_tokens=3000,
     )
+
+
+def _v4_config() -> AnalysisExecutionConfig:
+    return _config().model_copy(
+        update={"prompt_version": "body-analysis-v4-evidence", "schema_version": "4.0"}
+    )
+
+
+def _complete_body_profile(db: Session, user: User) -> UserProfile:
+    profile = UserProfile(
+        user_id=user.id,
+        sex=Sex.MALE,
+        height_cm=178,
+        fitness_goal=FitnessGoal.BUILD_MUSCLE,
+    )
+    measurement = BodyMeasurement(
+        user_id=user.id,
+        weight_kg=Decimal("82.5"),
+        shoulder_circumference_cm=Decimal("122"),
+        waist_circumference_cm=Decimal("84"),
+        hip_circumference_cm=Decimal("98"),
+    )
+    db.add_all([profile, measurement])
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+def test_v4_queue_accepts_explicit_measurement_confirmation() -> None:
+    assert "confirm_measurements_current" in inspect.signature(BodyAnalysisService.queue).parameters
+
+
+def test_v4_queue_captures_profile_measurement_and_photo_snapshot(db: Session) -> None:
+    user, session = _submitted_session(db)
+    _complete_body_profile(db, user)
+
+    analysis = BodyAnalysisService(db).queue(
+        session.id,
+        user.id,
+        _v4_config(),
+        confirm_measurements_current=True,
+    )
+
+    assert isinstance(analysis.raw_result, dict)
+    snapshot = analysis.raw_result["input_snapshot"]
+    assert isinstance(snapshot, dict)
+    assert snapshot["sex"] == "male"
+    assert snapshot["height_cm"] == 178
+    assert snapshot["weight_kg"] == 82.5
+    assert snapshot["shoulder_circumference_cm"] == 122.0
+    assert snapshot["waist_circumference_cm"] == 84.0
+    assert snapshot["hip_circumference_cm"] == 98.0
+    assert snapshot["selected_goal"] == "build_muscle"
+    assert {photo["view"] for photo in snapshot["photo_versions"]} == {
+        "front",
+        "side",
+        "back",
+    }
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    [
+        "sex",
+        "height_cm",
+        "weight_kg",
+        "shoulder_circumference_cm",
+        "waist_circumference_cm",
+        "hip_circumference_cm",
+        "fitness_goal",
+    ],
+)
+def test_v4_queue_rejects_each_missing_required_input(
+    db: Session,
+    missing_field: str,
+) -> None:
+    user, session = _submitted_session(db)
+    profile = _complete_body_profile(db, user)
+    if missing_field in {"sex", "height_cm", "fitness_goal"}:
+        setattr(profile, missing_field, None)
+    else:
+        measurement = db.scalar(
+            select(BodyMeasurement).where(BodyMeasurement.user_id == user.id)
+        )
+        assert measurement is not None
+        if missing_field == "weight_kg":
+            db.delete(measurement)
+        else:
+            setattr(measurement, missing_field, None)
+    db.commit()
+
+    with pytest.raises(ValueError, match="required body analysis inputs"):
+        BodyAnalysisService(db).queue(
+            session.id,
+            user.id,
+            _v4_config(),
+            confirm_measurements_current=True,
+        )
+
+
+@pytest.mark.parametrize("sex", [Sex.OTHER, Sex.PREFER_NOT_TO_SAY])
+def test_v4_queue_accepts_neutral_sex_values(db: Session, sex: Sex) -> None:
+    user, session = _submitted_session(db)
+    profile = _complete_body_profile(db, user)
+    profile.sex = sex
+    db.commit()
+
+    analysis = BodyAnalysisService(db).queue(
+        session.id,
+        user.id,
+        _v4_config(),
+        confirm_measurements_current=True,
+    )
+
+    assert analysis.raw_result["input_snapshot"]["sex"] == sex.value
+
+
+def test_v4_execution_uses_the_queued_snapshot_after_profile_changes(db: Session) -> None:
+    user, session = _submitted_session(db)
+    profile = _complete_body_profile(db, user)
+    analysis = BodyAnalysisService(db).queue(
+        session.id,
+        user.id,
+        _v4_config(),
+        confirm_measurements_current=True,
+    )
+    measurement = db.scalar(
+        select(BodyMeasurement).where(BodyMeasurement.user_id == user.id)
+    )
+    assert measurement is not None
+    profile.height_cm = 190
+    measurement.weight_kg = Decimal("91.0")
+    db.commit()
+
+    provider = _Provider()
+    asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, _v4_config()))
+
+    assert len(provider.requests) == 2
+    assert provider.requests[1].input_payload["profile_context"] == {
+        "selected_goal": "build_muscle",
+        "height_cm": 178,
+        "weight_kg": 82.5,
+        "shoulder_circumference_cm": 122.0,
+        "waist_circumference_cm": 84.0,
+        "hip_circumference_cm": 98.0,
+    }
+
+
+def test_v4_retry_without_photo_changes_reuses_the_original_snapshot(db: Session) -> None:
+    user, session = _submitted_session(db)
+    _complete_body_profile(db, user)
+    service = BodyAnalysisService(db)
+    config = _v4_config()
+    first = service.queue(session.id, user.id, config, confirm_measurements_current=True)
+    first.status = BodyAnalysisStatus.FAILED
+    db.commit()
+
+    replacement = service.retry(first.id, user.id, config)
+
+    assert replacement.raw_result == first.raw_result
+
+
+def test_v4_retry_after_photo_change_requires_fresh_confirmation(db: Session) -> None:
+    user, session = _submitted_session(db)
+    _complete_body_profile(db, user)
+    service = BodyAnalysisService(db)
+    config = _v4_config()
+    first = service.queue(session.id, user.id, config, confirm_measurements_current=True)
+    first.status = BodyAnalysisStatus.FAILED
+    db.commit()
+    changed_photo = session.photos[0]
+    changed_photo.storage_key = f"bb/{uuid4().hex}.jpg"
+    changed_photo.updated_at = datetime.now(UTC) + timedelta(seconds=1)
+    db.commit()
+
+    with pytest.raises(ValueError, match="current measurements must be confirmed"):
+        service.retry(first.id, user.id, config)
+
+    replacement = service.retry(
+        first.id,
+        user.id,
+        config,
+        confirm_measurements_current=True,
+    )
+
+    assert replacement.raw_result != first.raw_result
+    previous_keys = {
+        photo["view"]: photo["storage_key"]
+        for photo in first.raw_result["input_snapshot"]["photo_versions"]
+    }
+    replacement_keys = {
+        photo["view"]: photo["storage_key"]
+        for photo in replacement.raw_result["input_snapshot"]["photo_versions"]
+    }
+    assert replacement_keys[changed_photo.view.value] != previous_keys[changed_photo.view.value]
+
+
+def test_v4_snapshot_survives_preflight_rejection(db: Session) -> None:
+    user, session = _submitted_session(db)
+    _complete_body_profile(db, user)
+    config = _v4_config()
+    service = BodyAnalysisService(db)
+    analysis = service.queue(session.id, user.id, config, confirm_measurements_current=True)
+
+    failed = asyncio.run(service.execute(analysis.id, _PreflightRejectingProvider(), config))
+
+    assert failed.status is BodyAnalysisStatus.FAILED
+    assert isinstance(failed.raw_result, dict)
+    assert "input_snapshot" in failed.raw_result
+    assert "photo_validation" in failed.raw_result
+
+
+def test_v4_snapshot_survives_provider_failure(db: Session) -> None:
+    user, session = _submitted_session(db)
+    _complete_body_profile(db, user)
+    config = _v4_config()
+    service = BodyAnalysisService(db)
+    analysis = service.queue(session.id, user.id, config, confirm_measurements_current=True)
+
+    failed = asyncio.run(service.execute(analysis.id, _FailingProvider(), config))
+
+    assert failed.status is BodyAnalysisStatus.FAILED
+    assert isinstance(failed.raw_result, dict)
+    assert "input_snapshot" in failed.raw_result
 
 
 def _grant(db: Session, user: User, role: SpecialistRole) -> None:
