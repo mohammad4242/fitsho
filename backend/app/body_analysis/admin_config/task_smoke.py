@@ -339,10 +339,44 @@ def _fixture_jpeg(label: str, *, body: bool = False) -> str:
     image = Image.new("RGB", (512, 768 if body else 512), (226, 226, 226))
     draw = ImageDraw.Draw(image)
     if body:
-        draw.ellipse((190, 36, 322, 168), fill=(160, 160, 160))
-        draw.rounded_rectangle((160, 150, 352, 520), radius=48, fill=(150, 150, 150))
-        draw.rectangle((175, 500, 235, 730), fill=(145, 145, 145))
-        draw.rectangle((277, 500, 337, 730), fill=(145, 145, 145))
+        # A privacy-safe, headless mannequin with genuinely distinct views. A
+        # flat gray silhouette made vision models classify side/back as the
+        # wrong view, so the fixture uses simple clothing and body landmarks.
+        draw.ellipse((125, 710, 390, 750), fill=(190, 190, 190))
+        skin = (205, 150, 102)
+        top = (50, 74, 104)
+        shorts = (45, 48, 55)
+        shoe = (35, 35, 38)
+        if label == "front":
+            draw.rectangle((232, 70, 280, 145), fill=skin)
+            draw.rounded_rectangle((170, 125, 342, 370), radius=42, fill=top)
+            draw.polygon([(175, 145), (145, 185), (155, 200), (195, 175)], fill=skin)
+            draw.polygon([(337, 145), (367, 185), (357, 200), (317, 175)], fill=skin)
+            draw.rounded_rectangle((185, 342, 327, 445), radius=18, fill=shorts)
+            draw.polygon([(192, 430), (246, 430), (238, 665), (200, 665)], fill=skin)
+            draw.polygon([(266, 430), (320, 430), (312, 665), (274, 665)], fill=skin)
+            draw.rounded_rectangle((192, 655, 244, 710), radius=12, fill=shoe)
+            draw.rounded_rectangle((268, 655, 320, 710), radius=12, fill=shoe)
+        elif label == "side":
+            draw.rectangle((244, 70, 276, 145), fill=skin)
+            draw.rounded_rectangle((220, 125, 302, 370), radius=30, fill=top)
+            draw.polygon([(286, 150), (326, 205), (310, 220), (278, 180)], fill=skin)
+            draw.rounded_rectangle((225, 342, 300, 445), radius=16, fill=shorts)
+            draw.polygon([(230, 430), (269, 430), (267, 665), (238, 665)], fill=skin)
+            draw.polygon([(270, 430), (302, 430), (319, 665), (291, 665)], fill=skin)
+            draw.rounded_rectangle((230, 655, 270, 710), radius=12, fill=shoe)
+            draw.rounded_rectangle((290, 655, 330, 710), radius=12, fill=shoe)
+        else:
+            draw.rectangle((232, 70, 280, 145), fill=skin)
+            draw.rounded_rectangle((170, 125, 342, 370), radius=42, fill=top)
+            draw.polygon([(175, 145), (145, 185), (155, 200), (195, 175)], fill=skin)
+            draw.polygon([(337, 145), (367, 185), (357, 200), (317, 175)], fill=skin)
+            draw.rounded_rectangle((185, 342, 327, 445), radius=18, fill=shorts)
+            draw.polygon([(192, 430), (246, 430), (238, 665), (200, 665)], fill=skin)
+            draw.polygon([(266, 430), (320, 430), (312, 665), (274, 665)], fill=skin)
+            draw.rounded_rectangle((192, 655, 244, 710), radius=12, fill=shoe)
+            draw.rounded_rectangle((268, 655, 320, 710), radius=12, fill=shoe)
+            draw.line((200, 170, 312, 170), fill=(120, 165, 195), width=5)
         draw.text((16, 16), label, fill=(45, 45, 45))
     else:
         draw.ellipse((112, 120, 275, 282), fill=(201, 155, 95))
