@@ -19,6 +19,8 @@ import {
   submitAdminAiAgentAuthInput,
   cancelAdminAiAgentAuthActive,
   cancelAdminAiAgentAuthSession,
+  getAdminAiAgentServiceCapabilities,
+  testAdminAiAgentTask,
   uploadAdminMealImage,
   updateAdminAiRouting,
   createAdminTrainingProgramStructure,
@@ -181,6 +183,50 @@ it("routes agent authentication through the backend with bounded payloads", asyn
     expect.objectContaining({ method: "DELETE" }),
   );
   expect(fetchMock.mock.calls.flat().join(" ")).not.toContain("9001");
+});
+
+it("requests task-scoped Agent profiles and posts a profile smoke test", async () => {
+  const smoke = {
+    ok: true,
+    task_type: "food_price_search" as const,
+    agent: "antigravity" as const,
+    profile_id: "antigravity-gemini-3.7-flash-high",
+    fingerprint: "aaaaaaaaaaaaaaaa",
+    stage: "passed" as const,
+    request_id: "smoke-1",
+    checked_at: "2026-08-31T12:00:00Z",
+    duration_seconds: 0.4,
+    error_code: null,
+    safe_error_message: null,
+  };
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse({ runners: [] }))
+    .mockResolvedValueOnce(jsonResponse(smoke));
+
+  await expect(getAdminAiAgentServiceCapabilities("food_price_search")).resolves.toEqual({ runners: [] });
+  await expect(testAdminAiAgentTask({
+    taskType: "food_price_search",
+    agent: "antigravity",
+    profileId: smoke.profile_id,
+  })).resolves.toEqual(smoke);
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/admin/ai/agent-service/capabilities?task_type=food_price_search",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/admin/ai/agent-service/task-smoke",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({
+        task_type: "food_price_search",
+        agent: "antigravity",
+        profile_id: smoke.profile_id,
+      }),
+    }),
+  );
 });
 
 it("requests a fresh Antigravity login only when reauthentication is explicit", async () => {

@@ -20,6 +20,7 @@ import type {
   AdminAiAgentAuthSession,
   AdminAiAgentAuthCancellation,
   AdminAiAgentName,
+  AdminAiAgentTaskSmoke,
   AdminAiAgentServiceCapabilities,
   AdminAiAgentServiceTest,
   AdminAiProviderTest,
@@ -390,19 +391,44 @@ export function refreshAdminAiModels(): Promise<AdminAiCatalogRefresh> {
   });
 }
 
-export function getAdminAiAgentServiceCapabilities(): Promise<AdminAiAgentServiceCapabilities> {
+export function getAdminAiAgentServiceCapabilities(
+  taskType?: AdminAiTaskType,
+): Promise<AdminAiAgentServiceCapabilities> {
+  const query = taskType ? `?task_type=${encodeURIComponent(taskType)}` : "";
   return request<AdminAiAgentServiceCapabilities>(
-    "/api/v1/admin/ai/agent-service/capabilities",
+    `/api/v1/admin/ai/agent-service/capabilities${query}`,
   );
 }
 
 export function testAdminAiAgentService(
   agent: AdminAiAgentName,
   modelId: string,
+  profileId?: string,
 ): Promise<AdminAiAgentServiceTest> {
   return request<AdminAiAgentServiceTest>("/api/v1/admin/ai/agent-service/test", {
     method: "POST",
-    body: JSON.stringify({ agent, model_id: modelId }),
+    body: JSON.stringify({
+      agent,
+      model_id: modelId,
+      ...(profileId ? { profile_id: profileId } : {}),
+    }),
+  });
+}
+
+export function testAdminAiAgentTask(
+  input: {
+    taskType: AdminAiTaskType;
+    agent: AdminAiAgentName;
+    profileId: string;
+  },
+): Promise<AdminAiAgentTaskSmoke> {
+  return request<AdminAiAgentTaskSmoke>("/api/v1/admin/ai/agent-service/task-smoke", {
+    method: "POST",
+    body: JSON.stringify({
+      task_type: input.taskType,
+      agent: input.agent,
+      profile_id: input.profileId,
+    }),
   });
 }
 

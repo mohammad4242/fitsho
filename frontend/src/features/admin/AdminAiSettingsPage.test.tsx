@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   saveAdminAiTaskConfig: vi.fn(),
   testAdminAiProvider: vi.fn(),
   testAdminAiAgentService: vi.fn(),
+  testAdminAiAgentTask: vi.fn(),
   refreshAdminAiModels: vi.fn(),
 }));
 
@@ -36,6 +37,7 @@ const bodyConfig: AdminAiTaskConfig = {
   execution_backend: "api",
   agent_name: null,
   agent_model_id: null,
+  agent_profile_id: null,
   enabled: false,
   primary_model_id: null,
   fallback_model_ids: [],
@@ -537,12 +539,33 @@ it("tests the selected Agent and shows its safe failure without leaking details"
   api.getAdminAiTaskConfigs.mockResolvedValue([{ ...bodyConfig, credential: { configured: true, masked: "********cret" } }]);
   api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
     agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated", auth_mode: "browser_link",
-    models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
+    models: [],
+    profiles: [{
+      profile_id: "antigravity-vision-structured-high",
+      agent: "antigravity",
+      display_name: "Vision structured (High)",
+      model_id: "vision-structured",
+      effort: "high",
+      task_kinds: ["body_photo_analysis"],
+      fingerprint: "aaaaaaaaaaaaaaaa",
+      supports_text_input: true,
+      supports_image_input: true,
+      supports_structured_output: true,
+      verification_status: "unverified",
+      verified_at: null,
+      verification_error_code: null,
+      verification_safe_error_message: null,
+    }],
   }] });
-  api.testAdminAiAgentService.mockResolvedValue({
+  api.testAdminAiAgentTask.mockResolvedValue({
     ok: false,
     agent: "antigravity",
     model_id: "vision-structured",
+    profile_id: "antigravity-vision-structured-high",
+    task_type: "body_photo_analysis",
+    fingerprint: "aaaaaaaaaaaaaaaa",
+    stage: "agent_service",
+    request_id: null,
     checked_at: "2026-08-03T12:00:00Z",
     duration_seconds: null,
     error_code: "agent_unavailable",
@@ -555,7 +578,11 @@ it("tests the selected Agent and shows its safe failure without leaking details"
   await user.click(screen.getByRole("combobox", { name: "Model" }));
   await user.click(screen.getByRole("option", { name: /vision-structured/ }));
   await user.click(screen.getByRole("button", { name: "Test Agent" }));
-  expect(api.testAdminAiAgentService).toHaveBeenCalledWith("antigravity", "vision-structured");
+  expect(api.testAdminAiAgentTask).toHaveBeenCalledWith({
+    taskType: "body_photo_analysis",
+    agent: "antigravity",
+    profileId: "antigravity-vision-structured-high",
+  });
   expect(await screen.findByRole("alert")).toHaveTextContent("The selected Agent Service runner is unavailable.");
   expect(screen.queryByText(/agent-service-test-token|Bearer/i)).not.toBeInTheDocument();
 });
@@ -567,7 +594,23 @@ it("saves Agent Service routing without sending or replacing the stored API key"
   }]);
   api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
     agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated", auth_mode: "browser_link",
-    models: [{ model_id: "vision-structured", supports_text_input: true, supports_image_input: true, supports_structured_output: true }],
+    models: [],
+    profiles: [{
+      profile_id: "antigravity-vision-structured-high",
+      agent: "antigravity",
+      display_name: "Vision structured (High)",
+      model_id: "vision-structured",
+      effort: "high",
+      task_kinds: ["body_photo_analysis"],
+      fingerprint: "aaaaaaaaaaaaaaaa",
+      supports_text_input: true,
+      supports_image_input: true,
+      supports_structured_output: true,
+      verification_status: "passed",
+      verified_at: "2026-08-03T12:00:00Z",
+      verification_error_code: null,
+      verification_safe_error_message: null,
+    }],
   }] });
   api.saveAdminAiTaskConfig.mockResolvedValue({
     ...bodyConfig,
@@ -589,10 +632,75 @@ it("saves Agent Service routing without sending or replacing the stored API key"
       execution_backend: "agent_service",
       agent_name: "antigravity",
       agent_model_id: "vision-structured",
+      agent_profile_id: "antigravity-vision-structured-high",
       replace_credential: false,
     }),
   );
   expect(api.saveAdminAiTaskConfig.mock.calls[0][1]).not.toHaveProperty("api_key");
+});
+
+it("enables an Agent Service profile only after the selected task smoke passes", async () => {
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [{
+    agent: "antigravity", installed: true, version: "1.1.22", auth_state: "authenticated", auth_mode: "browser_link",
+    models: [],
+    profiles: [{
+      profile_id: "antigravity-vision-structured-high",
+      agent: "antigravity",
+      display_name: "Vision structured (High)",
+      model_id: "vision-structured",
+      effort: "high",
+      task_kinds: ["body_photo_analysis"],
+      fingerprint: "aaaaaaaaaaaaaaaa",
+      supports_text_input: true,
+      supports_image_input: true,
+      supports_structured_output: true,
+      verification_status: "unverified",
+      verified_at: null,
+      verification_error_code: null,
+      verification_safe_error_message: null,
+    }],
+  }] });
+  api.testAdminAiAgentTask.mockResolvedValue({
+    ok: true,
+    task_type: "body_photo_analysis",
+    agent: "antigravity",
+    profile_id: "antigravity-vision-structured-high",
+    fingerprint: "aaaaaaaaaaaaaaaa",
+    stage: "passed",
+    request_id: "smoke-1",
+    checked_at: "2026-08-03T12:00:00Z",
+    duration_seconds: 0.4,
+    error_code: null,
+    safe_error_message: null,
+  });
+  api.saveAdminAiTaskConfig.mockResolvedValue({
+    ...bodyConfig,
+    execution_backend: "agent_service",
+    agent_name: "antigravity",
+    agent_model_id: "vision-structured",
+    agent_profile_id: "antigravity-vision-structured-high",
+    enabled: true,
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByLabelText("Agent Service"));
+  await user.click(screen.getByRole("combobox", { name: "Model" }));
+  await user.click(screen.getByRole("option", { name: /Vision structured/ }));
+  expect(screen.getByRole("checkbox", { name: "Enabled" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Test Agent" }));
+  expect(await screen.findByText("Selected task passed with this profile")).toBeInTheDocument();
+  await user.click(screen.getByRole("checkbox", { name: "Enabled" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+
+  expect(api.saveAdminAiTaskConfig).toHaveBeenCalledWith(
+    "body_photo_analysis",
+    expect.objectContaining({
+      enabled: true,
+      agent_model_id: "vision-structured",
+      agent_profile_id: "antigravity-vision-structured-high",
+    }),
+  );
 });
 
 it("restores API controls and the stored key placeholder when switching back", async () => {

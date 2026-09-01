@@ -10,6 +10,7 @@ export type AgentServicePanelProps = {
   unavailable: boolean;
   selectedAgent: AdminAiAgentName | null;
   selectedModelId: string | null;
+  selectedModelLabel?: string | null;
   onSelectAgent: (agent: AdminAiAgentName) => void;
   onAuthenticate: (agent: AdminAiAgentName) => void;
   onTest: () => void;
@@ -22,6 +23,7 @@ export function AgentServicePanel({
   unavailable,
   selectedAgent,
   selectedModelId,
+  selectedModelLabel,
   onSelectAgent,
   onAuthenticate,
   onTest,
@@ -132,7 +134,7 @@ export function AgentServicePanel({
         </label>
         <div className="admin-agent-service__selected-values">
           <span>{t("admin.aiSettings.agentService.selectedAgent")}: {selectedLabel}</span>
-          <span>{t("admin.aiSettings.agentService.selectedModel")}: {selectedModelId ?? t("admin.aiSettings.agentService.none")}</span>
+          <span>{t("admin.aiSettings.agentService.selectedModel")}: {selectedModelLabel ?? selectedModelId ?? t("admin.aiSettings.agentService.none")}</span>
         </div>
         <button
           type="button"

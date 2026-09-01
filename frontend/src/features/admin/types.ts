@@ -308,6 +308,7 @@ export type AdminAiTaskConfig = {
   execution_backend: AdminAiExecutionBackend;
   agent_name: AdminAiAgentName | null;
   agent_model_id: string | null;
+  agent_profile_id: string | null;
   enabled: boolean;
   primary_model_id: string | null;
   fallback_model_ids: string[];
@@ -378,6 +379,23 @@ export type AdminAiAgentModelCapability = {
   supports_structured_output: boolean;
 };
 
+export type AdminAiAgentModelProfile = {
+  profile_id: string;
+  agent: AdminAiAgentName;
+  display_name: string;
+  model_id: string;
+  effort: "low" | "medium" | "high" | "thinking" | null;
+  task_kinds: AdminAiTaskType[];
+  fingerprint: string;
+  supports_text_input: boolean;
+  supports_image_input: boolean;
+  supports_structured_output: boolean;
+  verification_status: "unverified" | "passed" | "failed" | "stale";
+  verified_at: string | null;
+  verification_error_code: string | null;
+  verification_safe_error_message: string | null;
+};
+
 export type AdminAiAgentRunnerCapability = {
   agent: AdminAiAgentName;
   installed: boolean;
@@ -385,6 +403,7 @@ export type AdminAiAgentRunnerCapability = {
   auth_state: "unknown" | "authenticated" | "unauthenticated";
   auth_mode: "unknown" | "browser_link" | "manual";
   models: AdminAiAgentModelCapability[];
+  profiles?: AdminAiAgentModelProfile[];
 };
 
 export type AdminAiAgentServiceCapabilities = {
@@ -395,6 +414,28 @@ export type AdminAiAgentServiceTest = {
   ok: boolean;
   agent: AdminAiAgentName;
   model_id: string;
+  profile_id?: string | null;
+  checked_at: string;
+  duration_seconds: number | null;
+  error_code: string | null;
+  safe_error_message: string | null;
+};
+
+export type AdminAiAgentTaskSmoke = {
+  ok: boolean;
+  task_type: AdminAiTaskType;
+  agent: AdminAiAgentName;
+  profile_id: string;
+  fingerprint: string | null;
+  stage:
+    | "backend_request"
+    | "agent_service"
+    | "runner"
+    | "schema"
+    | "semantic_validation"
+    | "passed"
+    | "failed";
+  request_id: string | null;
   checked_at: string;
   duration_seconds: number | null;
   error_code: string | null;
