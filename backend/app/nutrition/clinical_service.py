@@ -95,6 +95,10 @@ def _store(root: Path, content: bytes, extension: str) -> str:
     key = f"{identifier[:2]}/{identifier}{extension}"
     destination = lab_storage_path(root, key)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(destination.parent, 0o755)
+    except OSError:
+        pass
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as handle:
@@ -102,6 +106,7 @@ def _store(root: Path, content: bytes, extension: str) -> str:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
+        os.chmod(temporary, 0o644)
         os.replace(temporary, destination)
     except OSError as error:
         if temporary:

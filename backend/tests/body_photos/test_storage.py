@@ -479,3 +479,16 @@ def test_delete_failure_is_retryable_without_losing_cleanup_key(
     assert retry.status_code == 204
     assert db.scalar(text("SELECT count(*) FROM body_photo_storage_cleanups")) == 0
     assert _stored_files(private_root) == []
+
+
+def test_stored_body_photo_has_readable_permissions(
+    test_settings: Settings, tmp_path: Path
+) -> None:
+    test_settings.body_photo_storage_root = tmp_path
+    storage = BodyPhotoStorage(test_settings)
+    stored = storage.store(b"dummy image data", ".jpg")
+    stored_path = tmp_path / stored.key
+    assert stored_path.is_file()
+    mode = stored_path.stat().st_mode & 0o777
+    assert mode == 0o644
+

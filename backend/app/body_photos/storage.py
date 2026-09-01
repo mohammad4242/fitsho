@@ -47,6 +47,10 @@ class BodyPhotoStorage:
         key = f"{identifier[:2]}/{identifier}{extension}"
         final_path = self._path_for(key)
         final_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(final_path.parent, 0o755)
+        except OSError:
+            pass
         temporary_path: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(
@@ -59,6 +63,7 @@ class BodyPhotoStorage:
                 temporary.write(content)
                 temporary.flush()
                 os.fsync(temporary.fileno())
+            os.chmod(temporary_path, 0o644)
             os.replace(temporary_path, final_path)
         except OSError as error:
             if temporary_path is not None:

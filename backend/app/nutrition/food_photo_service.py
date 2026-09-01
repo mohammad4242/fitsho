@@ -142,6 +142,10 @@ def _store(root: Path, content: bytes) -> str:
     key = f"{identifier[:2]}/{identifier}.jpg"
     destination = food_photo_storage_path(root, key)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(destination.parent, 0o755)
+    except OSError:
+        pass
     temporary: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as handle:
@@ -149,6 +153,7 @@ def _store(root: Path, content: bytes) -> str:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
+        os.chmod(temporary, 0o644)
         os.replace(temporary, destination)
     except OSError as error:
         if temporary:
