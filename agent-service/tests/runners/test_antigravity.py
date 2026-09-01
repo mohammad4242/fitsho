@@ -21,6 +21,7 @@ def make_request(
     *,
     image_paths: tuple[Path, ...] = (),
     response_schema: dict[str, Any] | None = None,
+    effort: str | None = None,
 ) -> RunnerRequest:
     return RunnerRequest(
         model_id="gemini-test",
@@ -32,6 +33,7 @@ def make_request(
         max_output_tokens=300,
         timeout_seconds=4,
         image_paths=image_paths,
+        effort=effort,
     )
 
 
@@ -152,10 +154,73 @@ def test_run_parses_structured_output_and_uses_exact_model_argv(
     assert command[1] == "--print"
     assert command[3:5] == ["--output-format", "json"]
     assert command[5] == "--json-schema"
-    assert command[-3:] == ["--model", "gemini-test", "--sandbox"]
-    assert "--dangerously-skip-permissions" not in command
+    assert command[-4:] == [
+        "--model",
+        "gemini-test",
+        "--sandbox",
+        "--dangerously-skip-permissions",
+    ]
     assert "shell" not in kwargs
     assert kwargs["workspace"] == tmp_path
+
+
+def test_profile_effort_is_passed_to_agy_and_thinking_maps_to_high(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del kwargs
+        calls.append(command)
+        return ProcessResult(0, success_output(structured=True), "")
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setattr(antigravity, "run_process", fake_run_process)
+    run(
+        AntigravityRunner(workspace=tmp_path).run(
+            make_request(),
+        )
+    )
+    assert calls
+
+    calls.clear()
+    run(AntigravityRunner(workspace=tmp_path).run(make_request(effort="thinking")))
+    command = calls[0]
+    assert command[command.index("--effort") + 1] == "high"
+    assert command[-1] == "--dangerously-skip-permissions"
+
+
+def test_model_discovery_reuses_last_successful_catalog_on_transient_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "agy"
+    executable.write_text("#!/bin/sh\nexit 0\n")
+    executable.chmod(executable.stat().st_mode | os.X_OK)
+    outputs = iter(
+        [
+            ProcessResult(0, "gemini-3.7-flash-high  Gemini 3.7 Flash (High)\n", ""),
+            ProcessResult(1, "", "Please sign in to view available models."),
+        ]
+    )
+
+    async def fake_models(command: list[str], **kwargs: Any) -> ProcessResult:
+        del command, kwargs
+        return next(outputs)
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setattr(antigravity, "run_process", fake_models)
+    runner = AntigravityRunner(workspace=tmp_path, executable=str(executable))
+    first = run(runner.capabilities())
+    runner._profiles_cached_at -= 61
+    second = run(runner.capabilities())
+    assert [profile.profile_id for profile in first.profiles or []] == [
+        "antigravity-gemini-3.7-flash-high"
+    ]
+    assert [profile.profile_id for profile in second.profiles or []] == [
+        "antigravity-gemini-3.7-flash-high"
+    ]
 
 
 def test_runner_does_not_pass_agent_service_secrets_to_cli(

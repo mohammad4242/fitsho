@@ -138,8 +138,12 @@ async def run_task_smoke(
                 token=settings.agent_service_token,
                 agent_name=agent.value,
                 profile_id=profile.profile_id,
+                # A task smoke may require a real image/tool turn. Keep it
+                # bounded, but do not reuse the short capabilities connect
+                # timeout for a provider completion.
                 timeout_seconds=min(
-                    120.0, float(settings.agent_service_connect_timeout_seconds * 20)
+                    300.0,
+                    max(30.0, float(settings.agent_service_connect_timeout_seconds * 60)),
                 ),
             )
         if task_type is AITaskType.WORKOUT_PLAN_GENERATION:

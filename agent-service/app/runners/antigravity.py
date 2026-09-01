@@ -59,6 +59,8 @@ class AntigravityRunner(AgentRunner):
         self.executable = executable
         self.configured_models = configured_models
         self.supports_image_input = supports_image_input
+        self._profiles_cache: tuple[AgentModelProfile, ...] = ()
+        self._profiles_cached_at = 0.0
         self._metadata = CliMetadataProbe(
             executable=self.executable,
             workspace=self.workspace,
@@ -93,6 +95,9 @@ class AntigravityRunner(AgentRunner):
                 _configured_profile(model_id, version, self.supports_image_input)
                 for model_id in self.configured_models
             )
+        now = time.monotonic()
+        if self._profiles_cache and now - self._profiles_cached_at < 60.0:
+            return self._profiles_cache
         try:
             result = await run_process(
                 [self.executable, "models"],
@@ -102,14 +107,19 @@ class AntigravityRunner(AgentRunner):
                 inherit_environment=False,
             )
         except (ProcessExecutionError, ProcessTimeoutError, OSError, ValueError):
-            return ()
+            return self._profiles_cache
         if result.returncode != 0:
-            return ()
-        return antigravity_profiles_from_output(
+            return self._profiles_cache
+        profiles = antigravity_profiles_from_output(
             result.stdout,
             version=version,
             supports_image_input=self.supports_image_input,
         )
+        if profiles:
+            self._profiles_cache = profiles
+            self._profiles_cached_at = now
+            return profiles
+        return self._profiles_cache
 
     async def probe_auth_state(self) -> AuthState:
         return AuthState.UNKNOWN
@@ -163,8 +173,15 @@ class AntigravityRunner(AgentRunner):
                 str(schema_path),
                 "--model",
                 request.model_id,
-                "--sandbox",
             ]
+            if request.effort is not None:
+                effort = "high" if request.effort == "thinking" else request.effort
+                command.extend(["--effort", effort])
+            # Keep the CLI in its workspace sandbox while allowing headless
+            # image inspection and web tools to run without an interactive
+            # permission prompt. The subprocess environment is separately
+            # restricted to the safe allow-list above.
+            command.extend(["--sandbox", "--dangerously-skip-permissions"])
             result = await run_process(
                 command,
                 workspace=workspace,
