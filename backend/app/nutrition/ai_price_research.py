@@ -365,6 +365,7 @@ class FoodPriceResearchEvidence:
     provider_code: str
     provider_product_id: str
     normalized_normal_price_toman: Decimal
+    canonical_unit: str
     match_accepted: bool
     match_reason_code: str | None
     agent_request_id: str | None
@@ -452,6 +453,8 @@ class AgentFoodPriceResearcher:
             domains=domains,
             requested_source_count=INITIAL_RESEARCH_SOURCES,
             request_id=request_ids[-1] if request_ids else None,
+            request_ids=tuple(request_ids),
+            expanded=False,
         )
 
         if self._has_trusted_initial_cluster(evidence):
@@ -474,6 +477,8 @@ class AgentFoodPriceResearcher:
                 domains=domains,
                 requested_source_count=additional_count,
                 request_id=request_ids[-1] if request_ids else None,
+                request_ids=tuple(request_ids),
+                expanded=True,
             )
         return AgentFoodPriceResearchResult(tuple(evidence), tuple(request_ids), True)
 
@@ -518,6 +523,7 @@ class AgentFoodPriceResearcher:
         food: FoodPriceResearchFood,
         evidence: tuple[FoodPriceResearchEvidence, ...],
         request_ids: tuple[str, ...],
+        expanded: bool,
     ) -> FoodPriceResearchOutput:
         try:
             parsed = FoodPriceResearchOutput.model_validate(response.payload)
@@ -527,6 +533,7 @@ class AgentFoodPriceResearcher:
                 code="malformed_response",
                 evidence=evidence,
                 request_ids=request_ids,
+                expanded=expanded,
             ) from error
         if parsed.food_slug != food.slug:
             raise FoodPriceResearchError(
@@ -535,6 +542,7 @@ class AgentFoodPriceResearcher:
                 reason=PriceReviewReason.AMBIGUOUS_MATCH,
                 evidence=evidence,
                 request_ids=request_ids,
+                expanded=expanded,
             )
         return parsed
 
@@ -547,12 +555,15 @@ class AgentFoodPriceResearcher:
         domains: set[str],
         requested_source_count: int,
         request_id: str | None,
+        request_ids: tuple[str, ...],
+        expanded: bool,
     ) -> None:
         parsed = self._parse_response(
             response,
             food=food,
             evidence=tuple(evidence),
-            request_ids=(),
+            request_ids=request_ids,
+            expanded=expanded,
         )
         for quote in parsed.quotes[:requested_source_count]:
             try:
@@ -605,6 +616,7 @@ class AgentFoodPriceResearcher:
                     provider_code=observation.provider_code,
                     provider_product_id=observation.provider_product_id,
                     normalized_normal_price_toman=normalized.normalized_normal_price,
+                    canonical_unit=normalized.canonical_unit,
                     match_accepted=match.accepted,
                     match_reason_code=match.reason_code,
                     agent_request_id=request_id,
@@ -615,6 +627,8 @@ class AgentFoodPriceResearcher:
     def _has_trusted_initial_cluster(evidence: Sequence[FoodPriceResearchEvidence]) -> bool:
         accepted = [item for item in evidence if item.match_accepted]
         if len({item.source_domain for item in accepted}) < INITIAL_RESEARCH_SOURCES:
+            return False
+        if len({item.canonical_unit for item in accepted}) != 1:
             return False
         values = [item.normalized_normal_price_toman for item in accepted]
         return len(median_band_indices(values)) == len(values)

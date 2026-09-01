@@ -16,9 +16,18 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.nutrition.ai_price_research import (
+    AgentFoodPriceResearcher,
+    AgentFoodPriceResearchResult,
+    FoodPriceResearchError,
+    FoodPriceResearchEvidence,
+    FoodPriceResearchFood,
+    median_band_indices,
+)
 from app.nutrition.enums import (
     EstimateConfidence,
     FoodVerificationStatus,
+    PriceProviderKind,
     PriceQuoteStatus,
     PriceReferenceStatus,
     PriceUpdateRunStatus,
@@ -69,10 +78,92 @@ def _observation_key(observation: PriceObservation) -> str:
     return sha256(payload.encode()).hexdigest()
 
 
+def _ensure_agent_provider(
+    db: Session,
+    evidence: FoodPriceResearchEvidence,
+    *,
+    now: datetime,
+) -> NutritionPriceProvider:
+    provider = db.get(NutritionPriceProvider, evidence.provider_code)
+    if provider is None:
+        provider = NutritionPriceProvider(
+            code=evidence.provider_code,
+            kind=PriceProviderKind.PUBLIC_CATALOG,
+            name=evidence.source_domain,
+            enabled=True,
+            base_url=f"https://{evidence.source_domain}/",
+            parser_version="agent-web-v1",
+            last_success_at=now,
+        )
+        db.add(provider)
+        db.flush()
+    else:
+        provider.kind = PriceProviderKind.PUBLIC_CATALOG
+        provider.name = evidence.source_domain
+        provider.enabled = True
+        provider.base_url = f"https://{evidence.source_domain}/"
+        provider.parser_version = "agent-web-v1"
+        provider.last_success_at = now
+        provider.last_error = None
+    return provider
+
+
+def _agent_quote(
+    db: Session,
+    *,
+    food_id: UUID,
+    evidence: FoodPriceResearchEvidence,
+    provider: NutritionPriceProvider,
+    now: datetime,
+) -> NutritionFoodPriceQuote:
+    observation = evidence.observation
+    normalized = normalize_observation(observation)
+
+    def to_irr(value: Decimal | None) -> Decimal | None:
+        if value is None:
+            return None
+        return value * 10 if observation.currency == "TOMAN" else value
+
+    quote = NutritionFoodPriceQuote(
+        food_id=food_id,
+        provider_code=evidence.provider_code,
+        provider_product_id=evidence.provider_product_id,
+        package_quantity=observation.package_quantity,
+        package_unit=observation.package_unit,
+        normal_price_irr=to_irr(observation.normal_price),
+        promotional_price_irr=to_irr(observation.promotional_price),
+        normalized_normal_irr=evidence.normalized_normal_price_toman * 10,
+        normalized_promotional_irr=(
+            normalized.normalized_promotional_price * 10
+            if normalized.normalized_promotional_price is not None
+            else None
+        ),
+        observed_at=observation.observed_at,
+        effective_date=observation.observed_at.date(),
+        status=PriceQuoteStatus.FRESH,
+        fetched_at=now,
+        parser_version=provider.parser_version,
+        provider_observation_key=_observation_key(observation),
+        raw_quote={
+            "title": evidence.product_title,
+            "region": observation.region,
+            "currency": observation.currency,
+            "source_name": evidence.source_name,
+            "source_url": evidence.source_url,
+            "source_domain": evidence.source_domain,
+            "research_backend": "agent_service",
+            "agent_request_id": evidence.agent_request_id,
+        },
+    )
+    db.add(quote)
+    return quote
+
+
 async def run_price_update_async(
     db: Session,
     *,
     providers: Iterable[FoodPriceProvider],
+    agent_researcher: AgentFoodPriceResearcher | None = None,
     scheduled_for: datetime | None = None,
     retry_attempts: int = 3,
     trigger_kind: PriceUpdateTriggerKind = PriceUpdateTriggerKind.MANUAL,
@@ -84,7 +175,11 @@ async def run_price_update_async(
     )
     if existing is not None:
         return existing
-    provider_list = sorted(providers, key=lambda provider: provider.code)
+    provider_list = (
+        []
+        if agent_researcher is not None
+        else sorted(providers, key=lambda provider: provider.code)
+    )
     run = NutritionFoodPriceUpdateRun(
         scheduled_for=slot,
         started_at=now,
@@ -197,6 +292,36 @@ async def run_price_update_async(
     discovered_keys: set[tuple[str, str]] = set()
     failures: set[str] = set()
     successful_probes: set[str] = set()
+    agent_results: dict[UUID, AgentFoodPriceResearchResult | FoodPriceResearchError] = {}
+    agent_expanded_foods = 0
+    agent_research_failures = 0
+
+    if agent_researcher is not None:
+        for food in foods:
+            research_food = FoodPriceResearchFood(
+                slug=food.slug,
+                name_fa=food.name_fa,
+                name_en=food.name_en,
+                category=food.category,
+                aliases=tuple(alias.alias for alias in food.aliases),
+            )
+            try:
+                result = await agent_researcher.research(research_food)
+            except FoodPriceResearchError as error:
+                agent_results[food.id] = error
+                agent_research_failures += 1
+                if error.expanded:
+                    agent_expanded_foods += 1
+            except Exception:
+                agent_results[food.id] = FoodPriceResearchError(
+                    "Agent price research failed",
+                    code="research_failed",
+                )
+                agent_research_failures += 1
+            else:
+                agent_results[food.id] = result
+                if result.expanded:
+                    agent_expanded_foods += 1
 
     mapped_provider_products = {
         (mapping.provider_code, mapping.provider_product_id) for mapping in mappings
@@ -396,19 +521,84 @@ async def run_price_update_async(
     )
     attempted_food_ids = (
         {food.id for food in foods}
-        if provider_list and discovery_enabled
+        if agent_researcher is not None or (provider_list and discovery_enabled)
         else {mapping.food_id for mapping in mappings}
     )
     run.foods_attempted = len(attempted_food_ids)
-    run.provider_failures = len(failures)
+    run.provider_failures = len(failures) + agent_research_failures
     usable_observation_count = 0
     for food_id in sorted(attempted_food_ids, key=str):
-        food_mappings = [mapping for mapping in mappings if mapping.food_id == food_id]
         saved: list[NutritionFoodPriceQuote] = []
         priced_quotes: list[tuple[NutritionFoodPriceQuote, Decimal]] = []
         unit: str | None = None
         invalid = False
         ambiguous_mapping = False
+        agent_research_error: FoodPriceResearchError | None = None
+        agent_cluster_rejected_quote_ids: list[str] = []
+        agent_valid_match_count = 0
+        agent_trusted_domains: set[str] = set()
+        if agent_researcher is not None:
+            research = agent_results.get(food_id)
+            if isinstance(research, FoodPriceResearchError):
+                agent_research_error = research
+                evidence_items = research.evidence
+            elif isinstance(research, AgentFoodPriceResearchResult):
+                evidence_items = research.evidence
+            else:
+                evidence_items = ()
+                agent_research_error = FoodPriceResearchError(
+                    "Agent price research failed",
+                    code="research_failed",
+                )
+            agent_entries: list[
+                tuple[NutritionFoodPriceQuote, Decimal, FoodPriceResearchEvidence]
+            ] = []
+            for evidence in evidence_items:
+                provider = _ensure_agent_provider(db, evidence, now=now)
+                quote = _agent_quote(
+                    db,
+                    food_id=food_id,
+                    evidence=evidence,
+                    provider=provider,
+                    now=now,
+                )
+                saved.append(quote)
+                if not evidence.match_accepted:
+                    ambiguous_mapping = True
+                    continue
+                try:
+                    normalized = normalize_observation(evidence.observation)
+                except PriceValidationError:
+                    invalid = True
+                    continue
+                if unit is not None and unit != normalized.canonical_unit:
+                    invalid = True
+                    continue
+                unit = normalized.canonical_unit
+                if normalized.normalized_normal_price is not None:
+                    agent_valid_match_count += 1
+                    agent_entries.append(
+                        (quote, normalized.normalized_normal_price, evidence)
+                    )
+            if agent_entries:
+                values = [value for _, value, _ in agent_entries]
+                trusted_indexes = median_band_indices(values)
+                trusted_entries = [agent_entries[index] for index in trusted_indexes]
+                agent_trusted_domains = {
+                    evidence.source_domain for _, _, evidence in trusted_entries
+                }
+                priced_quotes = [(quote, value) for quote, value, _ in trusted_entries]
+                usable_observation_count += len(agent_entries)
+            db.flush()
+            trusted_quote_ids = {str(quote.id) for quote, _ in priced_quotes}
+            agent_cluster_rejected_quote_ids = [
+                str(quote.id) for quote in saved if str(quote.id) not in trusted_quote_ids
+            ]
+        food_mappings = (
+            []
+            if agent_researcher is not None
+            else [mapping for mapping in mappings if mapping.food_id == food_id]
+        )
         mappings_by_provider: dict[str, list[NutritionFoodPriceMapping]] = {}
         for mapping in food_mappings:
             mappings_by_provider.setdefault(mapping.provider_code, []).append(mapping)
@@ -498,6 +688,11 @@ async def run_price_update_async(
                         "title": observed.product_title,
                         "region": observed.region,
                         "currency": observed.currency,
+                        **(
+                            {"source_url": mapping.public_product_url}
+                            if mapping.public_product_url
+                            else {}
+                        ),
                     },
                 )
                 db.add(quote)
@@ -520,6 +715,13 @@ async def run_price_update_async(
         reasons = (
             list(decision.review_reasons) if decision else [PriceReviewReason.INSUFFICIENT_SAMPLES]
         )
+        if agent_researcher is not None:
+            if agent_research_error is not None:
+                reasons.append(agent_research_error.reason)
+            if agent_valid_match_count < DEFAULT_PUBLIC_PRICE_POLICY.minimum_distinct_sources:
+                reasons.append(PriceReviewReason.INSUFFICIENT_SOURCES)
+            elif len(agent_trusted_domains) < DEFAULT_PUBLIC_PRICE_POLICY.minimum_distinct_sources:
+                reasons.append(PriceReviewReason.SOURCE_DISAGREEMENT)
         if invalid:
             reasons.append(PriceReviewReason.UNIT_PARSE_ERROR)
         if ambiguous_mapping:
@@ -550,7 +752,7 @@ async def run_price_update_async(
                 previous.accepted_at = now
             db.flush()
             outlier_counts = Counter(decision.outliers)
-            rejected_quote_ids: list[str] = []
+            rejected_quote_ids: list[str] = list(agent_cluster_rejected_quote_ids)
             accepted_quote_ids: list[str] = []
             for quote, value in priced_quotes:
                 if outlier_counts[value] > 0:
@@ -573,6 +775,8 @@ async def run_price_update_async(
             )
             run.foods_updated += 1
         else:
+            if saved:
+                db.flush()
             db.add(
                 NutritionFoodPriceReview(
                     run_id=run.id,
@@ -581,6 +785,7 @@ async def run_price_update_async(
                     candidate_reference_price_toman=(
                         decision.reference_price if decision else None
                     ),
+                    source_quote_ids=[str(quote.id) for quote in saved],
                 )
             )
             run.foods_needing_review += 1
@@ -597,12 +802,14 @@ async def run_price_update_async(
                     previous.calculated_at = now
                 run.foods_unchanged += 1
     failure_codes: list[str] = []
-    if not provider_list:
+    if not provider_list and agent_researcher is None:
         failure_codes.append("NO_PROVIDERS")
     if not foods:
         failure_codes.append("NO_VERIFIED_FOODS")
     if failures:
         failure_codes.append("PROVIDER_FAILURE")
+    if agent_research_failures:
+        failure_codes.append("AGENT_RESEARCH_FAILURE")
     if usable_observation_count == 0:
         failure_codes.append("NO_USABLE_OBSERVATIONS")
     if run.foods_needing_review:
@@ -615,11 +822,19 @@ async def run_price_update_async(
     )
     run.finished_at = datetime.now(UTC)
     run.details = {
+        "execution_mode": "agent_service" if agent_researcher is not None else "direct",
         "provider_failures": sorted(failures),
         "providers_succeeded": sorted(successful_probes),
         "usable_observations": usable_observation_count,
+        "agent_research_failures": agent_research_failures,
+        "agent_expanded_foods": agent_expanded_foods,
     }
-    if successful_probes and not failures and usable_observation_count > 0:
+    agent_update_succeeded = (
+        agent_researcher is not None
+        and agent_research_failures == 0
+        and usable_observation_count > 0
+    )
+    if (successful_probes and not failures and usable_observation_count > 0) or agent_update_succeeded:
         expire_active_overrides(db, run=run, expired_at=run.finished_at)
     record_operational_event(
         db,
@@ -642,6 +857,7 @@ def run_price_update(
     db: Session,
     *,
     providers: Iterable[FoodPriceProvider],
+    agent_researcher: AgentFoodPriceResearcher | None = None,
     scheduled_for: datetime | None = None,
     retry_attempts: int = 3,
     trigger_kind: PriceUpdateTriggerKind = PriceUpdateTriggerKind.MANUAL,
@@ -650,6 +866,7 @@ def run_price_update(
         run_price_update_async(
             db,
             providers=providers,
+            agent_researcher=agent_researcher,
             scheduled_for=scheduled_for,
             retry_attempts=retry_attempts,
             trigger_kind=trigger_kind,

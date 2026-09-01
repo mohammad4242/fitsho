@@ -645,3 +645,442 @@ def test_discovery_failure_is_visible_in_provider_health(db) -> None:
     assert run.provider_failures == 1
     assert provider is not None
     assert provider.last_error == "provider discovery failed"
+
+
+def _agent_quote_payload(
+    slug: str,
+    domain: str,
+    price: int,
+    *,
+    promotional_price: int | None = None,
+    title: str | None = None,
+) -> dict[str, object]:
+    return {
+        "source_name": domain,
+        "source_url": f"https://{domain}/products/{slug}",
+        "product_title": title or "سینه مرغ تازه 1 کیلوگرم",
+        "normal_price": price,
+        "promotional_price": promotional_price,
+        "currency": "TOMAN",
+        "package_quantity": 1,
+        "package_unit": "kg",
+        "region": "تهران",
+    }
+
+
+def _agent_output(slug: str, quotes: list[dict[str, object]]) -> dict[str, object]:
+    return {"food_slug": slug, "quotes": quotes}
+
+
+class _AgentStructuredProvider:
+    def __init__(self, payloads: list[dict[str, object]]) -> None:
+        self.payloads = list(payloads)
+        self.requests = []
+
+    async def generate_structured_text(self, request):
+        from app.body_analysis.providers.models import StructuredGenerationResponse
+
+        self.requests.append(request)
+        return StructuredGenerationResponse(
+            payload=self.payloads.pop(0),
+            model_id=request.route.primary_model,
+            attempted_models=(request.route.primary_model,),
+            provider_request_id=f"price-request-{len(self.requests)}",
+        )
+
+
+def _agent_researcher(slug: str, payloads: list[dict[str, object]]):
+    from app.body_analysis.providers.models import ModelRoute
+    from app.nutrition.ai_price_research import AgentFoodPriceResearcher
+
+    provider = _AgentStructuredProvider(payloads)
+    return AgentFoodPriceResearcher(provider, route=ModelRoute(primary_model=f"model-{slug}")), provider
+
+
+def _verified_price_food(db, slug: str):
+    from sqlalchemy import select
+
+    from app.nutrition.enums import FoodVerificationStatus
+    from app.nutrition.models import NutritionCatalogueFood
+
+    for existing in db.scalars(
+        select(NutritionCatalogueFood).where(
+            NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED
+        )
+    ).all():
+        existing.verification_status = FoodVerificationStatus.DRAFT
+    food = NutritionCatalogueFood(
+        slug=slug,
+        name_fa="سینه مرغ",
+        name_en="Chicken breast",
+        category="protein",
+        verification_status=FoodVerificationStatus.VERIFIED,
+        source_name="test",
+        source_reference="test",
+    )
+    db.add(food)
+    db.commit()
+    return food
+
+
+def test_agent_coherent_three_sources_persist_distinct_providers_and_accept_reference(db) -> None:
+    from app.nutrition.enums import PriceUpdateRunStatus
+    from app.nutrition.models import (
+        NutritionFoodPriceHistory,
+        NutritionFoodPriceQuote,
+        NutritionFoodPriceReference,
+        NutritionFoodPriceReview,
+        NutritionPriceProvider,
+    )
+    from app.nutrition.price_update_service import run_price_update
+
+    food = _verified_price_food(db, "agent-coherent-chicken")
+    researcher, provider = _agent_researcher(
+        food.slug,
+        [
+            _agent_output(
+                food.slug,
+                [
+                    _agent_quote_payload(food.slug, "digikala.com", 190000),
+                    _agent_quote_payload(food.slug, "okala.ir", 198000),
+                    _agent_quote_payload(food.slug, "basalam.com", 205000),
+                ],
+            )
+        ],
+    )
+
+    run = run_price_update(
+        db,
+        providers=[],
+        agent_researcher=researcher,
+        scheduled_for=datetime(2026, 8, 10, 9, tzinfo=UTC),
+    )
+
+    reference = db.get(NutritionFoodPriceReference, food.id)
+    history = db.scalar(
+        select(NutritionFoodPriceHistory).where(NutritionFoodPriceHistory.food_id == food.id)
+    )
+    quotes = db.scalars(
+        select(NutritionFoodPriceQuote).where(NutritionFoodPriceQuote.food_id == food.id)
+    ).all()
+    reviews = db.scalars(
+        select(NutritionFoodPriceReview).where(NutritionFoodPriceReview.food_id == food.id)
+    ).all()
+    providers = db.scalars(
+        select(NutritionPriceProvider).where(NutritionPriceProvider.code.like("agent_web_%"))
+    ).all()
+
+    assert len(provider.requests) == 1
+    assert run.status == PriceUpdateRunStatus.COMPLETED
+    assert run.foods_updated == 1
+    assert reference is not None
+    assert reference.reference_price_toman == Decimal("197666.66666667")
+    assert reference.sample_count == 3
+    assert len({item.provider_code for item in quotes}) == 3
+    assert len(providers) == 3
+    assert all(item.raw_quote["source_url"].startswith("https://") for item in quotes)
+    assert history is not None
+    assert len(history.source_quote_ids) == 3
+    assert len(history.accepted_quote_ids) == 3
+    assert history.rejected_quote_ids == []
+    assert reviews == []
+
+
+def test_agent_disagreement_expands_and_accepts_only_final_trusted_cluster(db) -> None:
+    from app.nutrition.models import (
+        NutritionFoodPriceHistory,
+        NutritionFoodPriceQuote,
+        NutritionFoodPriceReference,
+    )
+    from app.nutrition.price_update_service import run_price_update
+
+    food = _verified_price_food(db, "agent-expanded-chicken")
+    researcher, provider = _agent_researcher(
+        food.slug,
+        [
+            _agent_output(
+                food.slug,
+                [
+                    _agent_quote_payload(food.slug, "digikala.com", 190000),
+                    _agent_quote_payload(food.slug, "okala.ir", 200000),
+                    _agent_quote_payload(food.slug, "basalam.com", 430000),
+                ],
+            ),
+            _agent_output(
+                food.slug,
+                [
+                    _agent_quote_payload(food.slug, "torob.com", 195000),
+                    _agent_quote_payload(food.slug, "emalls.ir", 205000),
+                ],
+            ),
+        ],
+    )
+
+    run_price_update(
+        db,
+        providers=[],
+        agent_researcher=researcher,
+        scheduled_for=datetime(2026, 8, 10, 10, tzinfo=UTC),
+    )
+
+    reference = db.get(NutritionFoodPriceReference, food.id)
+    history = db.scalar(
+        select(NutritionFoodPriceHistory).where(NutritionFoodPriceHistory.food_id == food.id)
+    )
+    quotes = db.scalars(
+        select(NutritionFoodPriceQuote).where(NutritionFoodPriceQuote.food_id == food.id)
+    ).all()
+
+    assert len(provider.requests) == 2
+    assert provider.requests[1].input_payload["requested_source_count"] == 2
+    assert reference is not None
+    assert reference.sample_count == 4
+    assert reference.reference_price_toman == Decimal("197500")
+    assert len(quotes) == 5
+    rejected = next(item for item in quotes if item.normal_price_irr == Decimal("4300000"))
+    assert history is not None
+    assert str(rejected.id) in history.rejected_quote_ids
+    assert str(rejected.id) not in history.accepted_quote_ids
+    assert len(history.source_quote_ids) == 5
+
+
+def test_agent_five_disagreeing_sources_create_review_and_preserve_previous_reference(db) -> None:
+    from app.nutrition.enums import EstimateConfidence, PriceReferenceStatus, PriceUpdateRunStatus
+    from app.nutrition.models import (
+        NutritionFoodPriceReference,
+        NutritionFoodPriceReview,
+    )
+    from app.nutrition.price_update_service import run_price_update
+
+    food = _verified_price_food(db, "agent-disagreement-chicken")
+    previous = NutritionFoodPriceReference(
+        food_id=food.id,
+        canonical_unit="TOMAN_PER_KG",
+        reference_price_toman=Decimal("180000"),
+        sample_count=3,
+        confidence=EstimateConfidence.HIGH,
+        status=PriceReferenceStatus.ACCEPTED,
+        calculated_at=datetime(2026, 8, 9, 9, tzinfo=UTC),
+        accepted_at=datetime(2026, 8, 9, 9, tzinfo=UTC),
+    )
+    db.add(previous)
+    db.commit()
+    researcher, provider = _agent_researcher(
+        food.slug,
+        [
+            _agent_output(
+                food.slug,
+                [
+                    _agent_quote_payload(food.slug, "digikala.com", 190000),
+                    _agent_quote_payload(food.slug, "okala.ir", 350000),
+                    _agent_quote_payload(food.slug, "basalam.com", 520000),
+                ],
+            ),
+            _agent_output(
+                food.slug,
+                [
+                    _agent_quote_payload(food.slug, "torob.com", 760000),
+                    _agent_quote_payload(food.slug, "emalls.ir", 1100000),
+                ],
+            ),
+        ],
+    )
+
+    run = run_price_update(
+        db,
+        providers=[],
+        agent_researcher=researcher,
+        scheduled_for=datetime(2026, 8, 10, 11, tzinfo=UTC),
+    )
+
+    db.refresh(previous)
+    review = db.scalar(
+        select(NutritionFoodPriceReview).where(NutritionFoodPriceReview.food_id == food.id)
+    )
+    assert provider.requests[1].input_payload["requested_source_count"] == 2
+    assert run.status == PriceUpdateRunStatus.COMPLETED_WITH_ERRORS
+    assert previous.reference_price_toman == Decimal("180000")
+    assert review is not None
+    assert "source_disagreement" in review.reason_codes
+    assert "insufficient_sources" in review.reason_codes
+    assert len(review.source_quote_ids) == 5
+
+
+def test_agent_fewer_than_three_domains_needs_insufficient_sources_review(db) -> None:
+    from app.nutrition.models import NutritionFoodPriceReview
+    from app.nutrition.price_update_service import run_price_update
+
+    food = _verified_price_food(db, "agent-insufficient-chicken")
+    researcher, provider = _agent_researcher(
+        food.slug,
+        [
+            _agent_output(food.slug, [_agent_quote_payload(food.slug, "digikala.com", 190000)]),
+            _agent_output(food.slug, [_agent_quote_payload(food.slug, "digikala.com", 190000)]),
+        ],
+    )
+
+    run_price_update(
+        db,
+        providers=[],
+        agent_researcher=researcher,
+        scheduled_for=datetime(2026, 8, 10, 12, tzinfo=UTC),
+    )
+
+    review = db.scalar(
+        select(NutritionFoodPriceReview).where(NutritionFoodPriceReview.food_id == food.id)
+    )
+    assert len(provider.requests) == 2
+    assert review is not None
+    assert "insufficient_sources" in review.reason_codes
+    assert len(review.source_quote_ids) == 1
+
+
+def test_agent_promotional_price_is_persisted_but_normal_price_drives_reference(db) -> None:
+    from app.nutrition.models import NutritionFoodPriceQuote, NutritionFoodPriceReference
+    from app.nutrition.price_update_service import run_price_update
+
+    food = _verified_price_food(db, "agent-promotion-chicken")
+    researcher, _ = _agent_researcher(
+        food.slug,
+        [
+            _agent_output(
+                food.slug,
+                [
+                    _agent_quote_payload(food.slug, "digikala.com", 250000, promotional_price=210000),
+                    _agent_quote_payload(food.slug, "okala.ir", 250000),
+                    _agent_quote_payload(food.slug, "basalam.com", 250000),
+                ],
+            )
+        ],
+    )
+
+    run_price_update(
+        db,
+        providers=[],
+        agent_researcher=researcher,
+        scheduled_for=datetime(2026, 8, 10, 13, tzinfo=UTC),
+    )
+
+    reference = db.get(NutritionFoodPriceReference, food.id)
+    quote = db.scalar(select(NutritionFoodPriceQuote).where(NutritionFoodPriceQuote.food_id == food.id))
+    assert reference is not None
+    assert reference.reference_price_toman == Decimal("250000")
+    assert quote is not None
+    assert quote.normal_price_irr == Decimal("2500000")
+    assert quote.promotional_price_irr == Decimal("2100000")
+
+
+def test_agent_consensus_still_obeys_previous_price_jump_protection(db) -> None:
+    from app.nutrition.enums import EstimateConfidence, PriceReferenceStatus
+    from app.nutrition.models import NutritionFoodPriceReference, NutritionFoodPriceReview
+    from app.nutrition.price_update_service import run_price_update
+
+    food = _verified_price_food(db, "agent-jump-chicken")
+    previous = NutritionFoodPriceReference(
+        food_id=food.id,
+        canonical_unit="TOMAN_PER_KG",
+        reference_price_toman=Decimal("100000"),
+        sample_count=3,
+        confidence=EstimateConfidence.HIGH,
+        status=PriceReferenceStatus.ACCEPTED,
+        calculated_at=datetime(2026, 8, 9, 9, tzinfo=UTC),
+        accepted_at=datetime(2026, 8, 9, 9, tzinfo=UTC),
+    )
+    db.add(previous)
+    db.commit()
+    researcher, _ = _agent_researcher(
+        food.slug,
+        [
+            _agent_output(
+                food.slug,
+                [
+                    _agent_quote_payload(food.slug, "digikala.com", 200000),
+                    _agent_quote_payload(food.slug, "okala.ir", 202000),
+                    _agent_quote_payload(food.slug, "basalam.com", 205000),
+                ],
+            )
+        ],
+    )
+
+    run_price_update(
+        db,
+        providers=[],
+        agent_researcher=researcher,
+        scheduled_for=datetime(2026, 8, 10, 14, tzinfo=UTC),
+    )
+
+    db.refresh(previous)
+    review = db.scalar(
+        select(NutritionFoodPriceReview).where(NutritionFoodPriceReview.food_id == food.id)
+    )
+    assert previous.reference_price_toman == Decimal("100000")
+    assert review is not None
+    assert "price_jump" in review.reason_codes
+
+
+def test_agent_research_failure_isolated_to_one_food(db) -> None:
+    from app.body_analysis.providers.models import ModelRoute, StructuredGenerationResponse
+    from app.nutrition.ai_price_research import AgentFoodPriceResearcher
+    from app.nutrition.enums import PriceUpdateRunStatus
+    from app.nutrition.models import NutritionFoodPriceReference, NutritionFoodPriceReview
+    from app.nutrition.price_update_service import run_price_update
+
+    first_food = _verified_price_food(db, "agent-failing-food")
+    from app.nutrition.enums import FoodVerificationStatus
+    from app.nutrition.models import NutritionCatalogueFood
+
+    second_food = NutritionCatalogueFood(
+        slug="agent-successful-food",
+        name_fa="سینه مرغ",
+        name_en="Chicken breast",
+        category="protein",
+        verification_status=FoodVerificationStatus.VERIFIED,
+        source_name="test",
+        source_reference="test",
+    )
+    db.add(second_food)
+    db.commit()
+
+    class PerFoodProvider:
+        def __init__(self) -> None:
+            self.requests = []
+
+        async def generate_structured_text(self, request):
+            self.requests.append(request)
+            slug = request.input_payload["food"]["slug"]
+            if slug == first_food.slug:
+                raise RuntimeError("simulated timeout")
+            return StructuredGenerationResponse(
+                payload=_agent_output(
+                    slug,
+                    [
+                        _agent_quote_payload(slug, "digikala.com", 190000),
+                        _agent_quote_payload(slug, "okala.ir", 198000),
+                        _agent_quote_payload(slug, "basalam.com", 205000),
+                    ],
+                ),
+                model_id=request.route.primary_model,
+                attempted_models=(request.route.primary_model,),
+                provider_request_id=f"request-{len(self.requests)}",
+            )
+
+    provider = PerFoodProvider()
+    researcher = AgentFoodPriceResearcher(provider, route=ModelRoute(primary_model="price-model"))
+
+    run = run_price_update(
+        db,
+        providers=[],
+        agent_researcher=researcher,
+        scheduled_for=datetime(2026, 8, 10, 15, tzinfo=UTC),
+    )
+
+    assert run.status == PriceUpdateRunStatus.COMPLETED_WITH_ERRORS
+    assert run.foods_attempted == 2
+    assert run.foods_updated == 1
+    assert run.foods_needing_review == 1
+    assert run.details["execution_mode"] == "agent_service"
+    assert run.details["agent_research_failures"] == 1
+    assert db.get(NutritionFoodPriceReference, second_food.id) is not None
+    assert db.scalar(
+        select(NutritionFoodPriceReview).where(NutritionFoodPriceReview.food_id == first_food.id)
+    ) is not None
