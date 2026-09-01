@@ -122,11 +122,14 @@ def test_advanced_catalog_program_reaches_the_programmed_session(db: Session) ->
     )
 
     assert result.program is not None, result.errors
-    assert result.program.aggregate_metrics.get("reference_template") == reference.slug, (
-        tuple(
-            item.get("reason_codes")
-            for item in result.decision_trace
-            if item.get("stage") in {"template_reference", "template_attempt"}
-        )
+    primary_selection = next(
+        item
+        for item in result.program.decision_trace
+        if item.get("stage") == "post_construction_template_selection"
+    )
+    template_candidates = primary_selection.get("candidates", ())
+    assert any(
+        item.get("slug") == reference.slug and item.get("status") == "succeeded"
+        for item in template_candidates
     )
     assert len(result.program.weekly_schedule) == 4
