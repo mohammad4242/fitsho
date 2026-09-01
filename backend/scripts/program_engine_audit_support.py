@@ -70,9 +70,7 @@ def supported_profile_cohort(
         batch = profile_factory(batch_seed)
         if not batch:
             raise ValueError("profile factory produced no profiles")
-        profiles.extend(
-            profile for profile in batch if classify_profile_support(profile).supported
-        )
+        profiles.extend(profile for profile in batch if classify_profile_support(profile).supported)
         batch_seed += 1
         if batch_seed - seed > 1000:
             raise ValueError("profile factory could not produce enough supported profiles")
@@ -134,9 +132,7 @@ def extract_program_audit_metrics(result: Any) -> dict[str, Any]:
         "evaluated": _integer_or_zero(selection_trace.get("evaluated_candidate_count")),
         "successful": _integer_or_zero(selection_trace.get("successful_candidate_count")),
         "admitted": _integer_or_zero(selection_trace.get("admitted_candidate_count")),
-        "evidence_rejected": _integer_or_zero(
-            selection_trace.get("evidence_rejected_count")
-        ),
+        "evidence_rejected": _integer_or_zero(selection_trace.get("evidence_rejected_count")),
     }
     phase = _string_or_none(selection_trace.get("selection_phase"))
     selected_split = _enum_value(getattr(getattr(program, "split", None), "split_type", None))
@@ -151,9 +147,7 @@ def extract_program_audit_metrics(result: Any) -> dict[str, Any]:
         "evidence_rejected_candidates": counts["evidence_rejected"],
         "primary_candidates_evaluated": counts["evaluated"] if phase == "primary" else 0,
         "dynamic_candidates_evaluated": counts["evaluated"] if phase == "dynamic_fallback" else 0,
-        "first_valid_identifier": _string_or_none(
-            selection_trace.get("first_valid_identifier")
-        ),
+        "first_valid_identifier": _string_or_none(selection_trace.get("first_valid_identifier")),
         "selected_identifier": selected_identifier,
         "selected_source": selected_source,
         "selected_preconstruction_rank": (
@@ -184,9 +178,7 @@ def extract_program_audit_metrics(result: Any) -> dict[str, Any]:
         "duration": _quality_value(quality, "duration_fit"),
         "warning_burden": _json_safe(selection_trace.get("warning_burden", {})),
         "repair_burden": _json_safe(selection_trace.get("repair_burden", {})),
-        "substitution_burden": _integer_or_zero(
-            selection_trace.get("substitution_burden")
-        ),
+        "substitution_burden": _integer_or_zero(selection_trace.get("substitution_burden")),
         "trace_size_bytes": _trace_size_bytes(selection_trace),
         "selection_trace": _json_safe(selection_trace) if selection_trace else None,
         "selected_split": selected_split,
@@ -343,9 +335,7 @@ def _quality_from_selection_trace(
     aggregate = getattr(program, "aggregate_metrics", {}) if program is not None else {}
     coach_quality = aggregate.get("coach_quality", {}) if isinstance(aggregate, Mapping) else {}
     selection_quality = (
-        coach_quality.get("selection_quality", {})
-        if isinstance(coach_quality, Mapping)
-        else {}
+        coach_quality.get("selection_quality", {}) if isinstance(coach_quality, Mapping) else {}
     )
     return dict(_json_safe(selection_quality)) if isinstance(selection_quality, Mapping) else {}
 
@@ -375,9 +365,7 @@ def _quality_value(quality: Mapping[str, Any], key: str) -> float | int | None:
 def _trace_size_bytes(trace: Mapping[str, Any]) -> int:
     if not trace:
         return 0
-    return len(
-        json.dumps(_json_safe(trace), ensure_ascii=False, sort_keys=True).encode("utf-8")
-    )
+    return len(json.dumps(_json_safe(trace), ensure_ascii=False, sort_keys=True).encode("utf-8"))
 
 
 def _is_supported_record(record: Mapping[str, Any]) -> bool:
