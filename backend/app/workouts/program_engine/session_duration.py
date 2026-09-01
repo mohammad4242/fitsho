@@ -491,7 +491,7 @@ def _select_set_addition(
     other_days: tuple[WorkoutDay, ...],
     volume: WeeklyVolumePlan | None,
 ) -> tuple[int, ProgrammedExercise] | None:
-    """Select one useful set without exceeding main-duration or hard limits."""
+    """Select one useful set without exceeding the hard duration or volume limits."""
     priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
     coherence = SessionCoherence.from_workout_day(day)
     options: list[tuple[tuple[object, ...], int, ProgrammedExercise]] = []
@@ -565,8 +565,8 @@ def _select_set_addition(
 
 # _select_rest_extension_for_underfill intentionally removed.
 # Artificially extending rest merely to satisfy the duration floor is prohibited.
-# The configured main-training duration range remains a hard validation contract;
-# useful work may be added, but fake rest time must not be used to satisfy it.
+# The upper main-training limit remains hard; the lower target is a preferred
+# quality signal. Fake rest time must not be used to satisfy it.
 
 
 def _select_exercise_addition(
