@@ -29,7 +29,7 @@ _TEST_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {"ok": {"const": True}},
     "required": ["ok"],
-    "additionalProperties": True,
+    "additionalProperties": False,
 }
 
 _RUNNER_STATUS: dict[str, tuple[ErrorCode, int]] = {

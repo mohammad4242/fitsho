@@ -111,6 +111,7 @@ def test_profile_id_can_be_sent_to_test_endpoint(tmp_path: Path) -> None:
         async def run(self, request: RunnerRequest) -> RunnerResult:
             assert request.model_id == profile.model_id
             assert request.effort == profile.effort.value
+            assert request.response_schema["additionalProperties"] is False
             return RunnerResult(
                 payload={"ok": True},
                 model_id=request.model_id,
