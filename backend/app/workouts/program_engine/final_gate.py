@@ -366,7 +366,7 @@ def _evidence_proves_duration_code(
     if duration_code in {
         "SESSION_DURATION_UNDER_TARGET",
     }:
-        return duration_code in reasons and main_minutes < policy.minimum_minutes
+        return duration_code in reasons and policy.below_preferred_minimum(main_minutes)
     if duration_code in {
         "SESSION_DURATION_EXCEEDED",
         "SESSION_DURATION_OVER_TARGET",
@@ -385,7 +385,7 @@ def _duration_code_applies_to_day(
     main_minutes = calculate_main_training_minutes(day)
     policy = get_session_duration_policy(request.session_duration_minutes)
     if duration_code == "SESSION_DURATION_UNDER_TARGET":
-        return main_minutes < policy.minimum_minutes
+        return policy.below_preferred_minimum(main_minutes)
     if duration_code in {
         "SESSION_DURATION_EXCEEDED",
         "SESSION_DURATION_OVER_TARGET",

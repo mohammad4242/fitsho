@@ -582,10 +582,10 @@ def test_generate_program_preserves_volume_and_duration_constraints_without_set_
     outliers = tuple(
         day
         for day in result.program.weekly_schedule
-        if not policy.contains(resistance_minutes[day.day_index])
+        if not policy.within_preferred_range(resistance_minutes[day.day_index])
     )
     if outliers and not all(
-        resistance_minutes[day.day_index] < policy.minimum_minutes
+        policy.below_preferred_minimum(resistance_minutes[day.day_index])
         and main_exercise_count(day.exercises) >= RULESET.minimum_exercises_per_session
         for day in outliers
     ):

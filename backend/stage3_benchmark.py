@@ -559,7 +559,7 @@ def _audit_program(
 
     policy = get_session_duration_policy(request.session_duration_minutes)
     for day in program.weekly_schedule:
-        if not policy.contains(calculate_main_training_minutes(day)):
+        if not policy.within_preferred_range(calculate_main_training_minutes(day)):
             issue("DURATION_OUTSIDE_POLICY", "quality", str(day.day_index))
 
     priority_metrics = metrics.get("priority_metrics", {})
@@ -667,7 +667,7 @@ def _audit_quality_metrics(
     duration_trace = _trace_entry(result, "session_duration") or {}
     duration_reasons = set(_string_values(duration_trace.get("reason_codes")))
     durations_fit = all(
-        policy.contains(calculate_main_training_minutes(day))
+        policy.within_preferred_range(calculate_main_training_minutes(day))
         for day in program.weekly_schedule
     )
     duration_fit = (

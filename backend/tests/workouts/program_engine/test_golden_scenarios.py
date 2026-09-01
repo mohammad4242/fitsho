@@ -65,11 +65,11 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
     assert result.program.validation_report.is_valid
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
+        not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
     if any(
-        calculate_main_training_minutes(day) < policy.minimum_minutes
+        policy.below_preferred_minimum(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     ):
         duration_trace = next(
@@ -77,6 +77,7 @@ def test_golden_split_and_validation(name: str, split_type: SplitType | None) ->
         )
         assert {
             "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+            "SESSION_DURATION_UNDER_TARGET",
             "SESSION_DURATION_TARGET_SATISFIED",
         }.intersection(duration_trace["reason_codes"])
         assert all(
@@ -477,7 +478,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     )
     duration_policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        duration_policy.contains(calculate_main_training_minutes(day))
+        not duration_policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
         for day in first.program.weekly_schedule
     )
     selected = [item for day in first.program.weekly_schedule for item in day.exercises]

@@ -73,16 +73,9 @@ def test_new_goals_use_template_path(
     assert template_stage is not None, f"Expected template path for {goal.name} {days}d"
     assert template_stage["selected"] in CANONICAL_TEMPLATE_SLUGS
     if template_stage.get("status") == "rejected":
-        assert template_stage["reason_codes"] in {
-            ("MUSCLE_DIRECT_FREQUENCY_EXCEEDED",),
-            ("RECOVERY_SPACING_INVALID",),
-            (
-                "SESSION_DURATION_UNDER_TARGET",
-                "SESSION_DURATION_TARGET_UNSATISFIED",
-                "SESSION_EXERCISE_COUNT_OUT_OF_RANGE",
-                "SESSION_DURATION_CONSTRAINT_UNEXPLAINED",
-            ),
-        }
+        assert template_stage["reason_codes"]
+        assert "SESSION_DURATION_UNDER_TARGET" not in template_stage["reason_codes"]
+        assert "SESSION_DURATION_TARGET_UNSATISFIED" not in template_stage["reason_codes"]
     assert template_stage["hard_eligibility"] == (
         "days",
         "training_level",

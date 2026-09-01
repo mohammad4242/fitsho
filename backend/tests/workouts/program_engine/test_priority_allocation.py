@@ -259,9 +259,9 @@ def test_priority_program_reports_measurable_emphasis_and_frequency_for_each_pri
     workout_durations = tuple(
         calculate_main_training_minutes(day) for day in priority.program.weekly_schedule
     )
-    assert all(policy.contains(duration) for duration in workout_durations)
-    if any(duration < policy.minimum_minutes for duration in workout_durations):
-        assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in (
+    assert all(policy.within_preferred_range(duration) for duration in workout_durations)
+    if any(policy.below_preferred_minimum(duration) for duration in workout_durations):
+        assert "SESSION_DURATION_UNDER_TARGET" in (
             priority.program.validation_report.warnings
         )
     assert all(

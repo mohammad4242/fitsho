@@ -404,17 +404,11 @@ def analyze_failure(result: Any, request: ProgramGenerationRequest) -> dict[str,
             collected_reasons.extend(attempt_reasons)
 
         duration_policy = get_session_duration_policy(request.session_duration_minutes)
-        if "SESSION_DURATION_UNDER_TARGET" in collected_reasons or "SESSION_DURATION_EXCEEDED" in collected_reasons or "SESSION_DURATION_OVER_TARGET" in collected_reasons:
-            if "SESSION_DURATION_UNDER_TARGET" in collected_reasons:
-                root_cause = "SESSION_DURATION_UNDER_TARGET"
-                actual_val = f"< {duration_policy.minimum_minutes} دقیقه"
-                limit_val = f"{duration_policy.minimum_minutes}–{duration_policy.maximum_minutes} دقیقه"
-                exact_description_fa = f"مدت زمان جلسات کمتر از حداقل بازه مجاز ({duration_policy.minimum_minutes} دقیقه) است."
-            else:
-                root_cause = "SESSION_DURATION_EXCEEDED"
-                actual_val = f"> {duration_policy.maximum_minutes} دقیقه"
-                limit_val = f"{duration_policy.minimum_minutes}–{duration_policy.maximum_minutes} دقیقه"
-                exact_description_fa = f"مدت زمان جلسات بیش از حداکثر بازه مجاز ({duration_policy.maximum_minutes} دقیقه) شد."
+        if "SESSION_DURATION_EXCEEDED" in collected_reasons or "SESSION_DURATION_OVER_TARGET" in collected_reasons:
+            root_cause = "SESSION_DURATION_EXCEEDED"
+            actual_val = f"> {duration_policy.maximum_minutes} دقیقه"
+            limit_val = f"{duration_policy.minimum_minutes}–{duration_policy.maximum_minutes} دقیقه"
+            exact_description_fa = f"مدت زمان جلسات بیش از حداکثر بازه مجاز ({duration_policy.maximum_minutes} دقیقه) شد."
             rule_file = "app/workouts/program_engine/session_duration.py"
             rule_func = "repair_session_durations()"
             failing_phase = "session_duration_repair_and_validation"
@@ -1111,4 +1105,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

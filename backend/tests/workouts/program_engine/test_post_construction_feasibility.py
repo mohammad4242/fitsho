@@ -103,11 +103,11 @@ def test_survival_trace_includes_constraint_class_and_repair_cost() -> None:
         "repair_cost": 1,
         "repair_events": ("SESSION_DURATION_REPAIR_APPLIED",),
         "reason_codes": ("SESSION_DURATION_UNDER_TARGET",),
-        "hard_reason_codes": ("SESSION_DURATION_UNDER_TARGET",),
+        "hard_reason_codes": (),
         "constraints": (
             {
                 "reason_code": "SESSION_DURATION_UNDER_TARGET",
-                "constraint_class": "hard",
+                "constraint_class": "soft",
             },
         ),
     }

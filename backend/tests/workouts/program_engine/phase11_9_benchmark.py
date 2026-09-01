@@ -560,13 +560,13 @@ def _duration_counts_for_record(record: Mapping[str, object]) -> dict[str, float
     for day in cast(Sequence[Mapping[str, object]], final_program.get("days", ())):
         workout = calculate_main_training_minutes(day)
         counts["sessions"] += 1
-        if policy.contains(workout):
+        if policy.within_preferred_range(workout):
             counts["budget_fit"] += 1
         counts["overrun_minutes"] += max(0, workout - policy.maximum_minutes)
         counts["utilization_sum"] += workout / requested if requested else 0
 
         counts["legacy_absolute_deviation"] += abs(workout - requested)
-        if workout < policy.minimum_minutes:
+        if policy.below_preferred_minimum(workout):
             counts["legacy_under"] += 1
         elif workout > policy.maximum_minutes:
             counts["legacy_over"] += 1

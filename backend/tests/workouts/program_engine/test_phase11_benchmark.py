@@ -257,7 +257,7 @@ def test_any_hard_acceptance_failure_blocks_ready(section: str, key: str) -> Non
     assert benchmark.verify_closeout(payload)
 
 
-def test_underfilled_main_training_session_is_a_duration_quality_issue() -> None:
+def test_underfilled_main_training_session_is_not_a_hard_duration_failure() -> None:
     assert (
         benchmark._duration_policy_failure(
             requested_minutes=60,
@@ -266,7 +266,7 @@ def test_underfilled_main_training_session_is_a_duration_quality_issue() -> None
             },
             reason_codes=("SESSION_DURATION_TARGET_SATISFIED",),
         )
-        == "below_minimum"
+        is None
     )
 
 

@@ -25,10 +25,10 @@ def test_official_duration_windows_are_hard_and_exact(
     policy = get_session_duration_policy(requested)
 
     assert (policy.minimum_minutes, policy.maximum_minutes) == (minimum, maximum)
-    assert not policy.contains(below)
-    assert policy.contains(at_minimum)
-    assert policy.contains(at_maximum)
-    assert not policy.contains(above)
+    assert policy.below_preferred_minimum(below)
+    assert policy.within_preferred_range(at_minimum)
+    assert policy.within_preferred_range(at_maximum)
+    assert policy.exceeds_hard_maximum(above)
 
 
 def test_long_session_lower_bounds_widen_without_changing_upper_tolerance() -> None:

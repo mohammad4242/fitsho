@@ -254,7 +254,7 @@ def test_phase119_cardio_additive():
         assert day.cardio.duration_minutes == RULESET.cardio_start_minutes
 
 
-def test_phase119_underfill_repair_prefers_main_set_to_rest_extension():
+def test_phase119_underfill_repair_does_not_pad_time_when_count_is_low():
     import uuid
 
     from app.exercises.enums import ExerciseType, MuscleGroup
@@ -306,5 +306,5 @@ def test_phase119_underfill_repair_prefers_main_set_to_rest_extension():
     )
 
     assert len(repaired_day.exercises) == 1
-    assert repaired_day.exercises[0].sets == 4
+    assert repaired_day.exercises[0].sets == 3
     assert repaired_day.exercises[0].rest_seconds == 60

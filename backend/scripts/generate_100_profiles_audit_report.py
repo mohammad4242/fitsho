@@ -381,26 +381,15 @@ def analyze_failure(result: Any, request: ProgramGenerationRequest) -> dict[str,
             collected_reasons.extend(attempt_reasons)
 
         duration_policy = get_session_duration_policy(request.session_duration_minutes)
-        if "SESSION_DURATION_UNDER_TARGET" in collected_reasons or "SESSION_DURATION_EXCEEDED" in collected_reasons or "SESSION_DURATION_OVER_TARGET" in collected_reasons:
-            if "SESSION_DURATION_UNDER_TARGET" in collected_reasons:
-                root_cause = "SESSION_DURATION_UNDER_TARGET"
-                actual_val = f"< {duration_policy.minimum_minutes} دقیقه"
-                limit_val = f"{duration_policy.minimum_minutes} الی {duration_policy.maximum_minutes} دقیقه"
-                exact_description_fa = (
-                    f"مدت زمان جلسات تمرینی محاسبه‌شده پس از فاز ترمیم کمتر از کف مجاز استاندارد "
-                    f"({duration_policy.minimum_minutes} دقیقه برای هدف {request.session_duration_minutes} دقیقه‌ای) است. "
-                    f"موتور نتوانست بدون نقض سقف حجم ست‌ها، تمرین یا ست اضافه کند."
-                )
-                engine_repair_hint_fa = "بهبود الگوریتم repair_session_durations برای افزودن تمرینات کمکی سبک یا کاهش کف زمان مجاز در جلسات کوتاه/تجهیزات محدود."
-            else:
-                root_cause = "SESSION_DURATION_EXCEEDED"
-                actual_val = f"> {duration_policy.maximum_minutes} دقیقه"
-                limit_val = f"{duration_policy.minimum_minutes} الی {duration_policy.maximum_minutes} دقیقه"
-                exact_description_fa = (
-                    f"مدت زمان جلسات از سقف مجاز ({duration_policy.maximum_minutes} دقیقه) فراتر رفت "
-                    f"و موتور پس از تلاش برای کاهش ست‌ها، نتوانست زمان جلسه را در بازه مجاز حفظ کند."
-                )
-                engine_repair_hint_fa = "تنظیم دقیق‌تر فاز هرس (prune) ست‌ها یا تمرین‌های فرعی در session_duration.py."
+        if "SESSION_DURATION_EXCEEDED" in collected_reasons or "SESSION_DURATION_OVER_TARGET" in collected_reasons:
+            root_cause = "SESSION_DURATION_EXCEEDED"
+            actual_val = f"> {duration_policy.maximum_minutes} دقیقه"
+            limit_val = f"{duration_policy.minimum_minutes} الی {duration_policy.maximum_minutes} دقیقه"
+            exact_description_fa = (
+                f"مدت زمان جلسات از سقف مجاز ({duration_policy.maximum_minutes} دقیقه) فراتر رفت "
+                f"و موتور پس از تلاش برای کاهش ست‌ها، نتوانست زمان جلسه را در بازه مجاز حفظ کند."
+            )
+            engine_repair_hint_fa = "تنظیم دقیق‌تر فاز هرس (prune) ست‌ها یا تمرین‌های فرعی در session_duration.py."
             rule_file = "app/workouts/program_engine/session_duration.py"
             rule_func = "repair_session_durations()"
             failing_phase = "session_duration_repair_and_validation"
@@ -998,7 +987,7 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
     <div class="audit-box">
         <strong>خلاصه وضعیت عملکردی موتور و علل مسدود شدن برنامه‌ها (Engine Health & Diagnostic Audit):</strong><br>
         • <strong>برنامه‌های تولید شده:</strong> موتور در {success_count} مورد از ۱۰۰ پروفایل با رعایت سقف حجم ست‌ها، تطبیق دقیق مدت زمان جلسات و رعایت تمام محدودیت‌های پزشکی، موفق به چیدمان کامل حرکات در قالب اسپلیت‌های استاندارد (فول‌بادی، بالاتنه/پایین‌تنه، PPL و چرخش عضلانی) گردید.<br>
-        • <strong>علت اصلی عدم تولید در {failure_count} پروفایل:</strong> بیشترین عامل شکست در تولید برنامه مربوط به خطای <code>SESSION_DURATION_UNDER_TARGET</code> است؛ به طوری که در برخی ترکیبات محدود تجهیزات خانگی و آسیب‌های بدنی، فاز ترمیم نتوانسته بدون تخطی از سقف مجاز ست‌ها، زمان جلسه را به کف مجاز برساند. عامل دوم خطای سازگاری روزها (<code>UNSUPPORTED_RESISTANCE_TRAINING_DAYS</code>) برای سوابق مبتدی/ماه اول است که نشان‌دهنده دقت فیتشو در غربالگری ورودی‌هاست.
+        • <strong>علت اصلی عدم تولید در {failure_count} پروفایل:</strong> کف زمان جلسه (<code>SESSION_DURATION_UNDER_TARGET</code>) اکنون فقط هشدار کیفیت است و علت رد برنامه نیست؛ علل رد در جدول خطاها بر اساس شواهد واقعی موتور گزارش شده‌اند.
     </div>
 
     <div class="analytics-table-wrap">

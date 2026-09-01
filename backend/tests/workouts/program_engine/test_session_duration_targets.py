@@ -108,10 +108,7 @@ def test_useful_workload_limit_does_not_force_artificial_rest() -> None:
 
     result = generate_program(source, full_catalog(), RULESET, reference_templates=())
 
-    if result.program is None:
-        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
-        return
-    assert result.program is not None
+    assert result.program is not None, result.errors
     # In Phase 11.9, finishing under budget with sufficient exercises is SATISFIED, not CONSTRAINED
     assert "SESSION_DURATION_TARGET_UNSATISFIED" not in result.program.warnings
     assert "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" not in result.program.warnings
@@ -281,13 +278,11 @@ def test_generate_program_keeps_every_session_inside_duration_target(requested: 
 
     result = generate_program(source, full_catalog(), RULESET)
 
-    if result.program is None:
-        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
-        return
+    assert result.program is not None, result.errors
     assert result.is_success, result.errors
     policy = get_session_duration_policy(requested)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
+        not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
 
@@ -303,12 +298,12 @@ def test_advanced_strength_program_classifies_a_hard_constrained_120_minute_sess
 
     result = generate_program(source, full_catalog(), RULESET)
 
-    if result.program is None:
-        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
-        return
+    assert result.program is not None, result.errors
     assert result.is_success, result.errors
     policy = get_session_duration_policy(120)
-    assert policy.contains(calculate_main_training_minutes(result.program.weekly_schedule[0]))
+    assert not policy.exceeds_hard_maximum(
+        calculate_main_training_minutes(result.program.weekly_schedule[0])
+    )
 
 
 def test_underfilled_session_is_repaired_with_real_estimates() -> None:
@@ -317,19 +312,14 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
     eligibility = filter_eligible_exercises(normalized, full_catalog())
     result = generate_program(source, full_catalog(), RULESET)
 
-    if result.program is None:
-        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
-        return
+    assert result.program is not None, result.errors
     original = result.program.weekly_schedule[0]
     reduced_exercises = tuple(
         replace(
             item,
             sets=RULESET.minimum_working_sets,
-            estimated_minutes=estimate_exercise_minutes(
-                RULESET.minimum_working_sets,
-                item.rest_seconds,
-                item.warmup_sets,
-                RULESET,
+            estimated_minutes=(
+                1 if item.exercise_type is not ExerciseType.CORE else item.estimated_minutes
             ),
         )
         for item in original.exercises
@@ -353,8 +343,12 @@ def test_underfilled_session_is_repaired_with_real_estimates() -> None:
         RULESET,
     )
 
-    assert get_session_duration_policy(90).contains(calculate_main_training_minutes(repaired[0]))
-    assert "SESSION_DURATION_TARGET_SATISFIED" in reasons
+    assert (
+        calculate_main_training_minutes(repaired[0])
+        < get_session_duration_policy(90).minimum_minutes
+    )
+    assert "SESSION_DURATION_UNDER_TARGET" in reasons
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" not in reasons
 
 
 def test_short_session_without_capacity_uses_effective_exercise_floor() -> None:
@@ -482,7 +476,7 @@ def test_unsupported_target_fails_explicitly_instead_of_returning_short_session(
     assert "30, 45" in str(exc_info.value)
 
 
-def test_final_validator_rejects_underfilled_session() -> None:
+def test_final_validator_keeps_main_count_hard_for_underfilled_session() -> None:
     source = request(session_duration_minutes=45, available_training_days=1)
     result = generate_program(source, full_catalog(), RULESET)
 
@@ -502,8 +496,10 @@ def test_final_validator_rejects_underfilled_session() -> None:
 
     report = validate_program(invalid, source, RULESET)
 
-    assert "SESSION_DURATION_UNDER_TARGET" in report.errors
-    assert "SESSION_DURATION_TARGET_UNSATISFIED" in report.errors
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in report.errors
+    assert "SESSION_DURATION_UNDER_TARGET" in report.warnings
+    assert "SESSION_DURATION_UNDER_TARGET" not in report.errors
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" not in report.errors
 
 
 def _duration_fixture_exercise(candidate, *, order: int, sets: int = 3, minutes: int = 8):
@@ -530,7 +526,7 @@ def _duration_fixture_exercise(candidate, *, order: int, sets: int = 3, minutes:
     ("requested", "existing_count", "existing_minutes"),
     [(60, 9, 5), (75, 10, 5), (90, 11, 5)],
 )
-def test_duration_repair_can_add_tenth_eleventh_or_twelfth_main_exercise(
+def test_duration_repair_does_not_add_main_exercise_when_count_is_valid(
     requested: int, existing_count: int, existing_minutes: int
 ) -> None:
     source = request(session_duration_minutes=requested, available_training_days=1)
@@ -568,12 +564,14 @@ def test_duration_repair_can_add_tenth_eleventh_or_twelfth_main_exercise(
     result = repair_session_durations((day,), normalized, (candidate,), RULESET)
 
     repaired = result.days[0]
-    assert main_exercise_count(repaired.exercises) == existing_count + 1
-    assert candidate.id in {item.exercise_id for item in repaired.exercises}
+    assert main_exercise_count(repaired.exercises) == existing_count
+    assert candidate.id not in {item.exercise_id for item in repaired.exercises}
     main_minutes = calculate_main_training_minutes(repaired)
     policy = get_session_duration_policy(requested)
     assert main_minutes <= policy.maximum_minutes
-    assert ("SESSION_DURATION_TARGET_SATISFIED" in result.reasons) is policy.contains(main_minutes)
+    assert policy.below_preferred_minimum(main_minutes)
+    assert "SESSION_DURATION_UNDER_TARGET" in result.reasons
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" not in result.reasons
 
 
 @pytest.mark.parametrize(
@@ -640,7 +638,8 @@ def test_template_underfill_keeps_explicit_constraint_when_no_hard_volume_room_e
     )
 
     assert len(repaired[0].exercises) == expected_count
-    assert "SESSION_DURATION_TARGET_UNSATISFIED" in reasons
+    assert "SESSION_DURATION_UNDER_TARGET" in reasons
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" not in reasons
     assert "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in reasons
     assert all(item.counts_toward_volume for item in repaired[0].exercises)
 
@@ -685,7 +684,8 @@ def test_focus_rejection_does_not_claim_hard_volume_constraint() -> None:
     )
 
     assert repaired[0].exercises == ()
-    assert "SESSION_DURATION_TARGET_UNSATISFIED" in reasons
+    assert "SESSION_DURATION_UNDER_TARGET" in reasons
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" not in reasons
     assert "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD" in reasons
     assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" not in reasons
 
@@ -815,7 +815,7 @@ def test_batch2_profile_underfill_is_hard_volume_constrained(
     _, result = results[0]
     if result["success"] is not True:
         assert result["error_code"] == "UNSATISFIED_CONSTRAINT"
-        assert "SESSION_DURATION_UNDER_TARGET" in result["errors"]
+        assert "SESSION_DURATION_UNDER_TARGET" not in result["errors"]
         return
     plan = result["plan"]
     assert plan is not None
@@ -827,15 +827,7 @@ def test_batch2_profile_underfill_is_hard_volume_constrained(
     assert all(exercise.exercise.content_type.value == "exercise" for exercise in day.exercises)
 
     hard_attempts = [attempt for attempt in strict_attempts if attempt["day"] == underfilled_day]
-    if profile_number == 5:
-        # Secondary effective volume is not a hard blocker for classified muscles.
-        assert hard_attempts == []
-    else:
-        hard_attempt = hard_attempts[0]
-        assert hard_attempt["duration"] == 45
-        assert hard_attempt["existing"] >= 1
-        assert hard_attempt["checks"] > 0
-        assert 0 <= hard_attempt["safe"] <= hard_attempt["checks"]
+    assert hard_attempts == []
 
     ranges = plan.aggregate_metrics["volume_ranges_by_muscle"]
     assert any(

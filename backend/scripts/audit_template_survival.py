@@ -839,7 +839,6 @@ def _reason_codes_for_template(
 
 def _primary_root_cause(reason_codes: Sequence[str]) -> str | None:
     priority_fragments = (
-        "SESSION_DURATION_UNDER_TARGET",
         "SESSION_DURATION_TARGET_UNSATISFIED",
         "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
         "MAIN_EXERCISE_COUNT",

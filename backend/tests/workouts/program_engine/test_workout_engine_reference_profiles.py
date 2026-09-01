@@ -280,7 +280,7 @@ def _assert_reference_invariants(
     for day in program.weekly_schedule:
         assert day.exercises
         main_training_minutes = calculate_main_training_minutes(day)
-        assert policy.contains(main_training_minutes)
+        assert not policy.exceeds_hard_maximum(main_training_minutes)
         for first_index, first in enumerate(day.exercises):
             assert first.is_active and first.is_programmable and not first.needs_review
             assert effective_required_equipment(first.equipment, first.movement_pattern).issubset(
@@ -310,10 +310,16 @@ def test_reference_profiles_preserve_safety_quality_and_determinism(
     request_value = _request(profile)
     catalog = full_catalog()
     result = generate_program(request_value, catalog, RULESET)
-
     if not result.is_success:
         assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
-        assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+        assert "SESSION_DURATION_UNDER_TARGET" not in result.errors
+        assert any(
+            error in {
+                "REQUIRED_SLOT_HARD_IMPOSSIBILITY",
+                "SESSION_EXERCISE_COUNT_OUT_OF_RANGE",
+            }
+            for error in result.errors
+        )
         return
     assert result.is_success, f"{profile.code}: {result.errors}"
     assert result.program is not None

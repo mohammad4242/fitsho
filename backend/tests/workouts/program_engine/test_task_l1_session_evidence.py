@@ -54,7 +54,7 @@ def test_duration_evidence_is_emitted_for_dynamic_and_template_programs() -> Non
         }
 
 
-def test_duration_constraint_cannot_cross_excuse_another_day() -> None:
+def test_under_duration_warning_does_not_require_cross_day_evidence() -> None:
     program = _program()
     first, second = program.weekly_schedule
     first_evidence = SessionDurationRepairEvidence.from_day(
@@ -76,7 +76,8 @@ def test_duration_constraint_cannot_cross_excuse_another_day() -> None:
 
     report = validate_program(altered, request(available_training_days=2), RULESET)
 
-    assert "SESSION_DURATION_UNDER_TARGET" in report.errors
+    assert "SESSION_DURATION_UNDER_TARGET" in report.warnings
+    assert "SESSION_DURATION_UNDER_TARGET" not in report.errors
 
 
 def test_duration_evidence_must_match_the_exact_day_fingerprint() -> None:
@@ -230,7 +231,7 @@ def test_duration_evidence_trace_rejects_malformed_digest_and_scalar_types() -> 
     assert SessionDurationRepairEvidence.from_trace(malformed_count) is None
 
 
-def test_final_gate_rejects_stale_duration_evidence() -> None:
+def test_final_gate_ignores_stale_under_duration_evidence() -> None:
     program = _program(1)
     day = program.weekly_schedule[0]
     evidence = SessionDurationRepairEvidence.from_day(
@@ -256,11 +257,12 @@ def test_final_gate_rejects_stale_duration_evidence() -> None:
 
     decision = evaluate_final_program(stale, request(available_training_days=1), report, RULESET)
 
-    assert decision.status.value == "rejected"
-    assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" in decision.reason_codes
+    assert decision.status.value in {"accepted", "accepted_with_constraints"}
+    assert "SESSION_DURATION_UNDER_TARGET" not in decision.reason_codes
+    assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" not in decision.reason_codes
 
 
-def test_final_gate_cannot_cross_excuse_duration_constraint_between_days() -> None:
+def test_final_gate_does_not_cross_escalate_under_duration_between_days() -> None:
     program = _program()
     first, second = program.weekly_schedule
     short_first = replace(
@@ -300,10 +302,12 @@ def test_final_gate_cannot_cross_excuse_duration_constraint_between_days() -> No
     decision = evaluate_final_program(traced, request(available_training_days=2), report, RULESET)
 
     assert decision.status.value == "rejected"
-    assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" in decision.reason_codes
+    assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in decision.reason_codes
+    assert "SESSION_DURATION_UNDER_TARGET" not in decision.reason_codes
+    assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" not in decision.reason_codes
 
 
-def test_final_gate_duration_reason_order_is_deterministic() -> None:
+def test_final_gate_under_duration_reason_is_soft_and_deterministic() -> None:
     program = _program(1)
     day = program.weekly_schedule[0]
     day = replace(
@@ -337,19 +341,10 @@ def test_final_gate_duration_reason_order_is_deterministic() -> None:
 
     decision = evaluate_final_program(traced, request(available_training_days=1), report, RULESET)
 
-    duration_reasons = tuple(
-        code
-        for code in decision.metrics["checks"]["duration"]["reason_codes"]
-        if code
-        in {
-            "DURATION_PLANNED_REDUCED_EXERCISE_COUNT",
-            "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-        }
+    assert decision.metrics["checks"]["duration"]["reason_codes"] == (
+        "SESSION_DURATION_UNDER_TARGET",
     )
-    assert duration_reasons == (
-        "DURATION_PLANNED_REDUCED_EXERCISE_COUNT",
-        "SESSION_DURATION_CONSTRAINED_BY_USEFUL_WORKLOAD",
-    )
+    assert decision.metrics["checks"]["duration"]["status"] == "warning"
 
 
 def test_final_gate_duration_order_is_stable_across_pythonhashseed() -> None:

@@ -25,7 +25,6 @@ def test_repairable_contracts_become_hard_only_after_exhaustion() -> None:
     repairable_reasons = (
         "RECOVERY_SPACING_INVALID",
         "SESSION_EXERCISE_COUNT_OUT_OF_RANGE",
-        "SESSION_DURATION_UNDER_TARGET",
         "SESSION_DURATION_EXCEEDED",
     )
 
@@ -35,6 +34,11 @@ def test_repairable_contracts_become_hard_only_after_exhaustion() -> None:
     assert all(
         classify_constraint(reason, repair_exhausted=True) is ConstraintClass.HARD
         for reason in repairable_reasons
+    )
+    assert classify_constraint("SESSION_DURATION_UNDER_TARGET") is ConstraintClass.SOFT
+    assert (
+        classify_constraint("SESSION_DURATION_UNDER_TARGET", repair_exhausted=True)
+        is ConstraintClass.SOFT
     )
 
 

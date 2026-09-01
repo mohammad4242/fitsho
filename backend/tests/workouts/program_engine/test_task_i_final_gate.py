@@ -347,7 +347,7 @@ def test_final_gate_accepts_valid_program_without_distribution_evidence() -> Non
     assert accepted.status in {"accepted", "accepted_with_constraints"}
 
 
-def test_final_gate_rejects_unexplained_duration_constraint() -> None:
+def test_final_gate_accepts_under_duration_without_constraint_evidence() -> None:
     source = request(available_training_days=1)
     base = _program(source)
     report = ValidationReport(
@@ -362,8 +362,8 @@ def test_final_gate_rejects_unexplained_duration_constraint() -> None:
         replace(base, decision_trace=()), source, report, RULESET
     )
 
-    assert decision.status == "rejected"
-    assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" in decision.reason_codes
+    assert decision.status in {"accepted", "accepted_with_constraints"}
+    assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" not in decision.reason_codes
     assert "SESSION_DURATION_CONSTRAINT_UNEXPLAINED" not in decision.constraint_reason_codes
     assert "SESSION_DURATION_UNDER_TARGET" not in decision.constraint_reason_codes
 

@@ -73,16 +73,15 @@ def test_final_program_duration_matrix_is_valid(goal: Goal, duration: int) -> No
         RULESET,
         reference_templates=(),
     )
-    if result.program is None:
-        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
-        return
+    assert result.program is not None, result.errors
     program = result.program
     policy = get_session_duration_policy(duration)
 
     assert program.validation_report.is_valid
     assert len(program.weekly_schedule) == 3
     assert all(
-        policy.contains(calculate_main_training_minutes(day)) for day in program.weekly_schedule
+        not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
+        for day in program.weekly_schedule
     )
     assert all(
         item.sets <= RULESET.max_working_sets_per_exercise_absolute
@@ -199,9 +198,7 @@ def test_long_session_does_not_exceed_useful_or_hard_volume_to_fill_time() -> No
         RULESET,
         reference_templates=(),
     )
-    if result.program is None:
-        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
-        return
+    assert result.program is not None, result.errors
     program = result.program
     ranges = program.aggregate_metrics["volume_ranges_by_muscle"]
 

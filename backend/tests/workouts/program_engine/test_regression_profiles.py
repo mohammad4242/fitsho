@@ -131,7 +131,8 @@ def test_five_day_fallback_is_built_from_available_focuses() -> None:
 
     if not result.is_success:
         assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
-        assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+        assert "SESSION_DURATION_UNDER_TARGET" not in result.errors
+        assert "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in result.errors
         return
     assert result.program is not None
     assert result.program.split.split_type.value in {
@@ -313,7 +314,8 @@ def test_regression_profiles() -> None:
         result = generate_program(req, catalog, RULESET)
         if not result.is_success:
             assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
-            assert any(error.startswith("SESSION_DURATION_") for error in result.errors)
+            assert "SESSION_DURATION_UNDER_TARGET" not in result.errors
+            assert "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in result.errors
             continue
         program = result.program
         assert program is not None
@@ -341,7 +343,7 @@ def test_regression_profiles() -> None:
             )
 
             policy = get_session_duration_policy(req.session_duration_minutes)
-            assert policy.contains(calculate_main_training_minutes(day))
+            assert not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
             exercise_floor = (
                 3
                 if req.session_duration_minutes <= RULESET.short_session_minutes

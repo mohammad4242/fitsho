@@ -884,7 +884,7 @@ def test_unadaptable_template_falls_back_to_dynamic_generation_with_trace() -> N
     assert rejection["selected"] == unadaptable.slug
     assert rejection["reason_codes"]
     assert "MUSCLE_DIRECT_FREQUENCY_EXCEEDED" not in rejection["reason_codes"]
-    assert rejection["rejection_category"] == "DURATION_RECOVERY_HARD_IMPOSSIBILITY"
+    assert rejection["rejection_category"] == "VALIDATION_FAILURE"
 
 
 def test_template_rejection_categories_are_specific_and_stable() -> None:
@@ -1053,7 +1053,7 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     assert first.program.validation_report.is_valid
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
+        not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
         for day in first.program.weekly_schedule
     )
     primary_by_id = {candidate.id: candidate.primary_muscle for candidate in catalog}

@@ -63,7 +63,7 @@ def test_regression_thirty_minute_session_reports_traceable_constrained_workload
     assert "DURATION_PLANNED_REDUCED_EXERCISE_COUNT" in result.program.warnings
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
+        not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
 
@@ -145,6 +145,6 @@ def test_regression_short_upper_lower_keeps_main_work_with_additive_cardio() -> 
     )
     policy = get_session_duration_policy(30)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
+        not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )

@@ -549,10 +549,11 @@ def test_phase10_duration_repair_does_not_change_template_scoring(duration: int)
     )
     allowed_reasons = {
         "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+        "SESSION_DURATION_UNDER_TARGET",
         "SESSION_DURATION_TARGET_UNSATISFIED",
     }
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
+        not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
         or any(code in allowed_reasons for code in duration_trace["reason_codes"])
         for day in program.weekly_schedule
     )

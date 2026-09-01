@@ -541,7 +541,7 @@ def _duration_counts_for_record(record: Mapping[str, object]) -> dict[str, int]:
         workout = calculate_main_training_minutes(day)
         counts["sessions"] += 1
         counts["absolute_deviation"] += abs(workout - requested)
-        if workout < policy.minimum_minutes:
+        if policy.below_preferred_minimum(workout):
             counts["under"] += 1
         elif workout > policy.maximum_minutes:
             counts["over"] += 1

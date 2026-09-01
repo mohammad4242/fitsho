@@ -318,7 +318,7 @@ def test_thirty_minute_strength_program_keeps_main_training_inside_bounds() -> N
     assert result.program is not None, result.errors
     policy = get_session_duration_policy(source.session_duration_minutes)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
+        policy.within_preferred_range(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
     primary = next(

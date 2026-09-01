@@ -661,10 +661,8 @@ def _duration_policy_failure(
     del reason_codes
     policy = get_session_duration_policy(requested_minutes)
     main_minutes = calculate_main_training_minutes(day)
-    if main_minutes > policy.maximum_minutes:
+    if policy.exceeds_hard_maximum(main_minutes):
         return "above_maximum"
-    if main_minutes < policy.minimum_minutes:
-        return "below_minimum"
     return None
 
 
@@ -1023,7 +1021,8 @@ def _audit_quality_metrics(
     duration_trace = _trace_entry(result, "session_duration") or {}
     duration_reasons = set(_string_values(duration_trace.get("reason_codes")))
     durations_fit = all(
-        policy.contains(calculate_main_training_minutes(day)) for day in program.weekly_schedule
+        policy.within_preferred_range(calculate_main_training_minutes(day))
+        for day in program.weekly_schedule
     )
     duration_fit = (
         "fit"

@@ -88,13 +88,16 @@ def test_duration_policy_contains_main_training_bounds() -> None:
     policy = get_session_duration_policy(60)
 
     assert (policy.minimum_minutes, policy.maximum_minutes) == (50, 70)
-    assert [policy.contains(value) for value in (49, 50, 60, 70, 71)] == [
+    assert [policy.within_preferred_range(value) for value in (49, 50, 60, 70, 71)] == [
         False,
         True,
         True,
         True,
         False,
     ]
+    assert policy.below_preferred_minimum(49)
+    assert not policy.exceeds_hard_maximum(70)
+    assert policy.exceeds_hard_maximum(71)
 
 
 @pytest.mark.parametrize(
@@ -128,13 +131,10 @@ def test_official_duration_matrix_never_returns_an_invalid_success(
         reference_templates=(),
     )
 
-    if result.program is None:
-        assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
-        assert "SESSION_DURATION_UNDER_TARGET" in result.errors
-        return
+    assert result.program is not None, result.errors
     policy = get_session_duration_policy(duration)
     assert all(
-        policy.contains(calculate_main_training_minutes(day))
+        not policy.exceeds_hard_maximum(calculate_main_training_minutes(day))
         for day in result.program.weekly_schedule
     )
 
@@ -294,7 +294,7 @@ def test_core_and_cardio_are_additive_to_a_valid_main_training_duration() -> Non
     }.intersection(report.errors)
 
 
-def test_underfilled_main_training_is_invalid_even_when_addons_make_total_long() -> None:
+def test_underfilled_main_training_is_a_warning_even_when_addons_make_total_long() -> None:
     program = _generated_program()
     day = _duration_day(program.weekly_schedule[0], main_minutes=47, core_minutes=10)
     mutated = replace(program, weekly_schedule=(day,))
@@ -305,11 +305,12 @@ def test_underfilled_main_training_is_invalid_even_when_addons_make_total_long()
         RULESET,
     )
 
-    assert "SESSION_DURATION_UNDER_TARGET" in report.errors
-    assert "SESSION_DURATION_TARGET_UNSATISFIED" in report.errors
+    assert "SESSION_DURATION_UNDER_TARGET" in report.warnings
+    assert "SESSION_DURATION_UNDER_TARGET" not in report.errors
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" not in report.errors
 
 
-def test_underfill_repair_adds_main_work_without_using_core_or_rest() -> None:
+def test_underfill_repair_does_not_add_main_work_when_count_is_valid() -> None:
     program = _generated_program()
     day = _duration_day(program.weekly_schedule[0], main_minutes=47, core_minutes=10)
     normalized = normalize_request(
@@ -319,6 +320,9 @@ def test_underfill_repair_adds_main_work_without_using_core_or_rest() -> None:
     original_main = calculate_main_training_minutes(day)
     original_core = calculate_core_addon_minutes(day)
     original_rests = tuple(item.rest_seconds for item in day.exercises)
+    original_shape = tuple(
+        (item.exercise_id, item.sets, item.estimated_minutes) for item in day.exercises
+    )
 
     result = repair_session_durations(
         (day,),
@@ -330,9 +334,12 @@ def test_underfill_repair_adds_main_work_without_using_core_or_rest() -> None:
 
     assert original_main == 47
     assert original_core == 10
-    assert calculate_main_training_minutes(repaired) >= 50
+    assert calculate_main_training_minutes(repaired) == original_main
     assert calculate_core_addon_minutes(repaired) == original_core
     assert tuple(item.rest_seconds for item in repaired.exercises) == original_rests
+    assert tuple(
+        (item.exercise_id, item.sets, item.estimated_minutes) for item in repaired.exercises
+    ) == original_shape
 
 
 def test_template_core_reason_cannot_excuse_main_training_overfill() -> None:
@@ -393,7 +400,7 @@ def test_final_gate_rejects_main_training_outside_bounds_without_duration_codes(
     assert not decision.is_accepted
 
 
-def test_final_gate_rejects_underfill_even_with_constraint_evidence() -> None:
+def test_final_gate_accepts_underfill_even_with_legacy_constraint_evidence() -> None:
     program = _generated_program()
     day = _duration_day(program.weekly_schedule[0], main_minutes=47, core_minutes=10)
     reason_codes = (
@@ -411,8 +418,9 @@ def test_final_gate_rejects_underfill_even_with_constraint_evidence() -> None:
         RULESET,
     )
 
-    assert decision.status.value == "rejected"
-    assert "SESSION_DURATION_UNDER_TARGET" in decision.reason_codes
+    assert decision.status.value == "accepted"
+    assert "SESSION_DURATION_UNDER_TARGET" not in decision.reason_codes
+    assert "SESSION_DURATION_TARGET_UNSATISFIED" not in decision.reason_codes
     assert "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" not in (
         decision.constraint_reason_codes
     )

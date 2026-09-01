@@ -81,7 +81,7 @@ def test_under_preferred_minimum_is_a_warning_and_does_not_add_work(duration: in
     day = _under_target_day(program.weekly_schedule[0])
     policy = get_session_duration_policy(duration)
     count_policy = get_session_exercise_count_policy(duration, RULESET)
-    assert calculate_main_training_minutes(day) < policy.minimum_minutes
+    assert policy.below_preferred_minimum(calculate_main_training_minutes(day))
     assert main_exercise_count(day.exercises) >= count_policy.minimum_main_exercises
     original_shape = tuple(
         (item.exercise_id, item.sets, item.estimated_minutes) for item in day.exercises
