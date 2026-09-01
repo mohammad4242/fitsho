@@ -32,6 +32,11 @@ def _normalized(*, days: int, experience: TrainingExperience, **overrides: objec
     return normalize_request(request(**values), RULESET)
 
 
+@pytest.fixture
+def template_only(monkeypatch):
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: ())
+
+
 def _slot(pattern: MovementPattern, muscle: MuscleGroup, *, priority: str = "core"):
     return TemplateReferenceSlot(
         exercise_id=None,
@@ -253,7 +258,9 @@ def test_duration_infeasibility_remains_a_sort_key_before_professional_score() -
     assert body_part_index > upper_lower_index
 
 
-def test_generate_program_ranks_and_attempts_feasible_professional_reference_first() -> None:
+def test_generate_program_ranks_and_attempts_feasible_professional_reference_first(
+    template_only,
+) -> None:
     source = request(
         primary_goal=Goal.HYPERTROPHY,
         training_experience=TrainingExperience.INTERMEDIATE,
@@ -278,22 +285,32 @@ def test_generate_program_ranks_and_attempts_feasible_professional_reference_fir
     assert selection["stage"] == "template_selection"
     assert selection["candidates"][0]["slug"] == professional.slug
     assert selection["selected"] == professional.slug
-    attempt = next(
-        item for item in result.program.decision_trace if item.get("stage") == "template_attempt"
+    selection = next(
+        item
+        for item in result.program.decision_trace
+        if item.get("stage") == "post_construction_template_selection"
     )
-    assert attempt["slug"] == professional.slug
-    assert attempt["rank"] == 1
-    assert attempt["status"] == "succeeded"
-    assert attempt["post_construction_feasibility"]["status"] in {
+    assert selection["evaluated_count"] == 2
+    assert [item["slug"] for item in selection["candidates"]] == [
+        professional.slug,
+        generic.slug,
+    ]
+    professional_attempt = selection["candidates"][0]
+    assert professional_attempt["rank"] == 1
+    assert professional_attempt["status"] == "succeeded"
+    assert professional_attempt["post_construction_feasibility"]["status"] in {
         "comfortably_feasible",
         "repairable",
         "tight",
     }
-    assert attempt["post_construction_feasibility"]["hard_reason_codes"] == ()
-    assert result.program.aggregate_metrics["reference_template"] == professional.slug
+    assert professional_attempt["post_construction_feasibility"]["hard_reason_codes"] == ()
+    assert selection["selected_slug"] == result.program.aggregate_metrics["reference_template"]
 
 
-def test_generate_program_compares_close_successes_by_real_repair_cost(monkeypatch) -> None:
+def test_generate_program_compares_close_successes_by_real_repair_cost(
+    monkeypatch,
+    template_only,
+) -> None:
     source = request(
         primary_goal=Goal.HYPERTROPHY,
         training_experience=TrainingExperience.INTERMEDIATE,
@@ -364,7 +381,9 @@ def test_recovery_redistribution_counts_as_a_post_construction_repair() -> None:
     )
 
 
-def test_generate_program_keeps_upper_lower_when_professional_reference_is_ineligible() -> None:
+def test_generate_program_keeps_upper_lower_when_professional_reference_is_ineligible(
+    template_only,
+) -> None:
     source = request(
         primary_goal=Goal.HYPERTROPHY,
         training_experience=TrainingExperience.INTERMEDIATE,
@@ -396,7 +415,9 @@ def test_generate_program_keeps_upper_lower_when_professional_reference_is_ineli
     assert result.program.aggregate_metrics["reference_template"] == generic.slug
 
 
-def test_generate_program_falls_back_to_generic_after_professional_construction_failure() -> None:
+def test_generate_program_falls_back_to_generic_after_professional_construction_failure(
+    template_only,
+) -> None:
     source = request(
         primary_goal=Goal.HYPERTROPHY,
         training_experience=TrainingExperience.INTERMEDIATE,

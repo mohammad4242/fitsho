@@ -2,6 +2,7 @@ from dataclasses import replace
 
 from app.exercises.enums import MuscleGroup
 from app.training_templates.tags import TemplateFocusTag
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import SplitType
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -120,9 +121,10 @@ def test_biceps_priority_selects_the_best_canonical_quality_after_fallback() -> 
     )
 
 
-def test_no_priority_user_can_still_use_a_structural_upper_lower_template() -> None:
+def test_no_priority_user_can_still_use_a_structural_upper_lower_template(monkeypatch) -> None:
     reference, catalog = _upper_lower_reference()
     reference = replace(reference, focus_tags=(TemplateFocusTag.UPPER_LOWER.value,))
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: ())
     result = generate_program(
         request(
             available_training_days=4,

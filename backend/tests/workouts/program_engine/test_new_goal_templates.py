@@ -7,12 +7,18 @@ from app.profile.enums import TrainingLocation
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.seed_data import CANONICAL_TEMPLATE_SLUGS
 from app.training_templates.service import seed_training_program_templates
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal, ImpactLimit, TrainingExperience
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import ExerciseCandidate
 from tests.training_templates.catalog_fixture import seed_real_catalog_exercises
 from tests.workouts.program_engine.golden_fixtures import full_catalog, request
+
+
+@pytest.fixture
+def template_only(monkeypatch):
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: ())
 
 
 @pytest.mark.parametrize(
@@ -27,6 +33,7 @@ def test_new_goals_use_template_path(
     db: Session,
     goal: Goal,
     days: int,
+    template_only,
 ) -> None:
     seed_real_catalog_exercises(db)
     seed_training_program_templates(db)

@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from app.exercises.enums import Equipment, ExerciseCautionTag, MovementPattern, MuscleGroup
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.exercise_ranker import rank_exercises
@@ -234,7 +235,7 @@ def _template_slot(
     )
 
 
-def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> None:
+def test_reference_template_cannot_relax_configured_weekly_hard_maximum(monkeypatch) -> None:
     chest = (MuscleGroup.CHEST,)
     back = (MuscleGroup.BACK,)
     legs = (MuscleGroup.QUADRICEPS, MuscleGroup.HAMSTRINGS, MuscleGroup.GLUTES)
@@ -303,6 +304,7 @@ def test_reference_template_cannot_relax_configured_weekly_hard_maximum() -> Non
             Equipment.PULL_UP_BAR,
         ],
     )
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: ())
     result = generate_program(
         source,
         full_catalog(),

@@ -23,6 +23,7 @@ from app.workouts.program_engine.session_duration import (
     repair_session_durations,
 )
 from app.workouts.program_engine.supplemental_policy import (
+    contextual_minimum_working_sets,
     is_main_resistance_exercise,
     main_exercise_count,
 )
@@ -823,7 +824,11 @@ def test_batch2_profile_underfill_is_hard_volume_constrained(
 
     assert day.exercises
     assert day.estimated_duration_minutes > 0
-    assert all(exercise.sets >= RULESET.minimum_working_sets for exercise in day.exercises)
+    assert all(
+        exercise.sets
+        >= contextual_minimum_working_sets(exercise, RULESET.minimum_working_sets)
+        for exercise in day.exercises
+    )
     assert all(exercise.exercise.content_type.value == "exercise" for exercise in day.exercises)
 
     hard_attempts = [attempt for attempt in strict_attempts if attempt["day"] == underfilled_day]

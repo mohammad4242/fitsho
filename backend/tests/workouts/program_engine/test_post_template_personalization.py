@@ -1,7 +1,10 @@
 from dataclasses import replace
 from uuid import uuid4
 
+import pytest
+
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.eligibility import filter_eligible_exercises
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import Goal
@@ -27,6 +30,11 @@ from tests.workouts.program_engine.test_template_reference import (
     _upper_lower_reference,
     template_request,
 )
+
+
+@pytest.fixture
+def template_only(monkeypatch):
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: ())
 
 
 def _body_analysis_priorities() -> BodyAnalysisInfluence:
@@ -318,7 +326,9 @@ def test_duration_repair_reduces_non_priority_before_explicit_priority() -> None
     assert priority_sets > non_priority_sets
 
 
-def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions() -> None:
+def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions(
+    template_only,
+) -> None:
     template, catalog = _upper_lower_reference()
     common = {
         "available_training_days": 4,
@@ -363,7 +373,9 @@ def test_same_template_strength_and_hypertrophy_have_role_specific_prescriptions
     )
 
 
-def test_same_template_gives_explicit_chest_priority_more_final_direct_volume() -> None:
+def test_same_template_gives_explicit_chest_priority_more_final_direct_volume(
+    template_only,
+) -> None:
     template, catalog = _upper_lower_reference()
     common = {
         "available_training_days": 4,

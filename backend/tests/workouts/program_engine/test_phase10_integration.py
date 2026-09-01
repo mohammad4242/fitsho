@@ -9,6 +9,7 @@ from app.profile.enums import ExperienceLevel, FitnessGoal, HomeTrainingSetup, S
 from app.profile.schemas import ProfileCreate
 from app.profile.training_compatibility import UnsupportedResistanceTrainingCombinationError
 from app.training_templates.tags import TemplateFocusTag
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
@@ -25,6 +26,11 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.volume_policy import weekly_direct_volume_range
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
+
+
+@pytest.fixture
+def template_only(monkeypatch):
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: ())
 
 
 def _body_analysis(muscle: MuscleGroup, classification: str = "clear_lag") -> BodyAnalysisInfluence:
@@ -307,6 +313,7 @@ def test_phase10_template_scoring_is_goal_agnostic_for_hard_eligibility() -> Non
 @pytest.mark.parametrize("sex", ["male", "female", None])
 def test_phase10_representative_sex_inputs_reach_deterministic_generation(
     sex: str | None,
+    template_only,
 ) -> None:
     program = _assert_success(
         generate_program(
@@ -345,7 +352,9 @@ def test_phase10_same_input_produces_same_template_and_final_program() -> None:
     assert first.decision_trace[0]["selected"] == "chest-structure"
 
 
-def test_phase10_template_intent_survives_priority_and_body_analysis_personalization() -> None:
+def test_phase10_template_intent_survives_priority_and_body_analysis_personalization(
+    template_only,
+) -> None:
     catalog = [
         *full_catalog(),
         exercise("glute-kickback", MovementPattern.HIP_EXTENSION, MuscleGroup.GLUTES),
@@ -429,7 +438,10 @@ def test_phase10_template_intent_survives_priority_and_body_analysis_personaliza
 
 
 @pytest.mark.parametrize("classification", ["clear_lag", "mild_lag"])
-def test_phase10_body_analysis_only_changes_downstream_priority(classification: str) -> None:
+def test_phase10_body_analysis_only_changes_downstream_priority(
+    classification: str,
+    template_only,
+) -> None:
     catalog = [
         *full_catalog(),
         exercise("glute-kickback", MovementPattern.HIP_EXTENSION, MuscleGroup.GLUTES),
@@ -486,7 +498,7 @@ def test_phase10_single_explicit_priority_is_preserved_within_caps() -> None:
     )
 
 
-def test_phase10_goal_prescription_changes_without_changing_structure() -> None:
+def test_phase10_goal_prescription_changes_without_changing_structure(template_only) -> None:
     template = (_template("balanced-structure", (TemplateFocusTag.BALANCED,)),)
     programs = {
         goal: _assert_success(
@@ -654,7 +666,7 @@ def test_phase10_validation_metrics_match_final_program_and_hard_caps() -> None:
     assert report.is_valid is True
 
 
-def test_phase10_coach_quality_metrics_agree_with_final_program() -> None:
+def test_phase10_coach_quality_metrics_agree_with_final_program(template_only) -> None:
     program = _assert_success(
         generate_program(
             _template_request(

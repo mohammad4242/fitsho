@@ -40,6 +40,7 @@ from app.workouts.program_engine.program_selection import (
     CandidateSource,
     ProgramCandidate,
     ProgramQualityView,
+    ProgramSelectionDecision,
     select_best_program,
 )
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
@@ -116,6 +117,9 @@ from app.workouts.program_engine.weekly_coverage import (
     build_coverage_availability_evidence,
 )
 
+MAX_TEMPLATE_CANDIDATES = 6
+MAX_CANONICAL_CANDIDATES = 6
+
 
 def generate_program(
     request: ProgramGenerationRequest,
@@ -190,16 +194,10 @@ def generate_program(
         rejected_slot_candidates,
     )
     template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
-    successful_templates: list[
-        tuple[
-            tuple[int, int, int, int],
-            TemplateRankingResult,
-            ProgramGenerationResult,
-            dict[str, object],
-        ]
-    ] = []
+    primary_candidates: list[ProgramCandidate] = []
     evaluated_attempts: list[dict[str, object]] = []
-    for candidate_index, ranking in enumerate(template_selection.candidates):
+    shortlisted_templates = template_selection.candidates[:MAX_TEMPLATE_CANDIDATES]
+    for ranking in shortlisted_templates:
         reference = ranking.template
         try:
             reference_build = build_template_sessions(
@@ -228,33 +226,22 @@ def generate_program(
             )
             if reference_result.is_success:
                 repair_events = _post_construction_repair_events(reference_result)
-                survival = assess_candidate_survival(
-                    is_success=True,
-                    reason_codes=("TEMPLATE_ATTEMPT_SUCCEEDED",),
-                    repair_events=repair_events,
-                )
-                selection_key = candidate_survival_sort_key(
-                    survival, product_score=ranking.score.total
-                )
                 attempt_trace = _template_attempt_trace(
                     ranking,
                     status="succeeded",
                     repair_events=repair_events,
                 )
                 evaluated_attempts.append(attempt_trace)
-                successful_templates.append(
-                    (selection_key, ranking, reference_result, attempt_trace)
+                completed_result = _append_successful_template_attempt(
+                    reference_result,
+                    attempt_trace,
                 )
-                remaining = template_selection.candidates[candidate_index + 1 :]
-                best_key = max(item[0] for item in successful_templates)
-                best_remaining_product_score = max(
-                    (item.score.total for item in remaining), default=None
+                primary_candidates.append(
+                    _template_program_candidate(
+                        completed_result,
+                        ranking,
+                    )
                 )
-                if (
-                    best_remaining_product_score is None
-                    or best_remaining_product_score <= best_key[1]
-                ):
-                    break
                 continue
             rejection_category = _template_rejection_category(reference_result.errors)
             rejection = {
@@ -310,33 +297,12 @@ def generate_program(
             )
             evaluated_attempts.append(attempt_trace)
             template_rejection_trace += (rejection, attempt_trace)
-    if successful_templates:
-        selected_key, selected_ranking, selected_result, selected_attempt = max(
-            successful_templates, key=lambda item: item[0]
-        )
-        selected_result = _append_successful_template_attempt(selected_result, selected_attempt)
-        return _append_successful_template_attempt(
-            selected_result,
-            {
-                "stage": "post_construction_template_selection",
-                "status": "selected",
-                "selected_slug": selected_ranking.template.slug,
-                "selected_key": selected_key,
-                "evaluated_count": len(evaluated_attempts),
-                "pruned_count": len(template_selection.candidates) - len(evaluated_attempts),
-                "candidates": tuple(evaluated_attempts),
-                "reason_codes": (
-                    "POST_CONSTRUCTION_SURVIVAL_COMPARED",
-                    "REPAIR_COST_APPLIED_TO_TEMPLATE_SELECTION",
-                ),
-            },
-        )
-    if template_selection.candidates:
+    if template_selection.candidates and not primary_candidates:
         template_rejection_trace += (
             {
                 "stage": "template_recovery",
                 "status": "exhausted",
-                "attempted_count": len(template_selection.candidates),
+                "attempted_count": len(shortlisted_templates),
                 "candidate_count": len(template_selection.candidates),
                 "reason_codes": ("TEMPLATE_ALTERNATIVES_EXHAUSTED",),
             },
@@ -350,7 +316,7 @@ def generate_program(
     )
     exact_day_splits = tuple(
         candidate for candidate in ranked_splits if len(candidate.day_focuses) == requested_days
-    )
+    )[:MAX_CANONICAL_CANDIDATES]
     if not exact_day_splits:
         collected_errors: list[str] = [
             "REQUESTED_TRAINING_DAYS_UNSATISFIED",
@@ -360,13 +326,12 @@ def generate_program(
     else:
         rejected_splits = []
         collected_errors = []
-    successful_splits: list[ProgramCandidate] = []
     for attempt_index, candidate in enumerate(exact_day_splits):
         split = candidate
         split_reasons = list(candidate.reason_codes)
         if rejected_splits:
             split_reasons.append("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE")
-        if successful_splits:
+        if primary_candidates:
             split_reasons.append("SPLIT_CANDIDATE_EVALUATED_FOR_QUALITY")
         if tuple(split_reasons) != candidate.reason_codes:
             split = replace(candidate, reason_codes=tuple(dict.fromkeys(split_reasons)))
@@ -388,13 +353,12 @@ def generate_program(
             coverage_availability_evidence=coverage_availability_evidence,
         )
         if result.is_success:
-            successful_splits.append(
-                _canonical_program_candidate(
-                    result,
-                    split,
-                    preconstruction_rank=attempt_index + 1,
-                )
+            program_candidate = _canonical_program_candidate(
+                result,
+                split,
+                preconstruction_rank=attempt_index + 1,
             )
+            primary_candidates.append(program_candidate)
             continue
         collected_errors.extend(result.errors)
         rejected_attempt: dict[str, object] = {
@@ -407,10 +371,19 @@ def generate_program(
             rejected_attempt["decision_trace"] = result.decision_trace
         rejected_splits.append(rejected_attempt)
 
-    if successful_splits:
-        selection = select_best_program(tuple(successful_splits))
+    if primary_candidates:
+        selection = select_best_program(tuple(primary_candidates))
         if selection.selected is not None:
-            return selection.selected.result
+            selection_trace = _primary_selection_trace(
+                selection,
+                template_attempts=tuple(evaluated_attempts),
+                template_candidate_count=len(template_selection.candidates),
+                primary_candidate_count=len(primary_candidates),
+            )
+            return _append_successful_template_attempt(
+                selection.selected.result,
+                selection_trace,
+            )
 
     weekdays_fallback = (
         exact_day_splits[0].weekdays if exact_day_splits else tuple(range(requested_days))
@@ -615,6 +588,68 @@ def _rejected_split_summaries(
         }
         for rejected_split in rejected_splits
     )
+
+
+def _template_program_candidate(
+    result: ProgramGenerationResult,
+    ranking: TemplateRankingResult,
+) -> ProgramCandidate:
+    quality = _quality_view(result)
+    return ProgramCandidate(
+        source=CandidateSource.TEMPLATE,
+        identifier=f"template:{ranking.template.slug}",
+        preconstruction_rank=ranking.rank,
+        preconstruction_score=float(ranking.score.total),
+        result=result,
+        quality=quality,
+        actual_substitution_count=quality.actual_substitution_count if quality else 0,
+        source_metadata={"template_slug": ranking.template.slug},
+    )
+
+
+def _primary_selection_trace(
+    selection: ProgramSelectionDecision,
+    *,
+    template_attempts: tuple[dict[str, object], ...],
+    template_candidate_count: int,
+    primary_candidate_count: int,
+) -> dict[str, object]:
+    selected = selection.selected
+    if selected is None:
+        raise ValueError("primary selection trace requires a selected candidate")
+    selected_slug = (
+        selected.source_metadata.get("template_slug")
+        if selected.source is CandidateSource.TEMPLATE
+        else None
+    )
+    selected_key = next(
+        (
+            attempt.get("selection_key")
+            for attempt in template_attempts
+            if attempt.get("slug") == selected_slug
+        ),
+        None,
+    )
+    return {
+        "stage": "post_construction_template_selection",
+        "status": "selected",
+        "selection_scope": "primary_pool",
+        "selected_slug": selected_slug,
+        "selected_source": selected.source.value,
+        "selected_identifier": selected.identifier,
+        "selected_key": selected_key,
+        "evaluated_count": len(template_attempts),
+        "pruned_count": max(0, template_candidate_count - len(template_attempts)),
+        "candidates": template_attempts,
+        "primary_candidate_count": primary_candidate_count,
+        "admitted_primary_count": len(selection.admitted_candidates),
+        "reason_codes": (
+            "POST_CONSTRUCTION_PRIMARY_POOL_COMPARED",
+            "FINAL_QUALITY_SELECTION_APPLIED",
+        ),
+        "selection_reason_codes": selection.reason_codes,
+        "selection_diagnostic_codes": selection.diagnostic_codes,
+    }
 
 
 def _canonical_program_candidate(

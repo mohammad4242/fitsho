@@ -5,6 +5,7 @@ import pytest
 from app.exercises.enums import Equipment, MovementPattern, MuscleGroup
 from app.training_templates.engine_reference import load_template_references
 from app.training_templates.service import seed_training_program_templates
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
@@ -36,6 +37,11 @@ def template_request(**overrides: object):
     }
     values.update(overrides)
     return request(**values)
+
+
+@pytest.fixture
+def template_only(monkeypatch):
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: ())
 
 
 def test_level_specific_template_loads_as_one_engine_reference(db) -> None:
@@ -371,7 +377,7 @@ def _repeated_core_reference() -> tuple[TemplateReference, list[ExerciseCandidat
     )
 
 
-def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> None:
+def test_body_part_template_does_not_claim_aggregate_full_body_coverage(template_only) -> None:
     catalog = full_catalog()
     template = _four_day_reference()
 
@@ -471,7 +477,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage() -> Non
     assert candidate_trace["reason_codes"] == ()
 
 
-def test_upper_lower_template_does_not_claim_aggregate_full_body_coverage() -> None:
+def test_upper_lower_template_does_not_claim_aggregate_full_body_coverage(template_only) -> None:
     template, catalog = _upper_lower_reference()
     template = replace(
         template,
@@ -546,7 +552,7 @@ def _full_body_reference() -> TemplateReference:
     )
 
 
-def test_explicit_full_body_template_reports_actual_coverage_and_evidence() -> None:
+def test_explicit_full_body_template_reports_actual_coverage_and_evidence(template_only) -> None:
     template = _full_body_reference()
     result = generate_program(
         template_request(
@@ -583,7 +589,9 @@ def test_supplemental_only_template_day_cannot_satisfy_lower_topology(
     assert classify_template_region((supplemental,)) is None
 
 
-def test_template_priority_stays_inside_flexible_range_with_duration_planning() -> None:
+def test_template_priority_stays_inside_flexible_range_with_duration_planning(
+    template_only,
+) -> None:
     reference, catalog = _upper_lower_reference()
     result = generate_program(
         template_request(
@@ -635,7 +643,7 @@ def test_template_uses_shared_volume_and_prescription_rules() -> None:
     assert any(entry["stage"] == "volume_repair" for entry in result.program.decision_trace)
 
 
-def test_safe_template_superset_group_reaches_programmed_exercises() -> None:
+def test_safe_template_superset_group_reaches_programmed_exercises(template_only) -> None:
     template, catalog = _upper_lower_reference()
     grouped_slots = tuple(
         replace(slot, adaptation_priority="accessory", superset_group="upper-a")
@@ -669,7 +677,9 @@ def test_safe_template_superset_group_reaches_programmed_exercises() -> None:
     assert {item.superset_group for item in grouped} == {"upper-a"}
 
 
-def test_same_template_personalizes_weekly_volume_targets_for_different_priorities() -> None:
+def test_same_template_personalizes_weekly_volume_targets_for_different_priorities(
+    template_only,
+) -> None:
     template, catalog = _upper_lower_reference()
 
     chest_result = generate_program(
@@ -800,7 +810,7 @@ def test_template_volume_uses_recovery_history_and_short_session_prescription() 
     assert "VOLUME_CAPPED_FOR_PREVIOUS_VOLUME" in volume_trace["reasons"]
 
 
-def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable() -> None:
+def test_unsafe_template_exercise_is_substituted_and_trace_is_auditable(template_only) -> None:
     template, catalog = _upper_lower_reference()
     catalog.append(
         exercise(
@@ -936,7 +946,9 @@ def test_unadaptable_five_day_template_recovers_without_dropping_days() -> None:
     assert recovery["selected_split"] in {"body_part_rotation", "upper_lower_specialization"}
 
 
-def test_final_program_prefers_duration_feasible_template_regardless_of_input_order() -> None:
+def test_final_program_prefers_duration_feasible_template_regardless_of_input_order(
+    template_only,
+) -> None:
     feasible, _ = _upper_lower_reference()
     feasible = replace(feasible, slug="duration-feasible-reference")
     overloaded = _duration_overloaded_reference()
@@ -974,7 +986,7 @@ def test_final_program_prefers_duration_feasible_template_regardless_of_input_or
     )
 
 
-def test_final_program_caps_30_min_main_slots_without_dropping_core() -> None:
+def test_final_program_caps_30_min_main_slots_without_dropping_core(template_only) -> None:
     overloaded = _duration_overloaded_reference()
     source = template_request(
         available_training_days=4,
@@ -1008,7 +1020,7 @@ def test_final_program_caps_30_min_main_slots_without_dropping_core() -> None:
     )
 
 
-def test_template_priority_volume_is_repaired_when_safe_capacity_exists() -> None:
+def test_template_priority_volume_is_repaired_when_safe_capacity_exists(template_only) -> None:
     template = _four_day_reference()
 
     result = generate_program(
@@ -1069,7 +1081,7 @@ def test_template_generation_is_deterministic_and_strictly_valid() -> None:
     )
 
 
-def test_template_with_adjacent_direct_muscle_overlap_is_rearranged() -> None:
+def test_template_with_adjacent_direct_muscle_overlap_is_rearranged(template_only) -> None:
     template, catalog = _upper_lower_reference()
     unsafe = replace(
         template,
@@ -1097,7 +1109,9 @@ def test_template_with_adjacent_direct_muscle_overlap_is_rearranged() -> None:
     )
 
 
-def test_template_with_alternating_direct_muscles_keeps_valid_recovery_spacing() -> None:
+def test_template_with_alternating_direct_muscles_keeps_valid_recovery_spacing(
+    template_only,
+) -> None:
     template, catalog = _upper_lower_reference()
 
     result = generate_program(
@@ -1118,7 +1132,9 @@ def test_template_with_alternating_direct_muscles_keeps_valid_recovery_spacing()
     assert result.program.validation_report.is_valid
 
 
-def test_intentional_repeated_safe_template_core_is_preserved_deterministically() -> None:
+def test_intentional_repeated_safe_template_core_is_preserved_deterministically(
+    template_only,
+) -> None:
     template, catalog = _repeated_core_reference()
     repeated_id = template.days[0].slots[0].exercise_id
     source = template_request(
@@ -1146,7 +1162,7 @@ def test_intentional_repeated_safe_template_core_is_preserved_deterministically(
     assert first.program.validation_report.is_valid
 
 
-def test_repeated_blocked_template_core_uses_distinct_safe_substitutions() -> None:
+def test_repeated_blocked_template_core_uses_distinct_safe_substitutions(template_only) -> None:
     template, catalog = _repeated_core_reference()
     repeated_id = template.days[0].slots[0].exercise_id
     assert repeated_id is not None

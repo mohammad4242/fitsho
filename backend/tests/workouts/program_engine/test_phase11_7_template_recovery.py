@@ -1,7 +1,10 @@
 from dataclasses import replace
 
+import pytest
+
 from app.exercises.enums import ExerciseCautionTag, MovementPattern, MuscleGroup
 from app.training_templates.tags import TemplateFocusTag
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -54,13 +57,20 @@ def _recovery_request(**overrides: object):
     return template_request(**values)
 
 
+@pytest.fixture
+def template_only(monkeypatch):
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: ())
+
+
 def _template_attempts(result: ProgramGenerationResult) -> tuple[dict[str, object], ...]:
     program = result.program
     trace = program.decision_trace if program is not None else result.decision_trace
     return tuple(entry for entry in trace if entry.get("stage") == "template_attempt")
 
 
-def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallback() -> None:
+def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallback(
+    template_only,
+) -> None:
     good, _ = _upper_lower_reference()
     good = replace(
         good,
@@ -89,7 +99,7 @@ def test_top_ranked_template_failure_recovers_with_second_without_dynamic_fallba
     )
 
 
-def test_multiple_ranked_templates_fail_before_later_template_succeeds() -> None:
+def test_multiple_ranked_templates_fail_before_later_template_succeeds(template_only) -> None:
     good, _ = _upper_lower_reference()
     good = replace(
         good,
@@ -185,7 +195,7 @@ def test_template_retry_order_and_trace_are_deterministic() -> None:
     assert first.program == second.program
 
 
-def test_retry_preserves_safety_equipment_limitations_and_exact_day_count() -> None:
+def test_retry_preserves_safety_equipment_limitations_and_exact_day_count(template_only) -> None:
     good, catalog = _upper_lower_reference()
     catalog.append(
         exercise(
