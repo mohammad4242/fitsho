@@ -42,8 +42,8 @@ def test_chest_priority_is_muscle_specific_in_real_generation() -> None:
     assert result.is_success, result.errors
     assert baseline.is_success, baseline.errors
     assert result.program is not None and baseline.program is not None
-    assert result.program.split.split_type is SplitType.BODY_PART_ROTATION
-    assert result.program.weekly_schedule[0].focus == "chest_triceps"
+    assert result.program.split.split_type is SplitType.UPPER_LOWER_FULL
+    assert result.program.weekly_schedule[0].focus == "upper"
     assert _direct_sets(result.program, MuscleGroup.CHEST) >= _direct_sets(
         baseline.program, MuscleGroup.CHEST
     )
@@ -69,7 +69,7 @@ def test_back_priority_is_muscle_specific_in_real_generation() -> None:
 
     assert result.is_success, result.errors
     assert result.program is not None
-    assert any(day.focus == "back_biceps" for day in result.program.weekly_schedule)
+    assert any(day.focus == "pull" for day in result.program.weekly_schedule)
     assert set(result.program.aggregate_metrics["priority_metrics"]) == {MuscleGroup.BACK.value}
     assert (
         result.program.aggregate_metrics["priority_metrics"][MuscleGroup.BACK.value]["direct_sets"]
@@ -82,7 +82,7 @@ def test_back_priority_is_muscle_specific_in_real_generation() -> None:
     )
 
 
-def test_biceps_priority_uses_duration_valid_ppl_without_unnecessary_split_fallback() -> None:
+def test_biceps_priority_selects_the_best_canonical_quality_after_fallback() -> None:
     source = request(
         available_training_days=6,
         training_experience="advanced",
@@ -96,16 +96,15 @@ def test_biceps_priority_uses_duration_valid_ppl_without_unnecessary_split_fallb
 
     assert result.is_success, result.errors
     assert result.program is not None
-    assert result.program.split.split_type is SplitType.PUSH_PULL_LEGS_X2
-    assert result.program.weekly_schedule[-1].focus == "legs"
-    assert "PROFESSIONAL_TOPOLOGY_PPL_PREFERENCE" in result.program.split.reason_codes
-    assert "SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE" not in result.program.split.reason_codes
+    assert result.program.split.split_type is SplitType.UPPER_LOWER_X3
+    assert result.program.weekly_schedule[-1].focus == "lower"
+    assert "SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE" in result.program.split.reason_codes
     recovery = next(
         entry
         for entry in result.program.decision_trace
         if entry["stage"] == "construction_recovery"
     )
-    assert recovery["selected_split"] == SplitType.PUSH_PULL_LEGS_X2.value
+    assert recovery["selected_split"] == SplitType.UPPER_LOWER_X3.value
     assert recovery["rejected_splits"] == ()
     assert set(result.program.aggregate_metrics["priority_metrics"]) == {MuscleGroup.BICEPS.value}
     assert (

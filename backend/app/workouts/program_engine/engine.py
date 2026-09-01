@@ -36,6 +36,12 @@ from app.workouts.program_engine.final_gate import evaluate_final_program
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.prescription import prescribe_sessions
 from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
+from app.workouts.program_engine.program_selection import (
+    CandidateSource,
+    ProgramCandidate,
+    ProgramQualityView,
+    select_best_program,
+)
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
 from app.workouts.program_engine.recovery import (
     assess_recovery_spacing,
@@ -354,14 +360,16 @@ def generate_program(
     else:
         rejected_splits = []
         collected_errors = []
+    successful_splits: list[ProgramCandidate] = []
     for attempt_index, candidate in enumerate(exact_day_splits):
         split = candidate
-        if attempt_index:
-            split = replace(
-                candidate,
-                reason_codes=candidate.reason_codes
-                + ("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",),
-            )
+        split_reasons = list(candidate.reason_codes)
+        if rejected_splits:
+            split_reasons.append("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE")
+        if successful_splits:
+            split_reasons.append("SPLIT_CANDIDATE_EVALUATED_FOR_QUALITY")
+        if tuple(split_reasons) != candidate.reason_codes:
+            split = replace(candidate, reason_codes=tuple(dict.fromkeys(split_reasons)))
         result = _program_for_split(
             request,
             normalized,
@@ -374,13 +382,20 @@ def generate_program(
             ruleset,
             previous_volume=previous_volume,
             session_capacity=session_capacity,
-            rejected_splits=tuple(rejected_splits),
+            rejected_splits=(),
             template_rejection_trace=template_rejection_trace,
             rejected_slot_candidates=rejected_slot_candidates,
             coverage_availability_evidence=coverage_availability_evidence,
         )
         if result.is_success:
-            return result
+            successful_splits.append(
+                _canonical_program_candidate(
+                    result,
+                    split,
+                    preconstruction_rank=attempt_index + 1,
+                )
+            )
+            continue
         collected_errors.extend(result.errors)
         rejected_attempt: dict[str, object] = {
             "split": split.split_type.value,
@@ -391,6 +406,11 @@ def generate_program(
         if result.decision_trace:
             rejected_attempt["decision_trace"] = result.decision_trace
         rejected_splits.append(rejected_attempt)
+
+    if successful_splits:
+        selection = select_best_program(tuple(successful_splits))
+        if selection.selected is not None:
+            return selection.selected.result
 
     weekdays_fallback = (
         exact_day_splits[0].weekdays if exact_day_splits else tuple(range(requested_days))
@@ -595,6 +615,51 @@ def _rejected_split_summaries(
         }
         for rejected_split in rejected_splits
     )
+
+
+def _canonical_program_candidate(
+    result: ProgramGenerationResult,
+    split: SplitPlan,
+    *,
+    preconstruction_rank: int,
+) -> ProgramCandidate:
+    quality = _quality_view(result)
+    return ProgramCandidate(
+        source=CandidateSource.CANONICAL_SPLIT,
+        identifier=f"{split.split_type.value}:{'|'.join(split.day_focuses)}",
+        preconstruction_rank=preconstruction_rank,
+        preconstruction_score=float(split.score),
+        result=result,
+        quality=quality,
+        actual_substitution_count=quality.actual_substitution_count if quality else 0,
+        source_metadata={
+            "split_type": split.split_type.value,
+            "day_focuses": split.day_focuses,
+        },
+    )
+
+
+def _quality_view(result: ProgramGenerationResult) -> ProgramQualityView | None:
+    program = result.program
+    program_trace = getattr(program, "decision_trace", ()) if program is not None else ()
+    trace = (
+        program_trace
+        if isinstance(program_trace, (tuple, list)) and program_trace
+        else result.decision_trace
+    )
+    quality_entry = next(
+        (
+            item
+            for item in reversed(trace)
+            if isinstance(item, dict) and item.get("stage") == "coach_quality"
+        ),
+        None,
+    )
+    metrics = quality_entry.get("metrics") if quality_entry is not None else None
+    selection_quality = metrics.get("selection_quality") if isinstance(metrics, dict) else None
+    if not isinstance(selection_quality, dict):
+        return None
+    return ProgramQualityView.from_selection_quality(selection_quality)
 
 
 def _program_for_split(

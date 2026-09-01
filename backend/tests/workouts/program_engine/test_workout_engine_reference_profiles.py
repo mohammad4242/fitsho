@@ -314,7 +314,8 @@ def test_reference_profiles_preserve_safety_quality_and_determinism(
         assert result.error_code.value == "UNSATISFIED_CONSTRAINT"
         assert "SESSION_DURATION_UNDER_TARGET" not in result.errors
         assert any(
-            error in {
+            error
+            in {
                 "REQUIRED_SLOT_HARD_IMPOSSIBILITY",
                 "SESSION_EXERCISE_COUNT_OUT_OF_RANGE",
             }
@@ -330,8 +331,8 @@ def test_reference_profiles_preserve_safety_quality_and_determinism(
     assert reversed_result.program == result.program
 
     if profile.code == "U2":
-        assert result.program.split.split_type is SplitType.BODY_PART_ROTATION
-        assert "PROFESSIONAL_TOPOLOGY_BODY_PART_PREFERENCE" in result.program.split.reason_codes
+        assert result.program.split.split_type is SplitType.UPPER_LOWER_FULL
+        assert "SPLIT_CANDIDATE_EVALUATED_FOR_QUALITY" in result.program.split.reason_codes
 
     print(
         f"PROFILE {profile.code} PASS days={len(result.program.weekly_schedule)} "

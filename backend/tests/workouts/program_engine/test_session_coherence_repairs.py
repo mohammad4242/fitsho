@@ -2,12 +2,15 @@ from dataclasses import replace
 from uuid import NAMESPACE_URL, uuid5
 
 from app.exercises.enums import Equipment, ExerciseType, MovementPattern, MuscleGroup
+from app.workouts.program_engine import engine
 from app.workouts.program_engine.engine import generate_program
+from app.workouts.program_engine.enums import SplitType
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import ProgrammedExercise, WorkoutDay
 from app.workouts.program_engine.session_duration import repair_session_durations
 from app.workouts.program_engine.session_structure import finalize_session_structure
+from app.workouts.program_engine.split_selector import rank_split_candidates
 from app.workouts.program_engine.template_sessions import build_template_sessions
 from app.workouts.program_engine.validation import validate_program
 from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog, request
@@ -189,15 +192,22 @@ def test_lower_duration_hierarchy_places_major_muscles_before_calves() -> None:
     )
 
 
-def test_volume_repair_deepens_existing_intended_day_before_second_exposure() -> None:
+def test_volume_repair_deepens_existing_intended_day_before_second_exposure(monkeypatch) -> None:
+    source = request(
+        training_experience="intermediate",
+        training_age_months=30,
+        available_training_days=4,
+        primary_goal="hypertrophy",
+        priority_muscles=[MuscleGroup.CHEST],
+    )
+    body_part_split = next(
+        split
+        for split in rank_split_candidates(normalize_request(source, RULESET), RULESET)
+        if split.split_type is SplitType.BODY_PART_ROTATION
+    )
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: (body_part_split,))
     result = generate_program(
-        request(
-            training_experience="intermediate",
-            training_age_months=30,
-            available_training_days=4,
-            primary_goal="hypertrophy",
-            priority_muscles=[MuscleGroup.CHEST],
-        ),
+        source,
         full_catalog(),
         RULESET,
         reference_templates=(),
@@ -210,15 +220,22 @@ def test_volume_repair_deepens_existing_intended_day_before_second_exposure() ->
     assert len(chest_days) == 1
 
 
-def test_shoulder_priority_may_use_shoulder_push_but_never_back_or_leg() -> None:
+def test_shoulder_priority_may_use_shoulder_push_but_never_back_or_leg(monkeypatch) -> None:
+    source = request(
+        training_experience="intermediate",
+        training_age_months=30,
+        available_training_days=4,
+        primary_goal="hypertrophy",
+        priority_muscles=[MuscleGroup.SHOULDERS],
+    )
+    body_part_split = next(
+        split
+        for split in rank_split_candidates(normalize_request(source, RULESET), RULESET)
+        if split.split_type is SplitType.BODY_PART_ROTATION
+    )
+    monkeypatch.setattr(engine, "rank_split_candidates", lambda *args, **kwargs: (body_part_split,))
     result = generate_program(
-        request(
-            training_experience="intermediate",
-            training_age_months=30,
-            available_training_days=4,
-            primary_goal="hypertrophy",
-            priority_muscles=[MuscleGroup.SHOULDERS],
-        ),
+        source,
         full_catalog(),
         RULESET,
         reference_templates=(),

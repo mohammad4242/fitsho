@@ -497,7 +497,7 @@ def test_niloofar_profile_recovers_from_an_undersized_body_part_session() -> Non
     priority_metrics = first.program.aggregate_metrics["priority_metrics"]
     glute_metrics = priority_metrics[MuscleGroup.GLUTES.value]
     assert glute_metrics["session_frequency"] >= glute_metrics["preferred_frequency"]
-    assert glute_metrics["status"] == "partial"
+    assert glute_metrics["status"] == "satisfied"
     assert "PRIORITY_TARGET_CONSTRAINED" in glute_metrics["reason_codes"]
 
 
