@@ -289,7 +289,7 @@ def build_food_price_research_request(
     requested_source_count: int,
     excluded_domains: Iterable[str] = (),
     as_of_date: date | None = None,
-    preferences: ProviderRoutingPreferences | None = None,
+    provider_preferences: ProviderRoutingPreferences | None = None,
     temperature: float = 0.0,
     max_output_tokens: int = 4096,
 ) -> StructuredGenerationRequest:
@@ -318,7 +318,7 @@ def build_food_price_research_request(
         response_schema=FoodPriceResearchOutput.model_json_schema(),
         schema_name=FOOD_PRICE_RESEARCH_SCHEMA_NAME,
         route=route,
-        provider_preferences=preferences or ProviderRoutingPreferences(),
+        provider_preferences=provider_preferences or ProviderRoutingPreferences(),
         temperature=temperature,
         max_output_tokens=max_output_tokens,
     )
@@ -497,7 +497,7 @@ class AgentFoodPriceResearcher:
             route=self.route,
             requested_source_count=requested_source_count,
             excluded_domains=excluded_domains,
-            preferences=self.preferences,
+            provider_preferences=self.preferences,
             temperature=self.temperature,
             max_output_tokens=self.max_output_tokens,
         )

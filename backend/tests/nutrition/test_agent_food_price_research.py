@@ -86,7 +86,7 @@ def test_request_targets_three_sources_and_uses_canonical_prompt() -> None:
         FOOD,
         route=ROUTE,
         requested_source_count=3,
-        preferences=ProviderRoutingPreferences(),
+        provider_preferences=ProviderRoutingPreferences(),
     )
 
     assert request.input_payload["task"] == "research_current_iran_food_retail_prices"

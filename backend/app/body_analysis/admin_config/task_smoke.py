@@ -11,7 +11,7 @@ from typing import Literal
 
 import httpx
 from PIL import Image, ImageDraw
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.ai.schemas import WorkoutProviderError
@@ -33,15 +33,22 @@ from app.body_analysis.providers import (
     ModelRoute,
     ProviderErrorCode,
     ProviderRoutingPreferences,
-    StructuredGenerationRequest,
 )
 from app.body_analysis.schemas import BodyPhotoPreflight
 from app.body_analysis.service import AnalysisExecutionConfig, BodyAnalysisService
 from app.config import Settings
+from app.nutrition.ai_price_research import (
+    FoodPriceResearchFood,
+    FoodPriceResearchOutput,
+    build_food_price_research_request,
+    canonical_source_domain,
+)
 from app.nutrition.food_photo_service import FoodPhotoOutput, build_food_photo_request
+from app.nutrition.pricing import PriceObservation, normalize_observation
+from app.nutrition.public_price_matching import CanonicalFoodIdentity, match_candidate
+from app.nutrition.public_price_sources import PublicProductCandidate
 from app.workouts.ai_coach_provider import AiCoachProvider, AiCoachRecommendationRequest
 
-FIXTURE_REVISION = "agent-task-fixtures-v1"
 SmokeStage = Literal[
     "backend_request",
     "agent_service",
@@ -51,22 +58,6 @@ SmokeStage = Literal[
     "passed",
     "failed",
 ]
-
-
-class FoodPriceSmokeQuote(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    product_name: str = Field(min_length=1, max_length=160)
-    price: float = Field(gt=0, le=100_000_000_000)
-    currency: Literal["IRR", "TOMAN"]
-    source_url: str = Field(pattern=r"^https://[^\s]+$")
-
-
-class FoodPriceSmokeOutput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    query: str = Field(min_length=1, max_length=300)
-    quotes: list[FoodPriceSmokeQuote] = Field(min_length=1, max_length=10)
 
 
 @dataclass(frozen=True)
@@ -130,6 +121,14 @@ async def run_task_smoke(
         ):
             raise TaskSmokeFailure(
                 "backend_request", "invalid_request", "The profile does not support image input."
+            )
+        if task_type is AITaskType.FOOD_PRICE_SEARCH and (
+            not profile.supports_text_input or not profile.supports_structured_output
+        ):
+            raise TaskSmokeFailure(
+                "backend_request",
+                "invalid_request",
+                "The profile does not support structured text input.",
             )
         if provider is None:
             provider = AgentServiceProvider(
@@ -293,28 +292,90 @@ async def _smoke_food_photo(provider: AIProvider, profile: AgentServiceModelProf
 
 
 async def _smoke_food_price(provider: AIProvider, profile: AgentServiceModelProfile) -> str | None:
-    # This is an isolated Agent Service smoke fixture, not the production price updater.
-    query = "قیمت برنج ایرانی یک کیلویی در تهران"
-    request = StructuredGenerationRequest(
-        system_prompt=(
-            "Use web search for the exact Persian grocery query. Return only current public "
-            "quotes with HTTPS source URLs, price, currency, and no personal data."
-        ),
-        input_payload={"query": query, "fixture_revision": FIXTURE_REVISION},
-        response_schema=FoodPriceSmokeOutput.model_json_schema(),
-        schema_name="fitsho_food_price_search_v1",
+    food = FoodPriceResearchFood(
+        slug="smoke-iranian-rice",
+        name_fa="برنج ایرانی",
+        name_en="Iranian rice",
+        category="grains",
+        aliases=("برنج",),
+    )
+    request = build_food_price_research_request(
+        food,
         route=ModelRoute(primary_model=profile.model_id),
+        requested_source_count=3,
         provider_preferences=ProviderRoutingPreferences(),
         temperature=0,
         max_output_tokens=1024,
     )
     response = await provider.generate_structured_text(request)
-    result = FoodPriceSmokeOutput.model_validate(response.payload)
-    if result.query != query:
+    result = FoodPriceResearchOutput.model_validate(response.payload)
+    if result.food_slug != food.slug:
         raise TaskSmokeFailure(
             "semantic_validation",
             "invalid_output",
-            "The price search query was not preserved.",
+            "The price search food was not preserved.",
+        )
+    if len(result.quotes) < 3:
+        raise TaskSmokeFailure(
+            "semantic_validation",
+            "invalid_output",
+            "The price search did not return three independent sources.",
+        )
+    identity = CanonicalFoodIdentity(
+        slug=food.slug,
+        name_fa=food.name_fa,
+        category=food.category,
+        aliases=food.aliases,
+    )
+    domains: set[str] = set()
+    units: set[str] = set()
+    for quote in result.quotes:
+        source_domain = canonical_source_domain(quote.source_url)
+        if source_domain in domains:
+            raise TaskSmokeFailure(
+                "semantic_validation",
+                "invalid_output",
+                "The price search returned duplicate source domains.",
+            )
+        observation = PriceObservation(
+            provider_code="smoke",
+            provider_product_id=source_domain,
+            product_title=quote.product_title,
+            currency=quote.currency,
+            normal_price=quote.normal_price,
+            promotional_price=quote.promotional_price,
+            package_quantity=quote.package_quantity,
+            package_unit=quote.package_unit,
+            observed_at=datetime.now(),
+            region=quote.region,
+        )
+        normalized = normalize_observation(observation)
+        candidate = PublicProductCandidate(
+            provider_code=observation.provider_code,
+            product_id=observation.provider_product_id,
+            title=observation.product_title,
+            public_url=quote.source_url,
+            currency=observation.currency,
+            normal_price=observation.normal_price,
+            promotional_price=observation.promotional_price,
+            package_quantity=observation.package_quantity,
+            package_unit=observation.package_unit,
+            observed_at=observation.observed_at,
+            region=observation.region,
+        )
+        if not match_candidate(identity, candidate).accepted:
+            raise TaskSmokeFailure(
+                "semantic_validation",
+                "invalid_output",
+                "The price search returned a mismatched product.",
+            )
+        domains.add(source_domain)
+        units.add(normalized.canonical_unit)
+    if len(domains) < 3 or len(units) != 1:
+        raise TaskSmokeFailure(
+            "semantic_validation",
+            "invalid_output",
+            "The price search returned insufficient comparable evidence.",
         )
     return response.provider_request_id
 

@@ -5,7 +5,7 @@ from typing import Any
 
 import httpx
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.models import User
@@ -19,11 +19,17 @@ from app.body_analysis.admin_config.task_smoke import TaskSmokeResult, run_task_
 from app.body_analysis.enums import BodyArea
 from app.body_analysis.providers.models import (
     ImageInput,
+    ModelRoute,
     ProviderRoutingPreferences,
     StructuredGenerationRequest,
     StructuredGenerationResponse,
 )
 from app.config import Settings
+from app.nutrition.ai_price_research import (
+    FOOD_PRICE_RESEARCH_SCHEMA_NAME,
+    FoodPriceResearchFood,
+    build_food_price_research_request,
+)
 from app.nutrition.food_photo_service import build_food_photo_request
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -115,14 +121,35 @@ class _SmokeProvider:
             }
         else:
             payload = {
-                "query": "قیمت برنج ایرانی یک کیلویی در تهران",
+                "food_slug": "smoke-iranian-rice",
                 "quotes": [
                     {
-                        "product_name": "برنج ایرانی",
-                        "price": 100000,
+                        "source_name": "Digikala",
+                        "source_url": "https://digikala.com/products/smoke-rice",
+                        "product_title": "برنج ایرانی 1 کیلوگرم",
+                        "normal_price": 100000,
                         "currency": "TOMAN",
-                        "source_url": "https://example.com/price",
-                    }
+                        "package_quantity": 1,
+                        "package_unit": "kg",
+                    },
+                    {
+                        "source_name": "Okala",
+                        "source_url": "https://okala.ir/products/smoke-rice",
+                        "product_title": "برنج ایرانی 1 کیلوگرم",
+                        "normal_price": 105000,
+                        "currency": "TOMAN",
+                        "package_quantity": 1,
+                        "package_unit": "kg",
+                    },
+                    {
+                        "source_name": "Basalam",
+                        "source_url": "https://basalam.com/products/smoke-rice",
+                        "product_title": "برنج ایرانی 1 کیلوگرم",
+                        "normal_price": 110000,
+                        "currency": "TOMAN",
+                        "package_quantity": 1,
+                        "package_unit": "kg",
+                    },
                 ],
             }
         return StructuredGenerationResponse(
@@ -208,6 +235,22 @@ def _body_output() -> dict[str, Any]:
 
 
 def test_task_smoke_runs_all_four_safe_fixtures(db: Session, test_settings: Settings) -> None:
+    from app.nutrition.models import (
+        NutritionFoodPriceHistory,
+        NutritionFoodPriceQuote,
+        NutritionFoodPriceReference,
+        NutritionFoodPriceReview,
+    )
+
+    price_models = (
+        NutritionFoodPriceQuote,
+        NutritionFoodPriceReference,
+        NutritionFoodPriceHistory,
+        NutritionFoodPriceReview,
+    )
+    before_price_rows = tuple(
+        db.scalar(select(func.count()).select_from(model)) or 0 for model in price_models
+    )
     test_settings.agent_service_token = "agent-service-test-token"
     profile = _profile()
     provider = _SmokeProvider()
@@ -263,9 +306,27 @@ def test_task_smoke_runs_all_four_safe_fixtures(db: Session, test_settings: Sett
     price_request = next(
         request
         for kind, request, _ in provider.requests
-        if kind == "text" and request.schema_name == "fitsho_food_price_search_v1"
+        if kind == "text" and request.schema_name == FOOD_PRICE_RESEARCH_SCHEMA_NAME
     )
-    assert price_request.input_payload["fixture_revision"] == "agent-task-fixtures-v1"
+    smoke_food = FoodPriceResearchFood(
+        slug="smoke-iranian-rice",
+        name_fa="برنج ایرانی",
+        name_en="Iranian rice",
+        category="grains",
+        aliases=("برنج",),
+    )
+    assert price_request == build_food_price_research_request(
+        smoke_food,
+        route=ModelRoute(primary_model=profile.model_id),
+        requested_source_count=3,
+        provider_preferences=ProviderRoutingPreferences(),
+        temperature=0,
+        max_output_tokens=1024,
+    )
+    after_price_rows = tuple(
+        db.scalar(select(func.count()).select_from(model)) or 0 for model in price_models
+    )
+    assert after_price_rows == before_price_rows
 
 
 def test_task_smoke_verification_record_is_task_scoped(db: Session) -> None:
@@ -338,3 +399,55 @@ def test_task_smoke_endpoint_persists_result_without_user_data(
     assert row is not None
     assert row.status == "passed"
     assert row.profile_fingerprint == profile.fingerprint
+
+
+def test_task_smoke_endpoint_records_failed_food_price_verification(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+    monkeypatch: Any,
+) -> None:
+    _register_admin(client, db)
+    test_settings.agent_service_token = "agent-service-test-token-with-32-bytes-123"
+    profile = _profile()
+
+    async def fake_smoke(
+        *args: Any, **kwargs: Any
+    ) -> tuple[TaskSmokeResult, AgentServiceModelProfile]:
+        del args, kwargs
+        return (
+            TaskSmokeResult(
+                passed=False,
+                stage="semantic_validation",
+                request_id="failed-smoke-request",
+                duration_seconds=0.4,
+                error_code="invalid_output",
+                safe_error_message="The selected profile returned invalid price evidence.",
+            ),
+            profile,
+        )
+
+    monkeypatch.setattr("app.body_analysis.admin_config.router.run_task_smoke", fake_smoke)
+    response = client.post(
+        "/api/v1/admin/ai/agent-service/task-smoke",
+        headers=ORIGIN,
+        json={
+            "task_type": "food_price_search",
+            "agent": "antigravity",
+            "profile_id": profile.profile_id,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["ok"] is False
+    assert response.json()["stage"] == "semantic_validation"
+    assert response.json()["error_code"] == "invalid_output"
+    row = db.scalar(
+        select(AIAgentProfileVerification).where(
+            AIAgentProfileVerification.profile_id == profile.profile_id,
+            AIAgentProfileVerification.task_type == AITaskType.FOOD_PRICE_SEARCH,
+        )
+    )
+    assert row is not None
+    assert row.status == "failed"
+    assert row.error_code == "invalid_output"

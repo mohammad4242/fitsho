@@ -37,6 +37,7 @@ from app.nutrition.adherence_service import (
     adherence_history,
     confirm_target_update,
 )
+from app.nutrition.ai_price_research import canonical_source_domain
 from app.nutrition.catalogue_view import admin_food_catalogue, member_food_catalogue
 from app.nutrition.clinical_service import (
     ClinicalError,
@@ -112,6 +113,7 @@ from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueMeal,
     NutritionFoodPriceMapping,
+    NutritionFoodPriceQuote,
     NutritionFoodPriceReference,
     NutritionFoodPriceReview,
     NutritionFoodPriceUpdateRun,
@@ -667,6 +669,79 @@ def retire_food(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from None
 
 
+def _monitoring_toman(value: Decimal | None) -> str | None:
+    if value is None:
+        return None
+    formatted = format(value / Decimal("10"), "f").rstrip("0").rstrip(".")
+    return formatted or "0"
+
+
+def _review_quote_evidence(
+    db: DatabaseSession,
+    review: NutritionFoodPriceReview,
+    providers: dict[str, NutritionPriceProvider],
+) -> list[dict[str, object]]:
+    source_ids: list[str] = []
+    for value in review.source_quote_ids[:5]:
+        if isinstance(value, str):
+            try:
+                UUID(value)
+            except ValueError:
+                continue
+            source_ids.append(value)
+    if not source_ids:
+        return []
+    quotes = db.scalars(
+        select(NutritionFoodPriceQuote).where(
+            NutritionFoodPriceQuote.id.in_([UUID(value) for value in source_ids]),
+            NutritionFoodPriceQuote.food_id == review.food_id,
+        )
+    ).all()
+    quotes_by_id = {str(quote.id): quote for quote in quotes}
+    result: list[dict[str, object]] = []
+    for source_id in source_ids:
+        quote = quotes_by_id.get(source_id)
+        if quote is None:
+            continue
+        raw_quote = quote.raw_quote
+        provider = providers.get(quote.provider_code)
+        source_url = raw_quote.get("source_url")
+        source_url = source_url if isinstance(source_url, str) else None
+        source_domain = raw_quote.get("source_domain")
+        if not isinstance(source_domain, str) and source_url is not None:
+            try:
+                source_domain = canonical_source_domain(source_url)
+            except ValueError:
+                source_domain = None
+        if not isinstance(source_domain, str):
+            source_domain = provider.name if provider is not None else quote.provider_code
+        source_name = raw_quote.get("source_name")
+        if not isinstance(source_name, str):
+            source_name = provider.name if provider is not None else quote.provider_code
+        product_title = raw_quote.get("title")
+        if not isinstance(product_title, str):
+            product_title = ""
+        result.append(
+            {
+                "id": quote.id,
+                "provider_code": quote.provider_code,
+                "source_name": source_name,
+                "source_domain": source_domain,
+                "source_url": source_url,
+                "product_title": product_title,
+                "normal_price_toman": _monitoring_toman(quote.normal_price_irr),
+                "promotional_price_toman": _monitoring_toman(quote.promotional_price_irr),
+                "normalized_normal_price_toman": _monitoring_toman(
+                    quote.normalized_normal_irr
+                ),
+                "package_quantity": format(quote.package_quantity, "f").rstrip("0").rstrip("."),
+                "package_unit": quote.package_unit,
+                "observed_at": quote.observed_at,
+            }
+        )
+    return result
+
+
 @router.get("/admin/monitoring")
 def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str, object]:
     del admin
@@ -747,8 +822,17 @@ def read_nutrition_monitoring(db: DatabaseSession, admin: AdminUser) -> dict[str
                 "id": review.id,
                 "food_slug": food_slug,
                 "reason_codes": review.reason_codes,
-                "candidate_reference_price_toman": review.candidate_reference_price_toman,
+                "candidate_reference_price_toman": _monitoring_toman(
+                    review.candidate_reference_price_toman * Decimal("10")
+                    if review.candidate_reference_price_toman is not None
+                    else None
+                ),
                 "created_at": review.created_at,
+                "quotes": _review_quote_evidence(
+                    db,
+                    review,
+                    {provider.code: provider for provider in providers},
+                ),
             }
             for review, food_slug in reviews
         ],
