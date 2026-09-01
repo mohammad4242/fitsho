@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import hashlib
 import io
 import os
@@ -249,7 +248,8 @@ async def estimate_photo(
                 ImageInput(
                     label="food_photo",
                     mime_type="image/jpeg",
-                    base64_data=base64.b64encode(normalized).decode("ascii"),
+                    storage_scope="food",
+                    storage_key=key,
                 ),
             ),
         )

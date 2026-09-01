@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -139,15 +140,18 @@ def test_body_analysis_agent_service_e2e_uses_current_images_and_normalizes_v3(
     def agent_handler(request: httpx.Request) -> httpx.Response:
         body = request.content
         calls.append((request.url.path, body))
-        assert request.url.path == "/v1/analyze-images"
+        assert request.url.path == "/v1/analyze-stored-images"
         assert request.headers["authorization"] == "Bearer agent-service-test-token"
-        assert body.count(b'name="images"') == 3
-        assert body.count(b'filename="front.png"') == 1
-        assert body.count(b'filename="side.png"') == 1
-        assert body.count(b'filename="back.png"') == 1
+        assert request.headers["content-type"] == "application/json"
         assert b"base64_data" not in body
-        metadata_marker = b'name="metadata"'
-        assert metadata_marker in body
+        stored_request = json.loads(body)
+        assert sorted(image["label"] for image in stored_request["images"]) == [
+            "back",
+            "front",
+            "side",
+        ]
+        assert all(image["storage_scope"] == "body" for image in stored_request["images"])
+        assert all(image["storage_key"] for image in stored_request["images"])
         return httpx.Response(
             200,
             json={
@@ -194,7 +198,7 @@ def test_body_analysis_agent_service_e2e_uses_current_images_and_normalizes_v3(
         session = db.get(BodyPhotoSession, session_id)
         assert session is not None and session.state is BodyPhotoSessionState.REVIEW_PENDING
         assert len(calls) == 2
-        assert all(path == "/v1/analyze-images" for path, _ in calls)
+        assert all(path == "/v1/analyze-stored-images" for path, _ in calls)
     finally:
         import asyncio
 

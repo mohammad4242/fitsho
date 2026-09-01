@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from typing import BinaryIO, Protocol
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -65,10 +63,6 @@ class BodyAnalysisStateError(ValueError):
 
 class BodyAnalysisInputError(ValueError):
     pass
-
-
-class BodyAnalysisReadStorage(Protocol):
-    def open(self, key: str) -> BinaryIO: ...
 
 
 class AnalysisExecutionConfig(BaseModel):
@@ -348,7 +342,6 @@ class BodyAnalysisService:
         self,
         analysis_id: UUID,
         provider: AIProvider,
-        storage: BodyAnalysisReadStorage,
         config: AnalysisExecutionConfig | None = None,
     ) -> BodyAnalysis:
         analysis = self._analysis(analysis_id, lock=True)
@@ -370,7 +363,7 @@ class BodyAnalysisService:
             analysis.session.state = BodyPhotoSessionState.VALIDATING
             self._db.commit()
             images = self._prepare_images(analysis)
-            image_inputs = self._image_inputs(storage, images)
+            image_inputs = self._image_inputs(images)
             preflight_response = await provider.analyze_images(
                 self._preflight_request(execution_config),
                 images=image_inputs,
@@ -668,19 +661,15 @@ class BodyAnalysisService:
             raise BodyAnalysisInputError("three standardized headless views are required")
         return photos
 
-    @staticmethod
-    def _read(storage: BodyAnalysisReadStorage, key: str) -> bytes:
-        with storage.open(key) as handle:
-            return handle.read()
-
     def _image_inputs(
-        self, storage: BodyAnalysisReadStorage, images: tuple[BodyPhoto, ...]
+        self, images: tuple[BodyPhoto, ...]
     ) -> tuple[ImageInput, ...]:
         return tuple(
             ImageInput(
                 label=photo.view.value,
                 mime_type=photo.mime_type,
-                base64_data=base64.b64encode(self._read(storage, photo.storage_key)).decode(),
+                storage_scope="body",
+                storage_key=photo.storage_key,
             )
             for photo in images
         )

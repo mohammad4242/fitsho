@@ -1,4 +1,3 @@
-import base64
 import io
 from datetime import date
 from pathlib import Path
@@ -38,8 +37,9 @@ from tests.nutrition.test_weekly_plan_api import ORIGIN, _seed_foods_and_prices
 
 
 class FakeVisionProvider:
-    def __init__(self, model_id: str = "test/vision") -> None:
+    def __init__(self, model_id: str = "test/vision", storage_root: Path | None = None) -> None:
         self.model_id = model_id
+        self.storage_root = storage_root
         self.requests: list[StructuredGenerationRequest] = []
         self.images: list[tuple[ImageInput, ...]] = []
 
@@ -49,6 +49,9 @@ class FakeVisionProvider:
         self.requests.append(request)
         self.images.append(images)
         assert images[0].mime_type == "image/jpeg"
+        if self.storage_root is not None:
+            assert images[0].storage_key is not None
+            assert (self.storage_root / images[0].storage_key).is_file()
         assert "email" not in str(request.input_payload).lower()
         return StructuredGenerationResponse(
             payload={
@@ -287,7 +290,9 @@ def test_agent_photo_estimate_uses_agent_metadata_without_api_credential_decrypt
             AssertionError("API credentials must not be decrypted for Agent Service")
         ),
     )
-    provider = FakeVisionProvider(model_id="gemini-test")
+    provider = FakeVisionProvider(
+        model_id="gemini-test", storage_root=test_settings.food_photo_storage_root
+    )
     monkeypatch.setattr(
         "app.nutrition.food_photo_service.build_task_provider",
         lambda *_args, **_kwargs: _configured_provider(
@@ -314,11 +319,16 @@ def test_agent_photo_estimate_uses_agent_metadata_without_api_credential_decrypt
     assert len(provider.images) == 1
     assert provider.images[0][0].label == "food_photo"
     assert provider.images[0][0].mime_type == "image/jpeg"
+    assert provider.images[0][0].storage_scope == "food"
+    assert provider.images[0][0].storage_key
+    assert provider.images[0][0].base64_data is None
     normalized, normalized_mime = _normalize_image(
         _image(), test_settings.food_photo_max_pixels
     )
     assert normalized_mime == "image/jpeg"
-    assert base64.b64decode(provider.images[0][0].base64_data) == normalized
+    stored_path = test_settings.food_photo_storage_root / provider.images[0][0].storage_key
+    assert stored_path.is_file()
+    assert stored_path.read_bytes() == normalized
     body = response.json()
     assert body["model_id"] == "gemini-test"
     estimate = db.get(NutritionFoodPhotoEstimate, body["id"])

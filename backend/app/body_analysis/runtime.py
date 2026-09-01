@@ -17,14 +17,12 @@ from app.body_analysis.admin_config.service import (
 )
 from app.body_analysis.providers import AIProvider
 from app.body_analysis.service import AnalysisExecutionConfig
-from app.body_photos.storage import BodyPhotoStorage
 
 
 @dataclass(frozen=True)
 class BodyAnalysisRuntime:
     provider: AIProvider
     config: AnalysisExecutionConfig
-    storage: BodyPhotoStorage
 
 
 def get_body_analysis_runtime(
@@ -96,7 +94,6 @@ def get_body_analysis_runtime(
             ),
             routing_preferences=configured.routing_preferences,
         ),
-        storage=BodyPhotoStorage(settings),
     )
 
 

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
-import io
 import json
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -77,11 +75,6 @@ def _normalized_payload(*, classification: str = "clear_lag") -> dict[str, objec
     }
 
 
-class _Storage:
-    def open(self, key: str) -> io.BytesIO:
-        return io.BytesIO(f"processed-{key}".encode())
-
-
 class _Provider:
     def __init__(self, payload: dict[str, object] | None = None) -> None:
         self.payload = payload or _normalized_payload()
@@ -94,6 +87,9 @@ class _Provider:
         self.requests.append(cast(StructuredGenerationRequest, request))
         self.images.append(images)
         assert len(images) == 3
+        assert all(getattr(image, "base64_data", None) is None for image in images)
+        assert all(getattr(image, "storage_scope", None) == "body" for image in images)
+        assert all(getattr(image, "storage_key", None) for image in images)
         payload = (
             {"accepted": True, "confidence": 0.92, "issues": []}
             if getattr(request, "schema_name", None) == "fitsho_body_photo_preflight"
@@ -227,8 +223,8 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
     service = BodyAnalysisService(db)
     analysis = service.queue(session.id, user.id, _config())
 
-    completed = asyncio.run(service.execute(analysis.id, provider, _Storage()))
-    repeated = asyncio.run(service.execute(analysis.id, provider, _Storage()))
+    completed = asyncio.run(service.execute(analysis.id, provider))
+    repeated = asyncio.run(service.execute(analysis.id, provider))
 
     assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
     assert repeated.id == completed.id
@@ -252,7 +248,7 @@ def test_execution_uses_one_provider_for_preflight_and_analysis_without_cost(db:
     service = BodyAnalysisService(db)
     analysis = service.queue(session.id, user.id, config)
 
-    completed = asyncio.run(service.execute(analysis.id, provider, _Storage(), config))
+    completed = asyncio.run(service.execute(analysis.id, provider, config))
 
     assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
     assert provider.schema_names == ["fitsho_body_photo_preflight", "fitsho_body_analysis"]
@@ -263,7 +259,9 @@ def test_execution_uses_one_provider_for_preflight_and_analysis_without_cost(db:
 def test_body_requests_and_processed_image_labels_are_backend_independent(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    captured: list[tuple[list[StructuredGenerationRequest], list[tuple[object, ...]]]] = []
+    captured: list[
+        tuple[list[StructuredGenerationRequest], list[tuple[object, ...]], dict[str, str]]
+    ] = []
     profile_context = {
         "selected_goal": "build_muscle",
         "height_cm": 178,
@@ -281,36 +279,36 @@ def test_body_requests_and_processed_image_labels_are_backend_independent(
         config = _config().model_copy(update={"provider_name": provider_name})
         analysis = BodyAnalysisService(db).queue(session.id, user.id, config)
 
-        completed = asyncio.run(
-            BodyAnalysisService(db).execute(analysis.id, provider, _Storage(), config)
-        )
+        completed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, config))
 
         assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
-        captured.append((provider.requests, provider.images))
+        captured.append(
+            (
+                provider.requests,
+                provider.images,
+                {photo.view.value: photo.storage_key for photo in session.photos},
+            )
+        )
 
-    api_requests, api_images = captured[0]
-    agent_requests, agent_images = captured[1]
+    api_requests, api_images, api_keys = captured[0]
+    agent_requests, agent_images, agent_keys = captured[1]
     assert [request.model_dump() for request in api_requests] == [
         request.model_dump() for request in agent_requests
     ]
-    assert [
-        [(image.label, image.mime_type) for image in images]
-        for images in api_images
-    ] == [
-        [(image.label, image.mime_type) for image in images]
-        for images in agent_images
-    ]
+    for image_batches, keys in ((api_images, api_keys), (agent_images, agent_keys)):
+        for image_batch in image_batches:
+            expected_views = tuple(sorted(keys))
+            assert [
+                (image.label, image.mime_type, image.storage_scope, image.storage_key)
+                for image in image_batch
+            ] == [
+                (view, "image/jpeg", "body", keys[view]) for view in expected_views
+            ]
     assert [request.system_prompt for request in api_requests] == [
         _PHOTO_PREFLIGHT_PROMPT,
         _ANALYSIS_PROMPT,
     ]
     assert api_requests[1].input_payload["profile_context"] == profile_context
-    assert all(
-        base64.b64decode(image.base64_data).startswith(b"processed-")
-        for _requests, images in captured
-        for image_batch in images
-        for image in image_batch
-    )
 
 
 def test_execution_stops_after_rejected_photo_preflight_and_preserves_view_reasons(
@@ -320,7 +318,7 @@ def test_execution_stops_after_rejected_photo_preflight_and_preserves_view_reaso
     provider = _PreflightRejectingProvider()
     analysis = BodyAnalysisService(db).queue(session.id, user.id, _config())
 
-    failed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, _Storage()))
+    failed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider))
 
     assert failed.status is BodyAnalysisStatus.FAILED
     assert provider.calls == 1
@@ -357,7 +355,7 @@ def test_execution_creates_a_progress_comparison_for_the_new_result(
         _ComparisonService,
     )
 
-    asyncio.run(service.execute(analysis.id, _Provider(), _Storage()))
+    asyncio.run(service.execute(analysis.id, _Provider()))
 
     assert calls and calls[0][1] == user.id
 
@@ -366,7 +364,7 @@ def test_completed_analysis_cannot_be_retried(db: Session) -> None:
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)
     successful = service.queue(session.id, user.id, _config())
-    asyncio.run(service.execute(successful.id, _Provider(), _Storage()))
+    asyncio.run(service.execute(successful.id, _Provider()))
 
     with pytest.raises(BodyAnalysisStateError, match="only failed or stale"):
         service.retry(successful.id, user.id, _config())
@@ -376,7 +374,7 @@ def test_coach_and_doctor_approvals_are_independent_and_version_bound(db: Sessio
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)
     analysis = service.queue(session.id, user.id, _config())
-    asyncio.run(service.execute(analysis.id, _Provider(), _Storage()))
+    asyncio.run(service.execute(analysis.id, _Provider()))
     coach = User(email=f"coach-{uuid4()}@example.com", password_hash="x", is_admin=True)
     doctor = User(email=f"doctor-{uuid4()}@example.com", password_hash="x", is_admin=True)
     db.add_all([coach, doctor])
@@ -416,7 +414,7 @@ def test_specialist_correction_creates_history_and_invalidates_old_approval(
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)
     analysis = service.queue(session.id, user.id, _config())
-    asyncio.run(service.execute(analysis.id, _Provider(), _Storage()))
+    asyncio.run(service.execute(analysis.id, _Provider()))
     coach = User(email=f"coach-{uuid4()}@example.com", password_hash="x", is_admin=True)
     doctor = User(email=f"doctor-{uuid4()}@example.com", password_hash="x", is_admin=True)
     db.add_all([coach, doctor])
@@ -466,7 +464,7 @@ def test_same_user_cannot_satisfy_coach_and_doctor_approvals(db: Session) -> Non
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)
     analysis = service.queue(session.id, user.id, _config())
-    asyncio.run(service.execute(analysis.id, _Provider(), _Storage()))
+    asyncio.run(service.execute(analysis.id, _Provider()))
     reviewer = User(email=f"dual-{uuid4()}@example.com", password_hash="x")
     db.add(reviewer)
     db.commit()
@@ -522,7 +520,7 @@ def test_low_confidence_and_cost_limited_results_fail_safely(db: Session) -> Non
     )
     analysis = service.queue(session.id, user.id, config)
 
-    failed = asyncio.run(service.execute(analysis.id, _Provider(), _Storage(), config))
+    failed = asyncio.run(service.execute(analysis.id, _Provider(), config))
 
     assert failed.status is BodyAnalysisStatus.FAILED
     assert "invalid structured response" in (failed.error_message or "")
@@ -535,7 +533,7 @@ def test_unauthorized_provider_error_tells_admin_to_update_configured_credential
     analysis = BodyAnalysisService(db).queue(session.id, user.id, _config())
 
     failed = asyncio.run(
-        BodyAnalysisService(db).execute(analysis.id, _FailingProvider(), _Storage())
+        BodyAnalysisService(db).execute(analysis.id, _FailingProvider())
     )
 
     assert failed.status is BodyAnalysisStatus.FAILED
@@ -564,7 +562,7 @@ def test_rejected_cost_is_retained_for_billing_reconciliation(db: Session) -> No
     config = _config().model_copy(update={"max_cost_per_request": Decimal("0.01")})
     analysis = service.queue(session.id, user.id, config)
 
-    failed = asyncio.run(service.execute(analysis.id, _Provider(), _Storage(), config))
+    failed = asyncio.run(service.execute(analysis.id, _Provider(), config))
 
     assert failed.status is BodyAnalysisStatus.FAILED
     assert failed.request_cost == Decimal("0.012")
@@ -697,7 +695,7 @@ def test_provider_request_id_survives_post_response_validation_error(db: Session
     analysis = service.queue(session.id, user.id, _config())
     malformed_schema = {**_normalized_payload(), "schema_version": "9.9"}
 
-    failed = asyncio.run(service.execute(analysis.id, _Provider(malformed_schema), _Storage()))
+    failed = asyncio.run(service.execute(analysis.id, _Provider(malformed_schema)))
 
     assert failed.status is BodyAnalysisStatus.FAILED
     assert failed.provider_request_id == "req-safe-id"

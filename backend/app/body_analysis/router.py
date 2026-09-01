@@ -147,7 +147,6 @@ async def _execute_background(
     await service.execute(
         analysis_id,
         runtime.provider,
-        runtime.storage,
         runtime.config,
     )
 

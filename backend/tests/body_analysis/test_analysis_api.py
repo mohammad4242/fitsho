@@ -17,7 +17,6 @@ from app.body_photos.enums import BodyPhotoSessionState
 from .test_execution_and_reviews import (
     _config,
     _Provider,
-    _Storage,
     _submitted_session,
 )
 
@@ -41,7 +40,6 @@ def _runtime_override(client: TestClient) -> None:
     client.app.dependency_overrides[get_body_analysis_runtime] = lambda: BodyAnalysisRuntime(
         provider=_Provider(),
         config=_config(),
-        storage=_Storage(),  # type: ignore[arg-type]
     )
 
 
@@ -55,7 +53,7 @@ def test_analysis_result_api_is_owner_only_and_hides_provider_envelopes(
     _, photo_session = _submitted_session(db, owner)
     service = BodyAnalysisService(db)
     analysis = service.queue(photo_session.id, owner.id, _config())
-    asyncio.run(service.execute(analysis.id, _Provider(), _Storage()))
+    asyncio.run(service.execute(analysis.id, _Provider()))
 
     result = client.get(f"/api/v1/body-photo-sessions/{photo_session.id}/analysis")
 
@@ -102,7 +100,7 @@ def test_review_api_requires_admin_and_records_reviewer_identity(
     owner, photo_session = _submitted_session(db)
     service = BodyAnalysisService(db)
     analysis = service.queue(photo_session.id, owner.id, _config())
-    asyncio.run(service.execute(analysis.id, _Provider(), _Storage()))
+    asyncio.run(service.execute(analysis.id, _Provider()))
     path = f"/api/v1/reviews/body-analyses/{analysis.id}/review"
     payload = {
         "role": "coach",
