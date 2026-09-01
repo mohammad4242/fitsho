@@ -89,6 +89,12 @@ def test_generate_validates_capability_and_returns_normalized_contract(tmp_path:
     assert body["request_id"]
     assert len(runner.requests) == 1
     assert runner.requests[0].image_paths == ()
+    assert runner.requests[0].system_prompt == payload()["system_prompt"]
+    assert runner.requests[0].input_payload == payload()["input_payload"]
+    assert runner.requests[0].response_schema == payload()["response_schema"]
+    assert runner.requests[0].schema_name == payload()["schema_name"]
+    assert runner.requests[0].temperature == payload()["temperature"]
+    assert runner.requests[0].max_output_tokens == payload()["max_output_tokens"]
     assert list(tmp_path.iterdir()) == []
 
 

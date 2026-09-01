@@ -260,8 +260,20 @@ def test_execution_uses_one_provider_for_preflight_and_analysis_without_cost(db:
     assert completed.request_cost is None
 
 
-def test_body_requests_and_processed_image_labels_are_backend_independent(db: Session) -> None:
+def test_body_requests_and_processed_image_labels_are_backend_independent(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
     captured: list[tuple[list[StructuredGenerationRequest], list[tuple[object, ...]]]] = []
+    profile_context = {
+        "selected_goal": "build_muscle",
+        "height_cm": 178,
+        "weight_kg": 82.5,
+    }
+    monkeypatch.setattr(
+        BodyAnalysisService,
+        "_profile_context",
+        lambda _self, _user_id: profile_context,
+    )
 
     for provider_name in ("openrouter", "agent_service:antigravity"):
         user, session = _submitted_session(db)
@@ -292,6 +304,7 @@ def test_body_requests_and_processed_image_labels_are_backend_independent(db: Se
         _PHOTO_PREFLIGHT_PROMPT,
         _ANALYSIS_PROMPT,
     ]
+    assert api_requests[1].input_payload["profile_context"] == profile_context
     assert all(
         base64.b64decode(image.base64_data).startswith(b"processed-")
         for _requests, images in captured
