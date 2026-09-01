@@ -74,6 +74,7 @@ def build_task_provider(
         raise ValueError("Agent Service HTTP client is unavailable")
     agent_name = _required_agent(task.agent_name)
     primary_model_id = _required_model(task.agent_model_id, "agent_model_id")
+    profile_id = _optional_profile(getattr(task, "agent_profile_id", None))
     token = getattr(settings, "agent_service_token", None)
     token_value = _secret_value(token)
     if token_value is None:
@@ -87,6 +88,7 @@ def build_task_provider(
         base_url=getattr(settings, "agent_service_base_url", "http://agent-service:9001"),
         token=token,
         agent_name=agent_name,
+        profile_id=profile_id,
         timeout_seconds=float(task.timeout_seconds),
         max_image_bytes=int(getattr(settings, "agent_service_max_image_bytes", 8 * 1024 * 1024)),
     )
@@ -129,6 +131,14 @@ def _required_agent(value: object) -> str:
     except ValueError as error:
         raise ValueError("agent_name must be configured") from error
     return agent.value
+
+
+def _optional_profile(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("agent_profile_id must be configured")
+    return value.strip()
 
 
 def _model_tuple(value: object) -> tuple[str, ...]:

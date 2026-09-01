@@ -40,6 +40,7 @@ class AITaskConfigUpdate(BaseModel):
     execution_backend: AIExecutionBackend = AIExecutionBackend.API
     agent_name: AIAgentName | None = None
     agent_model_id: AgentModelId | None = None
+    agent_profile_id: AgentModelId | None = None
     enabled: bool = False
     api_key: SecretStr | None = Field(default=None, repr=False)
     replace_credential: bool = False
@@ -76,6 +77,7 @@ class AITaskConfigDetail(BaseModel):
     execution_backend: AIExecutionBackend
     agent_name: AIAgentName | None
     agent_model_id: str | None
+    agent_profile_id: str | None
     enabled: bool
     primary_model_id: str | None
     fallback_model_ids: list[str]
@@ -161,6 +163,43 @@ class AgentServiceRunnerCapability(BaseModel):
     auth_state: Literal["unknown", "authenticated", "unauthenticated"] = "unknown"
     auth_mode: Literal["unknown", "browser_link", "manual"] = "unknown"
     models: list[AgentServiceModelCapability] = Field(default_factory=list)
+    profiles: list["AgentServiceModelProfile"] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+
+
+class AgentServiceModelProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: AgentModelId
+    agent: AIAgentName
+    display_name: str = Field(min_length=1, max_length=300)
+    model_id: AgentModelId
+    effort: Literal["low", "medium", "high", "thinking"] | None = None
+    task_kinds: list[AITaskType] = Field(min_length=1, max_length=4)
+    fingerprint: str = Field(pattern=r"^[a-f0-9]{16,64}$")
+    supports_text_input: bool
+    supports_image_input: bool
+    supports_structured_output: bool
+    verification_status: Literal["unverified", "passed", "failed", "stale"] = "unverified"
+    verified_at: datetime | None = None
+    verification_error_code: str | None = None
+    verification_safe_error_message: str | None = None
+
+
+class AgentServiceProfileVerification(BaseModel):
+    profile_id: AgentModelId
+    task_type: AITaskType
+    fingerprint: str
+    status: Literal["unverified", "passed", "failed", "stale"]
+    checked_at: datetime | None = None
+    duration_seconds: float | None = Field(default=None, ge=0)
+    error_code: str | None = None
+    safe_error_message: str | None = None
+
+
+class AgentServiceProfileSummary(AgentServiceModelProfile):
+    verification: list[AgentServiceProfileVerification] = Field(default_factory=list)
 
 
 class AgentServiceCapabilitiesResponse(BaseModel):
@@ -174,6 +213,7 @@ class AgentServiceTestRequest(BaseModel):
 
     agent: AIAgentName
     model_id: AgentModelId
+    profile_id: AgentModelId | None = None
 
 
 class AgentServiceTestResponse(BaseModel):
@@ -182,6 +222,39 @@ class AgentServiceTestResponse(BaseModel):
     ok: bool
     agent: AIAgentName
     model_id: AgentModelId
+    profile_id: AgentModelId | None = None
+    checked_at: datetime
+    duration_seconds: float | None = Field(default=None, ge=0)
+    error_code: str | None = None
+    safe_error_message: str | None = None
+
+
+class AgentServiceTaskSmokeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    task_type: AITaskType
+    agent: AIAgentName
+    profile_id: AgentModelId
+
+
+class AgentServiceTaskSmokeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    task_type: AITaskType
+    agent: AIAgentName
+    profile_id: AgentModelId
+    fingerprint: str | None = None
+    stage: Literal[
+        "backend_request",
+        "agent_service",
+        "runner",
+        "schema",
+        "semantic_validation",
+        "passed",
+        "failed",
+    ]
+    request_id: str | None = None
     checked_at: datetime
     duration_seconds: float | None = Field(default=None, ge=0)
     error_code: str | None = None

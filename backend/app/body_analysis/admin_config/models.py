@@ -128,6 +128,7 @@ class AITaskConfig(Base):
         )
     )
     agent_model_id: Mapped[str | None] = mapped_column(String(300))
+    agent_profile_id: Mapped[str | None] = mapped_column(String(200))
     primary_model_id: Mapped[str | None] = mapped_column(String(300))
     fallback_model_ids: Mapped[list[str]] = mapped_column(
         JSON, default=list, server_default=text("'[]'::json"), nullable=False
@@ -162,6 +163,40 @@ class AITaskConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class AIAgentProfileVerification(Base):
+    __tablename__ = "ai_agent_profile_verifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "task_type",
+            name="uq_ai_agent_profile_verifications_profile_task",
+        ),
+        CheckConstraint(
+            "status IN ('passed', 'failed')",
+            name="ck_ai_agent_profile_verifications_status_values",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    profile_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    task_type: Mapped[AITaskType] = mapped_column(
+        Enum(
+            AITaskType,
+            native_enum=False,
+            create_constraint=False,
+            validate_strings=True,
+            values_callable=enum_values,
+        ),
+        nullable=False,
+    )
+    profile_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    duration_seconds: Mapped[float | None] = mapped_column()
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    safe_error_message: Mapped[str | None] = mapped_column(String(500))
 
 
 class AIModelCatalogEntry(Base):

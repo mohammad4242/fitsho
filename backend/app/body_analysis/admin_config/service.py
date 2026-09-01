@@ -18,6 +18,7 @@ from app.body_analysis.admin_config.enums import (
     AITaskType,
 )
 from app.body_analysis.admin_config.models import (
+    AIAgentProfileVerification,
     AIAuditEvent,
     AIModelCatalogEntry,
     AIProviderCredential,
@@ -96,6 +97,7 @@ class _AgentServiceTestOutput(BaseModel):
     ok: Literal[True]
     agent: str
     model_id: str = Field(min_length=1, max_length=300)
+    profile_id: str | None = Field(default=None, max_length=200)
     request_id: str = Field(min_length=1, max_length=300)
     duration_seconds: float = Field(ge=0)
 
@@ -134,6 +136,7 @@ def config_detail(
             execution_backend=AIExecutionBackend.API,
             agent_name=None,
             agent_model_id=None,
+            agent_profile_id=None,
             enabled=False,
             primary_model_id=None,
             fallback_model_ids=[],
@@ -155,6 +158,7 @@ def config_detail(
         execution_backend=config.execution_backend,
         agent_name=config.agent_name,
         agent_model_id=config.agent_model_id,
+        agent_profile_id=config.agent_profile_id,
         enabled=config.enabled,
         primary_model_id=config.primary_model_id,
         fallback_model_ids=list(config.fallback_model_ids),
@@ -210,14 +214,26 @@ def save_task_config(
     execution_backend = effective("execution_backend", AIExecutionBackend.API)
     agent_name = effective("agent_name")
     agent_model_id = effective("agent_model_id")
+    agent_profile_id = effective("agent_profile_id")
     primary_model_id = effective("primary_model_id")
     fallback_model_ids = effective("fallback_model_ids", [])
 
     if payload.enabled and execution_backend == AIExecutionBackend.AGENT_SERVICE:
         if task_type not in _AGENT_SERVICE_TASKS:
             raise AIConfigError("Agent service is not supported for this AI task")
-        if agent_name is None or agent_model_id is None:
-            raise AIConfigError("Agent name and model are required before enabling this task")
+        if agent_name is None or agent_profile_id is None or agent_model_id is None:
+            raise AIConfigError(
+                "Agent name, model, and verified profile are required before enabling this task"
+            )
+        verification = db.scalar(
+            select(AIAgentProfileVerification).where(
+                AIAgentProfileVerification.profile_id == agent_profile_id,
+                AIAgentProfileVerification.task_type == task_type,
+                AIAgentProfileVerification.status == "passed",
+            )
+        )
+        if verification is None:
+            raise AIConfigError("The selected Agent Service profile must pass its task test first")
     elif payload.enabled:
         if credential is None:
             raise AIConfigError("A provider credential is required before enabling this task")
@@ -246,6 +262,7 @@ def save_task_config(
         "execution_backend": execution_backend,
         "agent_name": agent_name,
         "agent_model_id": agent_model_id,
+        "agent_profile_id": agent_profile_id,
         "enabled": payload.enabled,
         "primary_model_id": primary_model_id,
         "fallback_model_ids": list(fallback_model_ids),
@@ -444,6 +461,8 @@ async def get_agent_service_capabilities(
     *,
     client: httpx.AsyncClient,
     settings: Settings,
+    db: Session | None = None,
+    task_type: AITaskType | None = None,
 ) -> AgentServiceCapabilitiesResponse:
     payload = await _agent_service_json(
         client,
@@ -452,7 +471,48 @@ async def get_agent_service_capabilities(
         path="/v1/capabilities",
     )
     try:
-        return AgentServiceCapabilitiesResponse.model_validate(payload)
+        capabilities = AgentServiceCapabilitiesResponse.model_validate(payload)
+        if db is None or task_type is None:
+            return capabilities
+        profile_ids = [
+            profile.profile_id
+            for runner in capabilities.runners
+            for profile in (runner.profiles or [])
+        ]
+        if not profile_ids:
+            return capabilities
+        verifications = db.scalars(
+            select(AIAgentProfileVerification).where(
+                AIAgentProfileVerification.profile_id.in_(profile_ids),
+                AIAgentProfileVerification.task_type == task_type,
+            )
+        ).all()
+        by_profile = {item.profile_id: item for item in verifications}
+        enriched_runners = []
+        for runner in capabilities.runners:
+            profiles = []
+            for profile in runner.profiles or []:
+                verification = by_profile.get(profile.profile_id)
+                if verification is None:
+                    profiles.append(profile)
+                    continue
+                status = (
+                    "stale"
+                    if verification.profile_fingerprint != profile.fingerprint
+                    else verification.status
+                )
+                profiles.append(
+                    profile.model_copy(
+                        update={
+                            "verification_status": status,
+                            "verified_at": verification.checked_at,
+                            "verification_error_code": verification.error_code,
+                            "verification_safe_error_message": verification.safe_error_message,
+                        }
+                    )
+                )
+            enriched_runners.append(runner.model_copy(update={"profiles": profiles or None}))
+        return capabilities.model_copy(update={"runners": enriched_runners})
     except ValidationError as error:
         raise AIProviderError(
             ProviderErrorCode.MALFORMED_RESPONSE,
@@ -473,13 +533,18 @@ async def test_agent_service(
             settings=settings,
             method="POST",
             path="/v1/test",
-            json_body={"agent": payload.agent.value, "model_id": payload.model_id},
+            json_body={
+                "agent": payload.agent.value,
+                "model_id": payload.model_id,
+                **({"profile_id": payload.profile_id} if payload.profile_id else {}),
+            },
         )
     except AIConfigError:
         return AgentServiceTestResponse(
             ok=False,
             agent=payload.agent,
             model_id=payload.model_id,
+            profile_id=payload.profile_id,
             checked_at=checked_at,
             error_code=ProviderErrorCode.NOT_CONFIGURED.value,
             safe_error_message=_AGENT_SAFE_MESSAGES[ProviderErrorCode.NOT_CONFIGURED],
@@ -489,13 +554,18 @@ async def test_agent_service(
             ok=False,
             agent=payload.agent,
             model_id=payload.model_id,
+            profile_id=payload.profile_id,
             checked_at=checked_at,
             error_code=error.code.value,
             safe_error_message=error.safe_message,
         )
     try:
         result = _AgentServiceTestOutput.model_validate(response_payload)
-        if result.agent != payload.agent.value or result.model_id != payload.model_id:
+        if (
+            result.agent != payload.agent.value
+            or result.model_id != payload.model_id
+            or (payload.profile_id is not None and result.profile_id != payload.profile_id)
+        ):
             raise ValueError("test response identity mismatch")
     except (ValidationError, ValueError):
         return AgentServiceTestResponse(
@@ -510,6 +580,7 @@ async def test_agent_service(
         ok=True,
         agent=payload.agent,
         model_id=payload.model_id,
+        profile_id=payload.profile_id,
         checked_at=checked_at,
         duration_seconds=result.duration_seconds,
     )

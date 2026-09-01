@@ -71,6 +71,7 @@ class AgentServiceProvider:
         base_url: str,
         token: SecretStr | str | None,
         agent_name: str,
+        profile_id: str | None = None,
         timeout_seconds: float = 30.0,
         max_image_bytes: int = 8 * 1024 * 1024,
         max_images: int = 5,
@@ -84,6 +85,9 @@ class AgentServiceProvider:
         self._base_url = base_url.rstrip("/")
         self._token = token
         self._agent_name = self._enum_value(agent_name)
+        self._profile_id = (
+            profile_id.strip() if isinstance(profile_id, str) and profile_id.strip() else None
+        )
         self._timeout = httpx.Timeout(timeout_seconds)
         self._timeout_seconds = float(timeout_seconds)
         self._max_image_bytes = max_image_bytes
@@ -257,6 +261,8 @@ class AgentServiceProvider:
             "max_output_tokens": request.max_output_tokens,
             "timeout_seconds": self._timeout_seconds,
         }
+        if self._profile_id is not None:
+            body["profile_id"] = self._profile_id
         try:
             json.dumps(body, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         except (TypeError, ValueError) as error:

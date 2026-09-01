@@ -4,18 +4,22 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import select
 
 from app.admin.dependencies import AdminUser, require_admin
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import AppSettings, DatabaseSession
 from app.body_analysis.admin_config.crypto import CredentialEncryptionError
 from app.body_analysis.admin_config.enums import AIProviderName, AITaskType
+from app.body_analysis.admin_config.models import AIAgentProfileVerification
 from app.body_analysis.admin_config.schemas import (
     AgentServiceAuthActiveCancellationResponse,
     AgentServiceAuthInputRequest,
     AgentServiceAuthSessionResponse,
     AgentServiceAuthStartRequest,
     AgentServiceCapabilitiesResponse,
+    AgentServiceTaskSmokeRequest,
+    AgentServiceTaskSmokeResponse,
     AgentServiceTestRequest,
     AgentServiceTestResponse,
     AITaskConfigDetail,
@@ -43,6 +47,10 @@ from app.body_analysis.admin_config.service import (
     submit_agent_service_auth_input,
     test_agent_service,
     test_provider_connection,
+)
+from app.body_analysis.admin_config.task_smoke import (
+    run_task_smoke,
+    smoke_response,
 )
 from app.body_analysis.providers import AIProviderError
 
@@ -221,12 +229,16 @@ async def refresh_models(
 )
 async def read_agent_service_capabilities(
     request: Request,
+    db: DatabaseSession,
     settings: AppSettings,
+    task_type: Annotated[AITaskType | None, Query()] = None,
 ) -> AgentServiceCapabilitiesResponse:
     try:
         return await get_agent_service_capabilities(
             client=_agent_client(request),
             settings=settings,
+            db=db,
+            task_type=task_type,
         )
     except AIConfigError as error:
         raise HTTPException(
@@ -254,6 +266,70 @@ async def test_agent_service_connection(
         client=_agent_client(request),
         settings=settings,
         payload=payload,
+    )
+
+
+@router.post(
+    "/agent-service/task-smoke",
+    response_model=AgentServiceTaskSmokeResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def test_agent_service_task(
+    payload: AgentServiceTaskSmokeRequest,
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+    admin: AdminUser,
+) -> AgentServiceTaskSmokeResponse:
+    del admin
+    checked_at = datetime.now(UTC)
+    try:
+        result, profile = await run_task_smoke(
+            db,
+            task_type=payload.task_type,
+            agent=payload.agent,
+            profile_id=payload.profile_id,
+            settings=settings,
+            client=_agent_client(request),
+        )
+    except AIConfigError as error:
+        raise _agent_not_configured(error) from None
+
+    if profile is not None:
+        verification = db.scalar(
+            select(AIAgentProfileVerification).where(
+                AIAgentProfileVerification.profile_id == profile.profile_id,
+                AIAgentProfileVerification.task_type == payload.task_type,
+            )
+        )
+        values = {
+            "profile_fingerprint": profile.fingerprint,
+            "status": "passed" if result.passed else "failed",
+            "checked_at": checked_at,
+            "duration_seconds": result.duration_seconds,
+            "error_code": result.error_code,
+            "safe_error_message": result.safe_error_message,
+        }
+        if verification is None:
+            db.add(
+                AIAgentProfileVerification(
+                    profile_id=profile.profile_id,
+                    task_type=payload.task_type,
+                    **values,
+                )
+            )
+        else:
+            for field, value in values.items():
+                setattr(verification, field, value)
+        db.commit()
+
+    return smoke_response(
+        task_type=payload.task_type,
+        agent=payload.agent,
+        profile_id=payload.profile_id,
+        fingerprint=profile.fingerprint if profile is not None else None,
+        result=result,
+        checked_at=checked_at,
     )
 
 

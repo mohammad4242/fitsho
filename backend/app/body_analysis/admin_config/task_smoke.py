@@ -1,0 +1,374 @@
+"""Safe, non-persistent task checks for Agent Service profiles."""
+
+from __future__ import annotations
+
+import base64
+import io
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Literal
+
+import httpx
+from PIL import Image, ImageDraw
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from sqlalchemy.orm import Session
+
+from app.ai.schemas import WorkoutProviderError
+from app.body_analysis.admin_config.enums import AIAgentName, AITaskType
+from app.body_analysis.admin_config.schemas import (
+    AgentServiceModelProfile,
+    AgentServiceTaskSmokeResponse,
+)
+from app.body_analysis.admin_config.service import get_agent_service_capabilities
+from app.body_analysis.normalization import (
+    normalize_visual_physique_assessment_v3,
+    visual_assessment_v3_to_normalized,
+)
+from app.body_analysis.providers import (
+    AgentServiceProvider,
+    AIProvider,
+    AIProviderError,
+    ImageInput,
+    ModelRoute,
+    ProviderErrorCode,
+    ProviderRoutingPreferences,
+    StructuredGenerationRequest,
+)
+from app.body_analysis.schemas import BodyPhotoPreflight
+from app.body_analysis.service import AnalysisExecutionConfig, BodyAnalysisService
+from app.config import Settings
+from app.nutrition.food_photo_service import FoodPhotoOutput
+from app.workouts.ai_coach_provider import AiCoachProvider, AiCoachRecommendationRequest
+
+FIXTURE_REVISION = "agent-task-fixtures-v1"
+SmokeStage = Literal[
+    "backend_request",
+    "agent_service",
+    "runner",
+    "schema",
+    "semantic_validation",
+    "passed",
+    "failed",
+]
+
+
+class FoodPriceSmokeQuote(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    product_name: str = Field(min_length=1, max_length=160)
+    price: float = Field(gt=0, le=100_000_000_000)
+    currency: Literal["IRR", "TOMAN"]
+    source_url: str = Field(pattern=r"^https://[^\s]+$")
+
+
+class FoodPriceSmokeOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(min_length=1, max_length=300)
+    quotes: list[FoodPriceSmokeQuote] = Field(min_length=1, max_length=10)
+
+
+@dataclass(frozen=True)
+class TaskSmokeResult:
+    passed: bool
+    stage: SmokeStage
+    request_id: str | None
+    duration_seconds: float
+    error_code: str | None = None
+    safe_error_message: str | None = None
+
+
+class TaskSmokeFailure(Exception):
+    def __init__(self, stage: SmokeStage, code: str, message: str) -> None:
+        super().__init__(message)
+        self.stage = stage
+        self.code = code
+        self.message = message
+
+
+async def run_task_smoke(
+    db: Session,
+    *,
+    task_type: AITaskType,
+    agent: AIAgentName,
+    profile_id: str,
+    settings: Settings,
+    client: httpx.AsyncClient,
+    provider: AIProvider | None = None,
+) -> tuple[TaskSmokeResult, AgentServiceModelProfile | None]:
+    started = time.perf_counter()
+    profile: AgentServiceModelProfile | None = None
+    request_id: str | None = None
+    try:
+        capabilities = await get_agent_service_capabilities(
+            client=client,
+            settings=settings,
+            db=db,
+            task_type=task_type,
+        )
+        runner = next((item for item in capabilities.runners if item.agent is agent), None)
+        profile = (
+            next(
+                (item for item in (runner.profiles or []) if item.profile_id == profile_id),
+                None,
+            )
+            if runner is not None
+            else None
+        )
+        if runner is None or profile is None:
+            raise TaskSmokeFailure(
+                "backend_request", "model_not_found", "The selected profile is unavailable."
+            )
+        if task_type not in profile.task_kinds:
+            raise TaskSmokeFailure(
+                "backend_request", "invalid_request", "The profile does not support this task."
+            )
+        if (
+            task_type in {AITaskType.BODY_PHOTO_ANALYSIS, AITaskType.FOOD_PHOTO_ESTIMATION}
+            and not profile.supports_image_input
+        ):
+            raise TaskSmokeFailure(
+                "backend_request", "invalid_request", "The profile does not support image input."
+            )
+        if provider is None:
+            provider = AgentServiceProvider(
+                client,
+                base_url=settings.agent_service_base_url,
+                token=settings.agent_service_token,
+                agent_name=agent.value,
+                profile_id=profile.profile_id,
+                timeout_seconds=min(
+                    120.0, float(settings.agent_service_connect_timeout_seconds * 20)
+                ),
+            )
+        if task_type is AITaskType.WORKOUT_PLAN_GENERATION:
+            request_id = await _smoke_workout(provider, profile)
+        elif task_type is AITaskType.BODY_PHOTO_ANALYSIS:
+            request_id = await _smoke_body(provider, profile)
+        elif task_type is AITaskType.FOOD_PHOTO_ESTIMATION:
+            request_id = await _smoke_food_photo(provider, profile)
+        elif task_type is AITaskType.FOOD_PRICE_SEARCH:
+            request_id = await _smoke_food_price(provider, profile)
+        else:
+            raise TaskSmokeFailure(
+                "backend_request", "invalid_request", "This task is not supported."
+            )
+    except TaskSmokeFailure as error:
+        return (
+            TaskSmokeResult(
+                passed=False,
+                stage=error.stage,
+                request_id=request_id,
+                duration_seconds=time.perf_counter() - started,
+                error_code=error.code,
+                safe_error_message=error.message,
+            ),
+            profile,
+        )
+    except AIProviderError as error:
+        return (
+            TaskSmokeResult(
+                passed=False,
+                stage="agent_service",
+                request_id=error.provider_request_id,
+                duration_seconds=time.perf_counter() - started,
+                error_code=error.code.value,
+                safe_error_message=error.safe_message,
+            ),
+            profile,
+        )
+    except WorkoutProviderError as error:
+        return (
+            TaskSmokeResult(
+                passed=False,
+                stage=(
+                    "semantic_validation"
+                    if error.code.value == "invalid_output"
+                    else "agent_service"
+                ),
+                request_id=None,
+                duration_seconds=time.perf_counter() - started,
+                error_code=error.code.value,
+                safe_error_message=error.safe_message,
+            ),
+            profile,
+        )
+    except (ValidationError, ValueError, TypeError) as error:
+        del error
+        return (
+            TaskSmokeResult(
+                passed=False,
+                stage="semantic_validation",
+                request_id=None,
+                duration_seconds=time.perf_counter() - started,
+                error_code=ProviderErrorCode.INVALID_OUTPUT.value,
+                safe_error_message="The selected profile returned an invalid task result.",
+            ),
+            profile,
+        )
+    return (
+        TaskSmokeResult(
+            passed=True,
+            stage="passed",
+            request_id=request_id,
+            duration_seconds=time.perf_counter() - started,
+        ),
+        profile,
+    )
+
+
+async def _smoke_workout(provider: AIProvider, profile: AgentServiceModelProfile) -> str | None:
+    candidates: tuple[dict[str, object], ...] = (
+        {"candidate_id": "smoke-upper", "days": [{"day_number": 1, "title": "Upper"}]},
+        {"candidate_id": "smoke-lower", "days": [{"day_number": 1, "title": "Lower"}]},
+    )
+    recommendation = await AiCoachProvider(provider).recommend(
+        AiCoachRecommendationRequest(
+            profile={"fitness_goal": "build_muscle", "training_days_per_week": 1},
+            candidate_programs=candidates,
+            primary_model=profile.model_id,
+            fallback_models=(),
+            temperature=0,
+            max_output_tokens=512,
+            routing_preferences=ProviderRoutingPreferences(),
+        )
+    )
+    if recommendation.selected_candidate_id not in {"smoke-upper", "smoke-lower"}:
+        raise TaskSmokeFailure(
+            "semantic_validation",
+            "invalid_output",
+            "The workout result selected an unavailable candidate.",
+        )
+    return recommendation.provider_request_id
+
+
+async def _smoke_body(provider: AIProvider, profile: AgentServiceModelProfile) -> str | None:
+    config = AnalysisExecutionConfig(
+        provider_name=f"agent_service:{profile.agent.value}",
+        primary_model=profile.model_id,
+        prompt_version="body-analysis-v3",
+        schema_version="3.0",
+        temperature=0,
+        max_output_tokens=4096,
+    )
+    images = _body_fixture_images()
+    preflight = await provider.analyze_images(
+        BodyAnalysisService._preflight_request(config), images=images
+    )
+    accepted = BodyPhotoPreflight.model_validate(preflight.payload)
+    if not accepted.accepted:
+        raise TaskSmokeFailure(
+            "semantic_validation",
+            "invalid_output",
+            "The body fixture was rejected by the photo gate.",
+        )
+    response = await provider.analyze_images(BodyAnalysisService._request(config), images=images)
+    visual = normalize_visual_physique_assessment_v3(response.payload)
+    normalized = visual_assessment_v3_to_normalized(visual)
+    if normalized.schema_version != "3.0" or normalized.overall_confidence <= 0:
+        raise TaskSmokeFailure(
+            "semantic_validation",
+            "invalid_output",
+            "The body result failed semantic validation.",
+        )
+    return response.provider_request_id
+
+
+async def _smoke_food_photo(provider: AIProvider, profile: AgentServiceModelProfile) -> str | None:
+    request = StructuredGenerationRequest(
+        system_prompt=(
+            "Identify only visible foods and estimate portions. Return uncertainty. "
+            "Do not provide calories, medical advice, allergy claims, or suitability."
+        ),
+        input_payload={"instruction": "Analyze this synthetic meal image without personal data."},
+        response_schema=FoodPhotoOutput.model_json_schema(),
+        schema_name="fitsho_food_photo_estimate_v1",
+        route=ModelRoute(primary_model=profile.model_id),
+        provider_preferences=ProviderRoutingPreferences(),
+        temperature=0,
+        max_output_tokens=1024,
+    )
+    response = await provider.analyze_images(request, images=(_meal_fixture_image(),))
+    FoodPhotoOutput.model_validate(response.payload)
+    return response.provider_request_id
+
+
+async def _smoke_food_price(provider: AIProvider, profile: AgentServiceModelProfile) -> str | None:
+    query = "قیمت برنج ایرانی یک کیلویی در تهران"
+    request = StructuredGenerationRequest(
+        system_prompt=(
+            "Use web search for the exact Persian grocery query. Return only current public "
+            "quotes with HTTPS source URLs, price, currency, and no personal data."
+        ),
+        input_payload={"query": query, "fixture_revision": FIXTURE_REVISION},
+        response_schema=FoodPriceSmokeOutput.model_json_schema(),
+        schema_name="fitsho_food_price_search_v1",
+        route=ModelRoute(primary_model=profile.model_id),
+        provider_preferences=ProviderRoutingPreferences(),
+        temperature=0,
+        max_output_tokens=1024,
+    )
+    response = await provider.generate_structured_text(request)
+    result = FoodPriceSmokeOutput.model_validate(response.payload)
+    if result.query != query:
+        raise TaskSmokeFailure(
+            "semantic_validation",
+            "invalid_output",
+            "The price search query was not preserved.",
+        )
+    return response.provider_request_id
+
+
+def _body_fixture_images() -> tuple[ImageInput, ...]:
+    return tuple(
+        ImageInput(label=view, mime_type="image/jpeg", base64_data=_fixture_jpeg(view, body=True))
+        for view in ("front", "side", "back")
+    )
+
+
+def _meal_fixture_image() -> ImageInput:
+    return ImageInput(label="meal", mime_type="image/jpeg", base64_data=_fixture_jpeg("meal"))
+
+
+def _fixture_jpeg(label: str, *, body: bool = False) -> str:
+    image = Image.new("RGB", (512, 768 if body else 512), (226, 226, 226))
+    draw = ImageDraw.Draw(image)
+    if body:
+        draw.ellipse((190, 36, 322, 168), fill=(160, 160, 160))
+        draw.rounded_rectangle((160, 150, 352, 520), radius=48, fill=(150, 150, 150))
+        draw.rectangle((175, 500, 235, 730), fill=(145, 145, 145))
+        draw.rectangle((277, 500, 337, 730), fill=(145, 145, 145))
+        draw.text((16, 16), label, fill=(45, 45, 45))
+    else:
+        draw.ellipse((112, 120, 275, 282), fill=(201, 155, 95))
+        draw.ellipse((240, 184, 402, 346), fill=(120, 165, 92))
+        draw.rectangle((145, 300, 380, 385), fill=(220, 220, 220), outline=(90, 90, 90), width=4)
+        draw.text((16, 16), "synthetic meal", fill=(45, 45, 45))
+    output = io.BytesIO()
+    image.save(output, format="JPEG", quality=85)
+    return base64.b64encode(output.getvalue()).decode("ascii")
+
+
+def smoke_response(
+    *,
+    task_type: AITaskType,
+    agent: AIAgentName,
+    profile_id: str,
+    fingerprint: str | None,
+    result: TaskSmokeResult,
+    checked_at: datetime,
+) -> AgentServiceTaskSmokeResponse:
+    return AgentServiceTaskSmokeResponse(
+        ok=result.passed,
+        task_type=task_type,
+        agent=agent,
+        profile_id=profile_id,
+        fingerprint=fingerprint,
+        stage=result.stage,
+        request_id=result.request_id,
+        checked_at=checked_at,
+        duration_seconds=result.duration_seconds,
+        error_code=result.error_code,
+        safe_error_message=result.safe_error_message,
+    )

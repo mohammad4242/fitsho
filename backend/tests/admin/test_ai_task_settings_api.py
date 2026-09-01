@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.body_analysis.admin_config.enums import AIAgentName, AITaskType
 from app.body_analysis.admin_config.models import (
+    AIAgentProfileVerification,
     AIAuditEvent,
     AIModelCatalogEntry,
     AIProviderCredential,
@@ -37,6 +38,18 @@ def test_ai_task_type_matches_persisted_task_catalog() -> None:
 def test_task_config_rejects_unsupported_routing_policy() -> None:
     with pytest.raises(ValidationError, match="routing_restrictions"):
         AITaskConfigUpdate.model_validate({"routing_restrictions": ["unsafe_free_text"]})
+
+
+def test_agent_service_task_config_requires_profile_id_field() -> None:
+    payload = AITaskConfigUpdate.model_validate(
+        {
+            "execution_backend": "agent_service",
+            "agent_name": "codex",
+            "agent_profile_id": "codex-gpt-5.6-luna-high",
+            "agent_model_id": "gpt-5.6-luna",
+        }
+    )
+    assert payload.agent_profile_id == "codex-gpt-5.6-luna-high"
 
 
 def _register(client: TestClient, email: str) -> None:
@@ -426,6 +439,16 @@ def test_agent_service_config_requires_each_agent_field(
 
 def test_agent_service_config_exposes_routing(client: TestClient, db: Session) -> None:
     _admin(client, db)
+    db.add(
+        AIAgentProfileVerification(
+            profile_id="codex-gpt-5-codex-high",
+            task_type=AITaskType.WORKOUT_PLAN_GENERATION,
+            profile_fingerprint="a" * 64,
+            status="passed",
+            checked_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
     saved = client.put(
         "/api/v1/admin/ai/task-configs/workout_plan_generation",
         headers=ORIGIN,
@@ -434,18 +457,30 @@ def test_agent_service_config_exposes_routing(client: TestClient, db: Session) -
             "execution_backend": "agent_service",
             "agent_name": AIAgentName.CODEX,
             "agent_model_id": "gpt-5-codex",
+            "agent_profile_id": "codex-gpt-5-codex-high",
         },
     )
     assert saved.status_code == 200, saved.text
     assert saved.json()["execution_backend"] == "agent_service"
     assert saved.json()["agent_name"] == "codex"
     assert saved.json()["agent_model_id"] == "gpt-5-codex"
+    assert saved.json()["agent_profile_id"] == "codex-gpt-5-codex-high"
 
 
 def test_agent_service_does_not_require_api_credential_or_catalog(
     client: TestClient, db: Session
 ) -> None:
     _admin(client, db)
+    db.add(
+        AIAgentProfileVerification(
+            profile_id="antigravity-vision-agent-high",
+            task_type=AITaskType.BODY_PHOTO_ANALYSIS,
+            profile_fingerprint="b" * 64,
+            status="passed",
+            checked_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
     response = client.put(
         "/api/v1/admin/ai/task-configs/body_photo_analysis",
         headers=ORIGIN,
@@ -454,6 +489,7 @@ def test_agent_service_does_not_require_api_credential_or_catalog(
             "execution_backend": "agent_service",
             "agent_name": "antigravity",
             "agent_model_id": "vision-agent",
+            "agent_profile_id": "antigravity-vision-agent-high",
         },
     )
     assert response.status_code == 200, response.text
@@ -532,6 +568,16 @@ def test_switching_api_to_agent_and_back_preserves_both_sides(
     )
     assert api_saved.status_code == 200, api_saved.text
 
+    db.add(
+        AIAgentProfileVerification(
+            profile_id="claude-saved-agent-model-high",
+            task_type=AITaskType.WORKOUT_PLAN_GENERATION,
+            profile_fingerprint="c" * 64,
+            status="passed",
+            checked_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
     agent_saved = client.put(
         "/api/v1/admin/ai/task-configs/workout_plan_generation",
         headers=ORIGIN,
@@ -540,6 +586,7 @@ def test_switching_api_to_agent_and_back_preserves_both_sides(
             "execution_backend": "agent_service",
             "agent_name": "claude",
             "agent_model_id": "saved-agent-model",
+            "agent_profile_id": "claude-saved-agent-model-high",
         },
     )
     assert agent_saved.status_code == 200, agent_saved.text
