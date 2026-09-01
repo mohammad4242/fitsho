@@ -1,3 +1,4 @@
+import base64
 import io
 from datetime import date
 from pathlib import Path
@@ -27,12 +28,12 @@ from app.body_analysis.providers.models import (
     StructuredGenerationResponse,
 )
 from app.config import Settings
+from app.nutrition.food_photo_service import _normalize_image, build_food_photo_request
 from app.nutrition.models import (
     NutritionConsumptionEntry,
     NutritionFoodPhotoEstimate,
     NutritionOperationalEvent,
 )
-from app.nutrition.food_photo_service import build_food_photo_request
 from tests.nutrition.test_weekly_plan_api import ORIGIN, _seed_foods_and_prices
 
 
@@ -126,7 +127,9 @@ def test_food_photo_request_builder_is_the_canonical_task_contract() -> None:
         "Identify only visible foods and estimate portions. Return uncertainty. "
         "Do not provide calories, medical advice, allergy claims, or suitability."
     )
-    assert request.input_payload == {"instruction": "Analyze this food image without personal data."}
+    assert request.input_payload == {
+        "instruction": "Analyze this food image without personal data."
+    }
     assert request.schema_name == "fitsho_food_photo_estimate_v1"
     assert request.route.primary_model == "vision-primary"
     assert request.route.fallback_models == ("vision-fallback",)
@@ -311,6 +314,11 @@ def test_agent_photo_estimate_uses_agent_metadata_without_api_credential_decrypt
     assert len(provider.images) == 1
     assert provider.images[0][0].label == "food_photo"
     assert provider.images[0][0].mime_type == "image/jpeg"
+    normalized, normalized_mime = _normalize_image(
+        _image(), test_settings.food_photo_max_pixels
+    )
+    assert normalized_mime == "image/jpeg"
+    assert base64.b64decode(provider.images[0][0].base64_data) == normalized
     body = response.json()
     assert body["model_id"] == "gemini-test"
     estimate = db.get(NutritionFoodPhotoEstimate, body["id"])

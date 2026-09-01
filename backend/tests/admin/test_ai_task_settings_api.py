@@ -140,7 +140,7 @@ def test_task_settings_require_admin_and_trusted_origin(client: TestClient) -> N
     )
 
 
-def test_admin_lists_only_production_ai_task_configs(client: TestClient, db: Session) -> None:
+def test_admin_excludes_unwired_food_price_task_config(client: TestClient, db: Session) -> None:
     _admin(client, db)
 
     response = client.get("/api/v1/admin/ai/task-configs")

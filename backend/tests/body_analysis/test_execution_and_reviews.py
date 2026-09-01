@@ -269,7 +269,9 @@ def test_body_requests_and_processed_image_labels_are_backend_independent(db: Se
         config = _config().model_copy(update={"provider_name": provider_name})
         analysis = BodyAnalysisService(db).queue(session.id, user.id, config)
 
-        completed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, _Storage(), config))
+        completed = asyncio.run(
+            BodyAnalysisService(db).execute(analysis.id, provider, _Storage(), config)
+        )
 
         assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
         captured.append((provider.requests, provider.images))

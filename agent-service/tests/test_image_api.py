@@ -21,6 +21,7 @@ class ImageRunner:
         self.supports_image = supports_image
         self.requests: list[RunnerRequest] = []
         self.seen_files: list[Path] = []
+        self.seen_file_bytes: list[bytes] = []
 
     async def capabilities(self) -> RunnerCapabilities:
         return RunnerCapabilities(
@@ -40,6 +41,7 @@ class ImageRunner:
     async def run(self, request: RunnerRequest) -> RunnerResult:
         self.requests.append(request)
         self.seen_files = [path for path in request.image_paths if path.is_file()]
+        self.seen_file_bytes = [path.read_bytes() for path in self.seen_files]
         return RunnerResult(
             payload={"answer": "image ok"},
             model_id=request.model_id,
@@ -96,12 +98,14 @@ def test_image_route_rejects_unverified_image_capability(tmp_path: Path) -> None
 
 def test_image_route_uses_generated_workspace_names_and_cleans_up(tmp_path: Path) -> None:
     runner = ImageRunner(True)
+    first_image = png_bytes()
+    second_image = png_bytes()
     response = client(tmp_path, runner).post(
         "/v1/analyze-images",
         data={"metadata": __import__("json").dumps(metadata(("front", "side")))},
         files=[
-            ("images", ("first.png", png_bytes(), "image/png")),
-            ("images", ("second.png", png_bytes(), "image/png")),
+            ("images", ("first.png", first_image, "image/png")),
+            ("images", ("second.png", second_image, "image/png")),
         ],
         headers={"Authorization": f"Bearer {TOKEN}"},
     )
@@ -113,6 +117,7 @@ def test_image_route_uses_generated_workspace_names_and_cleans_up(tmp_path: Path
         "side.png",
     ]
     assert len(runner.seen_files) == 2
+    assert runner.seen_file_bytes == [first_image, second_image]
     assert list(tmp_path.iterdir()) == []
 
 
