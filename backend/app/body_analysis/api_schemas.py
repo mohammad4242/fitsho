@@ -11,6 +11,7 @@ from app.body_analysis.enums import (
     BodyAnalysisReviewDecision,
     BodyAnalysisReviewerRole,
     BodyAnalysisStatus,
+    BodyArea,
 )
 from app.body_analysis.schemas import (
     BodyPhotoPreflight,
@@ -18,12 +19,93 @@ from app.body_analysis.schemas import (
     VisualPhysiqueAssessment,
     VisualPhysiqueAssessmentV3,
 )
+from app.body_photos.enums import BodyPhotoView
+from app.profile.enums import FitnessGoal, Sex
 
 
 class BodyAnalysisStartRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confirm_measurements_current: Literal[True]
+
+
+class BodyAnalysisInputSnapshotResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    captured_at: datetime
+    confirmed_at: datetime
+    profile_updated_at: datetime
+    measurement_id: UUID
+    measurement_measured_at: datetime
+    sex: Sex
+    height_cm: int
+    weight_kg: float
+    shoulder_circumference_cm: float
+    waist_circumference_cm: float
+    hip_circumference_cm: float
+    selected_goal: FitnessGoal
+
+
+class BodyAnalysisExperienceMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message_key: str
+    parameters: dict[str, object] = Field(default_factory=dict)
+
+
+class BodyAnalysisExperienceDirection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["aligned_with_current_goal", "goal_confirmation_required"]
+    goal: FitnessGoal | None
+    reason_codes: tuple[str, ...]
+
+
+class BodyAnalysisExperienceIndicator(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    message_key: str
+    parameters: dict[str, object] = Field(default_factory=dict)
+
+
+class BodyAnalysisExperienceIndicators(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body_proportion: BodyAnalysisExperienceIndicator
+    upper_lower_balance: BodyAnalysisExperienceIndicator
+    visible_symmetry: BodyAnalysisExperienceIndicator
+    current_development_focus: BodyAnalysisExperienceIndicator
+
+
+class BodyAnalysisExperienceRegion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    area: BodyArea
+    display_classification: Literal[
+        "stronger",
+        "balanced",
+        "room_to_grow",
+        "primary_priority",
+        "not_assessable",
+    ]
+    insight_key: str | None
+    insight_parameters: dict[str, object] = Field(default_factory=dict)
+    supporting_views: tuple[BodyPhotoView, ...]
+
+
+class BodyAnalysisExperienceV4(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["4.0"]
+    presentation_version: Literal["body-analysis-experience-v1"]
+    assessment_status: Literal["complete", "partial"]
+    input_snapshot: BodyAnalysisInputSnapshotResponse
+    first_impression: BodyAnalysisExperienceMessage
+    direction: BodyAnalysisExperienceDirection
+    indicators: BodyAnalysisExperienceIndicators
+    regions: tuple[BodyAnalysisExperienceRegion, ...] = Field(min_length=11, max_length=11)
+    review_notice_code: str
 
 
 class SpecialistReviewState(BaseModel):
@@ -46,6 +128,7 @@ class BodyAnalysisResponse(BaseModel):
     result_source: BodyAnalysisResultSource | None
     normalized_result: NormalizedBodyAnalysis | None
     visual_result: VisualPhysiqueAssessment | VisualPhysiqueAssessmentV3 | None
+    experience_result: BodyAnalysisExperienceV4 | None
     overall_confidence: float | None
     coach_review: SpecialistReviewState
     doctor_review: SpecialistReviewState

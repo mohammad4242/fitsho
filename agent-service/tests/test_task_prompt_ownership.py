@@ -18,6 +18,7 @@ def test_agent_service_contains_no_fitsho_production_task_prompts() -> None:
         "fitsho_ai_coach_recommendation",
         "fitsho_food_photo_estimate_v1",
         "fitsho_physique_assessment_v3",
+        "fitsho_body_analysis_v4_evidence",
         "Identify only visible foods and estimate portions.",
         "You are Fitsho AI Coach.",
     )

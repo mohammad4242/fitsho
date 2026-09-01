@@ -78,6 +78,48 @@ def _normalized_payload(*, classification: str = "clear_lag") -> dict[str, objec
     }
 
 
+def _v4_evidence_payload() -> dict[str, object]:
+    areas = (
+        "shoulders",
+        "chest",
+        "back",
+        "lats",
+        "arms",
+        "forearms",
+        "waist_midsection",
+        "glutes",
+        "quads",
+        "hamstrings",
+        "calves",
+    )
+    return {
+        "schema_version": "4.0",
+        "assessment_status": "complete",
+        "area_observations": [
+            {
+                "area": area,
+                "classification": "balanced",
+                "evidence_strength": "moderate",
+                "supporting_views": ["front", "side"],
+                "observation_tags": ["relative_width"],
+                "limitation_codes": [],
+                "suggested_training_emphasis": [],
+            }
+            for area in areas
+        ],
+        "upper_lower_balance": {
+            "state": "balanced",
+            "evidence_strength": "moderate",
+            "supporting_views": ["front", "side"],
+        },
+        "visible_symmetry": {
+            "state": "no_clear_difference",
+            "evidence_strength": "moderate",
+            "supporting_views": ["front", "back"],
+        },
+    }
+
+
 class _Provider:
     def __init__(self, payload: dict[str, object] | None = None) -> None:
         self.payload = payload or _normalized_payload()
@@ -124,6 +166,11 @@ class _CostlessProvider(_Provider):
         response = await super().analyze_images(request, images=images)
         assert isinstance(response, StructuredGenerationResponse)
         return response.model_copy(update={"cost": None})
+
+
+class _V4Provider(_Provider):
+    def __init__(self) -> None:
+        super().__init__(_v4_evidence_payload())
 
 
 class _FailingProvider(_Provider):
@@ -330,13 +377,9 @@ def test_v4_execution_uses_the_queued_snapshot_after_profile_changes(db: Session
     asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, _v4_config()))
 
     assert len(provider.requests) == 2
-    assert provider.requests[1].input_payload["profile_context"] == {
-        "selected_goal": "build_muscle",
-        "height_cm": 178,
-        "weight_kg": 82.5,
-        "shoulder_circumference_cm": 122.0,
-        "waist_circumference_cm": 84.0,
-        "hip_circumference_cm": 98.0,
+    assert provider.requests[1].input_payload == {
+        "task": "analyze_processed_body_views",
+        "schema_version": "4.0",
     }
 
 
@@ -466,6 +509,29 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
     assert len(versions) == 1
     assert versions[0].version == 1
     assert versions[0].normalized_result["summary"]["priority_areas"] == ["shoulders"]
+
+
+def test_v4_execution_persists_evidence_projection_without_legacy_visual_result(
+    db: Session,
+) -> None:
+    user, session = _submitted_session(db)
+    _complete_body_profile(db, user)
+    config = _v4_config()
+    analysis = BodyAnalysisService(db).queue(
+        session.id,
+        user.id,
+        config,
+        confirm_measurements_current=True,
+    )
+
+    completed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, _V4Provider(), config))
+
+    assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
+    assert completed.schema_version == "4.0"
+    assert completed.visual_result is None
+    assert completed.normalized_result is not None
+    assert completed.normalized_result["schema_version"] == "4.0"
+    assert completed.raw_result["analysis"]["schema_version"] == "4.0"
 
 
 def test_execution_uses_one_provider_for_preflight_and_analysis_without_cost(db: Session) -> None:
@@ -901,6 +967,17 @@ def test_v3_provider_request_includes_advisory_profile_context() -> None:
         "waist_circumference_cm": 84.0,
         "hip_circumference_cm": 98.0,
     }
+
+
+def test_v4_provider_request_is_evidence_only() -> None:
+    request = BodyAnalysisService._request(_v4_config())
+
+    assert request.schema_name == "fitsho_body_analysis_v4_evidence"
+    assert request.input_payload == {
+        "task": "analyze_processed_body_views",
+        "schema_version": "4.0",
+    }
+    assert request.system_prompt.startswith("You are Fitsho's evidence-only v4 body analysis")
 
 
 def test_retry_rejects_nonlatest_revision(db: Session) -> None:

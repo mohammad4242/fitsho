@@ -29,8 +29,10 @@ from app.body_analysis.normalization import (
     normalize_body_analysis,
     normalize_visual_physique_assessment,
     normalize_visual_physique_assessment_v3,
+    normalize_visual_physique_assessment_v4,
     visual_assessment_to_normalized,
     visual_assessment_v3_to_normalized,
+    visual_assessment_v4_to_normalized,
 )
 from app.body_analysis.providers import (
     AIProvider,
@@ -48,6 +50,7 @@ from app.body_analysis.schemas import (
     NormalizedBodyAnalysis,
     visual_physique_provider_schema,
     visual_physique_v3_provider_schema,
+    visual_physique_v4_provider_schema,
 )
 from app.body_photos.enums import BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
@@ -242,6 +245,22 @@ trunk_musculature; glutes -> glutes; quads -> quads; hamstrings -> hamstrings; c
 For symmetry use left_right_balance only when appropriate. For visible_alignment_or_posture leave
 suggested_training_emphasis empty. Never provide exercises or programming instructions. The result
 is provisional and requires human coach and doctor review."""
+
+_ANALYSIS_V4_PROMPT = """You are Fitsho's evidence-only v4 body analysis assessor.
+Review only the supplied labeled, standardized headless body photos. Return exactly one JSON object
+that matches the supplied schema. The response contains controlled visual observations only: no
+free-form prose, messages, recommendations, diagnoses, posture claims, pain or injury claims,
+body-composition estimates, genetic claims, or comparisons with other people.
+
+Assess these eleven visible areas: shoulders, chest, back, lats, arms, forearms, waist_midsection,
+glutes, quads, hamstrings, and calves. For each area choose only the supplied classification,
+evidence strength, supporting view labels, observation tags, limitation codes, and supported
+training-emphasis values. Add the controlled upper/lower balance and visible-symmetry states.
+Use high evidence only when the relevant area is clearly supported by its required views. Use
+not_assessable or low evidence when a responsible visual comparison is not possible. Never infer
+sex, goals, measurements, health, posture, strength, training history, or future potential.
+Do not include any field that is not declared by the schema."""
+
 
 _PHOTO_PREFLIGHT_PROMPT = """You validate three user-selected headless body photos standardized
 onto a neutral-gray background before any body-development analysis. Head removal was performed by
@@ -595,6 +614,11 @@ class BodyAnalysisService:
         response: StructuredGenerationResponse | None = None
         preflight_response: StructuredGenerationResponse | None = None
         try:
+            if (
+                execution_config.schema_version == "4.0"
+                and self._snapshot_from_analysis(analysis) is None
+            ):
+                raise BodyAnalysisInputError("analysis input snapshot is missing")
             analysis.status = BodyAnalysisStatus.VALIDATING
             analysis.attempt_count += 1
             analysis.started_at = datetime.now(UTC)
@@ -634,7 +658,7 @@ class BodyAnalysisService:
                 self._request(
                     execution_config,
                     profile_context=(
-                        self._snapshot_profile_context(analysis)
+                        None
                         if execution_config.schema_version == "4.0"
                         else self._profile_context(analysis.session.user_id)
                     ),
@@ -650,6 +674,19 @@ class BodyAnalysisService:
                 visual_v3 = normalize_visual_physique_assessment_v3(response.payload)
                 normalized = visual_assessment_v3_to_normalized(visual_v3)
                 visual_result = visual_v3.model_dump(mode="json")
+            elif execution_config.schema_version == "4.0":
+                evidence = normalize_visual_physique_assessment_v4(response.payload)
+                expected_status = "complete" if len(analysis_images) == 3 else "partial"
+                if evidence.assessment_status != expected_status:
+                    raise BodyAnalysisInputError("unexpected v4 assessment status")
+                try:
+                    normalized = visual_assessment_v4_to_normalized(
+                        evidence,
+                        preflight_confidence=preflight.confidence,
+                        usable_views={BodyPhotoView(image.label) for image in analysis_images},
+                    )
+                except ValueError as error:
+                    raise BodyAnalysisInputError("v4 evidence projection failed") from error
             else:
                 normalized = normalize_body_analysis(response.payload)
             if normalized.schema_version != execution_config.schema_version:
@@ -968,18 +1005,26 @@ class BodyAnalysisService:
         *,
         profile_context: dict[str, object] | None = None,
     ) -> StructuredGenerationRequest:
+        input_payload: dict[str, object] = {
+            "task": "analyze_processed_body_views",
+            "schema_version": config.schema_version,
+        }
+        if profile_context is not None:
+            input_payload["profile_context"] = profile_context
         return StructuredGenerationRequest(
-            system_prompt=_ANALYSIS_PROMPT,
-            input_payload={
-                "task": "analyze_processed_body_views",
-                "schema_version": config.schema_version,
-                "profile_context": profile_context or {},
-            },
+            system_prompt=(
+                _ANALYSIS_V4_PROMPT
+                if config.schema_version == "4.0"
+                else _ANALYSIS_PROMPT
+            ),
+            input_payload=input_payload,
             response_schema=(
                 visual_physique_provider_schema()
                 if config.schema_version == "2.0"
                 else visual_physique_v3_provider_schema()
                 if config.schema_version == "3.0"
+                else visual_physique_v4_provider_schema()
+                if config.schema_version == "4.0"
                 else NormalizedBodyAnalysis.model_json_schema()
             ),
             schema_name=(
@@ -987,6 +1032,8 @@ class BodyAnalysisService:
                 if config.schema_version == "2.0"
                 else "fitsho_physique_assessment_v3"
                 if config.schema_version == "3.0"
+                else "fitsho_body_analysis_v4_evidence"
+                if config.schema_version == "4.0"
                 else "fitsho_body_analysis"
             ),
             route=ModelRoute(

@@ -12,6 +12,7 @@ from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.body_analysis.api_schemas import (
+    BodyAnalysisExperienceV4,
     BodyAnalysisResponse,
     BodyAnalysisResultVersionResponse,
     BodyAnalysisReviewDetail,
@@ -23,10 +24,12 @@ from app.body_analysis.api_schemas import (
 )
 from app.body_analysis.enums import BodyAnalysisReviewerRole, BodyAnalysisStatus
 from app.body_analysis.models import BodyAnalysis, BodyAnalysisResultVersion, BodyAnalysisReview
+from app.body_analysis.normalization import normalize_visual_physique_assessment_v4
+from app.body_analysis.presentation import build_body_analysis_experience_v4
 from app.body_analysis.runtime import (
     BodyAnalysisRuntimeDependency,
 )
-from app.body_analysis.schemas import BodyPhotoPreflight
+from app.body_analysis.schemas import BodyPhotoPreflight, NormalizedBodyAnalysis
 from app.body_analysis.service import (
     BodyAnalysisInputError,
     BodyAnalysisNotFoundError,
@@ -109,6 +112,7 @@ def _response(db: Session, analysis: BodyAnalysis) -> BodyAnalysisResponse:
         and doctor.decision is not None
         and doctor.decision.value == "approved"
     )
+    experience_result = _experience_result(analysis, current, coach, doctor)
     photo_validation = None
     if isinstance(analysis.raw_result, dict):
         payload = analysis.raw_result.get("photo_validation")
@@ -130,6 +134,7 @@ def _response(db: Session, analysis: BodyAnalysis) -> BodyAnalysisResponse:
         result_source=current.source if current else None,
         normalized_result=current.normalized_result if current is not None else None,
         visual_result=current.visual_result if current is not None else None,
+        experience_result=experience_result,
         overall_confidence=current.overall_confidence if current else None,
         coach_review=coach,
         doctor_review=doctor,
@@ -141,6 +146,33 @@ def _response(db: Session, analysis: BodyAnalysis) -> BodyAnalysisResponse:
         created_at=analysis.created_at,
         completed_at=analysis.completed_at,
     )
+
+
+def _experience_result(
+    analysis: BodyAnalysis,
+    current: BodyAnalysisResultVersion | None,
+    coach: SpecialistReviewState,
+    doctor: SpecialistReviewState,
+) -> BodyAnalysisExperienceV4 | None:
+    if analysis.schema_version != "4.0" or current is None:
+        return None
+    snapshot = BodyAnalysisService._snapshot_from_analysis(analysis)
+    raw_result = analysis.raw_result
+    raw_analysis = raw_result.get("analysis") if isinstance(raw_result, dict) else None
+    if snapshot is None or not isinstance(raw_analysis, dict):
+        return None
+    try:
+        evidence = normalize_visual_physique_assessment_v4(raw_analysis)
+        normalized = NormalizedBodyAnalysis.model_validate(current.normalized_result)
+        return build_body_analysis_experience_v4(
+            normalized_result=normalized,
+            evidence=evidence,
+            snapshot=snapshot,
+            coach_approved=coach.decision is not None and coach.decision.value == "approved",
+            doctor_approved=doctor.decision is not None and doctor.decision.value == "approved",
+        )
+    except (TypeError, ValueError):
+        return None
 
 
 @router.get("/{session_id}/analysis", response_model=BodyAnalysisResponse | None)

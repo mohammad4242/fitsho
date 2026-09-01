@@ -15,10 +15,12 @@ from app.body_analysis.service import BodyAnalysisService
 from app.body_photos.enums import BodyPhotoSessionState
 
 from .test_execution_and_reviews import (
+    _complete_body_profile,
     _config,
     _Provider,
     _submitted_session,
     _v4_config,
+    _V4Provider,
 )
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -72,6 +74,7 @@ def test_analysis_result_api_is_owner_only_and_hides_provider_envelopes(
     assert result.json()["doctor_review"]["decision"] is None
     assert "raw_result" not in result.text
     assert "provider_request_id" not in result.text
+    assert result.json()["experience_result"] is None
 
     _logout(client)
     _register(client, f"result-other-{uuid4()}@example.com")
@@ -96,6 +99,38 @@ def test_analysis_result_exposes_a_safe_error_code_for_actionable_feedback(
 
     assert result.status_code == 200
     assert result.json()["error_code"] == "invalid_output"
+
+
+def test_v4_analysis_result_exposes_deterministic_experience_read_model(
+    client: TestClient, db: Session
+) -> None:
+    email = f"v4-result-{uuid4()}@example.com"
+    _register(client, email)
+    owner = db.scalar(select(User).where(User.email == email))
+    assert owner is not None
+    _, photo_session = _submitted_session(db, owner)
+    _complete_body_profile(db, owner)
+    service = BodyAnalysisService(db)
+    analysis = service.queue(
+        photo_session.id,
+        owner.id,
+        _v4_config(),
+        confirm_measurements_current=True,
+    )
+    asyncio.run(service.execute(analysis.id, _V4Provider(), _v4_config()))
+
+    result = client.get(f"/api/v1/body-photo-sessions/{photo_session.id}/analysis")
+
+    assert result.status_code == 200
+    payload = result.json()
+    assert payload["schema_version"] == "4.0"
+    assert payload["visual_result"] is None
+    assert payload["experience_result"]["schema_version"] == "4.0"
+    assert payload["experience_result"]["presentation_version"] == (
+        "body-analysis-experience-v1"
+    )
+    assert len(payload["experience_result"]["regions"]) == 11
+    assert "raw_result" not in result.text
 
 
 def test_review_api_requires_admin_and_records_reviewer_identity(

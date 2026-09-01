@@ -83,6 +83,8 @@ def test_runtime_uses_openrouter_and_keeps_api_cost_preflight(
     assert runtime.config.provider_name == "openrouter"
     assert runtime.config.primary_model == "vision-primary"
     assert runtime.config.fallback_models == ("vision-fallback",)
+    assert runtime.config.prompt_version == "body-analysis-v4-evidence"
+    assert runtime.config.schema_version == "4.0"
     assert runtime.config.max_cost_per_request == Decimal("0.15")
     assert checked == [(db, task)]
 
@@ -119,5 +121,7 @@ def test_runtime_uses_agent_service_and_skips_monetary_preflight(
     assert runtime.config.provider_name == "agent_service:antigravity"
     assert runtime.config.primary_model == "gemini-2.5-pro"
     assert runtime.config.fallback_models == ()
+    assert runtime.config.prompt_version == "body-analysis-v4-evidence"
+    assert runtime.config.schema_version == "4.0"
     assert runtime.config.max_cost_per_request is None
     checked.assert_not_called()
