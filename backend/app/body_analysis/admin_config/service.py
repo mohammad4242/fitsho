@@ -59,11 +59,10 @@ _AGENT_SERVICE_TASKS = {
     AITaskType.WORKOUT_PLAN_GENERATION,
     AITaskType.BODY_PHOTO_ANALYSIS,
     AITaskType.FOOD_PHOTO_ESTIMATION,
+    AITaskType.FOOD_PRICE_SEARCH,
 }
 
-_TASK_CONFIGURABLE_TASKS = tuple(
-    task_type for task_type in AITaskType if task_type is not AITaskType.FOOD_PRICE_SEARCH
-)
+_TASK_CONFIGURABLE_TASKS = tuple(AITaskType)
 
 _AGENT_SAFE_MESSAGES: dict[ProviderErrorCode, str] = {
     ProviderErrorCode.NOT_CONFIGURED: "The Agent Service is not configured.",
@@ -137,7 +136,11 @@ def config_detail(
         return AITaskConfigDetail(
             task_type=task_type,
             provider=AIProviderName.OPENROUTER,
-            execution_backend=AIExecutionBackend.API,
+            execution_backend=(
+                AIExecutionBackend.AGENT_SERVICE
+                if task_type is AITaskType.FOOD_PRICE_SEARCH
+                else AIExecutionBackend.API
+            ),
             agent_name=None,
             agent_model_id=None,
             agent_profile_id=None,
@@ -188,10 +191,6 @@ def save_task_config(
     actor: User,
     settings: Settings,
 ) -> AITaskConfigDetail:
-    if task_type is AITaskType.FOOD_PRICE_SEARCH:
-        raise AIConfigError(
-            "food_price_search is not used by the production price updater"
-        )
     config = db.scalar(select(AITaskConfig).where(AITaskConfig.task_type == task_type))
     credential = get_credential(db, payload.provider)
     credential_changed = False
@@ -225,6 +224,15 @@ def save_task_config(
     agent_profile_id = effective("agent_profile_id")
     primary_model_id = effective("primary_model_id")
     fallback_model_ids = effective("fallback_model_ids", [])
+
+    if (
+        task_type is AITaskType.FOOD_PRICE_SEARCH
+        and payload.enabled
+        and execution_backend != AIExecutionBackend.AGENT_SERVICE
+    ):
+        raise AIConfigError(
+            "FOOD_PRICE_SEARCH must use Agent Service for production price research"
+        )
 
     if payload.enabled and execution_backend == AIExecutionBackend.AGENT_SERVICE:
         if task_type not in _AGENT_SERVICE_TASKS:

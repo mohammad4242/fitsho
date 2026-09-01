@@ -140,7 +140,9 @@ def test_task_settings_require_admin_and_trusted_origin(client: TestClient) -> N
     )
 
 
-def test_admin_excludes_unwired_food_price_task_config(client: TestClient, db: Session) -> None:
+def test_admin_lists_food_price_search_as_disabled_agent_task(
+    client: TestClient, db: Session
+) -> None:
     _admin(client, db)
 
     response = client.get("/api/v1/admin/ai/task-configs")
@@ -151,10 +153,20 @@ def test_admin_excludes_unwired_food_price_task_config(client: TestClient, db: S
         "body_photo_analysis",
         "progress_comparison",
         "food_photo_estimation",
+        "food_price_search",
     }
-    assert all(item["execution_backend"] == "api" for item in response.json())
-    assert all(item["agent_name"] is None for item in response.json())
-    assert all(item["agent_model_id"] is None for item in response.json())
+    food_price = next(
+        item for item in response.json() if item["task_type"] == "food_price_search"
+    )
+    assert food_price["execution_backend"] == "agent_service"
+    assert food_price["enabled"] is False
+    assert food_price["agent_name"] is None
+    assert food_price["agent_model_id"] is None
+    assert all(
+        item["execution_backend"] == "api"
+        for item in response.json()
+        if item["task_type"] != "food_price_search"
+    )
 
 
 def test_openrouter_client_is_independent_from_zen_client(test_settings: Settings) -> None:
@@ -494,7 +506,44 @@ def test_agent_service_does_not_require_api_credential_or_catalog(
     assert response.status_code == 200, response.text
 
 
-def test_admin_rejects_food_price_search_task_config_because_updater_is_not_ai_backed(
+def test_admin_rejects_enabled_food_price_search_api_mode(
+    client: TestClient, db: Session
+) -> None:
+    _admin(client, db)
+    response = client.put(
+        "/api/v1/admin/ai/task-configs/food_price_search",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "api",
+            "primary_model_id": "vendor/price-model",
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert "agent service" in response.text.lower()
+
+
+def test_food_price_search_agent_enablement_requires_passed_profile(
+    client: TestClient, db: Session
+) -> None:
+    _admin(client, db)
+    response = client.put(
+        "/api/v1/admin/ai/task-configs/food_price_search",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "agent_service",
+            "agent_name": "antigravity",
+            "agent_model_id": "gemini-price-agent",
+            "agent_profile_id": "antigravity-price-agent-high",
+        },
+    )
+
+    assert response.status_code == 422, response.text
+    assert "pass" in response.text.lower()
+
+
+def test_food_price_search_agent_enablement_succeeds_after_passed_profile(
     client: TestClient, db: Session
 ) -> None:
     _admin(client, db)
@@ -508,6 +557,7 @@ def test_admin_rejects_food_price_search_task_config_because_updater_is_not_ai_b
         )
     )
     db.commit()
+
     response = client.put(
         "/api/v1/admin/ai/task-configs/food_price_search",
         headers=ORIGIN,
@@ -519,8 +569,10 @@ def test_admin_rejects_food_price_search_task_config_because_updater_is_not_ai_b
             "agent_profile_id": "antigravity-price-agent-high",
         },
     )
-    assert response.status_code == 422, response.text
-    assert "not used by the production price updater" in response.text.lower()
+
+    assert response.status_code == 200, response.text
+    assert response.json()["execution_backend"] == "agent_service"
+    assert response.json()["enabled"] is True
 
 
 def test_agent_service_rejects_unsupported_task(client: TestClient, db: Session) -> None:
