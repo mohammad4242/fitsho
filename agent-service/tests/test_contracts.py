@@ -32,6 +32,7 @@ def test_generation_contract_matches_the_backend_boundary() -> None:
         "temperature",
         "max_output_tokens",
         "timeout_seconds",
+        "image_labels",
     }
     assert set(AgentGenerationOutput.model_fields) == {
         "payload",

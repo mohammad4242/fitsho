@@ -140,7 +140,7 @@ def test_task_settings_require_admin_and_trusted_origin(client: TestClient) -> N
     )
 
 
-def test_admin_lists_all_supported_ai_task_configs(client: TestClient, db: Session) -> None:
+def test_admin_lists_only_production_ai_task_configs(client: TestClient, db: Session) -> None:
     _admin(client, db)
 
     response = client.get("/api/v1/admin/ai/task-configs")
@@ -151,7 +151,6 @@ def test_admin_lists_all_supported_ai_task_configs(client: TestClient, db: Sessi
         "body_photo_analysis",
         "progress_comparison",
         "food_photo_estimation",
-        "food_price_search",
     }
     assert all(item["execution_backend"] == "api" for item in response.json())
     assert all(item["agent_name"] is None for item in response.json())
@@ -495,7 +494,7 @@ def test_agent_service_does_not_require_api_credential_or_catalog(
     assert response.status_code == 200, response.text
 
 
-def test_agent_service_supports_food_price_search(
+def test_admin_rejects_food_price_search_task_config_because_updater_is_not_ai_backed(
     client: TestClient, db: Session
 ) -> None:
     _admin(client, db)
@@ -520,7 +519,8 @@ def test_agent_service_supports_food_price_search(
             "agent_profile_id": "antigravity-price-agent-high",
         },
     )
-    assert response.status_code == 200, response.text
+    assert response.status_code == 422, response.text
+    assert "not used by the production price updater" in response.text.lower()
 
 
 def test_agent_service_rejects_unsupported_task(client: TestClient, db: Session) -> None:

@@ -106,7 +106,7 @@ def test_analyze_images_decodes_base64_and_sends_only_multipart_bytes() -> None:
     seen: dict[str, Any] = {}
     image_bytes = b"trusted-image-bytes"
     image = ImageInput(
-        label="front",
+        label="front view",
         mime_type="image/jpeg",
         base64_data=base64.b64encode(image_bytes).decode("ascii"),
     )
@@ -124,8 +124,19 @@ def test_analyze_images_decodes_base64_and_sends_only_multipart_bytes() -> None:
     body = seen["body"]
     assert image_bytes in body
     assert image.base64_data.encode() not in body
-    assert b'filename="front.jpg"' in body
+    assert b'filename="front-view.jpg"' in body
     assert b'name="metadata"' in body
+    metadata_start = body.index(b'name="metadata"')
+    metadata_start = body.index(b"\r\n\r\n", metadata_start) + 4
+    metadata_end = body.index(b"\r\n", metadata_start)
+    forwarded = json.loads(body[metadata_start:metadata_end])
+    assert forwarded["system_prompt"] == _request().system_prompt
+    assert forwarded["input_payload"] == _request().input_payload
+    assert forwarded["response_schema"] == _request().response_schema
+    assert forwarded["schema_name"] == _request().schema_name
+    assert forwarded["temperature"] == _request().temperature
+    assert forwarded["max_output_tokens"] == _request().max_output_tokens
+    assert forwarded["image_labels"] == ["front view"]
     assert seen["headers"]["authorization"] == "Bearer agent-service-test-token"
 
 

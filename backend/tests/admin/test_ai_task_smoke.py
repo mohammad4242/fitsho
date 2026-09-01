@@ -23,6 +23,7 @@ from app.body_analysis.providers.models import (
     StructuredGenerationResponse,
 )
 from app.config import Settings
+from app.nutrition.food_photo_service import build_food_photo_request
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -246,6 +247,18 @@ def test_task_smoke_runs_all_four_safe_fixtures(db: Session, test_settings: Sett
     assert len(body_images[0]) == 3
     assert len(body_images[1]) == 3
     assert len(body_images[2]) == 1
+    food_request = next(
+        request
+        for kind, request, _ in provider.requests
+        if kind == "image" and request.schema_name == "fitsho_food_photo_estimate_v1"
+    )
+    assert food_request == build_food_photo_request(
+        primary_model=profile.model_id,
+        fallback_models=(),
+        provider_preferences=ProviderRoutingPreferences(),
+        temperature=0,
+        max_output_tokens=1024,
+    )
     price_request = next(
         request
         for kind, request, _ in provider.requests

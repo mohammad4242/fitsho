@@ -32,16 +32,21 @@ from app.nutrition.models import (
     NutritionFoodPhotoEstimate,
     NutritionOperationalEvent,
 )
+from app.nutrition.food_photo_service import build_food_photo_request
 from tests.nutrition.test_weekly_plan_api import ORIGIN, _seed_foods_and_prices
 
 
 class FakeVisionProvider:
     def __init__(self, model_id: str = "test/vision") -> None:
         self.model_id = model_id
+        self.requests: list[StructuredGenerationRequest] = []
+        self.images: list[tuple[ImageInput, ...]] = []
 
     async def analyze_images(
         self, request: StructuredGenerationRequest, *, images: tuple[ImageInput, ...]
     ) -> StructuredGenerationResponse:
+        self.requests.append(request)
+        self.images.append(images)
         assert images[0].mime_type == "image/jpeg"
         assert "email" not in str(request.input_payload).lower()
         return StructuredGenerationResponse(
@@ -106,6 +111,28 @@ def _image() -> bytes:
     output = io.BytesIO()
     Image.new("RGB", (100, 100), "white").save(output, "PNG")
     return output.getvalue()
+
+
+def test_food_photo_request_builder_is_the_canonical_task_contract() -> None:
+    request = build_food_photo_request(
+        primary_model="vision-primary",
+        fallback_models=("vision-fallback",),
+        provider_preferences=ProviderRoutingPreferences(zdr=True),
+        temperature=0.2,
+        max_output_tokens=777,
+    )
+
+    assert request.system_prompt == (
+        "Identify only visible foods and estimate portions. Return uncertainty. "
+        "Do not provide calories, medical advice, allergy claims, or suitability."
+    )
+    assert request.input_payload == {"instruction": "Analyze this food image without personal data."}
+    assert request.schema_name == "fitsho_food_photo_estimate_v1"
+    assert request.route.primary_model == "vision-primary"
+    assert request.route.fallback_models == ("vision-fallback",)
+    assert request.provider_preferences == ProviderRoutingPreferences(zdr=True)
+    assert request.temperature == 0.2
+    assert request.max_output_tokens == 777
 
 
 def _register(client: TestClient) -> None:
@@ -257,12 +284,11 @@ def test_agent_photo_estimate_uses_agent_metadata_without_api_credential_decrypt
             AssertionError("API credentials must not be decrypted for Agent Service")
         ),
     )
+    provider = FakeVisionProvider(model_id="gemini-test")
     monkeypatch.setattr(
         "app.nutrition.food_photo_service.build_task_provider",
         lambda *_args, **_kwargs: _configured_provider(
-            FakeVisionProvider(model_id="gemini-test"),
-            name="agent_service:antigravity",
-            model_id="gemini-test",
+            provider, name="agent_service:antigravity", model_id="gemini-test"
         ),
     )
 
@@ -273,6 +299,18 @@ def test_agent_photo_estimate_uses_agent_metadata_without_api_credential_decrypt
     )
 
     assert response.status_code == 201, response.text
+    assert provider.requests == [
+        build_food_photo_request(
+            primary_model="gemini-test",
+            fallback_models=(),
+            provider_preferences=ProviderRoutingPreferences(),
+            temperature=0.0,
+            max_output_tokens=4096,
+        )
+    ]
+    assert len(provider.images) == 1
+    assert provider.images[0][0].label == "food_photo"
+    assert provider.images[0][0].mime_type == "image/jpeg"
     body = response.json()
     assert body["model_id"] == "gemini-test"
     estimate = db.get(NutritionFoodPhotoEstimate, body["id"])

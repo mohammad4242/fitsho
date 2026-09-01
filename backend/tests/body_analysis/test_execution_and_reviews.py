@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import io
 import json
 from datetime import UTC, datetime, timedelta
@@ -85,9 +86,13 @@ class _Provider:
     def __init__(self, payload: dict[str, object] | None = None) -> None:
         self.payload = payload or _normalized_payload()
         self.calls = 0
+        self.requests: list[StructuredGenerationRequest] = []
+        self.images: list[tuple[object, ...]] = []
 
     async def analyze_images(self, request: object, *, images: tuple[object, ...]) -> object:
         self.calls += 1
+        self.requests.append(cast(StructuredGenerationRequest, request))
+        self.images.append(images)
         assert len(images) == 3
         payload = (
             {"accepted": True, "confidence": 0.92, "issues": []}
@@ -253,6 +258,44 @@ def test_execution_uses_one_provider_for_preflight_and_analysis_without_cost(db:
     assert provider.schema_names == ["fitsho_body_photo_preflight", "fitsho_body_analysis"]
     assert provider.calls == 2
     assert completed.request_cost is None
+
+
+def test_body_requests_and_processed_image_labels_are_backend_independent(db: Session) -> None:
+    captured: list[tuple[list[StructuredGenerationRequest], list[tuple[object, ...]]]] = []
+
+    for provider_name in ("openrouter", "agent_service:antigravity"):
+        user, session = _submitted_session(db)
+        provider = _Provider()
+        config = _config().model_copy(update={"provider_name": provider_name})
+        analysis = BodyAnalysisService(db).queue(session.id, user.id, config)
+
+        completed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, _Storage(), config))
+
+        assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
+        captured.append((provider.requests, provider.images))
+
+    api_requests, api_images = captured[0]
+    agent_requests, agent_images = captured[1]
+    assert [request.model_dump() for request in api_requests] == [
+        request.model_dump() for request in agent_requests
+    ]
+    assert [
+        [(image.label, image.mime_type) for image in images]
+        for images in api_images
+    ] == [
+        [(image.label, image.mime_type) for image in images]
+        for images in agent_images
+    ]
+    assert [request.system_prompt for request in api_requests] == [
+        _PHOTO_PREFLIGHT_PROMPT,
+        _ANALYSIS_PROMPT,
+    ]
+    assert all(
+        base64.b64decode(image.base64_data).startswith(b"processed-")
+        for _requests, images in captured
+        for image_batch in images
+        for image in image_batch
+    )
 
 
 def test_execution_stops_after_rejected_photo_preflight_and_preserves_view_reasons(

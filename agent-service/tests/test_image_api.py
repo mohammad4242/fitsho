@@ -49,7 +49,7 @@ class ImageRunner:
         )
 
 
-def metadata() -> dict[str, object]:
+def metadata(labels: tuple[str, ...] = ("front",)) -> dict[str, object]:
     return {
         "agent": "antigravity",
         "model_id": "fake-model",
@@ -64,6 +64,7 @@ def metadata() -> dict[str, object]:
         "temperature": 0,
         "max_output_tokens": 100,
         "timeout_seconds": 5,
+        "image_labels": list(labels),
     }
 
 
@@ -97,7 +98,7 @@ def test_image_route_uses_generated_workspace_names_and_cleans_up(tmp_path: Path
     runner = ImageRunner(True)
     response = client(tmp_path, runner).post(
         "/v1/analyze-images",
-        data={"metadata": __import__("json").dumps(metadata())},
+        data={"metadata": __import__("json").dumps(metadata(("front", "side")))},
         files=[
             ("images", ("first.png", png_bytes(), "image/png")),
             ("images", ("second.png", png_bytes(), "image/png")),
@@ -108,8 +109,8 @@ def test_image_route_uses_generated_workspace_names_and_cleans_up(tmp_path: Path
     assert response.status_code == 200
     assert response.json()["payload"] == {"answer": "image ok"}
     assert [path.name for path in runner.requests[0].image_paths] == [
-        "image-01.png",
-        "image-02.png",
+        "front.png",
+        "side.png",
     ]
     assert len(runner.seen_files) == 2
     assert list(tmp_path.iterdir()) == []
