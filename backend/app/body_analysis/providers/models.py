@@ -6,7 +6,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProviderErrorCode(StrEnum):
@@ -91,7 +91,22 @@ class ImageInput(BaseModel):
 
     label: str = Field(min_length=1, max_length=40)
     mime_type: Literal["image/jpeg", "image/png", "image/webp"]
-    base64_data: str = Field(min_length=1, repr=False)
+    base64_data: str | None = Field(default=None, min_length=1, repr=False)
+    storage_scope: Literal["body", "food"] | None = None
+    storage_key: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_source(self) -> ImageInput:
+        has_inline = self.base64_data is not None
+        has_scope = self.storage_scope is not None
+        has_key = self.storage_key is not None
+        if has_inline and not (not has_scope and not has_key):
+            raise ValueError("image source must be inline or stored, not both")
+        if not has_inline and not (has_scope and has_key):
+            raise ValueError("stored image source requires scope and key")
+        if has_scope != has_key:
+            raise ValueError("stored image source requires scope and key")
+        return self
 
 
 class StructuredGenerationRequest(BaseModel):
