@@ -24,6 +24,7 @@ from .concurrency import ConcurrencyController
 from .config import Settings, get_settings
 from .errors import AgentServiceError, handle_service_error
 from .observability import emit_log
+from .private_media import PrivateMediaResolver
 from .runners.registry import RunnerRegistry
 from .schemas import (
     AgentGenerationInput,
@@ -33,6 +34,7 @@ from .schemas import (
     ErrorCode,
     ErrorDetail,
     ErrorEnvelope,
+    StoredImageGenerationInput,
     TestOutput,
     TestRequest,
 )
@@ -88,6 +90,12 @@ def create_app(
         concurrency=controller,
         workspace_root=Path(effective_settings.agent_workspace_root),
         workspace_limits=WorkspaceLimits(
+            max_images=effective_settings.agent_max_images,
+            max_file_bytes=effective_settings.agent_max_file_bytes,
+            max_total_bytes=effective_settings.agent_max_total_bytes,
+        ),
+        private_media=PrivateMediaResolver(
+            Path(effective_settings.agent_shared_private_media_root),
             max_images=effective_settings.agent_max_images,
             max_file_bytes=effective_settings.agent_max_file_bytes,
             max_total_bytes=effective_settings.agent_max_total_bytes,
@@ -322,6 +330,22 @@ def create_app(
         request.state.task_kind = "analyze_images"
         request.state.image_count = len(images)
         result = await agent_service.analyze_images(payload, images, request.state.request_id)
+        request.state.input_tokens = result.input_tokens
+        request.state.output_tokens = result.output_tokens
+        return result
+
+    @app.post("/v1/analyze-stored-images", response_model=AgentGenerationOutput)
+    async def analyze_stored_images(
+        request: Request,
+        payload: StoredImageGenerationInput,
+        _: None = Depends(require_internal_auth),
+    ) -> AgentGenerationOutput:
+        generation = payload.generation
+        request.state.agent = generation.agent.value
+        request.state.model = generation.model_id
+        request.state.task_kind = "analyze_stored_images"
+        request.state.image_count = len(payload.images)
+        result = await agent_service.analyze_stored_images(payload, request.state.request_id)
         request.state.input_tokens = result.input_tokens
         request.state.output_tokens = result.output_tokens
         return result

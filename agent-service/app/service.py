@@ -10,6 +10,7 @@ from PIL import Image, UnidentifiedImageError
 
 from .concurrency import ConcurrencyController, ConcurrencyLimitError
 from .errors import AgentServiceError
+from .private_media import PrivateMediaError, PrivateMediaResolver
 from .profiles import AgentModelProfile, ResolvedProfile, legacy_profile
 from .runners.base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
 from .runners.registry import RunnerRegistry
@@ -20,6 +21,7 @@ from .schemas import (
     AuthState,
     ErrorCode,
     RunnerCapabilities,
+    StoredImageGenerationInput,
     TestOutput,
     TestRequest,
 )
@@ -56,11 +58,13 @@ class AgentService:
         concurrency: ConcurrencyController,
         workspace_root: Path,
         workspace_limits: WorkspaceLimits,
+        private_media: PrivateMediaResolver,
     ) -> None:
         self.registry = registry
         self.concurrency = concurrency
         self.workspace_root = workspace_root
         self.workspace_limits = workspace_limits
+        self.private_media = private_media
 
     async def capabilities(self) -> list[RunnerCapabilities]:
         return await self.registry.capabilities()
@@ -187,6 +191,58 @@ class AgentService:
             ) from exc
         return self._output(request, result, request_id, profile_id=request.profile_id)
 
+    async def analyze_stored_images(
+        self,
+        request: StoredImageGenerationInput,
+        request_id: str,
+    ) -> AgentGenerationOutput:
+        generation = request.generation
+        self._validate_schema(generation.response_schema)
+        runner = self._runner(generation.agent)
+        resolved = await self._resolve_profile(
+            runner,
+            generation.agent,
+            profile_id=generation.profile_id,
+            model_id=generation.model_id,
+        )
+        await self._check_capability(resolved.profile, generation.agent, image=True)
+        try:
+            image_paths = self.private_media.resolve_many(request.images)
+            for image_path, reference in zip(image_paths, request.images, strict=True):
+                self._validate_image_path(image_path, reference.mime_type)
+        except (OSError, PrivateMediaError, ValueError) as exc:
+            raise AgentServiceError(ErrorCode.INVALID_REQUEST, "invalid image", 422) from exc
+
+        try:
+            async with self.concurrency.slot(generation.agent.value):
+                async with RequestWorkspace(root=self.workspace_root) as workspace:
+                    runner_request = self._runner_request(
+                        generation, image_paths, resolved=resolved
+                    )
+                    if workspace.path is None:
+                        raise AgentServiceError(
+                            ErrorCode.PROVIDER_UNAVAILABLE, "provider is unavailable", 503
+                        )
+                    active_runner = self.registry.for_workspace(
+                        generation.agent, workspace.path
+                    )
+                    if active_runner is None:
+                        raise AgentServiceError(
+                            ErrorCode.INVALID_REQUEST, "agent is not configured", 422
+                        )
+                    result = await self._run_inside_slot(
+                        active_runner, runner_request, request_id
+                    )
+        except ConcurrencyLimitError as exc:
+            raise AgentServiceError(ErrorCode.RATE_LIMITED, "service is busy", 429) from exc
+        except OSError as exc:
+            raise AgentServiceError(
+                ErrorCode.PROVIDER_UNAVAILABLE, "provider is unavailable", 503
+            ) from exc
+        return self._output(
+            generation, result, request_id, profile_id=generation.profile_id
+        )
+
     async def _run(
         self, agent: AgentName, request: RunnerRequest, request_id: str
     ) -> RunnerResult:
@@ -263,6 +319,19 @@ class AgentService:
             raise ValueError("unsupported image type")
         try:
             with Image.open(BytesIO(data)) as image:
+                if image.format != expected_format:
+                    raise ValueError("image bytes do not match declared type")
+                image.verify()
+        except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as exc:
+            raise ValueError("invalid image bytes") from exc
+
+    @staticmethod
+    def _validate_image_path(path: Path, mime_type: str) -> None:
+        expected_format = _IMAGE_FORMATS.get(mime_type)
+        if expected_format is None:
+            raise ValueError("unsupported image type")
+        try:
+            with Image.open(path) as image:
                 if image.format != expected_format:
                     raise ValueError("image bytes do not match declared type")
                 image.verify()
