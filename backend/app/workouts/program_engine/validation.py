@@ -4,7 +4,6 @@ from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup, Pres
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
-    get_session_exercise_count_policy,
 )
 from app.workouts.program_engine.effective_volume import (
     calculate_effective_volume,
@@ -23,6 +22,12 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.session_builder import slots_for_focus
 from app.workouts.program_engine.session_coherence import SessionCoherence
+from app.workouts.program_engine.session_feasibility import (
+    SESSION_COUNT_CONSTRAINED_REASON,
+    SessionCountStatus,
+    assess_session_count,
+    session_feasibility_evidence_from_trace,
+)
 from app.workouts.program_engine.session_structure import session_structure_errors
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
@@ -75,7 +80,6 @@ def validate_program(
         weekly_exposures.update(
             {item.primary_muscle for item in day.exercises if item.primary_muscle is not None}
         )
-    count_policy = get_session_exercise_count_policy(request.session_duration_minutes, ruleset)
     for day in program.weekly_schedule:
         coherence = SessionCoherence.from_workout_day(day)
         exercise_count = main_exercise_count(day.exercises)
@@ -86,13 +90,21 @@ def validate_program(
         # ------------------------------------------------------------------
         # Exercise count validation (Phase 11.9 semantics)
         # 30-min: floor = 3 (allowed 3-4 when 5 doesn't fit)
-        # 45+min: floor = 5; any out-of-range count is a hard error
+        # 45+min: floor = 5; only complete safe-capacity evidence can explain
+        # an underfilled count.
         # ------------------------------------------------------------------
-        if not count_policy.contains(exercise_count):
+        count_assessment = assess_session_count(
+            day,
+            requested_minutes=request.session_duration_minutes,
+            ruleset=ruleset,
+            evidence=session_feasibility_evidence_from_trace(program.decision_trace, day),
+        )
+        if count_assessment.status is SessionCountStatus.UNPROVEN:
             errors.append("SESSION_EXERCISE_COUNT_OUT_OF_RANGE")
-        elif (
-            count_policy.requested_minutes <= ruleset.short_session_minutes
-            and exercise_count < ruleset.minimum_exercises_per_session
+        elif count_assessment.status is SessionCountStatus.CONSTRAINED:
+            warnings.append(SESSION_COUNT_CONSTRAINED_REASON)
+        elif count_assessment.minimum_main_exercises < ruleset.minimum_exercises_per_session and (
+            exercise_count < ruleset.minimum_exercises_per_session
         ):
             # 30-min: only the in-range 3-4 MAIN case receives this warning.
             warnings.append("DURATION_PLANNED_REDUCED_EXERCISE_COUNT")
@@ -116,8 +128,7 @@ def validate_program(
                 errors.extend(
                     (
                         "SESSION_DIRECT_MUSCLE_OUTSIDE_FOCUS_REJECTED",
-                        "SESSION_DIRECT_MUSCLE_OUTSIDE_FOCUS_REJECTED:"
-                        f"{item.primary_muscle.value}",
+                        f"SESSION_DIRECT_MUSCLE_OUTSIDE_FOCUS_REJECTED:{item.primary_muscle.value}",
                     )
                 )
             if has_near_equivalent(item, day.exercises[:index]):

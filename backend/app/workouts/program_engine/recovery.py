@@ -8,7 +8,6 @@ from app.workouts.program_engine.constraint_classification import ConstraintClas
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
-    get_session_exercise_count_policy,
 )
 from app.workouts.program_engine.enums import LoadLimit
 from app.workouts.program_engine.exercise_semantics import has_near_equivalent
@@ -20,6 +19,7 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
 )
 from app.workouts.program_engine.session_coherence import SessionCoherence
+from app.workouts.program_engine.session_feasibility import session_count_policy
 from app.workouts.program_engine.supplemental_policy import (
     is_supplemental_muscle,
     main_exercise_count,
@@ -403,9 +403,7 @@ def repair_recovery_accessory_distribution(
     """Move optional isolation work only when every hard contract remains valid."""
     if assess_recovery_spacing(days, ruleset).is_valid:
         return days, ()
-    count_policy = get_session_exercise_count_policy(
-        request.source.session_duration_minutes, ruleset
-    )
+    count_policy = session_count_policy(request.source.session_duration_minutes, ruleset)
     duration_policy = get_session_duration_policy(request.source.session_duration_minutes)
     for source_index, source in enumerate(days):
         for item_index, item in enumerate(source.exercises):

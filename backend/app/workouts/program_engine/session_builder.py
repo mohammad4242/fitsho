@@ -5,7 +5,6 @@ from uuid import UUID
 
 from app.exercises.enums import MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_capacity import SessionCapacity
-from app.workouts.program_engine.duration_policy import get_session_exercise_count_policy
 from app.workouts.program_engine.enums import CompatibilityLevel, Goal
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.exercise_semantics import (
@@ -26,6 +25,7 @@ from app.workouts.program_engine.session_coherence import (
     SessionCoherence,
     specialization_focus_for_priorities,
 )
+from app.workouts.program_engine.session_feasibility import session_count_policy
 from app.workouts.program_engine.slot_compatibility import (
     SlotCompatibility,
     evaluate_candidate_slot_compatibility,
@@ -108,9 +108,7 @@ def build_sessions(
     )
     covered_direct_muscles: set[MuscleGroup] = set()
     short_session = request.source.session_duration_minutes <= ruleset.short_session_minutes
-    count_policy = get_session_exercise_count_policy(
-        request.source.session_duration_minutes, ruleset
-    )
+    count_policy = session_count_policy(request.source.session_duration_minutes, ruleset)
     for index, planned_focus in enumerate(split.day_focuses):
         focus = _resolve_focus(planned_focus, request, volume, ruleset)
         coherence = SessionCoherence.from_dynamic_focus(focus)
@@ -179,9 +177,8 @@ def build_sessions(
                     allow_full_body=focus.startswith("full_body"),
                 )
                 if compatibility.compatible:
-                    if (
-                        not is_core_or_supplemental_exercise(item)
-                        and not coherence.allows_direct(item.primary_muscle)
+                    if not is_core_or_supplemental_exercise(item) and not coherence.allows_direct(
+                        item.primary_muscle
                     ):
                         rejected_slot_reasons.append(
                             f"DIRECT_MUSCLE_OUT_OF_SCOPE:{item.primary_muscle.value}"
@@ -332,8 +329,7 @@ def build_sessions(
                             for chosen_item in chosen
                         ),
                         user_priority=(
-                            item.exercise.primary_muscle
-                            in priority_policy.explicit_priorities
+                            item.exercise.primary_muscle in priority_policy.explicit_priorities
                         ),
                     ),
                     _role_repeated(item.exercise, chosen),

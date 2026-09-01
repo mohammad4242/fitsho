@@ -5,7 +5,6 @@ from uuid import UUID
 
 from app.exercises.enums import Equipment, ExerciseType, MovementPattern, MuscleGroup
 from app.workouts.program_engine.duration_capacity import SessionCapacity
-from app.workouts.program_engine.duration_policy import get_session_exercise_count_policy
 from app.workouts.program_engine.enums import TrainingExperience
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.exercise_semantics import (
@@ -24,6 +23,7 @@ from app.workouts.program_engine.schemas import (
     WorkoutDay,
 )
 from app.workouts.program_engine.session_coherence import SessionCoherence
+from app.workouts.program_engine.session_feasibility import session_count_policy
 from app.workouts.program_engine.slot_compatibility import (
     evaluate_candidate_slot_compatibility,
     template_slot_allowed_patterns,
@@ -118,9 +118,7 @@ def build_template_sessions(
     substitutions_by_requested: dict[UUID, set[UUID]] = {}
     preserved_template_occurrences: Counter[UUID] = Counter()
     weekly_direct_sessions: Counter[MuscleGroup] = Counter()
-    count_policy = get_session_exercise_count_policy(
-        request.source.session_duration_minutes, ruleset
-    )
+    count_policy = session_count_policy(request.source.session_duration_minutes, ruleset)
     for index, reference_day in enumerate(template.days, start=1):
         coherence = SessionCoherence.from_template_reference_day(reference_day)
         required_slot_count = sum(
@@ -306,9 +304,8 @@ def build_template_sessions(
                 else:
                     build_reasons.append("TEMPLATE_OPTIONAL_SLOT_OMITTED_UNAVAILABLE")
                     continue
-            if (
-                not is_core_or_supplemental_exercise(candidate)
-                and not coherence.allows_direct(candidate.primary_muscle)
+            if not is_core_or_supplemental_exercise(candidate) and not coherence.allows_direct(
+                candidate.primary_muscle
             ):
                 build_reasons.append("TEMPLATE_DIRECT_MUSCLE_OUT_OF_SCOPE")
                 if slot.adaptation_priority == "core":

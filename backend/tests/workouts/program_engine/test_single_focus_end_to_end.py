@@ -83,7 +83,7 @@ def test_back_priority_is_muscle_specific_in_real_generation() -> None:
     )
 
 
-def test_biceps_priority_selects_the_best_canonical_quality_after_fallback() -> None:
+def test_biceps_priority_selects_the_best_canonical_quality_after_count_feasibility() -> None:
     source = request(
         available_training_days=6,
         training_experience="advanced",
@@ -99,7 +99,6 @@ def test_biceps_priority_selects_the_best_canonical_quality_after_fallback() -> 
     assert result.program is not None
     assert result.program.split.split_type is SplitType.UPPER_LOWER_X3
     assert result.program.weekly_schedule[-1].focus == "lower"
-    assert "SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE" in result.program.split.reason_codes
     recovery = next(
         entry
         for entry in result.program.decision_trace

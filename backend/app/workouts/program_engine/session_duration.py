@@ -17,7 +17,6 @@ from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes_from_exercises,
     calculate_total_session_minutes_from_exercises,
     get_session_duration_policy,
-    get_session_exercise_count_policy,
     is_main_training_exercise,
 )
 from app.workouts.program_engine.effective_volume import calculate_effective_volume
@@ -47,6 +46,11 @@ from app.workouts.program_engine.session_coherence import (
     SessionCoherenceDecision,
     SessionMuscleRole,
     record_coherence_decision,
+)
+from app.workouts.program_engine.session_feasibility import (
+    CandidateSearchObservation,
+    SessionFeasibilityEvidence,
+    session_count_policy,
 )
 from app.workouts.program_engine.session_targets import english_session_title
 from app.workouts.program_engine.strength_programming import (
@@ -88,13 +92,18 @@ class SessionDurationRepairEvidence:
     post_repair_duration_minutes: int
     post_repair_exercise_fingerprint: str
     reason_codes: tuple[str, ...]
+    session_feasibility: SessionFeasibilityEvidence | None = None
 
     @classmethod
     def from_day(
         cls,
         day: WorkoutDay,
         reason_codes: tuple[str, ...] = (),
+        *,
+        feasibility: SessionFeasibilityEvidence | None = None,
     ) -> "SessionDurationRepairEvidence":
+        if feasibility is not None and not feasibility.matches(day):
+            raise ValueError("session feasibility evidence does not match the repaired day")
         return cls(
             day_index=day.day_index,
             post_repair_exercise_count=main_exercise_count(day.exercises),
@@ -103,6 +112,7 @@ class SessionDurationRepairEvidence:
             post_repair_duration_minutes=calculate_main_training_minutes(day),
             post_repair_exercise_fingerprint=_resistance_session_fingerprint(day),
             reason_codes=tuple(dict.fromkeys(reason_codes)),
+            session_feasibility=feasibility,
         )
 
     def matches(self, day: WorkoutDay) -> bool:
@@ -119,6 +129,7 @@ class SessionDurationRepairEvidence:
             and total_matches
             and self.post_repair_exercise_fingerprint == current.post_repair_exercise_fingerprint
             and self.reason_codes == current.reason_codes
+            and (self.session_feasibility is None or self.session_feasibility.matches(day))
         )
 
     @classmethod
@@ -132,6 +143,7 @@ class SessionDurationRepairEvidence:
         total_session = value.get("post_repair_total_session_minutes")
         raw_fingerprint = value.get("post_repair_exercise_fingerprint")
         raw_reasons = value.get("reason_codes")
+        raw_feasibility = value.get("session_feasibility")
         main_value = main_training if main_training is not None else duration
         if not (
             type(day_index) is int
@@ -148,6 +160,11 @@ class SessionDurationRepairEvidence:
             return None
         if not all(isinstance(reason, str) for reason in raw_reasons):
             return None
+        feasibility = None
+        if raw_feasibility is not None:
+            feasibility = SessionFeasibilityEvidence.from_trace(raw_feasibility)
+            if feasibility is None:
+                return None
         evidence = cls(
             day_index=day_index,
             post_repair_exercise_count=exercise_count,
@@ -158,11 +175,12 @@ class SessionDurationRepairEvidence:
             post_repair_duration_minutes=main_value,
             post_repair_exercise_fingerprint=raw_fingerprint,
             reason_codes=tuple(raw_reasons),
+            session_feasibility=feasibility,
         )
         return evidence
 
     def as_trace(self) -> dict[str, object]:
-        return {
+        trace = {
             "day_index": self.day_index,
             "post_repair_exercise_count": self.post_repair_exercise_count,
             "post_repair_main_training_minutes": self.post_repair_main_training_minutes,
@@ -171,6 +189,9 @@ class SessionDurationRepairEvidence:
             "post_repair_exercise_fingerprint": self.post_repair_exercise_fingerprint,
             "reason_codes": self.reason_codes,
         }
+        if self.session_feasibility is not None:
+            trace["session_feasibility"] = self.session_feasibility.as_trace()
+        return trace
 
 
 _SESSION_FINGERPRINT_SCHEMA = "resistance_session_v1"
@@ -266,10 +287,11 @@ def repair_session_durations(
 
     policy = get_session_duration_policy(request.source.session_duration_minutes)
     resistance_budget = request.source.session_duration_minutes  # pure resistance budget
-    count_policy = get_session_exercise_count_policy(resistance_budget, ruleset)
+    count_policy = session_count_policy(resistance_budget, ruleset)
     repaired: list[WorkoutDay] = []
     reasons: list[str] = []
     day_reason_codes: list[tuple[str, ...]] = []
+    day_feasibility: list[SessionFeasibilityEvidence | None] = []
     coherence_decisions: list[SessionCoherenceDecision] = []
     for day_index, day in enumerate(days):
         day_reason_start = len(reasons)
@@ -323,6 +345,7 @@ def repair_session_durations(
                 minimum_exercises=planned_minimum_exercises,
                 hard_volume_status=hard_volume_status,
                 coherence_decisions=coherence_decisions,
+                feasibility_evidence=day_feasibility,
             )
             if hard_volume_status and hard_volume_status[0]:
                 reasons.append("SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS")
@@ -351,9 +374,7 @@ def repair_session_durations(
         # The lower target is a soft quality signal; only the upper target is
         # a hard duration invariant.
         if policy.exceeds_hard_maximum(main_training_after):
-            reasons.extend(
-                ("SESSION_DURATION_OVER_TARGET", "SESSION_DURATION_TARGET_UNSATISFIED")
-            )
+            reasons.extend(("SESSION_DURATION_OVER_TARGET", "SESSION_DURATION_TARGET_UNSATISFIED"))
         elif policy.below_preferred_minimum(main_training_after):
             reasons.append("SESSION_DURATION_UNDER_TARGET")
             if volume is not None and _duration_shortfall_is_hard_constrained(request, volume):
@@ -367,12 +388,20 @@ def repair_session_durations(
 
         repaired.append(current)
         day_reason_codes.append(tuple(dict.fromkeys(reasons[day_reason_start:])))
+        if len(day_feasibility) < day_index + 1:
+            day_feasibility.append(None)
 
     repaired_tuple = _justify_duration_repeats(tuple(repaired))
     evidence_items: list[SessionDurationRepairEvidence] = []
     for index, day in enumerate(repaired_tuple):
         evidence_reasons = list(day_reason_codes[index])
-        evidence_items.append(SessionDurationRepairEvidence.from_day(day, tuple(evidence_reasons)))
+        evidence_items.append(
+            SessionDurationRepairEvidence.from_day(
+                day,
+                tuple(evidence_reasons),
+                feasibility=day_feasibility[index],
+            )
+        )
     evidence = tuple(evidence_items)
     return DurationRepairResult(
         days=repaired_tuple,
@@ -422,10 +451,12 @@ def _repair_underfill(
     minimum_exercises: int,
     hard_volume_status: list[bool] | None = None,
     coherence_decisions: list[SessionCoherenceDecision] | None = None,
+    feasibility_evidence: list[SessionFeasibilityEvidence | None] | None = None,
 ) -> WorkoutDay:
     """Add safe main-training work only until the structural floor is satisfied."""
     exercises = list(day.exercises)
     while main_exercise_count(exercises) < minimum_exercises:
+        search_observations: list[CandidateSearchObservation] = []
         addition = _select_exercise_addition(
             day,
             exercises,
@@ -438,6 +469,7 @@ def _repair_underfill(
             prefer_acceptable_volume_for_minimum_fill=(prefer_acceptable_volume_for_minimum_fill),
             minimum_exercises=minimum_exercises,
             coherence_decisions=coherence_decisions,
+            search_observation=search_observations,
         )
         if addition is not None:
             muscle = addition.primary_muscle
@@ -477,6 +509,18 @@ def _repair_underfill(
             )
             if hard_volume_status is not None and strict_hard_status == [True]:
                 hard_volume_status.append(True)
+        if feasibility_evidence is not None:
+            observation = search_observations[-1] if search_observations else None
+            feasibility_evidence.append(
+                SessionFeasibilityEvidence.from_observation(
+                    day,
+                    requested_minutes=policy.requested_minutes,
+                    ruleset=ruleset,
+                    observation=observation,
+                )
+                if observation is not None
+                else None
+            )
         break
     return day
 
@@ -583,16 +627,20 @@ def _select_exercise_addition(
     minimum_exercises: int,
     hard_volume_rejection: list[bool] | None = None,
     coherence_decisions: list[SessionCoherenceDecision] | None = None,
+    search_observation: list[CandidateSearchObservation] | None = None,
 ) -> ProgrammedExercise | None:
     if (
         main_exercise_count(exercises)
-        >= get_session_exercise_count_policy(
-            policy.requested_minutes, ruleset
-        ).maximum_main_exercises
+        >= session_count_policy(policy.requested_minutes, ruleset).maximum_main_exercises
     ):
         return None
     existing_ids = {item.exercise_id for item in exercises}
     coherence = SessionCoherence.from_workout_day(day)
+    candidate_outcomes: dict[object, list[str]] = {}
+
+    def mark(item: ExerciseCandidate, reason: str) -> None:
+        candidate_outcomes.setdefault(item.id, []).append(reason)
+
     for item in candidates:
         if (
             item.primary_muscle is not None
@@ -610,22 +658,37 @@ def _select_exercise_addition(
                     reason="SESSION_DIRECT_MUSCLE_OUTSIDE_FOCUS_REJECTED",
                 ),
             )
-    options = tuple(
-        item
-        for item in candidates
-        if item.id not in existing_ids
-        and not is_supplemental_muscle(item.primary_muscle)
-        and coherence.allows_direct(item.primary_muscle)
-        and (
+    options: list[ExerciseCandidate] = []
+    for item in candidates:
+        if item.id in existing_ids:
+            mark(item, "CANDIDATE_ALREADY_SELECTED")
+            continue
+        if is_supplemental_muscle(item.primary_muscle):
+            mark(item, "CANDIDATE_SUPPLEMENTAL_WORK")
+            continue
+        if not coherence.allows_direct(item.primary_muscle):
+            mark(item, "CANDIDATE_OUTSIDE_SESSION_FOCUS")
+            continue
+        if not (
             item.primary_muscle in day.template_target_muscles
             if day.focus.startswith("template_reference") and day.template_target_muscles
             else exercise_fits_focus(item, day.focus)
-        )
-        and _candidate_is_safe(item, request)
-        and is_main_training_exercise(item)
-        and ExerciseLabel.CARDIO not in item.labels
-        and not has_near_equivalent(item, exercises)
-    )
+        ):
+            mark(item, "CANDIDATE_OUTSIDE_SESSION_FOCUS")
+            continue
+        safety_reasons = _candidate_safety_reasons(item, request)
+        if safety_reasons:
+            for reason in safety_reasons:
+                mark(item, reason)
+            continue
+        if not is_main_training_exercise(item) or ExerciseLabel.CARDIO in item.labels:
+            mark(item, "CANDIDATE_NOT_MAIN_TRAINING")
+            continue
+        if has_near_equivalent(item, exercises):
+            mark(item, "CANDIDATE_SEMANTIC_REDUNDANCY")
+            continue
+        options.append(item)
+    options_tuple = tuple(options)
     training_days = len(other_days) + 1
     frequency_cap = ruleset.maximum_direct_sessions_per_muscle_per_week
     if training_days == 5:
@@ -662,7 +725,7 @@ def _select_exercise_addition(
 
     ranked = tuple(
         sorted(
-            rank_exercises(request, options, ruleset),
+            rank_exercises(request, options_tuple, ruleset),
             key=_candidate_ranking_key,
         )
     )
@@ -671,6 +734,7 @@ def _select_exercise_addition(
     for ranked_item in ranked:
         candidate = ranked_item.exercise
         if candidate.primary_muscle is None:
+            mark(candidate, "CANDIDATE_MISSING_PRIMARY_MUSCLE")
             continue
         direct_sets_for_muscle = sum(
             item.sets for item in exercises if item.primary_muscle is candidate.primary_muscle
@@ -705,8 +769,10 @@ def _select_exercise_addition(
             ),
         )
         if sets < 1:
+            mark(candidate, "CANDIDATE_SET_CAP_UNAVAILABLE")
             continue
         if direct_sets_for_muscle + sets > sess_max:
+            mark(candidate, "CANDIDATE_PER_SESSION_VOLUME_LIMIT")
             continue
         prescription = prescription_for(
             request.primary_goal,
@@ -725,11 +791,11 @@ def _select_exercise_addition(
             for other_day in other_days
             for item in other_day.exercises
         )
-        ranked_reasons = ranked_item.reason_codes + (
-            (STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,)
-            if strength_set_cap_authorized
-            else ()
-        ) + (_duration_coherence_reason(coherence, candidate.primary_muscle),)
+        ranked_reasons = (
+            ranked_item.reason_codes
+            + ((STRENGTH_PRIMARY_LIFT_SET_CAP_AUTHORIZED,) if strength_set_cap_authorized else ())
+            + (_duration_coherence_reason(coherence, candidate.primary_muscle),)
+        )
         programmed = _program_candidate(
             candidate,
             sets,
@@ -741,11 +807,13 @@ def _select_exercise_addition(
         )
         simulated = [*exercises, programmed]
         if calculate_main_training_minutes_from_exercises(simulated) > policy.maximum_minutes:
+            mark(candidate, "CANDIDATE_DURATION_HARD_MAXIMUM")
             continue
         weekly_exercises = [item for day in other_days for item in day.exercises] + simulated
         within_hard_volume = _within_weekly_hard_volume(weekly_exercises, ruleset, request, volume)
         if not within_hard_volume:
             hard_volume_rejected = True
+            mark(candidate, "CANDIDATE_WEEKLY_HARD_VOLUME_LIMIT")
         if main_exercise_count(exercises) < minimum_exercises and within_hard_volume:
             return simulated[-1]
         if _acceptable_volume_change(
@@ -762,6 +830,16 @@ def _select_exercise_addition(
             and within_hard_volume
         ):
             hard_volume_fallback = simulated[-1]
+            mark(candidate, "CANDIDATE_ACCEPTABLE_VOLUME_LIMIT")
+    if search_observation is not None:
+        search_observation.append(
+            CandidateSearchObservation.from_outcomes(
+                len(candidates),
+                candidate_outcomes,
+                search_exhausted=True,
+                candidate_pool_complete=True,
+            )
+        )
     if hard_volume_rejection is not None:
         hard_volume_rejection.append(hard_volume_rejected)
     return hard_volume_fallback
@@ -1127,19 +1205,31 @@ def _with_fewer_sets(exercise: ProgrammedExercise, ruleset: ProgramRuleset) -> P
 
 
 def _candidate_is_safe(candidate: ExerciseCandidate, request: NormalizedProgramRequest) -> bool:
-    return (
-        candidate.is_active
-        and candidate.is_programmable
-        and not candidate.needs_review
-        and candidate.id not in request.constraints.blocked_exercises
-        and candidate.movement_pattern not in request.constraints.blocked_movement_patterns
-        and not effective_caution_tags(candidate).intersection(
-            request.constraints.blocked_caution_tags
-        )
-        and effective_required_equipment(candidate.equipment, candidate.movement_pattern).issubset(
-            request.constraints.available_equipment
-        )
-    )
+    return not _candidate_safety_reasons(candidate, request)
+
+
+def _candidate_safety_reasons(
+    candidate: ExerciseCandidate,
+    request: NormalizedProgramRequest,
+) -> tuple[str, ...]:
+    reasons: list[str] = []
+    if not candidate.is_active:
+        reasons.append("CANDIDATE_INACTIVE")
+    if not candidate.is_programmable:
+        reasons.append("CANDIDATE_NONPROGRAMMABLE")
+    if candidate.needs_review:
+        reasons.append("CANDIDATE_REVIEW_PENDING")
+    if candidate.id in request.constraints.blocked_exercises:
+        reasons.append("CANDIDATE_BLOCKED_EXERCISE")
+    if candidate.movement_pattern in request.constraints.blocked_movement_patterns:
+        reasons.append("CANDIDATE_BLOCKED_MOVEMENT_PATTERN")
+    if effective_caution_tags(candidate).intersection(request.constraints.blocked_caution_tags):
+        reasons.append("CANDIDATE_BLOCKED_CAUTION")
+    if not effective_required_equipment(candidate.equipment, candidate.movement_pattern).issubset(
+        request.constraints.available_equipment
+    ):
+        reasons.append("CANDIDATE_UNAVAILABLE_EQUIPMENT")
+    return tuple(reasons)
 
 
 def _estimate_preserving_time_saving(

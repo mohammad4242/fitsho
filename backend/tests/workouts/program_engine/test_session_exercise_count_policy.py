@@ -5,9 +5,9 @@ import pytest
 from app.exercises.enums import ExerciseType, MuscleGroup
 from app.workouts.program_engine.duration_policy import (
     calculate_total_session_minutes_from_exercises,
-    get_session_exercise_count_policy,
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
+from app.workouts.program_engine.session_feasibility import session_count_policy
 from app.workouts.program_engine.supplemental_policy import (
     exercise_count_breakdown,
     main_exercise_count,
@@ -39,7 +39,7 @@ def test_session_exercise_count_policy_covers_supported_duration_matrix(
     minimum: int,
     maximum: int,
 ) -> None:
-    policy = get_session_exercise_count_policy(duration)
+    policy = session_count_policy(duration)
 
     assert (policy.minimum_main_exercises, policy.maximum_main_exercises) == (minimum, maximum)
     assert [policy.contains(count) for count in (minimum - 1, minimum, maximum, maximum + 1)] == [
@@ -51,7 +51,7 @@ def test_session_exercise_count_policy_covers_supported_duration_matrix(
 
 
 def test_normal_session_count_policy_keeps_preferred_workload_below_hard_ceiling() -> None:
-    policy = get_session_exercise_count_policy(60)
+    policy = session_count_policy(60)
 
     assert policy.minimum_main_exercises == 5
     assert policy.maximum_main_exercises == 12
@@ -59,13 +59,13 @@ def test_normal_session_count_policy_keeps_preferred_workload_below_hard_ceiling
 
 
 def test_thirty_minute_count_policy_still_caps_main_exercises_at_four() -> None:
-    policy = get_session_exercise_count_policy(30)
+    policy = session_count_policy(30)
 
     assert (policy.minimum_main_exercises, policy.maximum_main_exercises) == (3, 4)
 
 
 def test_thirteenth_main_exercise_is_outside_normal_session_policy() -> None:
-    policy = get_session_exercise_count_policy(60)
+    policy = session_count_policy(60)
 
     assert policy.contains(12)
     assert not policy.contains(13)

@@ -5,7 +5,6 @@ from enum import StrEnum
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
-    get_session_exercise_count_policy,
     under_target_message_fa,
 )
 from app.workouts.program_engine.enums import SplitType
@@ -17,10 +16,15 @@ from app.workouts.program_engine.schemas import (
     WorkoutProgram,
 )
 from app.workouts.program_engine.session_duration import SessionDurationRepairEvidence
-from app.workouts.program_engine.supplemental_policy import main_exercise_count
+from app.workouts.program_engine.session_feasibility import (
+    SESSION_COUNT_OUT_OF_RANGE_REASON,
+    SessionCountStatus,
+    SessionFeasibilityEvidence,
+    assess_session_count,
+)
 
 FINAL_GATE_SCHEMA_VERSION = "final_quality_gate_v1"
-_COUNT_OUT_OF_RANGE_CODE = "SESSION_EXERCISE_COUNT_OUT_OF_RANGE"
+_COUNT_OUT_OF_RANGE_CODE = SESSION_COUNT_OUT_OF_RANGE_REASON
 _FULL_BODY_SPLITS = frozenset(item for item in SplitType if item.value.startswith("full_body"))
 _DURATION_CODES = frozenset(
     "SESSION_DURATION_UNDER_TARGET SESSION_DURATION_TARGET_UNSATISFIED "
@@ -74,7 +78,9 @@ def evaluate_final_program(
     ruleset: ProgramRuleset,
 ) -> FinalGateResult:
     hard_validation_errors = tuple(
-        code for code in report.errors if code not in _DURATION_SOFT_CODES
+        code
+        for code in report.errors
+        if code not in _DURATION_SOFT_CODES and code != _COUNT_OUT_OF_RANGE_CODE
     )
     reasons = list(hard_validation_errors)
     constraints = [
@@ -97,17 +103,38 @@ def evaluate_final_program(
     }
 
     duration_policy = get_session_duration_policy(request.session_duration_minutes)
-    count_policy = get_session_exercise_count_policy(request.session_duration_minutes, ruleset)
-    count_invariant_reasons = tuple(
-        _COUNT_OUT_OF_RANGE_CODE
+    count_assessments = tuple(
+        assess_session_count(
+            day,
+            requested_minutes=request.session_duration_minutes,
+            ruleset=ruleset,
+            evidence=_count_evidence_for_day(program, day),
+        )
         for day in program.weekly_schedule
-        if not count_policy.contains(main_exercise_count(day.exercises))
     )
-    if count_invariant_reasons:
-        reasons.extend(count_invariant_reasons)
+    count_unproven_reasons = tuple(
+        reason
+        for assessment in count_assessments
+        for reason in assessment.reason_codes
+        if assessment.status is SessionCountStatus.UNPROVEN
+    )
+    constrained_count_reasons = tuple(
+        reason
+        for assessment in count_assessments
+        for reason in assessment.reason_codes
+        if assessment.status is SessionCountStatus.CONSTRAINED
+    )
+    if count_unproven_reasons:
+        reasons.extend(count_unproven_reasons)
         checks["exercise_count"] = {
             "status": "rejected",
-            "reason_codes": tuple(dict.fromkeys(count_invariant_reasons)),
+            "reason_codes": tuple(dict.fromkeys(count_unproven_reasons)),
+        }
+    elif constrained_count_reasons:
+        constraints.extend(constrained_count_reasons)
+        checks["exercise_count"] = {
+            "status": "constrained",
+            "reason_codes": tuple(dict.fromkeys(constrained_count_reasons)),
         }
     invariant_hard_duration_codes: list[str] = []
     for day in program.weekly_schedule:
@@ -125,9 +152,7 @@ def evaluate_final_program(
         for day in program.weekly_schedule
         if duration_policy.below_preferred_minimum(calculate_main_training_minutes(day))
     )
-    soft_duration_codes = (
-        ("SESSION_DURATION_UNDER_TARGET",) if under_target_messages else ()
-    )
+    soft_duration_codes = ("SESSION_DURATION_UNDER_TARGET",) if under_target_messages else ()
     hard_duration_codes = tuple(
         dict.fromkeys(
             code
@@ -351,6 +376,14 @@ def _duration_evidence_for_day(
         )
         matches.extend(parsed)
     return tuple(matches) if len(matches) == 1 else ()
+
+
+def _count_evidence_for_day(
+    program: WorkoutProgram,
+    day: WorkoutDay,
+) -> SessionFeasibilityEvidence | None:
+    matching = _duration_evidence_for_day(program, day)
+    return matching[0].session_feasibility if len(matching) == 1 else None
 
 
 def _evidence_proves_duration_code(

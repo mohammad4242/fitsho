@@ -4,7 +4,6 @@ from enum import StrEnum
 from app.exercises.enums import ExerciseType
 from app.workouts.program_engine.duration_policy import (
     get_session_duration_policy,
-    get_session_exercise_count_policy,
     is_main_training_exercise,
 )
 from app.workouts.program_engine.enums import Goal
@@ -14,6 +13,7 @@ from app.workouts.program_engine.prescription import (
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.schemas import ExerciseCandidate, NormalizedProgramRequest
+from app.workouts.program_engine.session_feasibility import session_count_policy
 from app.workouts.program_engine.strength_programming import (
     StrengthExerciseRole,
     classify_strength_role,
@@ -170,7 +170,7 @@ def build_session_capacity(
             resistance_budget,
             first_cost.minutes,
             later_cost.minutes,
-            get_session_exercise_count_policy(
+            session_count_policy(
                 request.source.session_duration_minutes, ruleset
             ).maximum_main_exercises,
         )

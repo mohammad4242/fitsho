@@ -351,7 +351,8 @@ def test_regression_profiles() -> None:
             )
             assert (
                 main_exercise_count(day.exercises) >= exercise_floor
-                or "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in program.validation_report.warnings
+                or "SESSION_EXERCISE_COUNT_CONSTRAINED_BY_SAFE_CAPACITY"
+                in program.validation_report.warnings
             )
 
             for ex in day.exercises:
