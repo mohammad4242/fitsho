@@ -146,6 +146,7 @@ from app.nutrition.plan_service import (
     weekly_plan_by_id,
     weekly_plan_history,
 )
+from app.nutrition.price_execution import resolve_price_update_execution
 from app.nutrition.price_overrides import create_price_override
 from app.nutrition.price_providers import configured_providers
 from app.nutrition.price_update_service import run_price_update_async
@@ -785,9 +786,22 @@ async def trigger_manual_price_refresh(
     settings: AppSettings,
 ) -> dict[str, object]:
     del admin
+    try:
+        execution = resolve_price_update_execution(
+            db,
+            settings=settings,
+            price_http_client=request.app.state.food_price_http_client,
+            agent_http_client=getattr(request.app.state, "agent_http_client", None),
+            direct_provider_factory=lambda: configured_providers(
+                settings, request.app.state.food_price_http_client
+            ),
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
     run = await run_price_update_async(
         db,
-        providers=configured_providers(settings, request.app.state.food_price_http_client),
+        providers=execution.providers,
+        agent_researcher=execution.agent_researcher,
         retry_attempts=settings.food_price_provider_retries,
         trigger_kind=PriceUpdateTriggerKind.MANUAL,
     )

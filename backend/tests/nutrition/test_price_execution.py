@@ -112,3 +112,41 @@ def test_enabled_api_food_price_task_is_rejected_without_direct_fallback(
             )
     finally:
         asyncio.run(price_client.aclose())
+
+
+def test_cli_uses_resolved_agent_execution(test_settings: Settings, monkeypatch) -> None:
+    from app.nutrition import price_update
+    from app.nutrition.price_execution import PriceUpdateExecution
+
+    marker = object()
+    captured: dict[str, object] = {}
+
+    class SessionContext:
+        def __init__(self, _engine) -> None:
+            pass
+
+        def __enter__(self):
+            return object()
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+    def resolve(_db, **kwargs):
+        captured["agent_client"] = kwargs["agent_http_client"]
+        return PriceUpdateExecution(providers=(), agent_researcher=marker)  # type: ignore[arg-type]
+
+    async def update(_db, **kwargs):
+        captured["providers"] = kwargs["providers"]
+        captured["agent_researcher"] = kwargs["agent_researcher"]
+
+    monkeypatch.setattr(price_update, "get_settings", lambda: test_settings)
+    monkeypatch.setattr(price_update, "get_engine", lambda _url: object())
+    monkeypatch.setattr(price_update, "Session", SessionContext)
+    monkeypatch.setattr(price_update, "resolve_price_update_execution", resolve)
+    monkeypatch.setattr(price_update, "run_price_update_async", update)
+
+    asyncio.run(price_update.main())
+
+    assert captured["providers"] == ()
+    assert captured["agent_researcher"] is marker
+    assert captured["agent_client"] is not None

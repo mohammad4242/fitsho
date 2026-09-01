@@ -404,7 +404,51 @@ def test_scheduler_commits_run_outside_advisory_lock_transaction(
             delete(NutritionFoodPriceUpdateRun).where(
                 NutritionFoodPriceUpdateRun.scheduled_for == due_now
             )
-        )
+            )
+
+
+def test_scheduler_passes_resolved_agent_execution_to_update(
+    db, test_settings, monkeypatch
+) -> None:
+    import asyncio
+
+    import httpx
+
+    from app.nutrition import price_scheduler
+    from app.nutrition.price_execution import PriceUpdateExecution
+
+    engine = db.get_bind().engine
+    monkeypatch.setattr(price_scheduler, "get_engine", lambda _url: engine)
+    marker = object()
+    captured: dict[str, object] = {}
+
+    def resolve(_db, **kwargs):
+        captured["agent_client"] = kwargs["agent_http_client"]
+        return PriceUpdateExecution(providers=(), agent_researcher=marker)  # type: ignore[arg-type]
+
+    async def update(_db, **kwargs):
+        captured["providers"] = kwargs["providers"]
+        captured["agent_researcher"] = kwargs["agent_researcher"]
+        return object()
+
+    monkeypatch.setattr(price_scheduler, "resolve_price_update_execution", resolve, raising=False)
+    monkeypatch.setattr(price_scheduler, "run_price_update_async", update)
+    due_now = datetime(2035, 8, 11, 8, 30, tzinfo=UTC)
+
+    async def trigger() -> bool:
+        async with httpx.AsyncClient(trust_env=False) as price_client:
+            async with httpx.AsyncClient(trust_env=False) as agent_client:
+                return await price_scheduler.trigger_scheduled_update(
+                    test_settings,
+                    price_client,
+                    agent_http_client=agent_client,
+                    now=due_now,
+                )
+
+    assert asyncio.run(trigger()) is True
+    assert captured["providers"] == ()
+    assert captured["agent_researcher"] is marker
+    assert captured["agent_client"] is not None
 
 
 def test_public_price_provider_registry_is_seeded_disabled_until_live_probe(db) -> None:

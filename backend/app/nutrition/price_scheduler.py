@@ -13,6 +13,7 @@ from app.config import Settings
 from app.database.session import get_engine
 from app.nutrition.enums import PriceUpdateTriggerKind
 from app.nutrition.models import NutritionFoodPriceUpdateRun
+from app.nutrition.price_execution import resolve_price_update_execution
 from app.nutrition.price_providers import configured_providers
 from app.nutrition.price_update_service import run_price_update_async
 
@@ -59,6 +60,7 @@ async def trigger_scheduled_update(
     settings: Settings,
     client: httpx.AsyncClient,
     *,
+    agent_http_client: httpx.AsyncClient | None = None,
     now: datetime | None = None,
 ) -> bool:
     if not settings.food_price_update_enabled:
@@ -84,9 +86,17 @@ async def trigger_scheduled_update(
                     if local_now.date() == local_slot.date()
                     else PriceUpdateTriggerKind.CATCH_UP
                 )
+                execution = resolve_price_update_execution(
+                    db,
+                    settings=settings,
+                    price_http_client=client,
+                    agent_http_client=agent_http_client,
+                    direct_provider_factory=lambda: configured_providers(settings, client),
+                )
                 await run_price_update_async(
                     db,
-                    providers=configured_providers(settings, client),
+                    providers=execution.providers,
+                    agent_researcher=execution.agent_researcher,
                     scheduled_for=due_slot,
                     retry_attempts=settings.food_price_provider_retries,
                     trigger_kind=trigger_kind,
@@ -100,10 +110,18 @@ async def trigger_scheduled_update(
     return True
 
 
-async def scheduler_loop(settings: Settings, client: httpx.AsyncClient) -> None:
+async def scheduler_loop(
+    settings: Settings,
+    client: httpx.AsyncClient,
+    agent_http_client: httpx.AsyncClient | None = None,
+) -> None:
     while True:
         try:
-            await trigger_scheduled_update(settings, client)
+            await trigger_scheduled_update(
+                settings,
+                client,
+                agent_http_client=agent_http_client,
+            )
         except Exception:
             # Observability is persisted by the run/service; never crash the API process for the scheduler.
             pass

@@ -74,3 +74,59 @@ def test_admin_can_trigger_manual_price_update_without_live_credentials(
     assert response.json()["trigger_kind"] == "manual"
     assert response.json()["status"] == "completed_with_errors"
     assert "NO_PROVIDERS" in response.json()["failure_codes"]
+
+
+def test_admin_manual_price_refresh_passes_resolved_agent_execution(
+    client: TestClient, db: Session, monkeypatch
+) -> None:
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from app.nutrition import router as nutrition_router
+    from app.nutrition.enums import PriceUpdateRunStatus, PriceUpdateTriggerKind
+    from app.nutrition.price_execution import PriceUpdateExecution
+
+    assert (
+        client.post(
+            "/api/v1/auth/register",
+            headers=ORIGIN,
+            json={"email": "agent-price-admin@example.com", "password": "long password"},
+        ).status_code
+        == 201
+    )
+    user = db.scalar(select(User).where(User.email == "agent-price-admin@example.com"))
+    assert user is not None
+    user.is_admin = True
+    db.flush()
+    marker = object()
+    captured: dict[str, object] = {}
+
+    def resolve(_db, **kwargs):
+        captured["agent_client"] = kwargs["agent_http_client"]
+        return PriceUpdateExecution(providers=(), agent_researcher=marker)  # type: ignore[arg-type]
+
+    async def update(_db, **kwargs):
+        captured["providers"] = kwargs["providers"]
+        captured["agent_researcher"] = kwargs["agent_researcher"]
+        return SimpleNamespace(
+            id=uuid4(),
+            status=PriceUpdateRunStatus.COMPLETED,
+            trigger_kind=PriceUpdateTriggerKind.MANUAL,
+            started_at=None,
+            finished_at=None,
+            foods_attempted=1,
+            foods_updated=1,
+            foods_needing_review=0,
+            provider_failures=0,
+            failure_codes=[],
+        )
+
+    monkeypatch.setattr(nutrition_router, "resolve_price_update_execution", resolve, raising=False)
+    monkeypatch.setattr(nutrition_router, "run_price_update_async", update)
+
+    response = client.post("/api/v1/nutrition/admin/prices/refresh", headers=ORIGIN)
+
+    assert response.status_code == 200, response.text
+    assert captured["providers"] == ()
+    assert captured["agent_researcher"] is marker
+    assert captured["agent_client"] is not None
