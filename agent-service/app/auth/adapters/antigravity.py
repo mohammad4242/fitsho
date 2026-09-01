@@ -1,3 +1,4 @@
+import os
 import re
 from collections.abc import Mapping
 from pathlib import Path
@@ -15,6 +16,10 @@ _OAUTH_FAILURE_PATTERN = re.compile(r"(?i)\btoken\s+exchange\s+failed\b")
 class AntigravityAuthAdapter:
     agent = AgentName.ANTIGRAVITY
     manual_auth_only = False
+    _AUTH_RELATIVE_PATH = (
+        Path(".gemini") / "antigravity-cli" / "antigravity-oauth-token"
+    )
+    _BACKUP_NAME = ".antigravity-oauth-token.fitsho-backup"
 
     def __init__(self, executable: str = "agy") -> None:
         self.executable = executable
@@ -34,20 +39,66 @@ class AntigravityAuthAdapter:
         return ANTIGRAVITY_AUTH_HOSTS
 
     def clear_saved_credentials(self, environment: Mapping[str, str]) -> None:
-        home = environment.get("HOME")
-        if not home:
+        if not environment.get("HOME"):
             return
-        token_path = Path(home) / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
-        token_path.unlink(missing_ok=True)
+        self.auth_path(environment).unlink(missing_ok=True)
+
+    def auth_path(self, environment: Mapping[str, str]) -> Path:
+        home = environment.get("HOME")
+        return Path(home or ".") / self._AUTH_RELATIVE_PATH
+
+    def backup_path(self, environment: Mapping[str, str]) -> Path:
+        return self.auth_path(environment).with_name(self._BACKUP_NAME)
+
+    def backup_saved_credentials(self, environment: Mapping[str, str]) -> None:
+        if not environment.get("HOME"):
+            return
+        source = self.auth_path(environment)
+        if not self.has_saved_credentials(environment):
+            return
+        backup = self.backup_path(environment)
+        backup.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        data = source.read_bytes()
+        temporary = backup.with_name(f".{backup.name}.tmp")
+        try:
+            temporary.write_bytes(data)
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, backup)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def restore_saved_credentials(self, environment: Mapping[str, str]) -> None:
+        if not environment.get("HOME"):
+            return
+        backup = self.backup_path(environment)
+        if not backup.is_file():
+            return
+        target = self.auth_path(environment)
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = target.with_name(f".{target.name}.tmp")
+        try:
+            temporary.write_bytes(backup.read_bytes())
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
+        backup.unlink(missing_ok=True)
+
+    def finalize_saved_credentials(self, environment: Mapping[str, str]) -> None:
+        if not environment.get("HOME"):
+            return
+        self.backup_path(environment).unlink(missing_ok=True)
+
+    def recover_saved_credentials(self, environment: Mapping[str, str]) -> None:
+        self.restore_saved_credentials(environment)
 
     def saved_credentials_marker(
         self,
         environment: Mapping[str, str],
     ) -> tuple[int, int, int] | None:
-        home = environment.get("HOME")
-        if not home:
+        if not environment.get("HOME"):
             return None
-        token_path = Path(home) / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+        token_path = self.auth_path(environment)
         try:
             if not token_path.is_file():
                 return None

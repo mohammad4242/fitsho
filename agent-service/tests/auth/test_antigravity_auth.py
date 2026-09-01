@@ -52,6 +52,24 @@ def test_antigravity_reports_non_empty_saved_oauth_credentials(tmp_path: Path) -
     assert adapter.has_saved_credentials({"HOME": str(tmp_path)}) is False
 
 
+def test_antigravity_preserves_saved_credentials_across_interrupted_login(
+    tmp_path: Path,
+) -> None:
+    adapter = AntigravityAuthAdapter()
+    environment = {"HOME": str(tmp_path)}
+    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("keep", encoding="utf-8")
+
+    adapter.backup_saved_credentials(environment)
+    token_path.unlink()
+    adapter.restore_saved_credentials(environment)
+
+    assert token_path.read_text(encoding="utf-8") == "keep"
+    adapter.finalize_saved_credentials(environment)
+    assert not adapter.backup_path(environment).exists()
+
+
 def test_antigravity_parser_exposes_only_google_url_and_code_prompt() -> None:
     adapter = AntigravityAuthAdapter()
     handoff = adapter.parse_output(

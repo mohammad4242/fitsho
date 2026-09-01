@@ -92,6 +92,41 @@ class ResettablePtyAuthAdapter(FakePtyAuthAdapter):
         self.reset_environments.append(environment)
 
 
+class PreservingAuthAdapter(FakeAuthAdapter):
+    def __init__(self, script: Path) -> None:
+        super().__init__(script)
+        self.backup_calls = 0
+        self.restore_calls = 0
+        self.finalize_calls = 0
+        self.recover_calls = 0
+
+    def backup_saved_credentials(self, environment: dict[str, str]) -> None:
+        del environment
+        self.backup_calls += 1
+
+    def restore_saved_credentials(self, environment: dict[str, str]) -> None:
+        del environment
+        self.restore_calls += 1
+
+    def finalize_saved_credentials(self, environment: dict[str, str]) -> None:
+        del environment
+        self.finalize_calls += 1
+
+    def recover_saved_credentials(self, environment: dict[str, str]) -> None:
+        del environment
+        self.recover_calls += 1
+
+    def has_saved_credentials(self, environment: dict[str, str]) -> bool:
+        del environment
+        return True
+
+
+class CredentialRequiredAuthAdapter(FakeAuthAdapter):
+    def has_saved_credentials(self, environment: dict[str, str]) -> bool:
+        del environment
+        return False
+
+
 class CredentialCompletingPtyAuthAdapter(FakePtyAuthAdapter):
     def __init__(self, script: Path) -> None:
         super().__init__(script)
@@ -164,6 +199,55 @@ def test_manager_starts_one_safe_session_and_rejects_duplicate(tmp_path: Path) -
             await manager.start(AgentName.CODEX)
         await manager.cancel(view.session_id)
         assert (await manager.get(view.session_id)).status is AuthSessionStatus.CANCELED
+        await manager.shutdown()
+
+    run(scenario())
+
+
+def test_manager_restores_saved_credentials_when_auth_is_canceled(tmp_path: Path) -> None:
+    script = write_script(tmp_path, "import time\nprint('READY', flush=True)\ntime.sleep(60)\n")
+    adapter = PreservingAuthAdapter(script)
+
+    async def scenario() -> None:
+        manager = AuthManager({AgentName.CODEX: adapter}, workspace=tmp_path)
+        view = await manager.start(AgentName.CODEX)
+        await asyncio.sleep(0.05)
+        assert await manager.cancel(view.session_id)
+        await manager.shutdown()
+
+    run(scenario())
+    assert adapter.recover_calls == 1
+    assert adapter.backup_calls == 1
+    assert adapter.restore_calls == 1
+    assert adapter.finalize_calls == 0
+
+
+def test_manager_finalizes_saved_credentials_after_verified_success(tmp_path: Path) -> None:
+    script = write_script(tmp_path, "print('AUTHENTICATED', flush=True)\n")
+    adapter = PreservingAuthAdapter(script)
+
+    async def scenario() -> None:
+        manager = AuthManager({AgentName.CODEX: adapter}, workspace=tmp_path)
+        view = await manager.start(AgentName.CODEX)
+        await asyncio.sleep(0.15)
+        assert (await manager.get(view.session_id)).status is AuthSessionStatus.AUTHENTICATED
+        await manager.shutdown()
+
+    run(scenario())
+    assert adapter.backup_calls == 1
+    assert adapter.restore_calls == 0
+    assert adapter.finalize_calls == 1
+
+
+def test_manager_does_not_claim_success_without_saved_credentials(tmp_path: Path) -> None:
+    script = write_script(tmp_path, "print('AUTHENTICATED', flush=True)\n")
+    adapter = CredentialRequiredAuthAdapter(script)
+
+    async def scenario() -> None:
+        manager = AuthManager({AgentName.CODEX: adapter}, workspace=tmp_path)
+        view = await manager.start(AgentName.CODEX)
+        await asyncio.sleep(0.15)
+        assert (await manager.get(view.session_id)).status is AuthSessionStatus.FAILED
         await manager.shutdown()
 
     run(scenario())

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Protocol, cast
@@ -73,6 +74,16 @@ class AuthManager:
         self._sessions: dict[UUID, AuthSession] = {}
         self._active: dict[AgentName, UUID] = {}
         self._lock = asyncio.Lock()
+        for adapter in self.adapters.values():
+            recover_saved_credentials = getattr(adapter, "recover_saved_credentials", None)
+            if callable(recover_saved_credentials):
+                try:
+                    recover_saved_credentials(self.environment)
+                except (OSError, TypeError, ValueError):
+                    # A stale backup is best-effort recovery; the next status
+                    # probe will still refuse to claim authentication if it is
+                    # unavailable or malformed.
+                    pass
 
     async def start(self, agent: AgentName, *, force_reauth: bool = False) -> AuthSessionView:
         if not isinstance(agent, AgentName):
@@ -80,6 +91,7 @@ class AuthManager:
                 "auth_unavailable", 422, AuthSafeErrorMessage.UNAVAILABLE
             )
         stale_process: AuthProcess | None = None
+        stale_session: AuthSession | None = None
         async with self._lock:
             active_id = self._active.get(agent)
             if active_id is not None:
@@ -88,6 +100,7 @@ class AuthManager:
                     if self._is_expired(active_session):
                         active_session.mark_terminal(AuthSessionStatus.EXPIRED)
                         stale_process = active_session.process
+                        stale_session = active_session
                         del self._active[agent]
                     else:
                         raise AuthManagerError(
@@ -105,9 +118,18 @@ class AuthManager:
                 raise AuthManagerError(
                     "auth_manual_only", 409, AuthSafeErrorMessage.UNAVAILABLE
                 )
+            if stale_session is not None:
+                self._restore_saved_credentials(adapter)
+            try:
+                self._backup_saved_credentials(adapter)
+            except (OSError, TypeError, ValueError) as exc:
+                raise AuthManagerError(
+                    "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
+                ) from exc
             if force_reauth:
                 clear_saved_credentials = getattr(adapter, "clear_saved_credentials", None)
                 if not callable(clear_saved_credentials):
+                    self._restore_saved_credentials(adapter)
                     raise AuthManagerError(
                         "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
                     )
@@ -115,7 +137,8 @@ class AuthManager:
                     cast(Callable[[Mapping[str, str]], None], clear_saved_credentials)(
                         self.environment
                     )
-                except OSError as exc:
+                except (OSError, TypeError, ValueError) as exc:
+                    self._restore_saved_credentials(adapter)
                     raise AuthManagerError(
                         "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
                     ) from exc
@@ -139,6 +162,12 @@ class AuthManager:
                         update = ParsedAuthUpdate()
                         try:
                             update = adapter.parse_output(parser_buffer[0])
+                            if update.authenticated and self._requires_saved_credentials(adapter):
+                                # A zero-exit/login-success message is not
+                                # enough for CLIs that replace their auth file
+                                # during startup. Wait for process completion or
+                                # a saved-credential marker before claiming it.
+                                update = replace(update, authenticated=False)
                             session.apply_update(
                                 update,
                                 allowed_hosts=adapter.allowed_auth_hosts(),
@@ -184,6 +213,7 @@ class AuthManager:
                 )
                 self._notify_state(session)
                 del self._active[agent]
+                self._restore_saved_credentials(adapter)
                 return session.view()
             asyncio.create_task(self._monitor(session, adapter, process, parser_buffer))
             view = session.view()
@@ -205,6 +235,9 @@ class AuthManager:
                     self._notify_state(session)
                     self._release_active(session)
             await process.terminate()
+            adapter = self.adapters.get(session.agent)
+            if adapter is not None:
+                self._restore_saved_credentials(adapter)
 
     async def get(self, session_id: UUID) -> AuthSessionView:
         process: AuthProcess | None = None
@@ -221,11 +254,15 @@ class AuthManager:
             view = session.view()
         if process is not None:
             await process.terminate()
+            adapter = self.adapters.get(session.agent)
+            if adapter is not None:
+                self._restore_saved_credentials(adapter)
         return view
 
     async def cancel_active(self, agent: AgentName) -> bool:
         process: AuthProcess | None = None
         canceled = False
+        adapter = self.adapters.get(agent)
         async with self._lock:
             active_id = self._active.get(agent)
             if active_id is None:
@@ -244,6 +281,8 @@ class AuthManager:
                 canceled = True
         if process is not None:
             await self._terminate_auth_process(process)
+        if adapter is not None:
+            self._restore_saved_credentials(adapter)
         return canceled
 
     async def submit_input(self, session_id: UUID, value: str) -> AuthSessionView:
@@ -256,6 +295,7 @@ class AuthManager:
 
         process: AuthProcess | None = None
         expired = False
+        adapter: AgentAuthAdapter | None = None
         credential_checker: Callable[[Mapping[str, str]], bool] | None = None
         credential_marker_reader: AuthCredentialMarkerReader | None = None
         credential_marker_before: AuthCredentialMarker = None
@@ -300,6 +340,10 @@ class AuthManager:
         if expired:
             if process is not None:
                 await process.terminate()
+            if adapter is None:
+                adapter = self.adapters.get(session.agent)
+            if adapter is not None:
+                self._restore_saved_credentials(adapter)
             raise AuthManagerError(
                 "auth_session_expired", 410, AuthSafeErrorMessage.EXPIRED
             )
@@ -316,6 +360,9 @@ class AuthManager:
                         )
                         self._notify_state(session)
                         self._release_active(session)
+                await self._terminate_auth_process(process)
+                if adapter is not None:
+                    self._restore_saved_credentials(adapter)
                 raise AuthManagerError(
                     "auth_unavailable", 503, AuthSafeErrorMessage.UNAVAILABLE
                 ) from exc
@@ -333,6 +380,8 @@ class AuthManager:
                 )
         elif process is not None:
             await process.terminate()
+            if adapter is not None:
+                self._restore_saved_credentials(adapter)
             raise AuthManagerError(
                 "auth_session_expired", 410, AuthSafeErrorMessage.EXPIRED
             )
@@ -358,6 +407,9 @@ class AuthManager:
                     expired = False
             if expired:
                 await self._terminate_auth_process(process)
+                adapter = self.adapters.get(session.agent)
+                if adapter is not None:
+                    self._restore_saved_credentials(adapter)
                 return
 
             if credential_marker_reader is not None:
@@ -378,6 +430,7 @@ class AuthManager:
                 credentials_ready = False
             if credentials_ready:
                 should_terminate = False
+                terminal_status: AuthSessionStatus | None = None
                 async with self._lock:
                     if not session.is_active or session.status is not AuthSessionStatus.VERIFYING:
                         return
@@ -385,18 +438,24 @@ class AuthManager:
                         session.mark_terminal(AuthSessionStatus.EXPIRED)
                         self._release_active(session)
                         should_terminate = True
+                        terminal_status = AuthSessionStatus.EXPIRED
                     else:
                         session.mark_terminal(AuthSessionStatus.AUTHENTICATED)
                         self._notify_state(session)
                         self._release_active(session)
                         should_terminate = True
+                        terminal_status = AuthSessionStatus.AUTHENTICATED
                 if should_terminate:
                     await self._terminate_auth_process(process)
+                    adapter = self.adapters.get(session.agent)
+                    if adapter is not None and terminal_status is not None:
+                        self._settle_saved_credentials(adapter, terminal_status)
                     return
             await asyncio.sleep(_AUTH_CREDENTIAL_POLL_INTERVAL_SECONDS)
 
     async def cancel(self, session_id: UUID) -> AuthSessionView:
         process: AuthProcess | None = None
+        adapter: AgentAuthAdapter | None = None
         async with self._lock:
             session = self._sessions.get(session_id)
             if session is None:
@@ -407,9 +466,12 @@ class AuthManager:
                 session.mark_terminal(AuthSessionStatus.CANCELED)
                 self._release_active(session)
                 process = session.process
+                adapter = self.adapters.get(session.agent)
             view = session.view()
         if process is not None:
             await self._terminate_auth_process(process)
+        if adapter is not None:
+            self._restore_saved_credentials(adapter)
         return view
 
     @staticmethod
@@ -433,6 +495,10 @@ class AuthManager:
             *(process.terminate() for process in processes),
             return_exceptions=True,
         )
+        for session in sessions:
+            adapter = self.adapters.get(session.agent)
+            if adapter is not None:
+                self._restore_saved_credentials(adapter)
         async with self._lock:
             self._sessions.clear()
 
@@ -453,6 +519,7 @@ class AuthManager:
                     session.mark_terminal(AuthSessionStatus.EXPIRED)
                     self._release_active(session)
             parser_buffer[0] = ""
+            self._restore_saved_credentials(adapter)
             return
         except (AuthProcessError, OSError):
             async with self._lock:
@@ -464,29 +531,107 @@ class AuthManager:
                     self._notify_state(session)
                     self._release_active(session)
             parser_buffer[0] = ""
+            self._restore_saved_credentials(adapter)
             return
 
         parser_buffer[0] = ""
+        terminal_status: AuthSessionStatus | None = None
         async with self._lock:
             if session.is_terminal:
-                return
-            try:
-                status = adapter.classify_exit(result.returncode, result.final_text)
-            except (ValueError, TypeError):
-                status = AuthSessionStatus.FAILED
-            if result.output_truncated:
-                status = AuthSessionStatus.FAILED
-            if status is AuthSessionStatus.AUTHENTICATED:
-                session.mark_terminal(AuthSessionStatus.AUTHENTICATED)
-            elif status is AuthSessionStatus.CANCELED:
-                session.mark_terminal(AuthSessionStatus.CANCELED)
+                terminal_status = session.status
             else:
-                session.mark_terminal(
-                    AuthSessionStatus.FAILED,
-                    AuthSafeErrorMessage.FAILED.value,
+                try:
+                    status = adapter.classify_exit(result.returncode, result.final_text)
+                except (ValueError, TypeError):
+                    status = AuthSessionStatus.FAILED
+                if result.output_truncated:
+                    status = AuthSessionStatus.FAILED
+                if (
+                    status is AuthSessionStatus.AUTHENTICATED
+                    and self._requires_saved_credentials(adapter)
+                    and not self._has_saved_credentials(adapter)
+                ):
+                    status = AuthSessionStatus.FAILED
+                if status is AuthSessionStatus.AUTHENTICATED:
+                    session.mark_terminal(AuthSessionStatus.AUTHENTICATED)
+                elif status is AuthSessionStatus.CANCELED:
+                    session.mark_terminal(AuthSessionStatus.CANCELED)
+                else:
+                    session.mark_terminal(
+                        AuthSessionStatus.FAILED,
+                        AuthSafeErrorMessage.FAILED.value,
+                    )
+                self._notify_state(session)
+                self._release_active(session)
+                terminal_status = session.status
+        if terminal_status is not None:
+            self._settle_saved_credentials(adapter, terminal_status)
+
+    def _backup_saved_credentials(self, adapter: AgentAuthAdapter) -> None:
+        backup_saved_credentials = getattr(adapter, "backup_saved_credentials", None)
+        if callable(backup_saved_credentials):
+            cast(Callable[[Mapping[str, str]], None], backup_saved_credentials)(
+                self.environment
+            )
+
+    def _restore_saved_credentials(self, adapter: AgentAuthAdapter) -> None:
+        restore_saved_credentials = getattr(adapter, "restore_saved_credentials", None)
+        if not callable(restore_saved_credentials):
+            return
+        try:
+            cast(Callable[[Mapping[str, str]], None], restore_saved_credentials)(
+                self.environment
+            )
+        except (OSError, TypeError, ValueError):
+            # Restoration is best effort; status remains failed/canceled and a
+            # later probe will not claim authentication without the credential.
+            pass
+
+    def _settle_saved_credentials(
+        self,
+        adapter: AgentAuthAdapter,
+        status: AuthSessionStatus,
+    ) -> None:
+        if status is AuthSessionStatus.AUTHENTICATED:
+            finalize_saved_credentials = getattr(adapter, "finalize_saved_credentials", None)
+            if callable(finalize_saved_credentials):
+                try:
+                    cast(Callable[[Mapping[str, str]], None], finalize_saved_credentials)(
+                        self.environment
+                    )
+                except (OSError, TypeError, ValueError):
+                    pass
+            return
+        self._restore_saved_credentials(adapter)
+
+    def _requires_saved_credentials(self, adapter: AgentAuthAdapter) -> bool:
+        return callable(getattr(adapter, "has_saved_credentials", None)) or callable(
+            getattr(adapter, "saved_credentials_marker", None)
+        )
+
+    def _has_saved_credentials(self, adapter: AgentAuthAdapter) -> bool:
+        has_saved_credentials = getattr(adapter, "has_saved_credentials", None)
+        if callable(has_saved_credentials):
+            try:
+                return bool(
+                    cast(Callable[[Mapping[str, str]], bool], has_saved_credentials)(
+                        self.environment
+                    )
                 )
-            self._notify_state(session)
-            self._release_active(session)
+            except (OSError, TypeError, ValueError):
+                return False
+        saved_credentials_marker = getattr(adapter, "saved_credentials_marker", None)
+        if callable(saved_credentials_marker):
+            try:
+                return (
+                    cast(AuthCredentialMarkerReader, saved_credentials_marker)(
+                        self.environment
+                    )
+                    is not None
+                )
+            except (OSError, TypeError, ValueError):
+                return False
+        return True
 
     @staticmethod
     def _is_expired(session: AuthSession) -> bool:
