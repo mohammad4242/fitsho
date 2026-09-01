@@ -35,7 +35,6 @@ const agentTasks: AdminAiTaskType[] = [
   "workout_plan_generation",
   "body_photo_analysis",
   "food_photo_estimation",
-  "food_price_search",
 ];
 
 export function AdminAiSettingsPage() {

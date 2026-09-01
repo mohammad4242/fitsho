@@ -38,7 +38,7 @@ from app.body_analysis.providers import (
 from app.body_analysis.schemas import BodyPhotoPreflight
 from app.body_analysis.service import AnalysisExecutionConfig, BodyAnalysisService
 from app.config import Settings
-from app.nutrition.food_photo_service import FoodPhotoOutput
+from app.nutrition.food_photo_service import FoodPhotoOutput, build_food_photo_request
 from app.workouts.ai_coach_provider import AiCoachProvider, AiCoachRecommendationRequest
 
 FIXTURE_REVISION = "agent-task-fixtures-v1"
@@ -280,15 +280,9 @@ async def _smoke_body(provider: AIProvider, profile: AgentServiceModelProfile) -
 
 
 async def _smoke_food_photo(provider: AIProvider, profile: AgentServiceModelProfile) -> str | None:
-    request = StructuredGenerationRequest(
-        system_prompt=(
-            "Identify only visible foods and estimate portions. Return uncertainty. "
-            "Do not provide calories, medical advice, allergy claims, or suitability."
-        ),
-        input_payload={"instruction": "Analyze this synthetic meal image without personal data."},
-        response_schema=FoodPhotoOutput.model_json_schema(),
-        schema_name="fitsho_food_photo_estimate_v1",
-        route=ModelRoute(primary_model=profile.model_id),
+    request = build_food_photo_request(
+        primary_model=profile.model_id,
+        fallback_models=(),
         provider_preferences=ProviderRoutingPreferences(),
         temperature=0,
         max_output_tokens=1024,
@@ -299,6 +293,7 @@ async def _smoke_food_photo(provider: AIProvider, profile: AgentServiceModelProf
 
 
 async def _smoke_food_price(provider: AIProvider, profile: AgentServiceModelProfile) -> str | None:
+    # This is an isolated Agent Service smoke fixture, not the production price updater.
     query = "قیمت برنج ایرانی یک کیلویی در تهران"
     request = StructuredGenerationRequest(
         system_prompt=(

@@ -26,6 +26,7 @@ from app.body_analysis.providers.models import (
     AIProviderError,
     ImageInput,
     ModelRoute,
+    ProviderRoutingPreferences,
     StructuredGenerationRequest,
 )
 from app.config import Settings
@@ -68,6 +69,30 @@ class FoodPhotoOutput(BaseModel):
 
 
 RESPONSE_SCHEMA = FoodPhotoOutput.model_json_schema()
+
+
+def build_food_photo_request(
+    *,
+    primary_model: str,
+    fallback_models: tuple[str, ...],
+    provider_preferences: ProviderRoutingPreferences,
+    temperature: float,
+    max_output_tokens: int,
+) -> StructuredGenerationRequest:
+    """Build the one production food-photo task request for any provider."""
+    return StructuredGenerationRequest(
+        system_prompt=(
+            "Identify only visible foods and estimate portions. Return uncertainty. "
+            "Do not provide calories, medical advice, allergy claims, or suitability."
+        ),
+        input_payload={"instruction": "Analyze this food image without personal data."},
+        response_schema=RESPONSE_SCHEMA,
+        schema_name="fitsho_food_photo_estimate_v1",
+        route=ModelRoute(primary_model=primary_model, fallback_models=fallback_models),
+        provider_preferences=provider_preferences,
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+    )
 
 
 def replay_idempotent_photo(
@@ -210,18 +235,9 @@ async def estimate_photo(
         raise FoodPhotoError("FOOD_PHOTO_TOO_LARGE")
     normalized, mime_type = _normalize_image(content, settings.food_photo_max_pixels)
     key = _store(settings.food_photo_storage_root, normalized)
-    request = StructuredGenerationRequest(
-        system_prompt=(
-            "Identify only visible foods and estimate portions. Return uncertainty. "
-            "Do not provide calories, medical advice, allergy claims, or suitability."
-        ),
-        input_payload={"instruction": "Analyze this food image without personal data."},
-        response_schema=RESPONSE_SCHEMA,
-        schema_name="fitsho_food_photo_estimate_v1",
-        route=ModelRoute(
-            primary_model=configured.primary_model_id,
-            fallback_models=configured.fallback_model_ids,
-        ),
+    request = build_food_photo_request(
+        primary_model=configured.primary_model_id,
+        fallback_models=configured.fallback_model_ids,
         provider_preferences=configured.routing_preferences,
         temperature=config.temperature,
         max_output_tokens=config.max_output_tokens,

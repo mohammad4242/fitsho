@@ -19,6 +19,7 @@ from app.body_analysis.admin_config.task_smoke import TaskSmokeResult, run_task_
 from app.body_analysis.enums import BodyArea
 from app.body_analysis.providers.models import (
     ImageInput,
+    ProviderRoutingPreferences,
     StructuredGenerationRequest,
     StructuredGenerationResponse,
 )

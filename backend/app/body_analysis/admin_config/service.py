@@ -59,8 +59,11 @@ _AGENT_SERVICE_TASKS = {
     AITaskType.WORKOUT_PLAN_GENERATION,
     AITaskType.BODY_PHOTO_ANALYSIS,
     AITaskType.FOOD_PHOTO_ESTIMATION,
-    AITaskType.FOOD_PRICE_SEARCH,
 }
+
+_TASK_CONFIGURABLE_TASKS = tuple(
+    task_type for task_type in AITaskType if task_type is not AITaskType.FOOD_PRICE_SEARCH
+)
 
 _AGENT_SAFE_MESSAGES: dict[ProviderErrorCode, str] = {
     ProviderErrorCode.NOT_CONFIGURED: "The Agent Service is not configured.",
@@ -118,7 +121,7 @@ def list_task_configs(db: Session) -> list[AITaskConfigDetail]:
     records = {record.task_type: record for record in db.scalars(select(AITaskConfig)).all()}
     credential = get_credential(db, AIProviderName.OPENROUTER)
     result: list[AITaskConfigDetail] = []
-    for task_type in AITaskType:
+    for task_type in _TASK_CONFIGURABLE_TASKS:
         record = records.get(task_type)
         result.append(config_detail(record, task_type=task_type, credential=credential))
     return result
@@ -185,6 +188,10 @@ def save_task_config(
     actor: User,
     settings: Settings,
 ) -> AITaskConfigDetail:
+    if task_type is AITaskType.FOOD_PRICE_SEARCH:
+        raise AIConfigError(
+            "food_price_search is not used by the production price updater"
+        )
     config = db.scalar(select(AITaskConfig).where(AITaskConfig.task_type == task_type))
     credential = get_credential(db, payload.provider)
     credential_changed = False
