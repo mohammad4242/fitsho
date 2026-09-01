@@ -1702,3 +1702,42 @@ def test_bodyweight_caution_rejection_does_not_substitute_or_use_normal_engine(
 
     assert error.value.error_code == "BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE"
     assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("experience_level", "training_days", "expected_slug"),
+    [
+        (ExperienceLevel.FIRST_MONTH, 2, "bw-first-month-2d-v1"),
+        (ExperienceLevel.FIRST_MONTH, 3, "bw-first-month-3d-v1"),
+        (ExperienceLevel.FIRST_MONTH, 4, "bw-first-month-4d-v1"),
+        (ExperienceLevel.BEGINNER, 2, "bw-beginner-2d-v1"),
+        (ExperienceLevel.BEGINNER, 3, "bw-beginner-3d-v1"),
+        (ExperienceLevel.BEGINNER, 4, "bw-beginner-4d-v1"),
+    ],
+)
+def test_all_six_supported_bodyweight_combinations_use_fixed_route_without_engine(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    experience_level: ExperienceLevel,
+    training_days: int,
+    expected_slug: str,
+) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    profile = get_profile(db, user.id).profile
+    profile.experience_level = experience_level
+    profile.training_days_per_week = training_days
+    profile.training_age_months = 0 if experience_level is ExperienceLevel.FIRST_MONTH else 3
+    _seed_bodyweight_template_catalog(db)
+
+    def fail_if_called(*args: object, **kwargs: object) -> object:
+        raise AssertionError("generate_program must not be called")
+
+    monkeypatch.setattr(workout_service_module, "generate_program", fail_if_called)
+
+    result = asyncio.run(_service(db).generate(user.id))
+
+    assert result.plan.engine_version == "bodyweight_template_v1"
+    assert result.plan.model_id == expected_slug
+    assert result.plan.aggregate_metrics["template_slug"] == expected_slug
+    assert len(result.plan.days) == training_days
+

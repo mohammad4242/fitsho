@@ -32,7 +32,7 @@ from app.exercises.media_resolver import resolve_primary_media
 from app.exercises.models import Exercise
 from app.exercises.programming_metadata import infer_exercise_demands
 from app.exercises.substitution_groups import effective_substitution_group
-from app.profile.enums import ExperienceLevel, Sex, TrainingLocation
+from app.profile.enums import ExperienceLevel, Sex
 from app.profile.exceptions import InvalidProfilePreferencesError
 from app.profile.service import ProfileSnapshot, get_profile
 from app.profile.training_compatibility import (
@@ -57,6 +57,14 @@ from app.workouts.ai_coach_provider import (
 from app.workouts.body_analysis_resolver import (
     BodyAnalysisInfluenceResolver,
     WorkoutBodyAnalysisResolver,
+)
+from app.workouts.bodyweight_routing import (
+    BODYWEIGHT_ENGINE_VERSION,
+    BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED,
+    BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED,
+    BodyweightRoutingStatus,
+    is_pure_bodyweight_home,
+    resolve_fixed_bodyweight_route,
 )
 from app.workouts.bodyweight_template_builder import (
     BodyweightTemplateBuildError,
@@ -210,10 +218,7 @@ class WorkoutGenerationFailedError(Exception):
         self.error_code = error_code
 
 
-BODYWEIGHT_MODE_EQUIPMENT = frozenset({Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR})
-BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED = "BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED"
-BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED = "BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED"
-BODYWEIGHT_ENGINE_VERSION = "bodyweight_template_v1"
+_is_pure_bodyweight_home = is_pure_bodyweight_home
 
 
 @dataclass(frozen=True)
@@ -223,17 +228,6 @@ class _BodyweightRouteContext:
     request: ProgramGenerationRequest
     template: BodyweightProgramTemplate
     template_fingerprint: str
-
-
-def _is_pure_bodyweight_home(
-    training_location: TrainingLocation,
-    resolved_equipment: frozenset[Equipment],
-) -> bool:
-    return (
-        training_location is TrainingLocation.HOME
-        and Equipment.BODYWEIGHT in resolved_equipment
-        and resolved_equipment.issubset(BODYWEIGHT_MODE_EQUIPMENT)
-    )
 
 
 class WorkoutGenerationService:
@@ -275,26 +269,35 @@ class WorkoutGenerationService:
         explicit_inventory = getattr(profile, "available_equipment", None)
         if effective_overrides is not None and effective_overrides.available_equipment is not None:
             explicit_inventory = effective_overrides.available_equipment
+        if profile.training_location is None:
+            return None
         resolved_equipment = resolve_available_equipment(
             profile.training_location,
             profile.home_training_setup,
             explicit_inventory,
         )
-        if not _is_pure_bodyweight_home(profile.training_location, resolved_equipment):
-            return None
-        if profile.experience_level not in {
-            ExperienceLevel.FIRST_MONTH,
-            ExperienceLevel.BEGINNER,
-        }:
-            raise ProgramGenerationRejectedError(BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED)
         effective_days = (
             effective_overrides.available_training_days
             if effective_overrides is not None
             and effective_overrides.available_training_days is not None
             else profile.training_days_per_week
         )
-        if effective_days not in {2, 3, 4}:
-            raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED)
+        decision = resolve_fixed_bodyweight_route(
+            profile.training_location,
+            resolved_equipment,
+            profile.experience_level,
+            effective_days,
+        )
+        if decision.status is BodyweightRoutingStatus.NOT_BODYWEIGHT_ROUTE:
+            return None
+        if decision.status is BodyweightRoutingStatus.UNSUPPORTED_LEVEL:
+            raise ProgramGenerationRejectedError(
+                decision.error_code or BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED
+            )
+        if decision.status is BodyweightRoutingStatus.UNSUPPORTED_DAYS:
+            raise ProgramGenerationRejectedError(
+                decision.error_code or BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED
+            )
         body_analysis_influence = applicable_body_analysis_influence(
             self._body_analysis_resolver.resolve(user_id), self._ruleset
         )
@@ -306,6 +309,8 @@ class WorkoutGenerationService:
             raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED) from error
         except (InvalidProfilePreferencesError, ValidationError) as error:
             raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT") from error
+        if profile.experience_level is None or effective_days is None:
+            raise ProgramGenerationRejectedError("INVALID_PROFILE_INPUT")
         template = load_bodyweight_template(self._db, profile.experience_level, effective_days)
         if template is None:
             raise ProgramGenerationRejectedError(BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED)
@@ -352,7 +357,7 @@ class WorkoutGenerationService:
         try:
             program = build_bodyweight_template_program(
                 request=request,
-                experience_level=context.source_profile.profile.experience_level,
+                experience_level=template.experience_level,
                 template=template,
                 exercise_catalog=catalog,
                 ruleset=self._ruleset,
