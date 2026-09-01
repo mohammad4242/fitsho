@@ -41,6 +41,7 @@ from app.workouts.program_engine.program_selection import (
     ProgramCandidate,
     ProgramQualityView,
     ProgramSelectionDecision,
+    build_final_selection_trace,
     select_best_program,
 )
 from app.workouts.program_engine.progression import deload_policy, double_progression_policy
@@ -119,6 +120,8 @@ from app.workouts.program_engine.weekly_coverage import (
 
 MAX_TEMPLATE_CANDIDATES = 6
 MAX_CANONICAL_CANDIDATES = 6
+MAX_DYNAMIC_CANDIDATES = 12
+DYNAMIC_BATCH_SIZE = 6
 
 
 def generate_program(
@@ -364,6 +367,7 @@ def generate_program(
         rejected_attempt: dict[str, object] = {
             "split": split.split_type.value,
             "day_focuses": split.day_focuses,
+            "preconstruction_rank": attempt_index + 1,
             "status": "rejected",
             "reason_codes": result.errors,
         }
@@ -380,10 +384,20 @@ def generate_program(
                 template_candidate_count=len(template_selection.candidates),
                 primary_candidate_count=len(primary_candidates),
             )
-            return _append_successful_template_attempt(
+            final_selection_trace = build_final_selection_trace(
+                selection_phase="primary",
+                selection_strategy="lexicographic_max_min_quality",
+                proposed_candidate_count=len(shortlisted_templates) + len(exact_day_splits),
+                decision=selection,
+                evaluated_failure_candidates=_primary_failure_summaries(
+                    tuple(evaluated_attempts), tuple(rejected_splits)
+                ),
+            )
+            selected_result = _append_successful_template_attempt(
                 selection.selected.result,
                 selection_trace,
             )
+            return _append_successful_template_attempt(selected_result, final_selection_trace)
 
     weekdays_fallback = (
         exact_day_splits[0].weekdays if exact_day_splits else tuple(range(requested_days))
@@ -394,37 +408,67 @@ def generate_program(
         ruleset,
         weekdays=weekdays_fallback,
         excluded_layouts=frozenset(candidate.day_focuses for candidate in exact_day_splits),
+        limit=MAX_DYNAMIC_CANDIDATES,
         session_capacity=session_capacity,
     )
-    for fallback_split in dynamic_splits:
-        result = _program_for_split(
-            request,
-            normalized,
-            safety.status,
-            safety.reason_codes,
-            eligibility.rejected,
-            eligibility.eligible,
-            eligibility.cardio_eligible,
-            fallback_split,
-            ruleset,
-            previous_volume=previous_volume,
-            session_capacity=session_capacity,
-            rejected_splits=tuple(rejected_splits),
-            template_rejection_trace=template_rejection_trace,
-            rejected_slot_candidates=rejected_slot_candidates,
-            coverage_availability_evidence=coverage_availability_evidence,
+    dynamic_splits = dynamic_splits[:MAX_DYNAMIC_CANDIDATES]
+    dynamic_candidates: list[ProgramCandidate] = []
+    primary_failure_summaries = _primary_failure_summaries(
+        tuple(evaluated_attempts), tuple(rejected_splits)
+    )
+    for batch_start in range(0, len(dynamic_splits), DYNAMIC_BATCH_SIZE):
+        batch = dynamic_splits[batch_start : batch_start + DYNAMIC_BATCH_SIZE]
+        for batch_offset, fallback_split in enumerate(batch):
+            preconstruction_rank = batch_start + batch_offset + 1
+            result = _program_for_split(
+                request,
+                normalized,
+                safety.status,
+                safety.reason_codes,
+                eligibility.rejected,
+                eligibility.eligible,
+                eligibility.cardio_eligible,
+                fallback_split,
+                ruleset,
+                previous_volume=previous_volume,
+                session_capacity=session_capacity,
+                rejected_splits=tuple(rejected_splits),
+                template_rejection_trace=template_rejection_trace,
+                rejected_slot_candidates=rejected_slot_candidates,
+                coverage_availability_evidence=coverage_availability_evidence,
+            )
+            dynamic_candidates.append(
+                _dynamic_program_candidate(
+                    result,
+                    fallback_split,
+                    preconstruction_rank=preconstruction_rank,
+                )
+            )
+            if result.is_success:
+                continue
+            collected_errors.extend(result.errors)
+            rejected_splits.append(
+                {
+                    "split": fallback_split.split_type.value,
+                    "day_focuses": fallback_split.day_focuses,
+                    "status": "rejected",
+                    "reason_codes": result.errors,
+                    "decision_trace": result.decision_trace,
+                }
+            )
+        selection = select_best_program(tuple(dynamic_candidates))
+        if selection.selected is None:
+            continue
+        final_selection_trace = build_final_selection_trace(
+            selection_phase="dynamic_fallback",
+            selection_strategy="lexicographic_max_min_quality",
+            proposed_candidate_count=len(dynamic_splits),
+            decision=selection,
+            failure_candidates=primary_failure_summaries,
         )
-        if result.is_success:
-            return result
-        collected_errors.extend(result.errors)
-        rejected_splits.append(
-            {
-                "split": fallback_split.split_type.value,
-                "day_focuses": fallback_split.day_focuses,
-                "status": "rejected",
-                "reason_codes": result.errors,
-                "decision_trace": result.decision_trace,
-            }
+        return _append_successful_template_attempt(
+            selection.selected.result,
+            final_selection_trace,
         )
     errors = (
         "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED",
@@ -530,12 +574,16 @@ def _append_successful_template_attempt(
         + (attempt_trace,)
         + result.program.decision_trace[coach_index:]
     )
-    report = replace(result.program.validation_report, decision_trace=final_trace)
-    program = replace(
-        result.program,
-        validation_report=report,
-        decision_trace=final_trace,
-    )
+    validation_report = result.program.validation_report
+    if hasattr(validation_report, "decision_trace"):
+        report = replace(validation_report, decision_trace=final_trace)
+        program = replace(
+            result.program,
+            validation_report=report,
+            decision_trace=final_trace,
+        )
+    else:
+        program = replace(result.program, decision_trace=final_trace)
     return replace(result, program=program, decision_trace=final_trace)
 
 
@@ -672,6 +720,64 @@ def _canonical_program_candidate(
             "day_focuses": split.day_focuses,
         },
     )
+
+
+def _dynamic_program_candidate(
+    result: ProgramGenerationResult,
+    split: SplitPlan,
+    *,
+    preconstruction_rank: int,
+) -> ProgramCandidate:
+    quality = _quality_view(result)
+    return ProgramCandidate(
+        source=CandidateSource.DYNAMIC_FALLBACK,
+        identifier=f"dynamic_fallback:{split.split_type.value}:{'|'.join(split.day_focuses)}",
+        preconstruction_rank=preconstruction_rank,
+        preconstruction_score=float(split.score),
+        result=result,
+        quality=quality,
+        actual_substitution_count=quality.actual_substitution_count if quality else 0,
+        source_metadata={
+            "split_type": split.split_type.value,
+            "day_focuses": split.day_focuses,
+        },
+    )
+
+
+def _primary_failure_summaries(
+    template_attempts: tuple[dict[str, object], ...],
+    rejected_splits: tuple[dict[str, object], ...],
+) -> tuple[dict[str, object], ...]:
+    summaries: list[dict[str, object]] = []
+    for attempt in template_attempts:
+        if attempt.get("status") != "rejected":
+            continue
+        slug = attempt.get("slug")
+        if not isinstance(slug, str):
+            continue
+        rank = attempt.get("rank")
+        summaries.append(
+            {
+                "identifier": f"template:{slug}",
+                "source": CandidateSource.TEMPLATE.value,
+                "preconstruction_rank": rank if isinstance(rank, int) else 0,
+                "reason_codes": attempt.get("reason_codes", ()),
+            }
+        )
+    for rejected_split in rejected_splits:
+        split_type = rejected_split.get("split")
+        day_focuses = rejected_split.get("day_focuses")
+        if not isinstance(split_type, str) or not isinstance(day_focuses, tuple):
+            continue
+        summaries.append(
+            {
+                "identifier": f"{split_type}:{'|'.join(day_focuses)}",
+                "source": CandidateSource.CANONICAL_SPLIT.value,
+                "preconstruction_rank": rejected_split.get("preconstruction_rank", 0),
+                "reason_codes": rejected_split.get("reason_codes", ()),
+            }
+        )
+    return tuple(summaries)
 
 
 def _quality_view(result: ProgramGenerationResult) -> ProgramQualityView | None:

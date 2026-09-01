@@ -23,6 +23,7 @@ class CoverageState(StrEnum):
 
 
 COACH_QUALITY_V2_SCHEMA_VERSION = "coach_quality_v2"
+PROGRAM_SELECTION_TRACE_SCHEMA_VERSION = "program_selection_v1"
 _ACCEPTED_GATE_STATUSES = frozenset({"accepted", "accepted_with_constraints"})
 
 
@@ -161,6 +162,155 @@ class ProgramSelectionDecision:
     admitted_candidates: tuple[ProgramCandidate, ...] = ()
     reason_codes: tuple[str, ...] = ()
     diagnostic_codes: tuple[str, ...] = ()
+
+
+def build_final_selection_trace(
+    *,
+    selection_phase: str,
+    selection_strategy: str,
+    proposed_candidate_count: int,
+    decision: ProgramSelectionDecision,
+    evaluated_failure_candidates: Sequence[Mapping[str, object]] = (),
+    failure_candidates: Sequence[Mapping[str, object]] = (),
+) -> dict[str, object]:
+    """Build bounded, JSON-safe evidence for one final selection decision."""
+
+    comparisons = decision.comparisons
+    successful = tuple(
+        comparison
+        for comparison in comparisons
+        if comparison.candidate.result.is_success
+        and comparison.candidate.result.program is not None
+    )
+    first_valid = successful[0].candidate if successful else None
+    selected = decision.selected
+    rejected_summaries = [
+        _comparison_failure_summary(comparison)
+        for comparison in comparisons
+        if not comparison.admitted
+    ]
+    rejected_summaries.extend(
+        _bounded_failure_summary(item)
+        for item in (*evaluated_failure_candidates, *failure_candidates)
+    )
+    selected_quality = selected.quality if selected is not None else None
+    evidence_rejected_count = sum(
+        comparison.candidate.result.is_success
+        and "PROGRAM_SELECTION_EVIDENCE_MISSING" in comparison.reason_codes
+        for comparison in comparisons
+    )
+    return {
+        "stage": "final_program_selection",
+        "schema_version": PROGRAM_SELECTION_TRACE_SCHEMA_VERSION,
+        "status": "selected" if selected is not None else "rejected",
+        "selection_phase": selection_phase,
+        "selection_strategy": selection_strategy,
+        "proposed_candidate_count": proposed_candidate_count,
+        "evaluated_candidate_count": len(comparisons) + len(evaluated_failure_candidates),
+        "successful_candidate_count": len(successful),
+        "admitted_candidate_count": len(decision.admitted_candidates),
+        "evidence_rejected_count": evidence_rejected_count,
+        "first_valid_identifier": first_valid.identifier if first_valid else None,
+        "selected_identifier": selected.identifier if selected else None,
+        "selected_source": selected.source.value if selected else None,
+        "selected_preconstruction_rank": selected.preconstruction_rank if selected else None,
+        "selected_different_from_first_valid": bool(
+            selected is not None
+            and first_valid is not None
+            and selected.identifier != first_valid.identifier
+        ),
+        "summarized_quality_key": _quality_summary(selected_quality),
+        "warning_burden": _warning_summary(selected_quality),
+        "repair_burden": _repair_summary(selected_quality),
+        "substitution_burden": (
+            selected.actual_substitution_count if selected is not None else 0
+        ),
+        "failure_reason_codes": _deduplicate_failure_summaries(rejected_summaries),
+        "reason_codes": (
+            "FINAL_PROGRAM_SELECTION_APPLIED",
+            *decision.reason_codes,
+        )
+        if selected is not None
+        else ("FINAL_PROGRAM_SELECTION_NO_ADMITTED_CANDIDATE", *decision.reason_codes),
+    }
+
+
+def _comparison_failure_summary(comparison: CandidateComparison) -> dict[str, object]:
+    candidate = comparison.candidate
+    result = candidate.result
+    reason_codes = result.errors if not result.is_success else comparison.reason_codes
+    if not reason_codes:
+        reason_codes = comparison.reason_codes or ("PROGRAM_SELECTION_REJECTED",)
+    return {
+        "identifier": candidate.identifier,
+        "source": candidate.source.value,
+        "preconstruction_rank": candidate.preconstruction_rank,
+        "reason_codes": tuple(dict.fromkeys(reason_codes)),
+    }
+
+
+def _bounded_failure_summary(item: Mapping[str, object]) -> dict[str, object]:
+    reason_codes = item.get("reason_codes", ())
+    normalized_reasons = tuple(code for code in _string_values(reason_codes))
+    return {
+        "identifier": str(item.get("identifier", "unknown")),
+        "source": str(item.get("source", "unknown")),
+        "preconstruction_rank": _integer(item.get("preconstruction_rank")),
+        "reason_codes": normalized_reasons or ("PROGRAM_SELECTION_REJECTED",),
+    }
+
+
+def _deduplicate_failure_summaries(
+    summaries: Sequence[Mapping[str, object]],
+) -> tuple[dict[str, object], ...]:
+    unique: list[dict[str, object]] = []
+    seen: set[tuple[object, ...]] = set()
+    for summary in summaries:
+        bounded = _bounded_failure_summary(summary)
+        key = (
+            bounded["identifier"],
+            bounded["source"],
+            bounded["preconstruction_rank"],
+            bounded["reason_codes"],
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(bounded)
+    return tuple(unique)
+
+
+def _quality_summary(quality: ProgramQualityView | None) -> dict[str, object]:
+    if quality is None:
+        return {}
+    return {
+        "critical_dimensions": dict(quality.critical_dimensions),
+        "coverage_state": quality.coverage_state,
+        "explicit_priority_floor": quality.explicit_priority_floor,
+        "body_analysis_priority_floor": quality.body_analysis_priority_floor,
+        "volume_floor": quality.volume_floor,
+        "volume_median": quality.volume_median,
+        "coverage_percentage": quality.coverage_percentage,
+        "recovery_margin": quality.recovery_margin,
+        "semantic_degradation": quality.semantic_degradation,
+        "duration_fit": quality.duration_fit,
+    }
+
+
+def _warning_summary(quality: ProgramQualityView | None) -> dict[str, int]:
+    return {
+        "repairable": quality.repairable_warning_burden if quality else 0,
+        "soft": quality.soft_warning_burden if quality else 0,
+    }
+
+
+def _repair_summary(quality: ProgramQualityView | None) -> dict[str, int]:
+    return {
+        "structural": quality.structural_repair_burden if quality else 0,
+        "workload": quality.workload_repair_burden if quality else 0,
+        "scheduling": quality.scheduling_repair_burden if quality else 0,
+        "total": quality.total_repair_burden if quality else 0,
+    }
 
 
 def select_best_program(

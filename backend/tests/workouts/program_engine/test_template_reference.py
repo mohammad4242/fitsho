@@ -443,6 +443,7 @@ def test_body_part_template_does_not_claim_aggregate_full_body_coverage(template
         "substitution_observability",
         "template_attempt",
         "post_construction_template_selection",
+        "final_program_selection",
         "final_construction",
         "coach_quality",
         "final_quality_gate",
