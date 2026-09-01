@@ -495,6 +495,34 @@ def test_agent_service_does_not_require_api_credential_or_catalog(
     assert response.status_code == 200, response.text
 
 
+def test_agent_service_supports_food_price_search(
+    client: TestClient, db: Session
+) -> None:
+    _admin(client, db)
+    db.add(
+        AIAgentProfileVerification(
+            profile_id="antigravity-price-agent-high",
+            task_type=AITaskType.FOOD_PRICE_SEARCH,
+            profile_fingerprint="c" * 64,
+            status="passed",
+            checked_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
+    response = client.put(
+        "/api/v1/admin/ai/task-configs/food_price_search",
+        headers=ORIGIN,
+        json={
+            "enabled": True,
+            "execution_backend": "agent_service",
+            "agent_name": "antigravity",
+            "agent_model_id": "gemini-price-agent",
+            "agent_profile_id": "antigravity-price-agent-high",
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
 def test_agent_service_rejects_unsupported_task(client: TestClient, db: Session) -> None:
     _admin(client, db)
     response = client.put(
