@@ -1249,6 +1249,12 @@ class NutritionFoodPriceReview(Base):
         ForeignKey("nutrition_catalogue_foods.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     reason_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    source_quote_ids: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
+        server_default=sql_text("'[]'::json"),
+    )
     candidate_reference_price_toman: Mapped[Decimal | None] = mapped_column(Numeric(20, 8))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -25,6 +25,16 @@ def observation(**changes: object):
     return PriceObservation(**values)  # type: ignore[arg-type]
 
 
+def test_price_review_source_quote_ids_is_non_null_empty_list() -> None:
+    from app.nutrition.models import NutritionFoodPriceReview
+
+    column = NutritionFoodPriceReview.__table__.c.source_quote_ids
+
+    assert column.nullable is False
+    assert column.default is not None
+    assert column.default.arg(None) == []
+
+
 def test_normalizes_grams_to_toman_per_kg() -> None:
     from app.nutrition.pricing import normalize_observation
 
