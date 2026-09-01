@@ -1,4 +1,7 @@
 import json
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 from app.profile.enums import ExperienceLevel
@@ -127,6 +130,20 @@ def test_write_audit_json_is_the_serialized_source_of_truth(tmp_path) -> None:
     assert isinstance(payload, list)
     assert isinstance(payload[0]["profile"], dict)
     assert payload[0]["profile_fingerprint"] == profile_fingerprint(profile)
+
+
+def test_catalog_audit_cli_is_directly_invocable() -> None:
+    backend_root = Path(__file__).resolve().parents[3]
+    result = subprocess.run(
+        [sys.executable, "scripts/audit_supported_profile_catalog.py", "--help"],
+        cwd=backend_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "--count" in result.stdout
 
 
 def test_catalog_audit_keeps_supported_catalog_gap_as_a_failure() -> None:

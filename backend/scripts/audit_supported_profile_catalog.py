@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app.main  # noqa: F401  # register SQLAlchemy models
 from app.config import get_settings
