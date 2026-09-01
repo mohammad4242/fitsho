@@ -3,8 +3,9 @@
 The Agent Service is a private, internal-only HTTP service on port `9001`.
 It contains the pinned Antigravity, Codex, and Claude CLIs in one image. The
 service never receives backend secrets, PostgreSQL credentials, Docker access,
-or the user's media archive. Request files are copied into short-lived
-workspaces by the application.
+or a general media archive. Production Body/Food images are resolved from two
+scoped read-only mounts by storage key; only inline compatibility images are
+copied into short-lived request workspaces.
 
 ## Build and run
 
@@ -21,10 +22,11 @@ docker compose up -d db agent-service backend
 the backend remains able to start and use API-mode providers.
 
 The Agent Service container is non-root, read-only apart from its persistent
-`/home/agent` volume and request-scoped `/tmp`. It has no Docker socket,
-database, backend source, or Fitsho private-media mount. The backend keeps
-body photos, food photos, and nutrition-lab uploads in separate persistent
-bind mounts under `backend/var/private/`.
+`/home/agent` volume, request-scoped `/tmp`, and the two read-only scoped media
+mounts `/shared-private-media/body` and `/shared-private-media/food`. It has no
+Docker socket, database, backend source, nutrition-lab mount, or broad private-
+media access. The backend keeps body photos, food photos, and nutrition-lab
+uploads in separate persistent bind mounts under `backend/var/private/`.
 
 ## Preferred admin login
 
@@ -75,8 +77,8 @@ docker compose exec agent-service curl -fsS \
 
 The response is authoritative: a provider is exposed only after its binary,
 configuration, authentication, and tested capabilities are available. Image
-input remains disabled until a real container smoke test proves it for that
-CLI.
+input remains an explicit per-runner capability and must be smoke-tested against
+the mounted read-only media paths for that CLI.
 
 ## Operations runbook
 

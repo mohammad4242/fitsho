@@ -22,6 +22,7 @@ services:
     environment:
       AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
       HOME: /home/agent
+      AGENT_SHARED_PRIVATE_MEDIA_ROOT: /shared-private-media
       HTTP_PROXY: ${AGENT_HTTP_PROXY:-}
       HTTPS_PROXY: ${AGENT_HTTPS_PROXY:-}
       NO_PROXY: ${AGENT_NO_PROXY:-agent-service,db,localhost,127.0.0.1}
@@ -38,6 +39,8 @@ services:
       - "9001"
     volumes:
       - fitsho_agent_home:/home/agent
+      - ./backend/var/private/body-photos:/shared-private-media/body:ro
+      - ./backend/var/private/food-photos:/shared-private-media/food:ro
     cap_drop:
       - ALL
     read_only: true
