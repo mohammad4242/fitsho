@@ -241,6 +241,41 @@ def test_image_flag_is_constructed_only_when_explicitly_enabled(
     assert commands[0][-3:] == ["--image", str(image), "-"]
 
 
+def test_shared_media_image_is_passed_to_codex_without_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    shared_root = tmp_path / "shared"
+    workspace.mkdir()
+    image = shared_root / "body/ab/image.jpg"
+    image.parent.mkdir(parents=True)
+    image.write_bytes(b"image")
+    commands: list[list[str]] = []
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del kwargs
+        commands.append(command)
+        Path(command[command.index("--output-last-message") + 1]).write_text(
+            '{"answer":"seen"}', encoding="utf-8"
+        )
+        return ProcessResult(0, "", "")
+
+    import app.runners.codex as codex
+
+    monkeypatch.setattr(codex, "run_process", fake_run_process)
+    result = run(
+        CodexRunner(
+            workspace=workspace,
+            shared_media_root=shared_root,
+            supports_image_input=True,
+        ).run(make_request(image_paths=(image,)))
+    )
+
+    assert result.payload == {"answer": "seen"}
+    assert commands[0][-3:] == ["--image", str(image.resolve()), "-"]
+    assert image.read_bytes() == b"image"
+
+
 def test_images_are_rejected_without_process_by_default(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

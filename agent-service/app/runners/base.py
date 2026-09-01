@@ -14,6 +14,47 @@ class RunnerError(RuntimeError):
         self.safe_message = safe_message
 
 
+def resolve_image_paths(
+    image_paths: tuple[Path, ...],
+    *,
+    workspace: Path,
+    shared_media_root: Path,
+    supports_image_input: bool,
+    max_images: int = 5,
+) -> list[Path]:
+    if image_paths and not supports_image_input:
+        raise RunnerError("invalid_request", "image input is not supported")
+    if len(image_paths) > max_images:
+        raise RunnerError("invalid_request", "too many images")
+    try:
+        workspace_root = workspace.resolve(strict=True)
+        if not workspace_root.is_dir():
+            raise OSError("workspace is not a directory")
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise RunnerError("invalid_request", "workspace is invalid") from exc
+    shared_root: Path | None
+    try:
+        shared_root = shared_media_root.resolve(strict=True)
+        if not shared_root.is_dir():
+            shared_root = None
+    except (OSError, RuntimeError, ValueError):
+        shared_root = None
+
+    resolved_paths: list[Path] = []
+    for image_path in image_paths:
+        candidate = image_path if image_path.is_absolute() else workspace_root / image_path
+        try:
+            resolved = candidate.resolve(strict=True)
+            in_workspace = resolved.is_relative_to(workspace_root)
+            in_shared_media = shared_root is not None and resolved.is_relative_to(shared_root)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise RunnerError("invalid_request", "image path is invalid") from exc
+        if not resolved.is_file() or not (in_workspace or in_shared_media):
+            raise RunnerError("invalid_request", "image path is invalid")
+        resolved_paths.append(resolved)
+    return resolved_paths
+
+
 @dataclass(frozen=True)
 class RunnerRequest:
     model_id: str

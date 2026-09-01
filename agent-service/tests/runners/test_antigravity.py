@@ -287,6 +287,37 @@ def test_image_paths_are_added_as_bounded_workspace_filenames_when_opted_in(
     assert "photo.jpg" in captured[0][2]
 
 
+def test_shared_media_image_path_is_listed_for_antigravity_transport(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    shared_root = tmp_path / "shared"
+    workspace.mkdir()
+    image = shared_root / "body/ab/image.jpg"
+    image.parent.mkdir(parents=True)
+    image.write_bytes(b"image")
+    captured: list[list[str]] = []
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del kwargs
+        captured.append(command)
+        return ProcessResult(0, success_output(), "")
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setattr(antigravity, "run_process", fake_run_process)
+    run(
+        AntigravityRunner(
+            workspace=workspace,
+            shared_media_root=shared_root,
+            supports_image_input=True,
+        ).run(make_request(image_paths=(image,)))
+    )
+
+    assert f"- {image.resolve()}" in captured[0][2]
+    assert "Do not inspect or modify unrelated files." in captured[0][2]
+
+
 def test_images_are_rejected_by_default_without_invoking_process(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

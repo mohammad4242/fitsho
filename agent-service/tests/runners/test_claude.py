@@ -250,6 +250,37 @@ def test_images_are_rejected_without_process_by_default(
     assert error.value.code == "invalid_request"
 
 
+def test_shared_media_image_path_is_listed_for_claude_transport(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = tmp_path / "workspace"
+    shared_root = tmp_path / "shared"
+    workspace.mkdir()
+    image = shared_root / "food/cd/image.jpg"
+    image.parent.mkdir(parents=True)
+    image.write_bytes(b"image")
+    prompts: list[str] = []
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        prompts.append(kwargs["input_text"])
+        return ProcessResult(0, '{"result":"{\\"answer\\":\\"ok\\"}"}', "")
+
+    import app.runners.claude as claude
+
+    monkeypatch.setattr(claude, "run_process", fake_run_process)
+    result = run(
+        ClaudeRunner(
+            workspace=workspace,
+            shared_media_root=shared_root,
+            supports_image_input=True,
+        ).run(make_request(image_paths=(image,)))
+    )
+
+    assert result.payload == {"answer": "ok"}
+    assert f"- {image.resolve()}" in prompts[0]
+    assert "Do not inspect or modify unrelated files." in prompts[0]
+
+
 def test_thinking_profile_uses_claude_effort_flag(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

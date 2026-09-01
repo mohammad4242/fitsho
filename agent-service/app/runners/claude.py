@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
 from ..profiles import claude_profiles
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
-from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
+from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult, resolve_image_paths
 from .probes import CliMetadataProbe
 
 
@@ -56,6 +56,7 @@ class ClaudeRunner(AgentRunner):
         *,
         configured_models: tuple[str, ...] = (),
         supports_image_input: bool = False,
+        shared_media_root: Path = Path("/shared-private-media"),
     ) -> None:
         self.workspace = workspace
         self.executable = executable
@@ -63,6 +64,7 @@ class ClaudeRunner(AgentRunner):
         # Claude image input is deliberately opt-in until the exact container
         # invocation is smoke-tested with a subscription login.
         self.supports_image_input = supports_image_input
+        self.shared_media_root = shared_media_root
         self._metadata = CliMetadataProbe(
             executable=self.executable,
             workspace=self.workspace,
@@ -203,22 +205,12 @@ class ClaudeRunner(AgentRunner):
             raise RunnerError("invalid_request", "model is invalid")
 
     def _image_paths(self, image_paths: tuple[Path, ...], workspace: Path) -> list[Path]:
-        if image_paths and not self.supports_image_input:
-            raise RunnerError("invalid_request", "image input is not supported")
-        if len(image_paths) > 5:
-            raise RunnerError("invalid_request", "too many images")
-        resolved_paths: list[Path] = []
-        for image_path in image_paths:
-            candidate = image_path if image_path.is_absolute() else workspace / image_path
-            try:
-                resolved = candidate.resolve(strict=True)
-                resolved.relative_to(workspace)
-            except (OSError, ValueError) as exc:
-                raise RunnerError("invalid_request", "image path is invalid") from exc
-            if not resolved.is_file():
-                raise RunnerError("invalid_request", "image path is invalid")
-            resolved_paths.append(resolved)
-        return resolved_paths
+        return resolve_image_paths(
+            image_paths,
+            workspace=workspace,
+            shared_media_root=self.shared_media_root,
+            supports_image_input=self.supports_image_input,
+        )
 
     def _command(self, request: RunnerRequest, response_schema: dict[str, Any]) -> list[str]:
         try:
@@ -256,12 +248,13 @@ class ClaudeRunner(AgentRunner):
             "Input JSON:\n"
             f"{input_json}\n\n"
             "Return only one JSON object matching the supplied output schema. "
-            "Do not inspect or change files."
+            "Do not inspect or modify unrelated files. "
+            "You may read only the explicitly listed image files for this request."
         )
         paths = tuple(image_paths)
         if paths:
-            prompt += "\n\nWorkspace image filenames:\n" + "\n".join(
-                f"- {path.name[:256]}" for path in paths
+            prompt += "\n\nImage files available for this request:\n" + "\n".join(
+                f"- {path}" for path in paths
             )
         return prompt
 

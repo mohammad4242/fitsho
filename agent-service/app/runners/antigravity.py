@@ -16,7 +16,7 @@ from ..profiles import (
     antigravity_profiles_from_output,
 )
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
-from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
+from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult, resolve_image_paths
 from .probes import CliMetadataProbe
 
 
@@ -54,11 +54,13 @@ class AntigravityRunner(AgentRunner):
         *,
         configured_models: tuple[str, ...] = (),
         supports_image_input: bool = False,
+        shared_media_root: Path = Path("/shared-private-media"),
     ) -> None:
         self.workspace = workspace
         self.executable = executable
         self.configured_models = configured_models
         self.supports_image_input = supports_image_input
+        self.shared_media_root = shared_media_root
         self._profiles_cache: tuple[AgentModelProfile, ...] = ()
         self._profiles_cached_at = 0.0
         self._metadata = CliMetadataProbe(
@@ -142,7 +144,7 @@ class AntigravityRunner(AgentRunner):
         }:
             raise RunnerError("invalid_request", "reasoning effort is invalid")
         workspace = self._workspace_path()
-        image_names = self._image_names(request.image_paths, workspace)
+        image_paths = self._image_paths(request.image_paths, workspace)
         started = time.perf_counter()
         schema_path: Path | None = None
 
@@ -151,7 +153,7 @@ class AntigravityRunner(AgentRunner):
                 Draft202012Validator.check_schema(request.response_schema)
             except Exception as exc:
                 raise RunnerError("invalid_request", "response schema is invalid") from exc
-            prompt = self._prompt(request, image_names)
+            prompt = self._prompt(request, image_paths)
             with tempfile.NamedTemporaryFile(
                 mode="w",
                 encoding="utf-8",
@@ -254,35 +256,27 @@ class AntigravityRunner(AgentRunner):
             if key in cls._SAFE_ENVIRONMENT_KEYS
         }
 
-    def _image_names(self, image_paths: tuple[Path, ...], workspace: Path) -> list[str]:
-        if image_paths and not self.supports_image_input:
-            raise RunnerError("invalid_request", "image input is not supported")
-        if len(image_paths) > 5:
-            raise RunnerError("invalid_request", "too many images")
-        names: list[str] = []
-        for image_path in image_paths:
-            candidate = image_path if image_path.is_absolute() else workspace / image_path
-            try:
-                resolved = candidate.resolve(strict=True)
-                resolved.relative_to(workspace)
-            except (OSError, ValueError) as exc:
-                raise RunnerError("invalid_request", "image path is invalid") from exc
-            if not resolved.is_file():
-                raise RunnerError("invalid_request", "image path is invalid")
-            names.append(resolved.name)
-        return names
+    def _image_paths(self, image_paths: tuple[Path, ...], workspace: Path) -> list[Path]:
+        return resolve_image_paths(
+            image_paths,
+            workspace=workspace,
+            shared_media_root=self.shared_media_root,
+            supports_image_input=self.supports_image_input,
+        )
 
     @staticmethod
-    def _prompt(request: RunnerRequest, image_names: list[str]) -> str:
+    def _prompt(request: RunnerRequest, image_paths: list[Path]) -> str:
         prompt = (
             f"{request.system_prompt}\n\n"
             "Input JSON:\n"
             f"{json.dumps(request.input_payload, ensure_ascii=False, sort_keys=True)}\n\n"
-            "Return one JSON object matching the supplied schema."
+            "Return one JSON object matching the supplied schema. "
+            "Do not inspect or modify unrelated files. "
+            "You may read only the explicitly listed image files for this request."
         )
-        if image_names:
-            prompt += "\n\nWorkspace image filenames:\n" + "\n".join(
-                f"- {name[:256]}" for name in image_names
+        if image_paths:
+            prompt += "\n\nImage files available for this request:\n" + "\n".join(
+                f"- {path}" for path in image_paths
             )
         return prompt
 

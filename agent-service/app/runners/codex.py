@@ -13,7 +13,7 @@ from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
 from ..profiles import codex_profiles
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
-from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult
+from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult, resolve_image_paths
 from .probes import CliMetadataProbe
 
 
@@ -53,12 +53,14 @@ class CodexRunner(AgentRunner):
         *,
         configured_models: tuple[str, ...] = (),
         supports_image_input: bool = False,
+        shared_media_root: Path = Path("/shared-private-media"),
     ) -> None:
         self.workspace = workspace
         self.executable = executable
         self.configured_models = configured_models
         # This opt-in is deliberately false until the exact container capability is tested.
         self.supports_image_input = supports_image_input
+        self.shared_media_root = shared_media_root
         self._metadata = CliMetadataProbe(
             executable=self.executable,
             workspace=self.workspace,
@@ -201,22 +203,12 @@ class CodexRunner(AgentRunner):
             raise RunnerError("invalid_request", "model is invalid")
 
     def _image_paths(self, image_paths: tuple[Path, ...], workspace: Path) -> list[Path]:
-        if image_paths and not self.supports_image_input:
-            raise RunnerError("invalid_request", "image input is not supported")
-        if len(image_paths) > 5:
-            raise RunnerError("invalid_request", "too many images")
-        resolved_paths: list[Path] = []
-        for image_path in image_paths:
-            candidate = image_path if image_path.is_absolute() else workspace / image_path
-            try:
-                resolved = candidate.resolve(strict=True)
-                resolved.relative_to(workspace)
-            except (OSError, ValueError) as exc:
-                raise RunnerError("invalid_request", "image path is invalid") from exc
-            if not resolved.is_file():
-                raise RunnerError("invalid_request", "image path is invalid")
-            resolved_paths.append(resolved)
-        return resolved_paths
+        return resolve_image_paths(
+            image_paths,
+            workspace=workspace,
+            shared_media_root=self.shared_media_root,
+            supports_image_input=self.supports_image_input,
+        )
 
     def _command(
         self,
@@ -262,7 +254,8 @@ class CodexRunner(AgentRunner):
             "Input JSON:\n"
             f"{input_json}\n\n"
             "Return only one JSON object matching the supplied output schema. "
-            "Do not inspect or change files."
+            "Do not inspect or modify unrelated files. "
+            "You may read only the explicitly listed image files for this request."
         )
 
     @classmethod

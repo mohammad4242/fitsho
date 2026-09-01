@@ -28,18 +28,21 @@ class RunnerRegistry:
             executable=settings.agent_antigravity_executable,
             configured_models=settings.agent_antigravity_models,
             supports_image_input=settings.agent_antigravity_supports_image_input,
+            shared_media_root=Path(settings.agent_shared_private_media_root),
         )
         codex = CodexRunner(
             workspace=Path(settings.agent_workspace_root),
             executable=settings.agent_codex_executable,
             configured_models=settings.agent_codex_models,
             supports_image_input=settings.agent_codex_supports_image_input,
+            shared_media_root=Path(settings.agent_shared_private_media_root),
         )
         claude = ClaudeRunner(
             workspace=Path(settings.agent_workspace_root),
             executable=settings.agent_claude_executable,
             configured_models=settings.agent_claude_models,
             supports_image_input=settings.agent_claude_supports_image_input,
+            shared_media_root=Path(settings.agent_shared_private_media_root),
         )
 
         def antigravity_workspace_runner(workspace: Path) -> AgentRunner:
@@ -48,6 +51,7 @@ class RunnerRegistry:
                 executable=settings.agent_antigravity_executable,
                 configured_models=settings.agent_antigravity_models,
                 supports_image_input=settings.agent_antigravity_supports_image_input,
+                shared_media_root=Path(settings.agent_shared_private_media_root),
             )
 
         def codex_workspace_runner(workspace: Path) -> AgentRunner:
@@ -56,6 +60,7 @@ class RunnerRegistry:
                 executable=settings.agent_codex_executable,
                 configured_models=settings.agent_codex_models,
                 supports_image_input=settings.agent_codex_supports_image_input,
+                shared_media_root=Path(settings.agent_shared_private_media_root),
             )
 
         def claude_workspace_runner(workspace: Path) -> AgentRunner:
@@ -64,6 +69,7 @@ class RunnerRegistry:
                 executable=settings.agent_claude_executable,
                 configured_models=settings.agent_claude_models,
                 supports_image_input=settings.agent_claude_supports_image_input,
+                shared_media_root=Path(settings.agent_shared_private_media_root),
             )
 
         return cls(
