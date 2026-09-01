@@ -36,6 +36,7 @@ from app.workouts.candidate_selector import caution_tags_for_training_cautions
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
     get_session_duration_policy,
+    get_session_exercise_count_policy,
 )
 from app.workouts.program_engine.engine import generate_program
 from app.workouts.program_engine.enums import (
@@ -438,15 +439,32 @@ def analyze_failure(result: Any, request: ProgramGenerationRequest) -> dict[str,
             rule_file = "app/workouts/program_engine/session_builder.py"
             rule_func = "build_sessions()"
             failing_phase = "session_construction"
-        elif "REQUESTED_TRAINING_DAYS_UNSATISFIED" in collected_reasons:
-            root_cause = "REQUESTED_TRAINING_DAYS_UNSATISFIED"
-            actual_val = f"اسپلیت {request.available_training_days} روزه"
-            limit_val = f"{request.available_training_days} روز در هفته"
-            exact_description_fa = f"موتور الگوی تقسیم معتبری برای چیدمان {request.available_training_days} روز تمرین در هفته با این شرایط نیافت."
-            engine_repair_hint_fa = "افزودن تمپلیت‌ها یا الگوهای اسپلیت جدید برای این تعداد روز در split_selector.py."
-            rule_file = "app/workouts/program_engine/split_selector.py"
-            rule_func = "rank_split_candidates()"
-            failing_phase = "split_selection"
+        elif "SESSION_EXERCISE_COUNT_OUT_OF_RANGE" in collected_reasons:
+            root_cause = "SESSION_EXERCISE_COUNT_OUT_OF_RANGE"
+            ex_policy = get_session_exercise_count_policy(request.session_duration_minutes)
+            actual_val = "خارج از بازه استاندارد حرکات جلسه"
+            limit_val = f"{ex_policy.minimum_main_exercises} الی {ex_policy.maximum_main_exercises} حرکت اصلی در هر جلسه"
+            exact_description_fa = (
+                f"تعداد حرکات اصلی تجویزشده در جلسه خارج از بازه مجاز تعیین‌شده برای مدت زمان "
+                f"{request.session_duration_minutes} دقیقه‌ای است (حداقل {ex_policy.minimum_main_exercises} و حداکثر {ex_policy.maximum_main_exercises} حرکت). "
+                f"موتور نتوانست تعداد تمرینات را بدون نقض سایر قوانین در این بازه تنظیم کند."
+            )
+            engine_repair_hint_fa = "بررسی پالیسی get_session_exercise_count_policy یا تنظیم منطق افزودن/حذف حرکات کمکی در session_duration.py."
+            rule_file = "app/workouts/program_engine/duration_policy.py"
+            rule_func = "get_session_exercise_count_policy()"
+            failing_phase = "session_exercise_count_validation"
+        elif "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in collected_reasons or "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT" in collected_reasons:
+            root_cause = "REQUIRED_SLOT_HARD_IMPOSSIBILITY" if "REQUIRED_SLOT_HARD_IMPOSSIBILITY" in collected_reasons else "SESSION_CONSTRUCTION_FAILED_REQUIRED_SLOT"
+            actual_val = "۰ حرکت منطبق با اسلات اجباری"
+            limit_val = "حداقل ۱ حرکت ایمن و منطبق با تجهیزات"
+            exact_description_fa = (
+                "تمپلیت تمرینی جلسه دارای اسلات الزامی (Required Slot) برای یک الگوی حرکتی خاص است، "
+                "اما به دلیل تلاقی برچسب‌های آسیب یا تجهیزات محدود، هیچ تمرین مجازی در کاتالوگ برای پر کردن این اسلات وجود ندارد."
+            )
+            engine_repair_hint_fa = "انعطاف‌پذیر کردن اسلات‌های اجباری در session_builder.py هنگام تجهیزات خانگی/آسیب‌دیدگی یا گسترش کاتالوگ حرکات جایگزین."
+            rule_file = "app/workouts/program_engine/session_builder.py"
+            rule_func = "build_sessions()"
+            failing_phase = "required_slot_resolution"
         else:
             non_generic = [r for r in collected_reasons if r not in ("PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED", "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED", "UNSATISFIED_CONSTRAINT")]
             if non_generic:
