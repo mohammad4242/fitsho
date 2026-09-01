@@ -25,6 +25,7 @@ from app.workouts.program_engine.enums import (
 )
 from app.workouts.program_engine.exercise_ranker import rank_exercises
 from app.workouts.program_engine.normalization import normalize_request
+from app.workouts.program_engine.repair_observability import collect_repair_observability
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 from app.workouts.program_engine.schemas import (
     ProgrammedExercise,
@@ -46,6 +47,58 @@ from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog
 
 def _direct_muscles(day: WorkoutDay) -> set[MuscleGroup]:
     return {item.primary_muscle for item in day.exercises if item.primary_muscle is not None}
+
+
+def test_repair_observability_counts_only_explicit_real_operations() -> None:
+    observation = collect_repair_observability(
+        (
+            {
+                "stage": "candidate_options",
+                "reason_codes": ("EXERCISE_REPLACED_OPTION", "SUBSTITUTION_CURATED_ALTERNATIVE"),
+            },
+            {
+                "stage": "volume_repair",
+                "reasons": (
+                    "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET",
+                    "PRIORITY_VOLUME_REDISTRIBUTED",
+                    "UNRELATED_REPLACED_LABEL",
+                ),
+            },
+            {
+                "stage": "recovery_repair",
+                "reason_codes": ("RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED",),
+            },
+            {
+                "stage": "session_duration",
+                "per_session_evidence": (
+                    {
+                        "reason_codes": (
+                            "SESSION_DURATION_TARGET_SATISFIED",
+                            "SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION",
+                        )
+                    },
+                ),
+            },
+            {
+                "stage": "template_adaptation",
+                "substitutions": ({"day_index": 1},),
+                "prescription_changes": ({"day_index": 1},),
+            },
+        )
+    )
+
+    assert tuple(event.partition("@")[0] for event in observation.events) == (
+        "VOLUME_REPAIR_ADDED_SET_FOR_EFFECTIVE_TARGET",
+        "PRIORITY_VOLUME_REDISTRIBUTED",
+        "RECOVERY_OPTIONAL_ISOLATION_REDISTRIBUTED",
+        "SUPPLEMENTAL_WORK_TRIMMED_FOR_DURATION",
+        "TEMPLATE_SAFE_SUBSTITUTION_APPLIED",
+        "TEMPLATE_PRESCRIPTION_ADAPTED",
+    )
+    assert observation.actual_substitution_count == 1
+    assert observation.structural_repair_burden == 1
+    assert observation.workload_repair_burden == 3
+    assert observation.scheduling_repair_burden == 2
 
 
 def test_required_muscle_without_any_safe_coverage_is_structured_unsatisfied() -> None:
@@ -386,10 +439,7 @@ def test_template_session_replaces_excess_redundancy_with_complementary_role() -
         for candidate in build.drafts[0].exercises
     ]
     assert roles.count((MuscleGroup.CHEST, MovementPattern.HORIZONTAL_PUSH)) <= 2
-    assert all(
-        muscle in (MuscleGroup.CHEST, MuscleGroup.TRICEPS)
-        for muscle, _pattern in roles
-    )
+    assert all(muscle in (MuscleGroup.CHEST, MuscleGroup.TRICEPS) for muscle, _pattern in roles)
     assert not any(muscle is MuscleGroup.SHOULDERS for muscle, _pattern in roles)
     assert "TEMPLATE_REDUNDANCY_REPLACED_WITH_COMPLEMENTARY_ROLE" in build.reason_codes
 

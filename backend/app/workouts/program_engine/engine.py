@@ -42,6 +42,7 @@ from app.workouts.program_engine.recovery import (
     repair_recovery_accessory_distribution,
     repair_recovery_weekdays,
 )
+from app.workouts.program_engine.repair_observability import collect_repair_events
 from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
 from app.workouts.program_engine.safety import screen_safety
 from app.workouts.program_engine.schemas import (
@@ -307,9 +308,7 @@ def generate_program(
         selected_key, selected_ranking, selected_result, selected_attempt = max(
             successful_templates, key=lambda item: item[0]
         )
-        selected_result = _append_successful_template_attempt(
-            selected_result, selected_attempt
-        )
+        selected_result = _append_successful_template_attempt(selected_result, selected_attempt)
         return _append_successful_template_attempt(
             selected_result,
             {
@@ -515,109 +514,8 @@ def _template_attempt_trace(
 def _post_construction_repair_events(
     result: ProgramGenerationResult,
 ) -> tuple[str, ...]:
-    """Return one stable event per observed repair operation."""
-
-    events: list[str] = []
     trace = result.program.decision_trace if result.program is not None else result.decision_trace
-    repair_markers = (
-        "ADDED",
-        "APPLIED",
-        "PERSONALIZED",
-        "REARRANGED",
-        "RECOVERED",
-        "REDUCED",
-        "REDISTRIBUTED",
-        "REMOVED",
-        "REPLACED",
-        "SUBSTITUT",
-        "TRIMMED",
-    )
-    ignored = {
-        "FINAL_SESSION_SEQUENCE_APPLIED",
-        "SESSION_DURATION_TARGET_SATISFIED",
-        "WEEKLY_REDISTRIBUTION_ALREADY_BALANCED",
-    }
-    for trace_index, entry in enumerate(trace):
-        stage = str(entry.get("stage", "unknown"))
-        substitutions = entry.get("substitutions", ())
-        prescription_changes = entry.get("prescription_changes", ())
-        if stage == "template_adaptation":
-            if isinstance(substitutions, (tuple, list)):
-                for operation_index, substitution in enumerate(substitutions):
-                    events.append(
-                        _repair_event_token(
-                            "TEMPLATE_SAFE_SUBSTITUTION_APPLIED",
-                            stage,
-                            trace_index,
-                            operation_index,
-                            substitution,
-                        )
-                    )
-            if isinstance(prescription_changes, (tuple, list)):
-                for operation_index, change in enumerate(prescription_changes):
-                    events.append(
-                        _repair_event_token(
-                            "TEMPLATE_PRESCRIPTION_ADAPTED",
-                            stage,
-                            trace_index,
-                            operation_index,
-                            change,
-                        )
-                    )
-
-        per_session_evidence = entry.get("per_session_evidence", ())
-        has_session_evidence = stage == "session_duration" and isinstance(
-            per_session_evidence, (tuple, list)
-        )
-        session_evidence_items: tuple[object, ...] = ()
-        if isinstance(per_session_evidence, (tuple, list)):
-            session_evidence_items = tuple(per_session_evidence)
-        if session_evidence_items:
-            for evidence_index, evidence in enumerate(session_evidence_items):
-                if not isinstance(evidence, dict):
-                    continue
-                values = evidence.get("reason_codes", ())
-                if not isinstance(values, (tuple, list)):
-                    continue
-                for value_index, value in enumerate(values):
-                    if (
-                        isinstance(value, str)
-                        and value not in ignored
-                        and any(marker in value for marker in repair_markers)
-                    ):
-                        events.append(
-                            f"{value}@{stage}:{trace_index}:session:{evidence_index}:"
-                            f"operation:{value_index}"
-                        )
-
-        for field in ("reason_codes", "reasons"):
-            if has_session_evidence:
-                continue
-            values = entry.get(field, ())
-            if not isinstance(values, (tuple, list)):
-                continue
-            for value_index, value in enumerate(values):
-                if (
-                    isinstance(value, str)
-                    and value not in ignored
-                    and any(marker in value for marker in repair_markers)
-                ):
-                    events.append(
-                        f"{value}@{stage}:{trace_index}:{field}:operation:{value_index}"
-                    )
-    return tuple(events)
-
-
-def _repair_event_token(
-    code: str,
-    stage: str,
-    trace_index: int,
-    operation_index: int,
-    operation: object,
-) -> str:
-    day = operation.get("day_index") if isinstance(operation, dict) else None
-    day_suffix = f":day:{day}" if isinstance(day, int) else ""
-    return f"{code}@{stage}:{trace_index}:operation:{operation_index}{day_suffix}"
+    return collect_repair_events(trace)
 
 
 def _append_successful_template_attempt(
@@ -1640,9 +1538,7 @@ def _duration_repair_trace(
         classification = "minor"
     else:
         classification = "major"
-    unavoidable_constraints = tuple(
-        sorted(code for code in reason_codes if "CONSTRAINED" in code)
-    )
+    unavoidable_constraints = tuple(sorted(code for code in reason_codes if "CONSTRAINED" in code))
     session_metrics = tuple(
         {
             "day_index": updated.day_index,
@@ -1701,9 +1597,7 @@ def _recovery_repair_trace(
     has_recovery_conflict = bool(
         before_assessment.repairable_conflicts or before_assessment.hard_conflicts
     )
-    repair_attempts: tuple[str, ...] = (
-        ("reorder_weekdays",) if has_recovery_conflict else ()
-    )
+    repair_attempts: tuple[str, ...] = ("reorder_weekdays",) if has_recovery_conflict else ()
     if any(code.startswith("RECOVERY_OPTIONAL_ISOLATION_") for code in reason_codes):
         repair_attempts += ("move_optional_isolation",)
     if before_assessment.hard_conflicts:
@@ -1961,6 +1855,7 @@ def _volume_range_metric(
         "acceptable_maximum": target.acceptable_maximum,
         "actual_direct_volume": actual_direct,
         "actual_effective_volume": actual_effective,
+        "actual_constraint_volume": actual_weekly_volume,
         "status": status,
         "constraint_reason_codes": tuple(dict.fromkeys(constraint_reasons)),
         "minimum_soft": target.minimum_soft,

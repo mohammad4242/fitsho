@@ -21,6 +21,10 @@ def build_coach_quality_projection(
     if entry is None or not isinstance(entry.get("metrics"), dict):
         return None
     try:
-        return CoachQualityMetricsResponse.model_validate(entry["metrics"])
+        public_fields = CoachQualityMetricsResponse.model_fields
+        public_metrics = {
+            key: value for key, value in entry["metrics"].items() if key in public_fields
+        }
+        return CoachQualityMetricsResponse.model_validate(public_metrics)
     except ValidationError:
         return None

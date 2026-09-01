@@ -16,6 +16,11 @@ def test_coach_quality_projection_accepts_only_well_formed_trace_metrics() -> No
         "substitution_count": 1,
         "constraint_count": 2,
         "hard_validation_status": "VALID_WITH_CONSTRAINTS",
+        "schema_version": "coach_quality_v2",
+        "selection_quality": {
+            "coverage_state": "satisfied",
+            "coverage_percentage": 100.0,
+        },
     }
 
     projection = build_coach_quality_projection([{"stage": "coach_quality", "metrics": metrics}])

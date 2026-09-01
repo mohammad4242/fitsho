@@ -16,6 +16,7 @@ from app.workouts.program_engine.recovery import (
     ExposureLoad,
     assess_recovery_spacing,
     classify_muscle_exposures,
+    recovery_quality_evidence,
     recovery_spacing_is_valid,
     repair_recovery_weekdays,
 )
@@ -100,7 +101,11 @@ def test_moderate_overlap_is_safe_but_still_repairable() -> None:
 
     assert recovery_spacing_is_valid(moderate_then_light, RULESET)
     assert recovery_spacing_is_valid(two_moderate, RULESET)
-    assert assess_recovery_spacing(two_moderate, RULESET).repairable_conflicts
+    assessment = assess_recovery_spacing(two_moderate, RULESET)
+    assert assessment.repairable_conflicts
+    evidence = recovery_quality_evidence(assessment)
+    assert evidence["status"] == "repairable_conflict"
+    assert evidence["recovery_margin"] < 100.0
 
 
 def test_high_to_light_overlap_is_safe_but_prefers_calendar_spacing() -> None:

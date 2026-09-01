@@ -50,6 +50,22 @@ def test_classifies_quality_drift_as_soft_and_unknown_explicitly() -> None:
     assert classify_constraint("FUTURE_REASON_CODE") is None
 
 
+def test_classifies_current_final_quality_constraints_explicitly() -> None:
+    final_quality_constraints = (
+        "WEEKLY_VOLUME_CONSTRAINED",
+        "DIRECT_VOLUME_BELOW_SOFT_TARGET",
+        "PRIORITY_TARGET_PARTIALLY_SATISFIED",
+        "PRIORITY_TARGET_CONSTRAINED",
+        "RECOVERY_REPAIRABLE_OVERLAP_REMAINS",
+        "MINIMUM_DIRECT_MUSCLE_COVERAGE_UNSATISFIED:shoulders",
+        "MINIMUM_MUSCLE_COVERAGE_UNSATISFIED:shoulders",
+        "DURATION_CAPACITY_LIMITED_VOLUME",
+    )
+
+    classifications = tuple(classify_constraint(reason) for reason in final_quality_constraints)
+    assert classifications == (ConstraintClass.SOFT,) * len(final_quality_constraints)
+
+
 def test_structured_reason_suffix_uses_the_stable_base_code() -> None:
     assert (
         classify_constraint("REQUESTED_TRAINING_DAYS_MISMATCH:expected=6:actual=5")

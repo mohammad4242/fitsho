@@ -130,6 +130,38 @@ class RecoveryAssessment:
         }
 
 
+def recovery_quality_evidence(assessment: RecoveryAssessment) -> dict[str, object]:
+    """Expose the weakest observed recovery margin without changing safety gates."""
+
+    conflicts = assessment.conflicts
+    if not conflicts:
+        margin = 100.0
+    elif assessment.hard_conflicts:
+        margin = 0.0
+    else:
+        margins = tuple(
+            min(
+                100.0,
+                max(
+                    0.0,
+                    conflict.actual_gap_days / conflict.required_gap_days * 100.0,
+                ),
+            )
+            for conflict in conflicts
+            if conflict.required_gap_days > 0
+        )
+        margin = min(margins, default=0.0)
+    trace = assessment.decision_trace()
+    return {
+        "status": trace["status"],
+        "recovery_margin": round(margin, 1),
+        "conflict_count": len(conflicts),
+        "hard_conflict_count": len(assessment.hard_conflicts),
+        "repairable_conflict_count": len(assessment.repairable_conflicts),
+        "soft_conflict_count": len(assessment.soft_conflicts),
+    }
+
+
 def _conflict_trace(conflict: RecoveryConflict) -> dict[str, object]:
     return {
         "muscle": conflict.muscle.value,
@@ -298,11 +330,7 @@ def _pair_recovery_requirement(
         # credited work remains available to volume accounting elsewhere.
         return ruleset.recovery_light_gap_days, ConstraintClass.SOFT
     if ExposureSource.SECONDARY_ONLY in sources:
-        secondary = (
-            current
-            if current.source is ExposureSource.SECONDARY_ONLY
-            else following
-        )
+        secondary = current if current.source is ExposureSource.SECONDARY_ONLY else following
         # Small secondary overlap is normal in professional splits. Escalate
         # only when the secondary dose is at least a moderate direct-equivalent
         # or has explicit high-load evidence.
