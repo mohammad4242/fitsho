@@ -58,6 +58,13 @@ class AgentGenerationInput(BaseModel):
     temperature: float = Field(ge=0, le=2)
     max_output_tokens: int = Field(ge=1, le=65_536)
     timeout_seconds: float = Field(gt=0, le=600)
+    # Multipart transport metadata. Backend task semantics remain in the fields above.
+    image_labels: tuple[
+        Annotated[str, StringConstraints(min_length=1, max_length=40)], ...
+    ] | None = Field(
+        default=None,
+        max_length=5,
+    )
 
 
 class AgentGenerationOutput(BaseModel):

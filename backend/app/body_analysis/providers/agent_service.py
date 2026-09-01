@@ -311,12 +311,18 @@ class AgentServiceProvider:
                 )
             filename = self._safe_filename(image.label, index, image.mime_type)
             files.append(("images", (filename, decoded, image.mime_type)))
+        multipart_metadata = {
+            **metadata,
+            "image_labels": [image.label for image in images],
+        }
         try:
             response = await self._client.post(
                 f"{self._base_url}/v1/analyze-images",
                 headers=self._headers(),
                 data={
-                    "metadata": json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
+                    "metadata": json.dumps(
+                        multipart_metadata, ensure_ascii=False, separators=(",", ":")
+                    )
                 },
                 files=files,
                 timeout=self._timeout,

@@ -127,6 +127,10 @@ class AgentService:
             raise AgentServiceError(
                 ErrorCode.INVALID_REQUEST, "at least one image is required", 422
             )
+        if request.image_labels is None or len(request.image_labels) != len(images):
+            raise AgentServiceError(
+                ErrorCode.INVALID_REQUEST, "image labels do not match supplied images", 422
+            )
         self._validate_schema(request.response_schema)
         runner = self._runner(request.agent)
         resolved = await self._resolve_profile(
@@ -155,6 +159,7 @@ class AgentService:
                                 image.content_type,
                                 index,
                                 self.workspace_limits,
+                                label=request.image_labels[index - 1],
                             )
                         except (OSError, ValueError) as exc:
                             raise AgentServiceError(

@@ -1,3 +1,4 @@
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -44,6 +45,7 @@ class RequestWorkspace:
         mime_type: str,
         index: int,
         limits: WorkspaceLimits = WorkspaceLimits(),  # noqa: B008
+        label: str | None = None,
     ) -> Path:
         if self.path is None:
             raise RuntimeError("workspace is not active")
@@ -62,7 +64,10 @@ class RequestWorkspace:
             raise ValueError("images exceed total size limit")
 
         suffix = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}[mime_type]
-        image_path = self.path / f"image-{index:02d}{suffix}"
+        stem = self._safe_label_stem(label, index)
+        image_path = self.path / f"{stem}{suffix}"
+        if image_path.exists():
+            image_path = self.path / f"{stem}-{index:02d}{suffix}"
         try:
             with image_path.open("xb") as image_file:
                 image_file.write(data)
@@ -71,6 +76,13 @@ class RequestWorkspace:
         self._saved_indices.add(index)
         self._total_bytes += data_size
         return image_path
+
+    @staticmethod
+    def _safe_label_stem(label: str | None, index: int) -> str:
+        if label is None:
+            return f"image-{index:02d}"
+        stem = re.sub(r"[^A-Za-z0-9_-]+", "-", label).strip("-_")[:32]
+        return stem or f"image-{index:02d}"
 
 
 def create_request_workspace(
