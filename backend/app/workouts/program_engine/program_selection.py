@@ -219,7 +219,13 @@ def build_final_selection_trace(
             and first_valid is not None
             and selected.identifier != first_valid.identifier
         ),
+        "first_valid_quality_key": _quality_summary(first_valid.quality) if first_valid else {},
         "summarized_quality_key": _quality_summary(selected_quality),
+        "selected_quality_not_worse_than_first_valid": (
+            _compare_preference(selected, first_valid) >= 0
+            if selected is not None and first_valid is not None
+            else None
+        ),
         "warning_burden": _warning_summary(selected_quality),
         "repair_burden": _repair_summary(selected_quality),
         "substitution_burden": (

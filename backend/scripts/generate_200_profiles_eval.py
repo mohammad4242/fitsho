@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-import json
 import os
 import random
-from dataclasses import asdict, dataclass
-from datetime import date, timedelta
-from decimal import Decimal
+from dataclasses import dataclass
+from datetime import date
+from time import perf_counter
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+import app.main  # noqa: F401  # Ensure all SQLAlchemy models and relationships are registered
 from app.config import get_settings
-import app.main  # Ensure all SQLAlchemy models and relationships are registered
-from app.workout_reviews.models import WorkoutPlanReview  # Ensure models loaded
-from app.exercises.enums import Equipment, ExerciseCautionTag, MuscleGroup
+from app.exercises.enums import MuscleGroup
 from app.exercises.models import Exercise
 from app.profile.enums import (
     ExperienceLevel,
@@ -25,12 +23,9 @@ from app.profile.enums import (
     TrainingCaution,
     TrainingLocation,
 )
-from app.profile.training_compatibility import (
-    UnsupportedResistanceTrainingCombinationError,
-    require_supported_resistance_training_days,
-)
 from app.profile.training_focus import USER_SELECTABLE_PRIORITY_MUSCLES
 from app.training_templates.engine_reference import load_template_references
+from app.workout_reviews.models import WorkoutPlanReview  # noqa: F401  # Ensure models loaded
 from app.workouts.candidate_selector import caution_tags_for_training_cautions
 from app.workouts.program_engine.duration_policy import (
     calculate_main_training_minutes,
@@ -57,6 +52,14 @@ from app.workouts.program_engine.schemas import (
 )
 from app.workouts.program_engine.volume_policy import session_hard_volume_cap
 from app.workouts.service import WorkoutGenerationService
+from scripts.program_engine_audit_support import (
+    build_profile_audit_record,
+    classify_profile_support,
+    summarize_audit_results,
+    supported_profile_cohort,
+    unsupported_profile_failure,
+    write_audit_json,
+)
 
 FA_TRANSLATIONS = {
     "male": "مرد",
@@ -296,6 +299,16 @@ def generate_200_stratified_profiles(seed: int = 20260901) -> list[ProfileSpec]:
     return profiles
 
 
+def generate_200_supported_profiles(seed: int = 20260901) -> list[ProfileSpec]:
+    """Generate exactly 200 deterministic profiles allowed by production rules."""
+
+    return supported_profile_cohort(
+        generate_200_stratified_profiles,
+        count=200,
+        seed=seed,
+    )
+
+
 def profile_to_request(spec: ProfileSpec, user_id: UUID) -> ProgramGenerationRequest:
     equipment = resolve_available_equipment(
         spec.training_location,
@@ -466,12 +479,14 @@ def analyze_failure(result: Any, request: ProgramGenerationRequest) -> dict[str,
     }
 
 
-def evaluate_all_200_profiles() -> list[dict[str, Any]]:
+def evaluate_all_200_profiles(
+    profiles: list[ProfileSpec] | None = None,
+) -> list[dict[str, Any]]:
     print("Loading settings and database session...")
     settings = get_settings()
     engine = create_engine(settings.database_url)
 
-    profiles = generate_200_stratified_profiles()
+    profiles = profiles or generate_200_supported_profiles()
     print(f"Generated {len(profiles)} stratified profiles.")
 
     results: list[dict[str, Any]] = []
@@ -486,48 +501,34 @@ def evaluate_all_200_profiles() -> list[dict[str, Any]]:
         print(f"Loaded {len(catalog)} exercises and {len(references)} templates.")
 
         for p in profiles:
-            user_uuid = uuid4()
-
-            # First verify compatibility rule
-            try:
-                require_supported_resistance_training_days(
-                    p.experience_level,
-                    p.training_days_per_week,
+            support = classify_profile_support(p)
+            if not support.supported:
+                failure_info = unsupported_profile_failure(p, support)
+                record = build_profile_audit_record(
+                    p,
+                    support,
+                    status="FAILED",
+                    failure_info=failure_info,
                 )
-                compatibility_error = None
-            except UnsupportedResistanceTrainingCombinationError as err:
-                compatibility_error = str(err)
-
-            if compatibility_error:
-                failure_info = {
-                    "final_error_code": "UNSUPPORTED_RESISTANCE_TRAINING_DAYS",
-                    "all_errors": [compatibility_error],
-                    "root_cause": "UNSUPPORTED_RESISTANCE_TRAINING_DAYS",
-                    "secondary_causes": [],
-                    "rule_file": "app/profile/training_compatibility.py",
-                    "rule_func": "require_supported_resistance_training_days()",
-                    "actual_val": f"{p.experience_level.value} با {p.training_days_per_week} روز تمرین",
-                    "limit_val": "تعداد روزهای مجاز طبق ماتریس سازگاری تمرین مقاومتی",
-                    "failing_phase": "input_compatibility_validation",
-                    "exact_description_fa": f"سطح سابقه {FA_TRANSLATIONS.get(p.experience_level.value, p.experience_level.value)} با {p.training_days_per_week} روز تمرین در هفته سازگار نیست و در قوانین فیتشو مجاز شمرده نمی‌شود.",
-                }
-                results.append({
-                    "profile": p,
-                    "status": "FAILED",
-                    "split": None,
-                    "split_fa": None,
-                    "days_count": 0,
-                    "days": [],
-                    "weekly_direct_volume": {},
-                    "weekly_effective_volume": {},
-                    "warnings": [],
-                    "final_gate_status": "rejected",
-                    "failure_info": failure_info,
-                })
-                print(f"Profile #{p.index:03d} [{p.name}]: FAILED -> {failure_info['root_cause']}")
+                record.update(
+                    {
+                        "split": None,
+                        "split_fa": None,
+                        "days_count": 0,
+                        "days": [],
+                        "weekly_direct_volume": {},
+                        "weekly_effective_volume": {},
+                        "warnings": [],
+                        "final_gate_status": "rejected",
+                    }
+                )
+                results.append(record)
+                print(f"Profile #{p.index:03d} [{p.name}]: UNSUPPORTED")
                 continue
 
+            user_uuid = uuid4()
             req = profile_to_request(p, user_uuid)
+            started = perf_counter()
 
             try:
                 gen_result = generate_program(
@@ -539,6 +540,7 @@ def evaluate_all_200_profiles() -> list[dict[str, Any]]:
             except Exception as e:
                 print(f"Profile #{p.index:03d} Exception: {e}")
                 gen_result = None
+            runtime_ms = (perf_counter() - started) * 1000.0
 
             if gen_result and gen_result.is_success and gen_result.program:
                 prog: WorkoutProgram = gen_result.program
@@ -578,19 +580,28 @@ def evaluate_all_200_profiles() -> list[dict[str, Any]]:
                 final_gate = prog.aggregate_metrics.get("final_quality_gate", {})
                 gate_status = final_gate.get("status", "accepted")
 
-                results.append({
-                    "profile": p,
-                    "status": "SUCCESS",
-                    "split": prog.split.split_type.value,
-                    "split_fa": FA_TRANSLATIONS.get(prog.split.split_type.value, prog.split.split_type.value),
-                    "days_count": len(prog.weekly_schedule),
-                    "days": days_data,
-                    "weekly_direct_volume": direct_vol,
-                    "weekly_effective_volume": effective_vol,
-                    "warnings": list(prog.warnings),
-                    "final_gate_status": gate_status,
-                    "failure_info": None,
-                })
+                record = build_profile_audit_record(
+                    p,
+                    support,
+                    status="SUCCESS",
+                    result=gen_result,
+                    runtime_ms=runtime_ms,
+                )
+                record.update(
+                    {
+                        "split": prog.split.split_type.value,
+                        "split_fa": FA_TRANSLATIONS.get(
+                            prog.split.split_type.value, prog.split.split_type.value
+                        ),
+                        "days_count": len(prog.weekly_schedule),
+                        "days": days_data,
+                        "weekly_direct_volume": direct_vol,
+                        "weekly_effective_volume": effective_vol,
+                        "warnings": list(prog.warnings),
+                        "final_gate_status": gate_status,
+                    }
+                )
+                results.append(record)
                 print(f"Profile #{p.index:03d} [{p.name}]: SUCCESS -> {prog.split.split_type.value} ({len(prog.weekly_schedule)} days)")
             else:
                 failure_info = analyze_failure(gen_result, req) if gen_result else {
@@ -605,34 +616,44 @@ def evaluate_all_200_profiles() -> list[dict[str, Any]]:
                     "failing_phase": "exception",
                     "exact_description_fa": "خطای سیستمی رخ داد و برنامه تمرینی ساخته نشد.",
                 }
-                results.append({
-                    "profile": p,
-                    "status": "FAILED",
-                    "split": None,
-                    "split_fa": None,
-                    "days_count": 0,
-                    "days": [],
-                    "weekly_direct_volume": {},
-                    "weekly_effective_volume": {},
-                    "warnings": [],
-                    "final_gate_status": "rejected",
-                    "failure_info": failure_info,
-                })
+                record = build_profile_audit_record(
+                    p,
+                    support,
+                    status="FAILED",
+                    result=gen_result,
+                    failure_info=failure_info,
+                    runtime_ms=runtime_ms,
+                )
+                record.update(
+                    {
+                        "split": None,
+                        "split_fa": None,
+                        "days_count": 0,
+                        "days": [],
+                        "weekly_direct_volume": {},
+                        "weekly_effective_volume": {},
+                        "warnings": [],
+                        "final_gate_status": "rejected",
+                    }
+                )
+                results.append(record)
                 print(f"Profile #{p.index:03d} [{p.name}]: FAILED -> {failure_info['root_cause']}")
 
     return results
 
 
 def build_pdf_html(results: list[dict[str, Any]]) -> str:
-    total = len(results)
-    success_count = sum(1 for r in results if r["status"] == "SUCCESS")
-    failure_count = total - success_count
-    success_rate = (success_count / total) * 100 if total > 0 else 0
+    audit_summary = summarize_audit_results(results)
+    total = audit_summary["supported_attempted"]
+    success_count = audit_summary["supported_success"]
+    failure_count = audit_summary["supported_failure"]
+    unsupported_count = audit_summary["unsupported_negative_cohort"]
+    success_rate = audit_summary["supported_success_rate"]
 
     failures_by_code: dict[str, int] = {}
     failed_rules_counter: dict[str, int] = {}
     for r in results:
-        if r["status"] == "FAILED" and r.get("failure_info"):
+        if r.get("supported") is True and r["status"] == "FAILED" and r.get("failure_info"):
             finfo = r["failure_info"]
             code = finfo.get("final_error_code", "UNKNOWN")
             root = finfo.get("root_cause", "UNKNOWN")
@@ -901,6 +922,10 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
         <div class="stat-val">{success_rate:.1f}٪</div>
         <div class="stat-lbl">نرخ موفقیت (Success Rate)</div>
     </div>
+    <div class="stat-card">
+        <div class="stat-val">{unsupported_count}</div>
+        <div class="stat-lbl">خارج از دامنه پشتیبانی</div>
+    </div>
 </div>
 
 <div class="analytics-section">
@@ -1054,37 +1079,18 @@ def main() -> None:
     import weasyprint
 
     results = evaluate_all_200_profiles()
-    successes = sum(1 for r in results if r["status"] == "SUCCESS")
-    failures = len(results) - successes
-    print(f"\nEvaluation summary: {successes} succeeded, {failures} failed.")
+    summary = summarize_audit_results(results)
+    print(
+        f"\nEvaluation summary: {summary['supported_success']} supported succeeded, "
+        f"{summary['supported_failure']} supported failed; "
+        f"{summary['unsupported_negative_cohort']} unsupported excluded."
+    )
 
-    # Save JSON raw report
     os.makedirs("/home/mohammad/project/fitsho/var/reports", exist_ok=True)
     os.makedirs("/home/mohammad/project/fitsho/reports", exist_ok=True)
 
     json_path = "/home/mohammad/project/fitsho/var/reports/200_profiles_eval_data.json"
-    with open(json_path, "w", encoding="utf-8") as f:
-        json_data = []
-        for r in results:
-            p_dict = asdict(r["profile"])
-            p_dict["birth_date"] = p_dict["birth_date"].isoformat()
-            p_dict["sex"] = p_dict["sex"].value
-            p_dict["fitness_goal"] = p_dict["fitness_goal"].value
-            p_dict["experience_level"] = p_dict["experience_level"].value
-            p_dict["training_location"] = p_dict["training_location"].value
-            if p_dict["home_training_setup"]:
-                p_dict["home_training_setup"] = p_dict["home_training_setup"].value
-            if p_dict["priority_muscle"]:
-                p_dict["priority_muscle"] = p_dict["priority_muscle"].value
-            p_dict["training_cautions"] = [c.value for c in p_dict["training_cautions"]]
-            p_dict["sleep_quality"] = p_dict["sleep_quality"].value
-            p_dict["stress_level"] = p_dict["stress_level"].value
-            p_dict["physical_job_demand"] = p_dict["physical_job_demand"].value
-
-            r_clean = dict(r)
-            r_clean["profile"] = p_dict
-            json_data.append(r_clean)
-        json.dump(json_data, f, ensure_ascii=False, indent=2)
+    write_audit_json(results, json_path)
     print(f"Saved raw evaluation data to {json_path}")
 
     # Build HTML
