@@ -227,7 +227,7 @@ def test_strength_primary_remains_first_non_opener() -> None:
     )
 
 
-def test_mixed_push_up_and_pull_up_openers_fail_final_validation() -> None:
+def test_mixed_push_up_and_pull_up_requires_only_one_opener() -> None:
     source = request(available_training_days=1)
     result = generate_program(source, full_catalog(), RULESET, reference_templates=())
     assert result.program is not None, result.errors
@@ -256,7 +256,118 @@ def test_mixed_push_up_and_pull_up_openers_fail_final_validation() -> None:
 
     report = validate_program(mutated, source, RULESET)
 
-    assert "SEMANTIC_OPENER_CONFLICT" in report.errors
+    assert "SEMANTIC_OPENER_CONFLICT" not in report.errors
+
+
+def test_mixed_push_up_and_pull_up_allow_one_strength_primary_opener() -> None:
+    push_up = _programmed(
+        "mixed-strength-push-up",
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        muscle=MuscleGroup.CHEST,
+        order=2,
+        substitution_group="horizontal_press_push_up",
+        reasons=("STRENGTH_PRIMARY_COMPOUND",),
+    )
+    pull_up = _programmed(
+        "mixed-pull-up-allowed",
+        pattern=MovementPattern.VERTICAL_PULL,
+        muscle=MuscleGroup.BACK,
+        order=1,
+        substitution_group="vertical_pull_bodyweight",
+    )
+    normalized = _normalized(primary_goal=Goal.STRENGTH)
+
+    finalized = finalize_session_structure(
+        (_day("upper", (pull_up, push_up)),), normalized, RULESET
+    )[0]
+
+    assert {item.exercise_name for item in finalized.exercises} == {
+        "mixed-strength-push-up",
+        "mixed-pull-up-allowed",
+    }
+    assert finalized.exercises[0].exercise_name == "mixed-strength-push-up"
+    assert "SEMANTIC_OPENER_CONFLICT" not in session_structure_errors(
+        finalized, Goal.STRENGTH, normalized
+    )
+
+
+def test_mixed_openers_use_explicit_chest_priority_before_original_order() -> None:
+    push_up = _programmed(
+        "priority-push-up",
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        muscle=MuscleGroup.CHEST,
+        order=2,
+        substitution_group="horizontal_press_push_up",
+    )
+    pull_up = _programmed(
+        "priority-pull-up",
+        pattern=MovementPattern.VERTICAL_PULL,
+        muscle=MuscleGroup.BACK,
+        order=1,
+        substitution_group="vertical_pull_bodyweight",
+    )
+
+    finalized = finalize_session_structure(
+        (_day("upper", (pull_up, push_up)),),
+        _normalized(priority_muscles=[MuscleGroup.CHEST]),
+        RULESET,
+    )[0]
+
+    assert finalized.exercises[0].exercise_name == "priority-push-up"
+
+
+def test_mixed_openers_use_original_construction_order_without_priority() -> None:
+    push_up = _programmed(
+        "ordered-push-up",
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        muscle=MuscleGroup.CHEST,
+        order=2,
+        substitution_group="horizontal_press_push_up",
+    )
+    pull_up = _programmed(
+        "ordered-pull-up",
+        pattern=MovementPattern.VERTICAL_PULL,
+        muscle=MuscleGroup.BACK,
+        order=1,
+        substitution_group="vertical_pull_bodyweight",
+    )
+
+    finalized = finalize_session_structure(
+        (_day("upper", (push_up, pull_up)),), _normalized(), RULESET
+    )[0]
+
+    assert finalized.exercises[0].exercise_name == "ordered-pull-up"
+
+
+def test_mixed_openers_use_stable_identifier_for_an_original_order_tie() -> None:
+    push_up = _programmed(
+        "stable-push-up",
+        pattern=MovementPattern.HORIZONTAL_PUSH,
+        muscle=MuscleGroup.CHEST,
+        order=1,
+        substitution_group="horizontal_press_push_up",
+    )
+    pull_up = _programmed(
+        "stable-pull-up",
+        pattern=MovementPattern.VERTICAL_PULL,
+        muscle=MuscleGroup.BACK,
+        order=1,
+        substitution_group="vertical_pull_bodyweight",
+    )
+    expected = min(
+        (push_up, pull_up),
+        key=lambda item: str(item.exercise_id),
+    ).exercise_name
+
+    first = finalize_session_structure(
+        (_day("upper", (push_up, pull_up)),), _normalized(), RULESET
+    )[0]
+    second = finalize_session_structure(
+        (_day("upper", (pull_up, push_up)),), _normalized(), RULESET
+    )[0]
+
+    assert first.exercises[0].exercise_name == expected
+    assert second.exercises[0].exercise_name == expected
 
 
 def test_every_safe_leg_extension_primer_precedes_every_squat() -> None:

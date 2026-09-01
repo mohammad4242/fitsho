@@ -37,6 +37,9 @@ from app.workouts.program_engine.supplemental_policy import (
     supplemental_reason_codes,
 )
 
+_PUSH_UP_OPENER = "push_up"
+_PULL_UP_OPENER = "pull_up"
+
 
 @dataclass(frozen=True)
 class _ExerciseUnit:
@@ -277,13 +280,8 @@ def _semantic_order_rank(
     all_units: tuple[_ExerciseUnit, ...],
     request: NormalizedProgramRequest,
 ) -> int:
-    if _session_has_meaningful_muscle(all_units, MuscleGroup.CHEST) and any(
-        is_push_up_family(item) for item in unit.exercises
-    ):
-        return 0
-    if _session_has_meaningful_back(all_units) and any(
-        is_pull_up_family(item) for item in unit.exercises
-    ):
+    opener_family = _semantic_opener_family(all_units, request)
+    if opener_family in _semantic_opener_families(unit):
         return 0
     has_safe_primer = any(
         is_leg_extension_primer(item) and _ordering_eligible(item, request)
@@ -320,19 +318,65 @@ def _is_required_semantic_opener(
     request: ProgramGenerationRequest | NormalizedProgramRequest | None,
 ) -> bool:
     return (
-        (
-            _session_has_meaningful_muscle(all_units, MuscleGroup.CHEST)
-            and any(is_push_up_family(item) for item in unit.exercises)
-        )
-        or (
-            _session_has_meaningful_back(all_units)
-            and any(is_pull_up_family(item) for item in unit.exercises)
-        )
+        _semantic_opener_family(all_units, request) in _semantic_opener_families(unit)
         or (
             _has_safe_leg_extension_primer(all_units, request)
             and any(is_leg_extension_primer(item) for item in unit.exercises)
         )
     )
+
+
+def _semantic_opener_families(unit: _ExerciseUnit) -> frozenset[str]:
+    families: set[str] = set()
+    if any(is_push_up_family(item) for item in unit.exercises):
+        families.add(_PUSH_UP_OPENER)
+    if any(is_pull_up_family(item) for item in unit.exercises):
+        families.add(_PULL_UP_OPENER)
+    return frozenset(families)
+
+
+def _semantic_opener_family(
+    units: tuple[_ExerciseUnit, ...],
+    request: ProgramGenerationRequest | NormalizedProgramRequest | None,
+) -> str | None:
+    family_units = {
+        family: tuple(unit for unit in units if family in _semantic_opener_families(unit))
+        for family in (_PUSH_UP_OPENER, _PULL_UP_OPENER)
+    }
+    available = tuple(family for family, candidates in family_units.items() if candidates)
+    if len(available) <= 1:
+        return available[0] if available else None
+
+    strength_primary = tuple(
+        family
+        for family in available
+        if any(_contains_reason(unit, "STRENGTH_PRIMARY_COMPOUND") for unit in family_units[family])
+    )
+    if len(strength_primary) == 1:
+        return strength_primary[0]
+
+    priority_families = _priority_opener_families(request)
+    prioritized = tuple(family for family in available if family in priority_families)
+    if len(prioritized) == 1:
+        return prioritized[0]
+
+    def construction_key(family: str) -> tuple[object, ...]:
+        return min((unit.original_order, unit.identifier) for unit in family_units[family])
+
+    return min(available, key=construction_key)
+
+
+def _priority_opener_families(
+    request: ProgramGenerationRequest | NormalizedProgramRequest | None,
+) -> frozenset[str]:
+    source = getattr(request, "source", request)
+    priorities = getattr(source, "priority_muscles", ()) if source is not None else ()
+    families: set[str] = set()
+    if MuscleGroup.CHEST in priorities:
+        families.add(_PUSH_UP_OPENER)
+    if MuscleGroup.BACK in priorities:
+        families.add(_PULL_UP_OPENER)
+    return frozenset(families)
 
 
 def _session_has_meaningful_muscle(units: tuple[_ExerciseUnit, ...], muscle: MuscleGroup) -> bool:
@@ -431,7 +475,22 @@ def _semantic_ordering_errors(
         is_pull_up_family(item) for unit in main_units for item in unit.exercises
     )
     if push_up_required and pull_up_required:
-        errors.append("SEMANTIC_OPENER_CONFLICT")
+        opener_family = _semantic_opener_family(units, request)
+        opener_index = next(
+            (
+                index
+                for index, unit in enumerate(main_units)
+                if opener_family in _semantic_opener_families(unit)
+            ),
+            None,
+        )
+        if opener_index not in {None, 0}:
+            opener_error = (
+                "PUSH_UP_OPENER_ORDER_INVALID"
+                if opener_family == _PUSH_UP_OPENER
+                else "PULL_UP_OPENER_ORDER_INVALID"
+            )
+            errors.append(opener_error)
     elif push_up_required:
         push_index = next(
             (

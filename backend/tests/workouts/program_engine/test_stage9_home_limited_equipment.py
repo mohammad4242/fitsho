@@ -251,6 +251,30 @@ def test_home_equipment_matrix_preserves_safe_deterministic_roles(
     _assert_safe_home_program(first, source, catalog)
 
 
+@pytest.mark.parametrize(
+    "blocked_caution_tags",
+    [
+        frozenset(),
+        frozenset({ExerciseCautionTag.DEEP_KNEE_FLEXION}),
+    ],
+)
+def test_bodyweight_profiles_keep_valid_structure_without_or_with_caution(
+    blocked_caution_tags: frozenset[ExerciseCautionTag],
+) -> None:
+    source = _build_request(
+        (Equipment.BODYWEIGHT,),
+        TrainingExperience.BEGINNER,
+        Goal.GENERAL_FITNESS,
+        2,
+        blocked_caution_tags=blocked_caution_tags,
+    )
+
+    result = generate_program(source, full_catalog(), RULESET)
+
+    assert result.is_success, result.errors
+    _assert_safe_home_program(result, source, full_catalog())
+
+
 def test_home_equipment_substitution_preserves_available_muscle_focus() -> None:
     target = replace(
         exercise(
