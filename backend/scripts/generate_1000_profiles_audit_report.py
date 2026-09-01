@@ -104,6 +104,8 @@ FA_TRANSLATIONS = {
     "quadriceps": "چهارسر ران",
     "hamstrings": "همسترینگ",
     "calves": "ساق پا",
+    "abs": "شکم (عضلات شکم)",
+    "obliques": "پهلو (مورب شکمی)",
     "lower_back": "آسیب کمر (ستون فقرات کمری)",
     "knee": "آسیب زانو",
     "shoulder": "آسیب شانه",
@@ -850,6 +852,8 @@ def _format_program_days(
                 "prescription_mode": it.prescription_mode.value if hasattr(it.prescription_mode, "value") else str(it.prescription_mode),
                 "rep_min": it.rep_min,
                 "rep_max": it.rep_max,
+                "duration_min_seconds": it.duration_min_seconds,
+                "duration_max_seconds": it.duration_max_seconds,
                 "rest_seconds": it.rest_seconds,
                 "rir": it.target_rir,
                 "primary_muscle": it.primary_muscle.value if it.primary_muscle else "-",
@@ -1482,7 +1486,9 @@ def build_pdf_html(results: list[dict[str, Any]]) -> str:
                     if it["prescription_mode"] == "reps":
                         presc_str = f"{it['sets']} ست × {it['rep_min']}–{it['rep_max']} تکرار"
                     else:
-                        presc_str = f"{it['sets']} ست × {it['rep_min']}–{it['rep_max']} ثانیه"
+                        d_min = it.get("duration_min_seconds") or it.get("rep_min") or 20
+                        d_max = it.get("duration_max_seconds") or it.get("rep_max") or 40
+                        presc_str = f"{it['sets']} ست × {d_min}–{d_max} ثانیه"
 
                     rir_str = f"RIR {it['rir']}" if it["rir"] is not None else "-"
 
