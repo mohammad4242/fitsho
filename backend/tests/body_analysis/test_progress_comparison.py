@@ -85,6 +85,8 @@ def _session_with_result(
     created_at: datetime,
     findings: dict[BodyArea, tuple[BodyAnalysisClassification, float]],
     purpose: BodyPhotoPurpose = BodyPhotoPurpose.PROGRESS_CHECK,
+    analysis_schema_version: str = "1.0",
+    raw_result: dict[str, object] | None = None,
 ) -> tuple[BodyPhotoSession, BodyAnalysis, BodyAnalysisResultVersion]:
     session = BodyPhotoSession(
         user_id=user.id,
@@ -113,8 +115,9 @@ def _session_with_result(
         provider="openrouter",
         model_id="vision-model",
         prompt_version="body-v1",
-        schema_version="1.0",
+        schema_version=analysis_schema_version,
         status=BodyAnalysisStatus.REVIEW_PENDING,
+        raw_result=raw_result,
         normalized_result=payload,
         overall_confidence=0.9,
         completed_at=created_at,
@@ -133,6 +136,45 @@ def _session_with_result(
     db.add(version)
     db.commit()
     return session, analysis, version
+
+
+def _snapshot(
+    session: BodyPhotoSession,
+    *,
+    measurement_id: object,
+    measured_at: datetime,
+    weight_kg: float,
+    shoulder_circumference_cm: float,
+    waist_circumference_cm: float,
+    hip_circumference_cm: float,
+) -> dict[str, object]:
+    return {
+        "captured_at": measured_at.isoformat(),
+        "confirmed_at": measured_at.isoformat(),
+        "profile_updated_at": measured_at.isoformat(),
+        "measurement_id": str(measurement_id),
+        "measurement_measured_at": measured_at.isoformat(),
+        "sex": "other",
+        "height_cm": 180,
+        "weight_kg": weight_kg,
+        "shoulder_circumference_cm": shoulder_circumference_cm,
+        "waist_circumference_cm": waist_circumference_cm,
+        "hip_circumference_cm": hip_circumference_cm,
+        "selected_goal": "build_muscle",
+        "photo_versions": [
+            {
+                "view": photo.view.value,
+                "photo_id": str(photo.id),
+                "storage_key": photo.storage_key,
+                "updated_at": photo.updated_at.isoformat(),
+            }
+            for photo in session.photos
+        ],
+    }
+
+
+def _iso_z(value: datetime) -> str:
+    return value.isoformat().replace("+00:00", "Z")
 
 
 def _user(db: Session, prefix: str = "comparison") -> User:
@@ -305,6 +347,170 @@ def test_latest_cycle_feedback_and_user_reported_measurements_are_context_only(
     }
     assert "note" not in str(context)
     assert "performance_changes" not in str(comparison.normalized_result)
+
+
+def test_v4_comparison_uses_exact_snapshots_and_controlled_provenance(db: Session) -> None:
+    user = _user(db, "comparison-v4")
+    now = datetime.now(UTC)
+    previous_session, _, _ = _session_with_result(
+        db,
+        user,
+        created_at=now - timedelta(days=40),
+        findings={
+            BodyArea.SHOULDERS: (BodyAnalysisClassification.NEUTRAL, 0.9),
+            BodyArea.LATS: (BodyAnalysisClassification.CLEAR_LAG, 0.9),
+        },
+        analysis_schema_version="4.0",
+    )
+    previous_measurement_id = uuid4()
+    previous_analysis = db.scalar(
+        select(BodyAnalysis).where(BodyAnalysis.session_id == previous_session.id)
+    )
+    assert previous_analysis is not None
+    previous_analysis.raw_result = {
+        "input_snapshot": _snapshot(
+            previous_session,
+            measurement_id=previous_measurement_id,
+            measured_at=now - timedelta(days=41),
+            weight_kg=80.0,
+            shoulder_circumference_cm=118.0,
+            waist_circumference_cm=84.0,
+            hip_circumference_cm=98.0,
+        )
+    }
+    db.commit()
+
+    current_session, _, current_version = _session_with_result(
+        db,
+        user,
+        created_at=now,
+        findings={
+            BodyArea.SHOULDERS: (BodyAnalysisClassification.STRENGTH, 0.9),
+            BodyArea.LATS: (BodyAnalysisClassification.CLEAR_LAG, 0.9),
+        },
+        analysis_schema_version="4.0",
+    )
+    current_measurement_id = uuid4()
+    current_analysis = db.scalar(
+        select(BodyAnalysis).where(BodyAnalysis.session_id == current_session.id)
+    )
+    assert current_analysis is not None
+    current_analysis.raw_result = {
+        "input_snapshot": _snapshot(
+            current_session,
+            measurement_id=current_measurement_id,
+            measured_at=now - timedelta(days=1),
+            weight_kg=81.25,
+            shoulder_circumference_cm=120.5,
+            waist_circumference_cm=82.0,
+            hip_circumference_cm=99.0,
+        )
+    }
+    db.commit()
+
+    comparison = BodyProgressComparisonService(db).create_for_result(
+        current_version.id,
+        user.id,
+    )
+
+    assert comparison is not None
+    assert comparison.schema_version == "2.0"
+    result = comparison.normalized_result
+    assert result["schema_version"] == "2.0"
+    assert result["interval_days"] == 40
+    deltas = {
+        item["measurement"]: item
+        for item in result["measurement_deltas"]
+        if isinstance(item, dict)
+    }
+    assert deltas["waist_circumference_cm"] == {
+        "measurement": "waist_circumference_cm",
+        "unit": "cm",
+        "previous": 84.0,
+        "current": 82.0,
+        "delta": -2.0,
+        "availability": "exact",
+        "provenance": {
+            "previous": {
+                "source": "body_analysis_input_snapshot",
+                "reference_id": str(previous_measurement_id),
+                "recorded_at": _iso_z(now - timedelta(days=41)),
+                "reason_code": "exact_analysis_input_snapshot",
+            },
+            "current": {
+                "source": "body_analysis_input_snapshot",
+                "reference_id": str(current_measurement_id),
+                "recorded_at": _iso_z(now - timedelta(days=1)),
+                "reason_code": "exact_analysis_input_snapshot",
+            },
+        },
+    }
+    transitions = {
+        item["body_area"]: item
+        for item in result["visual_transitions"]
+        if isinstance(item, dict)
+    }
+    assert transitions["shoulders"]["state"] == "improved"
+    assert "classification_changed" in transitions["shoulders"]["reason_codes"]
+    assert transitions["shoulders"]["provenance"]["previous"]["source"] == "normalized_result"
+    assert result["persistent_priorities"] == [
+        {
+            "body_area": "lats",
+            "provenance": {
+                "previous": {
+                    "source": "normalized_result",
+                    "reference_id": str(_session_version_id(db, previous_session.id)),
+                    "recorded_at": _iso_z(now - timedelta(days=40)),
+                    "reason_code": "effective_normalized_result",
+                },
+                "current": {
+                    "source": "normalized_result",
+                    "reference_id": str(current_version.id),
+                    "recorded_at": _iso_z(current_version.created_at),
+                    "reason_code": "effective_normalized_result",
+                },
+            },
+        }
+    ]
+
+
+def _session_version_id(db: Session, session_id: object) -> object:
+    session = db.get(BodyPhotoSession, session_id)
+    assert session is not None
+    analysis = db.scalar(select(BodyAnalysis).where(BodyAnalysis.session_id == session.id))
+    assert analysis is not None
+    version = db.scalar(
+        select(BodyAnalysisResultVersion).where(
+            BodyAnalysisResultVersion.analysis_id == analysis.id
+        )
+    )
+    assert version is not None
+    return version.id
+
+
+def test_legacy_comparison_remains_schema_v1_without_guessed_measurements(db: Session) -> None:
+    user = _user(db, "comparison-legacy")
+    now = datetime.now(UTC)
+    _session_with_result(
+        db,
+        user,
+        created_at=now - timedelta(days=10),
+        findings={BodyArea.SHOULDERS: (BodyAnalysisClassification.NEUTRAL, 0.9)},
+    )
+    current, _, current_version = _session_with_result(
+        db,
+        user,
+        created_at=now,
+        findings={BodyArea.SHOULDERS: (BodyAnalysisClassification.STRENGTH, 0.9)},
+    )
+
+    comparison = BodyProgressComparisonService(db).create_for_result(current_version.id, user.id)
+
+    assert comparison is not None
+    assert comparison.schema_version == "1.0"
+    assert comparison.normalized_result["schema_version"] == "1.0"
+    assert "measurement_deltas" not in comparison.normalized_result
+    assert comparison.current_session_id == current.id
 
 
 def _completed_cycle_feedback(

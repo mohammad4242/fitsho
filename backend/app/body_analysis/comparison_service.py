@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from numbers import Real
 from typing import Literal
 from uuid import UUID
@@ -17,8 +18,14 @@ from app.body_analysis.comparison_models import BodyProgressComparison
 from app.body_analysis.comparison_schemas import (
     BodyProgressAreaComparison,
     BodyProgressComparisonContext,
+    BodyProgressItemProvenance,
+    BodyProgressMeasurementDelta,
+    BodyProgressPersistentPriority,
+    BodyProgressProvenance,
+    BodyProgressVisualTransition,
     ComparisonInputQuality,
     NormalizedBodyProgressComparison,
+    NormalizedBodyProgressComparisonV2,
     UserReportedMeasurementChange,
 )
 from app.body_analysis.enums import BodyAnalysisClassification, BodyAnalysisStatus, BodyArea
@@ -26,6 +33,7 @@ from app.body_analysis.models import BodyAnalysis, BodyAnalysisResultVersion
 from app.body_analysis.schemas import BodyAnalysisFinding, NormalizedBodyAnalysis
 from app.body_photos.enums import BodyPhotoSessionState
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
+from app.profile.models import BodyMeasurement
 from app.workout_cycles.enums import WorkoutCycleStatus
 from app.workout_cycles.models import WorkoutCycle, WorkoutCycleFeedback
 
@@ -48,6 +56,16 @@ class _ResultInput:
     version: BodyAnalysisResultVersion
     normalized: NormalizedBodyAnalysis
     quality: ComparisonInputQuality
+    measurement_evidence: _MeasurementEvidence | None
+
+
+@dataclass(frozen=True)
+class _MeasurementEvidence:
+    source: Literal["body_analysis_input_snapshot", "cycle_measurement"]
+    reference_id: UUID
+    recorded_at: datetime
+    values: dict[str, float | None]
+    reason_code: Literal["exact_analysis_input_snapshot", "exact_cycle_measurement"]
 
 
 _CLASSIFICATION_RANK = {
@@ -75,7 +93,7 @@ class BodyProgressComparisonService:
         user_id: UUID,
     ) -> BodyProgressComparison | None:
         session = self._owner_session(session_id, user_id)
-        current = self._latest_eligible_result(session)
+        current = self._latest_eligible_result(session, user_id)
         if current is None:
             return None
         return self.create_for_result(current.version.id, user_id)
@@ -103,7 +121,7 @@ class BodyProgressComparisonService:
         previous_feedback = self._feedback_at(user_id, previous.session.created_at)
         current_feedback = self._feedback_at(user_id, current.session.created_at)
         context = self._context(previous_feedback, current_feedback)
-        normalized = self._compare(previous, current)
+        normalized = self._comparison_for_results(previous, current)
         next_version = (
             int(
                 self._db.scalar(
@@ -124,7 +142,7 @@ class BodyProgressComparisonService:
             previous_feedback_id=previous_feedback.id if previous_feedback else None,
             current_feedback_id=current_feedback.id if current_feedback else None,
             comparison_version=next_version,
-            schema_version=self._policy.schema_version,
+            schema_version=normalized.schema_version,
             normalized_result=normalized.model_dump(mode="json"),
             quality_snapshot={
                 "previous": previous.quality.model_dump(mode="json"),
@@ -154,11 +172,11 @@ class BodyProgressComparisonService:
         previous_result_version_id: UUID,
         current_result_version_id: UUID,
         user_id: UUID,
-    ) -> NormalizedBodyProgressComparison:
+    ) -> NormalizedBodyProgressComparison | NormalizedBodyProgressComparisonV2:
         """Reuse the normalized analysis comparison for an explicit start/end pair."""
         previous = self._result_input(previous_result_version_id, user_id)
         current = self._result_input(current_result_version_id, user_id)
-        return self._compare(previous, current)
+        return self._comparison_for_results(previous, current)
 
     def _owner_session(
         self,
@@ -196,9 +214,14 @@ class BodyProgressComparisonService:
             version=version,
             normalized=NormalizedBodyAnalysis.model_validate(version.normalized_result),
             quality=self._quality(session.id, version.overall_confidence),
+            measurement_evidence=self._measurement_evidence(analysis, user_id),
         )
 
-    def _latest_eligible_result(self, session: BodyPhotoSession) -> _ResultInput | None:
+    def _latest_eligible_result(
+        self,
+        session: BodyPhotoSession,
+        user_id: UUID,
+    ) -> _ResultInput | None:
         analyses = self._db.scalars(
             select(BodyAnalysis)
             .where(
@@ -223,6 +246,7 @@ class BodyProgressComparisonService:
                     version=version,
                     normalized=NormalizedBodyAnalysis.model_validate(version.normalized_result),
                     quality=self._quality(session.id, version.overall_confidence),
+                    measurement_evidence=self._measurement_evidence(analysis, user_id),
                 )
         return None
 
@@ -248,10 +272,269 @@ class BodyProgressComparisonService:
             .order_by(BodyPhotoSession.created_at.desc(), BodyPhotoSession.id.desc())
         ).all()
         for session in candidates:
-            result = self._latest_eligible_result(session)
+            result = self._latest_eligible_result(session, user_id)
             if result is not None:
                 return result
         return None
+
+    def _measurement_evidence(
+        self,
+        analysis: BodyAnalysis,
+        user_id: UUID,
+    ) -> _MeasurementEvidence | None:
+        if analysis.schema_version == "4.0":
+            raw_result = analysis.raw_result
+            raw_snapshot = (
+                raw_result.get("input_snapshot") if isinstance(raw_result, dict) else None
+            )
+            if not isinstance(raw_snapshot, dict):
+                return None
+            try:
+                from app.body_analysis.service import BodyAnalysisInputSnapshot
+
+                snapshot = BodyAnalysisInputSnapshot.model_validate(raw_snapshot)
+            except (TypeError, ValueError):
+                return None
+            return _MeasurementEvidence(
+                source="body_analysis_input_snapshot",
+                reference_id=snapshot.measurement_id,
+                recorded_at=snapshot.measurement_measured_at,
+                values={
+                    "weight_kg": snapshot.weight_kg,
+                    "shoulder_circumference_cm": snapshot.shoulder_circumference_cm,
+                    "waist_circumference_cm": snapshot.waist_circumference_cm,
+                    "hip_circumference_cm": snapshot.hip_circumference_cm,
+                },
+                reason_code="exact_analysis_input_snapshot",
+            )
+
+        if analysis.cycle_id is None:
+            return None
+        measurement = self._db.scalar(
+            select(BodyMeasurement)
+            .where(
+                BodyMeasurement.user_id == user_id,
+                BodyMeasurement.cycle_id == analysis.cycle_id,
+            )
+            .order_by(BodyMeasurement.measured_at.desc(), BodyMeasurement.id.desc())
+            .limit(1)
+        )
+        if measurement is None:
+            return None
+        return _MeasurementEvidence(
+            source="cycle_measurement",
+            reference_id=measurement.id,
+            recorded_at=measurement.measured_at,
+            values={
+                "weight_kg": self._measurement_value(measurement.weight_kg),
+                "shoulder_circumference_cm": self._measurement_value(
+                    measurement.shoulder_circumference_cm
+                ),
+                "waist_circumference_cm": self._measurement_value(
+                    measurement.waist_circumference_cm
+                ),
+                "hip_circumference_cm": self._measurement_value(
+                    measurement.hip_circumference_cm
+                ),
+            },
+            reason_code="exact_cycle_measurement",
+        )
+
+    @staticmethod
+    def _measurement_value(value: object) -> float | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+            return None
+        return round(float(value), 2)
+
+    def _comparison_for_results(
+        self,
+        previous: _ResultInput,
+        current: _ResultInput,
+    ) -> NormalizedBodyProgressComparison | NormalizedBodyProgressComparisonV2:
+        if current.analysis.schema_version == "4.0":
+            return self._compare_v2(previous, current)
+        return self._compare(previous, current)
+
+    def _compare_v2(
+        self,
+        previous: _ResultInput,
+        current: _ResultInput,
+    ) -> NormalizedBodyProgressComparisonV2:
+        previous_by_area = {finding.body_area: finding for finding in previous.normalized.findings}
+        current_by_area = {finding.body_area: finding for finding in current.normalized.findings}
+        visual_transitions = tuple(
+            self._compare_visual_v2(
+                area,
+                previous_by_area.get(area),
+                current_by_area.get(area),
+                previous,
+                current,
+            )
+            for area in BodyArea
+        )
+        measurement_deltas = tuple(
+            self._measurement_delta(
+                measurement,
+                unit,
+                previous.measurement_evidence,
+                current.measurement_evidence,
+            )
+            for measurement, unit in (
+                ("weight_kg", "kg"),
+                ("shoulder_circumference_cm", "cm"),
+                ("waist_circumference_cm", "cm"),
+                ("hip_circumference_cm", "cm"),
+            )
+        )
+        confident = [
+            item.change_confidence
+            for item in visual_transitions
+            if item.state is not BodyProgressState.UNCERTAIN
+        ]
+        return NormalizedBodyProgressComparisonV2(
+            overall_confidence=round(sum(confident) / len(confident), 4)
+            if confident
+            else 0.0,
+            previous_session_id=previous.session.id,
+            current_session_id=current.session.id,
+            previous_result_version_id=previous.version.id,
+            current_result_version_id=current.version.id,
+            previous_session_date=previous.session.created_at,
+            current_session_date=current.session.created_at,
+            interval_days=(
+                current.session.created_at.date() - previous.session.created_at.date()
+            ).days,
+            measurement_deltas=measurement_deltas,
+            visual_transitions=visual_transitions,
+            persistent_priorities=self._persistent_priorities(previous, current),
+        )
+
+    def _measurement_delta(
+        self,
+        measurement: str,
+        unit: str,
+        previous: _MeasurementEvidence | None,
+        current: _MeasurementEvidence | None,
+    ) -> BodyProgressMeasurementDelta:
+        previous_value = previous.values.get(measurement) if previous else None
+        current_value = current.values.get(measurement) if current else None
+        exact = previous_value is not None and current_value is not None
+        delta: float | None = None
+        if previous_value is not None and current_value is not None:
+            delta = round(current_value - previous_value, 2)
+        return BodyProgressMeasurementDelta(
+            measurement=measurement,
+            unit=unit,
+            previous=previous_value,
+            current=current_value,
+            delta=delta,
+            availability="exact" if exact else "unavailable",
+            provenance=BodyProgressItemProvenance(
+                previous=self._measurement_provenance(previous),
+                current=self._measurement_provenance(current),
+            ),
+        )
+
+    @staticmethod
+    def _measurement_provenance(
+        evidence: _MeasurementEvidence | None,
+    ) -> BodyProgressProvenance:
+        if evidence is None:
+            return BodyProgressProvenance(
+                source="unavailable",
+                reason_code="measurement_unavailable_for_legacy_scan",
+            )
+        return BodyProgressProvenance(
+            source=evidence.source,
+            reference_id=evidence.reference_id,
+            recorded_at=evidence.recorded_at,
+            reason_code=evidence.reason_code,
+        )
+
+    @staticmethod
+    def _normalized_provenance(result: _ResultInput) -> BodyProgressProvenance:
+        return BodyProgressProvenance(
+            source="normalized_result",
+            reference_id=result.version.id,
+            recorded_at=result.version.created_at,
+            reason_code="effective_normalized_result",
+        )
+
+    def _compare_visual_v2(
+        self,
+        area: BodyArea,
+        previous_finding: BodyAnalysisFinding | None,
+        current_finding: BodyAnalysisFinding | None,
+        previous: _ResultInput,
+        current: _ResultInput,
+    ) -> BodyProgressVisualTransition:
+        comparison = self._compare_area(
+            area,
+            previous_finding,
+            current_finding,
+            previous.quality,
+            current.quality,
+        )
+        reasons: list[str] = []
+        if previous_finding is None:
+            reasons.append("missing_previous_observation")
+        if current_finding is None:
+            reasons.append("missing_current_observation")
+        if previous_finding is not None and current_finding is not None:
+            if previous_finding.classification == current_finding.classification:
+                reasons.append("classification_unchanged")
+            else:
+                reasons.append("classification_changed")
+        if (
+            not previous.quality.all_standardized_views_present
+            or not current.quality.all_standardized_views_present
+        ):
+            reasons.append("incomplete_standardized_views")
+        if (
+            previous_finding is not None
+            and current_finding is not None
+            and not comparison.supporting_views
+        ):
+            reasons.append("no_common_supporting_view")
+        if comparison.change_confidence < self._policy.minimum_change_confidence:
+            reasons.append("low_confidence")
+        if (
+            previous.version.source.value != "ai"
+            or current.version.source.value != "ai"
+        ):
+            reasons.append("specialist_corrected_result")
+        return BodyProgressVisualTransition(
+            body_area=area,
+            state=comparison.state,
+            previous_classification=comparison.previous_classification,
+            current_classification=comparison.current_classification,
+            change_confidence=comparison.change_confidence,
+            supporting_views=comparison.supporting_views,
+            reason_codes=tuple(dict.fromkeys(reasons)),
+            provenance=BodyProgressItemProvenance(
+                previous=self._normalized_provenance(previous),
+                current=self._normalized_provenance(current),
+            ),
+        )
+
+    @staticmethod
+    def _persistent_priorities(
+        previous: _ResultInput,
+        current: _ResultInput,
+    ) -> tuple[BodyProgressPersistentPriority, ...]:
+        previous_priorities = set(previous.normalized.summary.priority_areas)
+        current_priorities = set(current.normalized.summary.priority_areas)
+        return tuple(
+            BodyProgressPersistentPriority(
+                body_area=area,
+                provenance=BodyProgressItemProvenance(
+                    previous=BodyProgressComparisonService._normalized_provenance(previous),
+                    current=BodyProgressComparisonService._normalized_provenance(current),
+                ),
+            )
+            for area in BodyArea
+            if area in previous_priorities and area in current_priorities
+        )
 
     def _quality(self, session_id: UUID, analysis_confidence: float) -> ComparisonInputQuality:
         photos = self._db.scalars(select(BodyPhoto).where(BodyPhoto.session_id == session_id)).all()

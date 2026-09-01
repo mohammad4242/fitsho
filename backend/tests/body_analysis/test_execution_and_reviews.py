@@ -653,6 +653,36 @@ def test_execution_creates_a_progress_comparison_for_the_new_result(
     assert calls and calls[0][1] == user.id
 
 
+def test_progress_comparison_failure_does_not_discard_valid_analysis(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    analysis = service.queue(session.id, user.id, _config())
+
+    class _FailingComparisonService:
+        def __init__(self, comparison_db: Session) -> None:
+            assert comparison_db is db
+
+        def create_for_result(self, result_version_id: object, owner_id: object) -> None:
+            raise RuntimeError("history database is temporarily unavailable")
+
+    monkeypatch.setattr(
+        "app.body_analysis.service.BodyProgressComparisonService",
+        _FailingComparisonService,
+    )
+
+    result = asyncio.run(service.execute(analysis.id, _Provider()))
+
+    assert result.status is BodyAnalysisStatus.REVIEW_PENDING
+    assert db.scalar(
+        select(BodyAnalysisResultVersion).where(
+            BodyAnalysisResultVersion.analysis_id == analysis.id
+        )
+    ) is not None
+
+
 def test_completed_analysis_cannot_be_retried(db: Session) -> None:
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)
