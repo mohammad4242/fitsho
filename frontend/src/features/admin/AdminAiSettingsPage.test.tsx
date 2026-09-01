@@ -59,6 +59,12 @@ const progressConfig: AdminAiTaskConfig = {
   task_type: "progress_comparison",
 };
 
+const foodPriceConfig: AdminAiTaskConfig = {
+  ...bodyConfig,
+  task_type: "food_price_search",
+  execution_backend: "agent_service",
+};
+
 beforeEach(() => {
   void i18n.changeLanguage("en");
   Object.values(api).forEach((mock) => mock.mockReset());
@@ -533,6 +539,80 @@ it("filters Agent Service food-photo models by image and structured capabilities
   await user.click(screen.getByRole("combobox", { name: "Model" }));
   expect(await screen.findByRole("option", { name: /food-vision/ })).toBeInTheDocument();
   expect(screen.queryByRole("option", { name: /food-image-only/ })).not.toBeInTheDocument();
+});
+
+it("shows Food price search as Agent-only and gates enablement on its smoke", async () => {
+  api.getAdminAiTaskConfigs.mockResolvedValue([bodyConfig, foodPriceConfig]);
+  api.getAdminAiAgentServiceCapabilities.mockResolvedValue({
+    runners: [{
+      agent: "antigravity",
+      installed: true,
+      version: "1.1.22",
+      auth_state: "authenticated",
+      auth_mode: "browser_link",
+      models: [],
+      profiles: [{
+        profile_id: "antigravity-price-high",
+        agent: "antigravity",
+        display_name: "Price research (High)",
+        model_id: "price-research",
+        effort: "high",
+        task_kinds: ["food_price_search"],
+        fingerprint: "b".repeat(64),
+        supports_text_input: true,
+        supports_image_input: false,
+        supports_structured_output: true,
+        verification_status: "unverified",
+        verified_at: null,
+        verification_error_code: null,
+        verification_safe_error_message: null,
+      }],
+    }],
+  });
+  api.testAdminAiAgentTask.mockResolvedValue({
+    ok: true,
+    task_type: "food_price_search",
+    agent: "antigravity",
+    profile_id: "antigravity-price-high",
+    fingerprint: "b".repeat(64),
+    stage: "passed",
+    request_id: "price-smoke-1",
+    checked_at: "2026-08-03T12:00:00Z",
+    duration_seconds: 0.4,
+    error_code: null,
+    safe_error_message: null,
+  });
+  api.saveAdminAiTaskConfig.mockResolvedValue({
+    ...foodPriceConfig,
+    agent_name: "antigravity",
+    agent_model_id: "price-research",
+    agent_profile_id: "antigravity-price-high",
+    enabled: true,
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("button", { name: "Food price search" }));
+  expect(screen.getByLabelText("API")).toBeDisabled();
+  await user.click(screen.getByRole("combobox", { name: "Model" }));
+  expect(await screen.findByRole("option", { name: /Price research/ })).toBeInTheDocument();
+  await user.click(screen.getByRole("option", { name: /Price research/ }));
+  expect(screen.getByRole("checkbox", { name: "Enabled" })).toBeDisabled();
+
+  await user.click(screen.getByRole("button", { name: "Test Agent" }));
+  expect(await screen.findByText("Selected task passed with this profile")).toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: "Enabled" })).toBeEnabled();
+  await user.click(screen.getByRole("checkbox", { name: "Enabled" }));
+  await user.click(screen.getByRole("button", { name: "Save" }));
+
+  expect(api.saveAdminAiTaskConfig).toHaveBeenCalledWith(
+    "food_price_search",
+    expect.objectContaining({
+      execution_backend: "agent_service",
+      enabled: true,
+      agent_profile_id: "antigravity-price-high",
+    }),
+  );
 });
 
 it("tests the selected Agent and shows its safe failure without leaking details", async () => {

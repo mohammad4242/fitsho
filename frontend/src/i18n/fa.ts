@@ -533,6 +533,7 @@ const fa = {
         apiBackend: "API",
         agentServiceBackend: "Agent Service",
         agentUnsupported: "Agent Service هنوز برای این وظیفه در دسترس نیست.",
+        foodPriceAgentOnly: "جستجوی قیمت مواد غذایی برای تولید فقط از Agent Service پشتیبانی می‌کند.",
         provider: "ارائه‌دهنده",
         apiKey: "کلید API",
         apiKeyPlaceholder: "کلید OpenRouter را وارد کنید",

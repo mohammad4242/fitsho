@@ -412,12 +412,27 @@ export function updatePhysicianSupplementOrder(orderId: string, input: Physician
 export function transitionPhysicianSupplementOrder(orderId: string, status: "active" | "completed" | "discontinued" | "cancelled"): Promise<SupplementOrder> { return request(`${nutritionPath}/physician/supplement-orders/${orderId}/transition`, { method: "POST", body: JSON.stringify({ status }) }); }
 export function saveSupplementCatalogue(input: Record<string, unknown>): Promise<unknown> { return request(`${nutritionPath}/admin/supplements/catalogue`, { method: "PUT", body: JSON.stringify(input) }); }
 
+export type NutritionMonitoringPriceQuote = {
+  id: string;
+  provider_code: string;
+  source_name: string;
+  source_domain: string;
+  source_url: string | null;
+  product_title: string;
+  normal_price_toman: string;
+  promotional_price_toman: string | null;
+  normalized_normal_price_toman: string;
+  package_quantity: string;
+  package_unit: string;
+  observed_at: string;
+};
+
 export type NutritionMonitoring = {
   counts: { foods: number; meals: number; accepted_price_references: number; price_reviews: number; supplements: number };
   recent_price_runs: Array<{ id: string; status: string; trigger_kind: string; started_at: string; finished_at: string | null; foods_attempted: number; foods_updated: number; foods_needing_review: number; provider_failures: number; failure_codes: string[] }>;
   provider_health: Array<{ code: string; enabled: boolean; last_success_at: string | null; last_error: string | null; parser_version: string | null }>;
   coverage_warning: string | null;
-  price_reviews: Array<{ id: string; food_slug: string; reason_codes: string[]; candidate_reference_price_toman: string | null; created_at: string }>;
+  price_reviews: Array<{ id: string; food_slug: string; reason_codes: string[]; candidate_reference_price_toman: string | null; created_at: string; quotes: NutritionMonitoringPriceQuote[] }>;
   broken_mappings: Array<{ id: string; food_slug: string; provider_code: string; provider_product_id: string; broken_at: string | null }>;
 };
 export function getNutritionMonitoring(): Promise<NutritionMonitoring> { return request(`${nutritionPath}/admin/monitoring`); }

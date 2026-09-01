@@ -35,6 +35,7 @@ const agentTasks: AdminAiTaskType[] = [
   "workout_plan_generation",
   "body_photo_analysis",
   "food_photo_estimation",
+  "food_price_search",
 ];
 
 export function AdminAiSettingsPage() {
@@ -66,6 +67,7 @@ export function AdminAiSettingsPage() {
 
   const agentMode = config?.execution_backend === "agent_service";
   const agentTaskSupported = agentTasks.includes(selectedTask);
+  const foodPriceAgentOnly = selectedTask === "food_price_search";
   const selectedAgent = config?.agent_name
     ?? agentCapabilities.find((runner) => runner.installed)?.agent
     ?? "antigravity";
@@ -180,6 +182,10 @@ export function AdminAiSettingsPage() {
   function handleSave(event: FormEvent) {
     event.preventDefault();
     if (!config) return;
+    if (foodPriceAgentOnly && config.execution_backend !== "agent_service" && config.enabled) {
+      setError(t("admin.aiSettings.foodPriceAgentOnly"));
+      return;
+    }
     persistConfig(config, apiKey);
   }
 
@@ -386,12 +392,13 @@ export function AdminAiSettingsPage() {
           <h2>{t(`admin.aiSettings.tasks.${selectedTask}`)}</h2>
           <fieldset className="admin-ai-backend-switch">
             <legend>{t("admin.aiSettings.executionBackend")}</legend>
-            <label>
+            <label className={foodPriceAgentOnly ? "is-disabled" : undefined}>
               <input
                 type="radio"
                 name="execution-backend"
                 value="api"
                 checked={config.execution_backend === "api"}
+                disabled={foodPriceAgentOnly}
                 onChange={() => {
                   setAuthAgent(null);
                   patchConfig({ execution_backend: "api" });
@@ -414,6 +421,7 @@ export function AdminAiSettingsPage() {
               {t("admin.aiSettings.agentServiceBackend")}
             </label>
             {!agentTaskSupported && <p className="admin-ai-inline-note">{t("admin.aiSettings.agentUnsupported")}</p>}
+            {foodPriceAgentOnly && <p className="admin-ai-inline-note">{t("admin.aiSettings.foodPriceAgentOnly")}</p>}
           </fieldset>
           {!agentMode && <>
             <label className="admin-ai-setting-field"><span>{t("admin.aiSettings.provider")}</span><input value="OpenRouter" disabled /></label>
@@ -487,7 +495,7 @@ export function AdminAiSettingsPage() {
 
         <section className="admin-panel admin-ai-settings-grid">
           <div className="admin-ai-enabled-field">
-            <label htmlFor="ai-task-enabled"><input id="ai-task-enabled" type="checkbox" checked={config.enabled} disabled={agentMode && !config.enabled && selectedProfile?.verification_status !== "passed"} onChange={(event) => patchConfig({ enabled: event.target.checked })} /> {t("admin.aiSettings.enabled")}</label>
+            <label htmlFor="ai-task-enabled"><input id="ai-task-enabled" type="checkbox" checked={config.enabled} disabled={(foodPriceAgentOnly && !agentMode) || (agentMode && !config.enabled && selectedProfile?.verification_status !== "passed")} onChange={(event) => patchConfig({ enabled: event.target.checked })} /> {t("admin.aiSettings.enabled")}</label>
             <SettingHelp label={t("admin.aiSettings.enabled")} guide={t("admin.aiSettings.guides.enabled")} />
           </div>
           <NumberField id="ai-temperature" label={t("admin.aiSettings.temperature")} guide={t("admin.aiSettings.guides.temperature")} value={config.temperature} step="0.1" disabled={agentMode} onChange={(value) => patchConfig({ temperature: value })} />

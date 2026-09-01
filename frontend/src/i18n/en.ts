@@ -533,6 +533,7 @@ const en = {
         apiBackend: "API",
         agentServiceBackend: "Agent Service",
         agentUnsupported: "Agent Service is not available for this task yet.",
+        foodPriceAgentOnly: "Production food price search is supported only through Agent Service.",
         provider: "Provider",
         apiKey: "API key",
         apiKeyPlaceholder: "Enter an OpenRouter key",
