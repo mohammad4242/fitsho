@@ -13,6 +13,7 @@ from app.body_analysis.admin_config.enums import (
     AIProviderName,
     AITaskType,
 )
+from app.private_media import PrivateMediaResolver
 
 
 def _task(**overrides: object) -> SimpleNamespace:
@@ -43,7 +44,11 @@ def test_api_task_preserves_openrouter_provider_and_route_metadata(
 
     configured = build_task_provider(
         _task(),
-        settings=SimpleNamespace(openrouter_base_url="https://openrouter.test/v1"),
+        settings=SimpleNamespace(
+            openrouter_base_url="https://openrouter.test/v1",
+            body_photo_storage_root="var/private/body-photos",
+            food_photo_storage_root="var/private/food-photos",
+        ),
         http_client=Mock(name="api-client"),
         agent_http_client=Mock(name="agent-client"),
         api_key="openrouter-secret",
@@ -56,6 +61,9 @@ def test_api_task_preserves_openrouter_provider_and_route_metadata(
     assert configured.fallback_model_ids == ("openai/gpt-4.1-mini",)
     assert configured.supports_cost_accounting is True
     openrouter_factory.assert_called_once()
+    assert isinstance(
+        openrouter_factory.call_args.kwargs["private_media_resolver"], PrivateMediaResolver
+    )
 
 
 def test_agent_task_selects_agent_service_and_exposes_agent_provenance(

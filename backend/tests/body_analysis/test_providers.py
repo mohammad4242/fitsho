@@ -22,6 +22,7 @@ from app.body_analysis.providers import (
     ProviderRoutingPreferences,
     StructuredGenerationRequest,
 )
+from app.private_media import PrivateMediaResolver
 
 
 def _run[ResultT](awaitable: Coroutine[Any, Any, ResultT]) -> ResultT:
@@ -78,6 +79,8 @@ def test_task_provider_factory_preserves_api_openrouter_and_cost_accounting() ->
         openrouter_base_url="https://openrouter.example/v1",
         frontend_origin="http://localhost:5173",
         openrouter_timeout_seconds=45,
+        body_photo_storage_root="var/private/body-photos",
+        food_photo_storage_root="var/private/food-photos",
     )
 
     async def scenario() -> None:
@@ -273,6 +276,49 @@ def test_openrouter_image_request_sends_three_standardized_images_with_json_sche
         "data:image/webp;base64,YmFjaw==",
     ]
     assert "test-openrouter-secret" not in json.dumps(body)
+
+
+def test_openrouter_resolves_stored_image_only_at_external_api_boundary(tmp_path) -> None:
+    body_root = tmp_path / "body-photos"
+    image_path = body_root / "ab/abcdef0123456789abcdef0123456789.jpg"
+    image_path.parent.mkdir(parents=True)
+    image_path.write_bytes(b"stored-image")
+    resolver = PrivateMediaResolver(
+        SimpleNamespace(
+            body_photo_storage_root=body_root,
+            food_photo_storage_root=tmp_path / "food-photos",
+        )
+    )
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return _completion('{"status":"ok"}')
+
+    provider = OpenRouterProvider(
+        httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+        api_key="test-openrouter-secret",
+        timeout_seconds=5,
+        private_media_resolver=resolver,
+    )
+    _run(
+        provider.analyze_images(
+            _request(),
+            images=(
+                ImageInput(
+                    label="front",
+                    mime_type="image/jpeg",
+                    storage_scope="body",
+                    storage_key="ab/abcdef0123456789abcdef0123456789.jpg",
+                ),
+            ),
+        )
+    )
+
+    body = seen["body"]
+    assert isinstance(body, dict)
+    content = body["messages"][1]["content"]
+    assert content[2]["image_url"]["url"] == "data:image/jpeg;base64,c3RvcmVkLWltYWdl"
 
 
 def test_openrouter_strict_schema_requires_every_declared_property() -> None:

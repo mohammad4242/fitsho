@@ -55,6 +55,15 @@ def _output(*, model_id: str = "gemini-2.5-pro", request_id: str = "req-agent-1"
     }
 
 
+def _stored_image() -> ImageInput:
+    return ImageInput(
+        label="front",
+        mime_type="image/jpeg",
+        storage_scope="body",
+        storage_key="ab/abcdef0123456789abcdef0123456789.jpg",
+    )
+
+
 def _provider(
     handler: Callable[[httpx.Request], httpx.Response],
 ) -> AgentServiceProvider:
@@ -138,6 +147,62 @@ def test_analyze_images_decodes_base64_and_sends_only_multipart_bytes() -> None:
     assert forwarded["max_output_tokens"] == _request().max_output_tokens
     assert forwarded["image_labels"] == ["front view"]
     assert seen["headers"]["authorization"] == "Bearer agent-service-test-token"
+
+
+def test_analyze_stored_images_sends_only_json_storage_references() -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
+        seen["url"] = str(request.url)
+        seen["headers"] = dict(request.headers)
+        seen["body"] = request.content
+        return httpx.Response(200, json=_output())
+
+    response = _run(
+        _provider(handler).analyze_images(_request(), images=(_stored_image(),))
+    )
+
+    assert response.payload == {"score": 0.82}
+    assert seen["method"] == "POST"
+    assert seen["url"] == "http://agent-service:9001/v1/analyze-stored-images"
+    assert seen["headers"]["content-type"] == "application/json"
+    body = json.loads(seen["body"])
+    assert body == {
+        "generation": {
+            "agent": "antigravity",
+            "model_id": "gemini-2.5-pro",
+            "system_prompt": _request().system_prompt,
+            "input_payload": _request().input_payload,
+            "response_schema": _request().response_schema,
+            "schema_name": _request().schema_name,
+            "temperature": _request().temperature,
+            "max_output_tokens": _request().max_output_tokens,
+            "timeout_seconds": 7.0,
+        },
+        "images": [
+            {
+                "label": "front",
+                "mime_type": "image/jpeg",
+                "storage_scope": "body",
+                "storage_key": "ab/abcdef0123456789abcdef0123456789.jpg",
+            }
+        ],
+    }
+    assert b"base64_data" not in seen["body"]
+    assert b"trusted-image-bytes" not in seen["body"]
+    assert b"multipart/form-data" not in seen["body"]
+
+
+def test_analyze_images_rejects_mixed_inline_and_stored_sources() -> None:
+    inline = ImageInput(label="side", mime_type="image/jpeg", base64_data="c2lkZQ==")
+
+    with pytest.raises(AIProviderError) as error:
+        _run(_provider(lambda _: httpx.Response(500)).analyze_images(
+            _request(), images=(inline, _stored_image())
+        ))
+
+    assert error.value.code is ProviderErrorCode.INVALID_REQUEST
 
 
 def test_list_models_maps_capabilities_and_applies_filter() -> None:

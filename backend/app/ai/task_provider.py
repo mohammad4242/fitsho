@@ -19,6 +19,7 @@ from app.body_analysis.providers import (
     ProviderRoutingPreferences,
 )
 from app.config import Settings
+from app.private_media import PrivateMediaResolver
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ def build_task_provider(
                 )
             ),
             app_url=getattr(settings, "frontend_origin", None),
+            private_media_resolver=PrivateMediaResolver(settings),
         )
         return ConfiguredAIProvider(
             provider=provider,

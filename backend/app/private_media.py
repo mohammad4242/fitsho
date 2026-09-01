@@ -24,8 +24,8 @@ class PrivateMediaResolver:
 
     def __init__(self, settings: Settings) -> None:
         self._roots = {
-            "body": settings.body_photo_storage_root.resolve(),
-            "food": settings.food_photo_storage_root.resolve(),
+            "body": Path(settings.body_photo_storage_root).resolve(),
+            "food": Path(settings.food_photo_storage_root).resolve(),
         }
 
     def resolve(self, scope: str, storage_key: str, expected_mime_type: str) -> Path:

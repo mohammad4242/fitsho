@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from collections.abc import Mapping
 from copy import deepcopy
@@ -23,6 +24,7 @@ from app.body_analysis.providers.models import (
     StructuredGenerationResponse,
     _ProviderCompletion,
 )
+from app.private_media import PrivateMediaError, PrivateMediaResolver
 
 
 class OpenRouterProvider:
@@ -37,6 +39,7 @@ class OpenRouterProvider:
         timeout_seconds: float = 30.0,
         app_url: str | None = None,
         app_name: str = "Fitsho",
+        private_media_resolver: PrivateMediaResolver | None = None,
     ) -> None:
         self._client = client
         self._api_key = api_key
@@ -44,6 +47,7 @@ class OpenRouterProvider:
         self._timeout = httpx.Timeout(timeout_seconds)
         self._app_url = app_url
         self._app_name = app_name
+        self._private_media_resolver = private_media_resolver
 
     async def test_connection(self) -> ProviderConnectionResult:
         await self._request_json("GET", "/auth/key")
@@ -188,7 +192,7 @@ class OpenRouterProvider:
         payload = await self._request_json(
             "POST",
             "/chat/completions",
-            json_body=self._completion_body(
+            json_body=await self._completion_body(
                 request,
                 model_id=model_id,
                 images=images,
@@ -273,7 +277,7 @@ class OpenRouterProvider:
             )
         return payload
 
-    def _completion_body(
+    async def _completion_body(
         self,
         request: StructuredGenerationRequest,
         *,
@@ -288,7 +292,7 @@ class OpenRouterProvider:
                 + json.dumps(request.input_payload, ensure_ascii=False, separators=(",", ":"))
             )
             user_content: str | list[dict[str, object]] = (
-                self._image_content(repair_text, images) if images else repair_text
+                await self._image_content(repair_text, images) if images else repair_text
             )
         elif images:
             input_text = json.dumps(
@@ -296,7 +300,7 @@ class OpenRouterProvider:
                 ensure_ascii=False,
                 separators=(",", ":"),
             )
-            user_content = self._image_content(input_text, images)
+            user_content = await self._image_content(input_text, images)
         else:
             user_content = json.dumps(
                 request.input_payload,
@@ -341,13 +345,36 @@ class OpenRouterProvider:
         require_all_properties(strict_schema)
         return strict_schema
 
-    @staticmethod
-    def _image_content(
+    async def _image_content(
+        self,
         initial_text: str,
         images: tuple[ImageInput, ...],
     ) -> list[dict[str, object]]:
         content: list[dict[str, object]] = [{"type": "text", "text": initial_text}]
         for image in images:
+            encoded = image.base64_data
+            if encoded is None:
+                if (
+                    self._private_media_resolver is None
+                    or image.storage_scope is None
+                    or image.storage_key is None
+                ):
+                    raise AIProviderError(
+                        ProviderErrorCode.INVALID_REQUEST,
+                        "The stored image reference cannot be resolved.",
+                    )
+                try:
+                    data = self._private_media_resolver.read(
+                        image.storage_scope,
+                        image.storage_key,
+                        image.mime_type,
+                    )
+                except PrivateMediaError as error:
+                    raise AIProviderError(
+                        ProviderErrorCode.INVALID_REQUEST,
+                        "The stored image reference cannot be resolved.",
+                    ) from error
+                encoded = base64.b64encode(data).decode("ascii")
             content.extend(
                 [
                     {
@@ -356,7 +383,7 @@ class OpenRouterProvider:
                     },
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:{image.mime_type};base64,{image.base64_data}"},
+                        "image_url": {"url": f"data:{image.mime_type};base64,{encoded}"},
                     },
                 ]
             )

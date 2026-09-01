@@ -7,7 +7,7 @@ import math
 import re
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from jsonschema import Draft202012Validator
@@ -232,7 +232,12 @@ class AgentServiceProvider:
         model_id = request.route.primary_model
         body = self._generation_body(request, model_id=model_id)
         if images:
-            payload = await self._request_multipart(body, images)
+            source = self._image_source(images)
+            payload = (
+                await self._request_stored_images(body, images)
+                if source == "stored"
+                else await self._request_multipart(body, images)
+            )
         else:
             payload = await self._request_json("POST", "/v1/generate", json_body=body)
         completion = self._parse_completion(payload, expected_model_id=model_id)
@@ -272,6 +277,47 @@ class AgentServiceProvider:
             ) from error
         return body
 
+    @staticmethod
+    def _image_source(images: tuple[ImageInput, ...]) -> Literal["inline", "stored"]:
+        inline = all(image.base64_data is not None for image in images)
+        stored = all(
+            image.storage_scope is not None and image.storage_key is not None for image in images
+        )
+        if stored and not inline:
+            return "stored"
+        if inline and not stored:
+            return "inline"
+        raise AIProviderError(
+            ProviderErrorCode.INVALID_REQUEST,
+            "Inline and stored images cannot be mixed.",
+        )
+
+    async def _request_stored_images(
+        self,
+        metadata: dict[str, object],
+        images: tuple[ImageInput, ...],
+    ) -> dict[str, Any]:
+        references: list[dict[str, str]] = []
+        for image in images:
+            if image.storage_scope is None or image.storage_key is None:
+                raise AIProviderError(
+                    ProviderErrorCode.INVALID_REQUEST,
+                    "Stored image references are incomplete.",
+                )
+            references.append(
+                {
+                    "label": image.label,
+                    "mime_type": image.mime_type,
+                    "storage_scope": image.storage_scope,
+                    "storage_key": image.storage_key,
+                }
+            )
+        return await self._request_json(
+            "POST",
+            "/v1/analyze-stored-images",
+            json_body={"generation": metadata, "images": references},
+        )
+
     async def _request_multipart(
         self,
         metadata: dict[str, object],
@@ -285,14 +331,20 @@ class AgentServiceProvider:
         files: list[tuple[str, tuple[str, bytes, str]]] = []
         total_bytes = 0
         for index, image in enumerate(images, start=1):
+            base64_data = image.base64_data
+            if base64_data is None:
+                raise AIProviderError(
+                    ProviderErrorCode.INVALID_REQUEST,
+                    "Inline image data is required for multipart analysis.",
+                )
             max_encoded_bytes = ((self._max_image_bytes + 2) // 3) * 4
-            if len(image.base64_data) > max_encoded_bytes:
+            if len(base64_data) > max_encoded_bytes:
                 raise AIProviderError(
                     ProviderErrorCode.INVALID_REQUEST,
                     "The supplied image exceeds the configured limit.",
                 )
             try:
-                decoded = base64.b64decode(image.base64_data, validate=True)
+                decoded = base64.b64decode(base64_data, validate=True)
             except (binascii.Error, ValueError) as error:
                 raise AIProviderError(
                     ProviderErrorCode.INVALID_REQUEST,
