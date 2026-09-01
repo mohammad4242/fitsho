@@ -144,6 +144,7 @@ def test_run_parses_known_claude_json_output_forms(
         ("", "model not found", 1, "model_not_found"),
         ("", "unauthorized: login required", 1, "unauthorized"),
         ("", "rate limit exceeded", 1, "rate_limited"),
+        ("", "You've hit your usage limit", 1, "rate_limited"),
     ],
 )
 def test_provider_errors_map_to_safe_codes(

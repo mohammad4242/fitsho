@@ -216,6 +216,7 @@ def test_images_are_rejected_without_process_by_default(
         ("", "model not found", 1, "model_not_found"),
         ("", "unauthorized: login required", 1, "unauthorized"),
         ("", "rate limit exceeded", 1, "rate_limited"),
+        ("", "You've hit your usage limit", 1, "rate_limited"),
         ("", "upstream unavailable", 1, "provider_unavailable"),
     ],
 )

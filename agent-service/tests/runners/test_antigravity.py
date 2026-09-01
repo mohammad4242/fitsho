@@ -419,6 +419,7 @@ def test_malformed_or_schema_invalid_output_is_safe_error(
         ("unauthorized: please login", "unauthorized"),
         ("temporary upstream outage", "provider_unavailable"),
         ("rate limit exceeded", "rate_limited"),
+        ("You've hit your usage limit", "rate_limited"),
     ],
 )
 def test_error_status_is_classified_without_leaking_provider_text(

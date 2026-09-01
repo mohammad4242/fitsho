@@ -320,7 +320,9 @@ class AntigravityRunner(AgentRunner):
         text = " ".join((stdout, stderr)).lower()
         if re.search(r"model[ _-]+not[ _-]+found|unknown model|model does not exist", text):
             return RunnerError("model_not_found", "model was not found")
-        if re.search(r"rate[ -]?limit|too many requests|quota exceeded|\b429\b", text):
+        if re.search(
+            r"rate[ -]?limit|usage limit|too many requests|quota exceeded|\b429\b", text
+        ):
             return RunnerError("rate_limited", "runner rate limit reached")
         if re.search(
             r"unauthori[sz]ed|authentication failed|not authenticated|login required|"
