@@ -629,10 +629,486 @@ def evaluate_all_200_profiles() -> list[dict[str, Any]]:
     return results
 
 
-if __name__ == "__main__":
+def build_pdf_html(results: list[dict[str, Any]]) -> str:
+    total = len(results)
+    success_count = sum(1 for r in results if r["status"] == "SUCCESS")
+    failure_count = total - success_count
+    success_rate = (success_count / total) * 100 if total > 0 else 0
+
+    failures_by_code: dict[str, int] = {}
+    failed_rules_counter: dict[str, int] = {}
+    for r in results:
+        if r["status"] == "FAILED" and r.get("failure_info"):
+            finfo = r["failure_info"]
+            code = finfo.get("final_error_code", "UNKNOWN")
+            root = finfo.get("root_cause", "UNKNOWN")
+            failures_by_code[code] = failures_by_code.get(code, 0) + 1
+            failed_rules_counter[root] = failed_rules_counter.get(root, 0) + 1
+
+    top_failed_rules = sorted(failed_rules_counter.items(), key=lambda x: x[1], reverse=True)
+
+    css = """
+    @page {
+        size: A4 portrait;
+        margin: 10mm 10mm 12mm 10mm;
+        @bottom-left {
+            content: "Fitsho Workout Engine - 200 Profile Evaluation Report";
+            font-family: 'Vazirmatn', 'Noto Sans Arabic', sans-serif;
+            font-size: 7.5pt;
+            color: #64748b;
+        }
+        @bottom-right {
+            content: "صفحه " counter(page) " از " counter(pages);
+            font-family: 'Vazirmatn', 'Noto Sans Arabic', sans-serif;
+            font-size: 7.5pt;
+            color: #64748b;
+        }
+    }
+    * { box-sizing: border-box; }
+    body {
+        font-family: 'Vazirmatn', 'Noto Sans Arabic', 'DejaVu Sans', sans-serif;
+        font-size: 8pt;
+        line-height: 1.45;
+        direction: rtl;
+        text-align: right;
+        color: #0f172a;
+        background: #ffffff;
+    }
+    .header {
+        text-align: center;
+        background: linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%);
+        color: #ffffff;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+    }
+    .header h1 {
+        font-size: 15pt;
+        margin: 0 0 4px 0;
+        font-weight: bold;
+    }
+    .header p {
+        font-size: 8.5pt;
+        margin: 0;
+        opacity: 0.92;
+    }
+    .stats-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .stat-card {
+        flex: 1;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 5px;
+        padding: 8px 6px;
+        text-align: center;
+    }
+    .stat-val {
+        font-size: 13pt;
+        font-weight: bold;
+        color: #1e40af;
+    }
+    .stat-lbl {
+        font-size: 7pt;
+        color: #64748b;
+        margin-top: 2px;
+    }
+    .analytics-section {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 14px;
+        page-break-inside: avoid;
+    }
+    .analytics-title {
+        font-size: 9.5pt;
+        font-weight: bold;
+        color: #1e3a8a;
+        margin-bottom: 6px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 7.5pt;
+        margin-bottom: 6px;
+    }
+    th, td {
+        border: 1px solid #cbd5e1;
+        padding: 3px 6px;
+        text-align: right;
+    }
+    th {
+        background: #e2e8f0;
+        color: #334155;
+        font-weight: bold;
+    }
+    .badge-success {
+        background: #dcfce7;
+        color: #166534;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 7pt;
+        display: inline-block;
+    }
+    .badge-fail {
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-weight: bold;
+        font-size: 7pt;
+        display: inline-block;
+    }
+    .profile-card {
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        background: #ffffff;
+        page-break-inside: avoid;
+        overflow: hidden;
+    }
+    .profile-card.success-card {
+        border-right: 5px solid #16a34a;
+    }
+    .profile-card.fail-card {
+        border-right: 5px solid #dc2626;
+    }
+    .card-header {
+        background: #f8fafc;
+        padding: 6px 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .card-title {
+        font-size: 9pt;
+        font-weight: bold;
+        color: #0f172a;
+    }
+    .grid-info {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px 8px;
+        padding: 6px 10px;
+        background: #ffffff;
+        font-size: 7.2pt;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+    .info-item span.lbl {
+        color: #64748b;
+    }
+    .info-item span.val {
+        font-weight: bold;
+        color: #0f172a;
+    }
+    .card-body {
+        padding: 8px 10px;
+    }
+    .program-summary {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 4px;
+        padding: 6px 8px;
+        margin-bottom: 6px;
+        font-size: 7.5pt;
+    }
+    .day-container {
+        margin-top: 5px;
+        background: #fafafa;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        padding: 5px 8px;
+    }
+    .day-header {
+        font-weight: bold;
+        font-size: 7.8pt;
+        color: #1e3a8a;
+        margin-bottom: 4px;
+        display: flex;
+        justify-content: space-between;
+    }
+    .ex-table {
+        margin-top: 3px;
+        margin-bottom: 0;
+    }
+    .ex-table th {
+        background: #f1f5f9;
+        font-size: 6.8pt;
+        padding: 2px 4px;
+    }
+    .ex-table td {
+        font-size: 6.8pt;
+        padding: 2px 4px;
+    }
+    .fail-box {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 4px;
+        padding: 8px 10px;
+        font-size: 7.5pt;
+    }
+    .fail-title {
+        color: #991b1b;
+        font-weight: bold;
+        font-size: 8.5pt;
+        margin-bottom: 4px;
+    }
+    .fail-row {
+        margin-bottom: 3px;
+    }
+    .fail-lbl {
+        color: #7f1d1d;
+        font-weight: bold;
+    }
+    code {
+        font-family: monospace;
+        background: #f1f5f9;
+        padding: 1px 3px;
+        border-radius: 2px;
+        font-size: 7pt;
+    }
+    </style>
+    """
+
+    html = f"""<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>گزارش جامع ۲۰۰ پروفایل موتور برنامه تمرینی Fitsho</title>
+{css}
+</head>
+<body>
+
+<div class="header">
+    <h1>گزارش ارزیابی ۲۰۰ پروفایل در موتور تمرینی فیتشو (Fitsho Workout Engine)</h1>
+    <p>بررسی خروجی و علل دقیق عدم ساخت برنامه بر روی ۲۰۰ پروفایل متنوع طبقه‌بندی‌شده | تاریخ ارزیابی: ۲۰۲۶-۰۹-۰۱</p>
+</div>
+
+<div class="stats-row">
+    <div class="stat-card">
+        <div class="stat-val">{total}</div>
+        <div class="stat-lbl">کل پروفایل‌های تستی</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-val" style="color: #166534;">{success_count}</div>
+        <div class="stat-lbl">برنامه تولید شده (موفق)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-val" style="color: #991b1b;">{failure_count}</div>
+        <div class="stat-lbl">عدم تولید برنامه (دارای خطا)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-val">{success_rate:.1f}٪</div>
+        <div class="stat-lbl">نرخ موفقیت (Success Rate)</div>
+    </div>
+</div>
+
+<div class="analytics-section">
+    <div class="analytics-title">تحلیل و ریشه‌یابی آماری عدم تولید برنامه (Failure Root Causes Analytics)</div>
+    <div style="display: flex; gap: 10px;">
+        <div style="flex: 1;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>کد وضعیت خطا</th>
+                        <th style="width: 50px; text-align: center;">تعداد</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(f"<tr><td><code>{k}</code></td><td style='text-align: center; font-weight: bold;'>{v}</td></tr>" for k, v in failures_by_code.items())}
+                </tbody>
+            </table>
+        </div>
+        <div style="flex: 1;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>علت ریشه‌ای / محدودیت ناموفق</th>
+                        <th style="width: 50px; text-align: center;">تعداد</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {"".join(f"<tr><td><code>{k}</code></td><td style='text-align: center; font-weight: bold;'>{v}</td></tr>" for k, v in top_failed_rules[:5])}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<h2 style="font-size: 11pt; color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 3px; margin: 14px 0 10px 0;">
+    فهرست و کارنامه تفصیلی ۲۰۰ پروفایل و برنامه‌های تخصیص‌یافته
+</h2>
+"""
+
+    for r in results:
+        p: ProfileSpec = r["profile"]
+        status = r["status"]
+        is_success = (status == "SUCCESS")
+        card_class = "success-card" if is_success else "fail-card"
+        badge = '<span class="badge-success">برنامه با موفقیت تولید شد</span>' if is_success else '<span class="badge-fail">برنامه تولید نشد</span>'
+
+        sex_fa = FA_TRANSLATIONS.get(p.sex.value, p.sex.value)
+        goal_fa = FA_TRANSLATIONS.get(p.fitness_goal.value, p.fitness_goal.value)
+        level_fa = FA_TRANSLATIONS.get(p.experience_level.value, p.experience_level.value)
+        loc_fa = FA_TRANSLATIONS.get(p.training_location.value, p.training_location.value)
+        setup_fa = FA_TRANSLATIONS.get(p.home_training_setup.value, p.home_training_setup.value) if p.home_training_setup else "کامل باشگاه"
+        pri_fa = FA_TRANSLATIONS.get(p.priority_muscle.value, p.priority_muscle.value) if p.priority_muscle else "ندارد"
+        cautions_fa = ", ".join(FA_TRANSLATIONS.get(c.value, c.value) for c in p.training_cautions) if p.training_cautions else "بدون آسیب"
+
+        html += f"""
+<div class="profile-card {card_class}">
+    <div class="card-header">
+        <span class="card-title">پروفایل #{p.index:03d}: {p.name}</span>
+        {badge}
+    </div>
+    <div class="grid-info">
+        <div class="info-item"><span class="lbl">جنسیت و سن:</span> <span class="val">{sex_fa}، {p.age} سال</span></div>
+        <div class="info-item"><span class="lbl">قد و وزن:</span> <span class="val">{p.height_cm}cm / {p.weight_kg}kg</span></div>
+        <div class="info-item"><span class="lbl">هدف تمرینی:</span> <span class="val">{goal_fa}</span></div>
+        <div class="info-item"><span class="lbl">سطح و سابقه:</span> <span class="val">{level_fa} ({p.training_age_months} ماه)</span></div>
+        <div class="info-item"><span class="lbl">روزهای تمرین:</span> <span class="val">{p.training_days_per_week} روز در هفته</span></div>
+        <div class="info-item"><span class="lbl">مدت زمان جلسه:</span> <span class="val">{p.session_duration_minutes} دقیقه</span></div>
+        <div class="info-item"><span class="lbl">مکان و تجهیزات:</span> <span class="val">{loc_fa} ({setup_fa})</span></div>
+        <div class="info-item"><span class="lbl">اولویت عضلانی:</span> <span class="val">{pri_fa}</span></div>
+        <div class="info-item" style="grid-column: span 4;"><span class="lbl">محدودیت‌ها و آسیب‌ها:</span> <span class="val">{cautions_fa}</span></div>
+    </div>
+    <div class="card-body">
+"""
+
+        if is_success:
+            split_fa = r.get("split_fa") or r.get("split")
+            days_count = r.get("days_count", 0)
+            html += f"""
+        <div class="program-summary">
+            <strong>ساختار برنامه:</strong> اسپلیت <strong>{split_fa}</strong> | تعداد جلسات: <strong>{days_count} جلسه در هفته</strong> | طول دوره: <strong>{p.plan_duration_weeks} هفته</strong>
+        </div>
+"""
+            for day in r.get("days", []):
+                d_idx = day.get("day_index")
+                d_title = day.get("title")
+                d_dur = day.get("estimated_duration_minutes")
+                ex_list = day.get("exercises", [])
+
+                html += f"""
+        <div class="day-container">
+            <div class="day-header">
+                <span>جلسه {d_idx}: {d_title}</span>
+                <span>زمان تخمینی: {d_dur} دقیقه ({len(ex_list)} حرکت)</span>
+            </div>
+            <table class="ex-table">
+                <thead>
+                    <tr>
+                        <th style="width: 25px; text-align: center;">#</th>
+                        <th>نام تمرین (فارسی / انگلیسی)</th>
+                        <th style="width: 70px;">عضله هدف</th>
+                        <th style="width: 45px; text-align: center;">ست</th>
+                        <th style="width: 65px; text-align: center;">تکرار</th>
+                        <th style="width: 45px; text-align: center;">RIR</th>
+                        <th style="width: 55px; text-align: center;">استراحت</th>
+                    </tr>
+                </thead>
+                <tbody>
+"""
+                for it in ex_list:
+                    html += f"""
+                    <tr>
+                        <td style="text-align: center;">{it['order']}</td>
+                        <td><strong>{it['name_fa']}</strong> <span style="color: #64748b; font-size: 6.2pt;">({it['name_en']})</span></td>
+                        <td>{it['primary_muscle_fa']}</td>
+                        <td style="text-align: center; font-weight: bold;">{it['sets']}</td>
+                        <td style="text-align: center;">{it['rep_min']}-{it['rep_max']}</td>
+                        <td style="text-align: center;">{it['rir']}</td>
+                        <td style="text-align: center;">{it['rest_seconds']}ث</td>
+                    </tr>
+"""
+                html += """
+                </tbody>
+            </table>
+        </div>
+"""
+        else:
+            finfo = r.get("failure_info", {})
+            html += f"""
+        <div class="fail-box">
+            <div class="fail-title">علت دقیق عدم تولید برنامه: {finfo.get('root_cause')}</div>
+            <div class="fail-row"><span class="fail-lbl">توضیح تفصیلی:</span> {finfo.get('exact_description_fa')}</div>
+            <div class="fail-row"><span class="fail-lbl">فاز اجرایی شکست:</span> <code>{finfo.get('failing_phase')}</code></div>
+            <div class="fail-row"><span class="fail-lbl">قانون و متد ناظر:</span> <code>{finfo.get('rule_file')} -> {finfo.get('rule_func')}</code></div>
+            <div class="fail-row"><span class="fail-lbl">مقدار واقعی / حد مجاز:</span> {finfo.get('actual_val')} (حد مجاز: {finfo.get('limit_val')})</div>
+        </div>
+"""
+
+        html += """
+    </div>
+</div>
+"""
+
+    html += """
+</body>
+</html>
+"""
+    return html
+
+
+def main() -> None:
+    import weasyprint
+
     results = evaluate_all_200_profiles()
     successes = sum(1 for r in results if r["status"] == "SUCCESS")
     failures = len(results) - successes
-    print(f"\nCompleted evaluation of {len(results)} profiles:")
-    print(f"  Successes: {successes} ({successes/len(results)*100:.1f}%)")
-    print(f"  Failures:  {failures} ({failures/len(results)*100:.1f}%)")
+    print(f"\nEvaluation summary: {successes} succeeded, {failures} failed.")
+
+    # Save JSON raw report
+    os.makedirs("/home/mohammad/project/fitsho/var/reports", exist_ok=True)
+    os.makedirs("/home/mohammad/project/fitsho/reports", exist_ok=True)
+
+    json_path = "/home/mohammad/project/fitsho/var/reports/200_profiles_eval_data.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json_data = []
+        for r in results:
+            p_dict = asdict(r["profile"])
+            p_dict["birth_date"] = p_dict["birth_date"].isoformat()
+            p_dict["sex"] = p_dict["sex"].value
+            p_dict["fitness_goal"] = p_dict["fitness_goal"].value
+            p_dict["experience_level"] = p_dict["experience_level"].value
+            p_dict["training_location"] = p_dict["training_location"].value
+            if p_dict["home_training_setup"]:
+                p_dict["home_training_setup"] = p_dict["home_training_setup"].value
+            if p_dict["priority_muscle"]:
+                p_dict["priority_muscle"] = p_dict["priority_muscle"].value
+            p_dict["training_cautions"] = [c.value for c in p_dict["training_cautions"]]
+            p_dict["sleep_quality"] = p_dict["sleep_quality"].value
+            p_dict["stress_level"] = p_dict["stress_level"].value
+            p_dict["physical_job_demand"] = p_dict["physical_job_demand"].value
+
+            r_clean = dict(r)
+            r_clean["profile"] = p_dict
+            json_data.append(r_clean)
+        json.dump(json_data, f, ensure_ascii=False, indent=2)
+    print(f"Saved raw evaluation data to {json_path}")
+
+    # Build HTML
+    print("Building Persian HTML for 200 profiles...")
+    html_content = build_pdf_html(results)
+    html_path = "/home/mohammad/project/fitsho/reports/fitsho_200_profiles_eval_report.html"
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+    print(f"HTML report saved to {html_path}")
+
+    # Render PDF
+    pdf_path = "/home/mohammad/project/fitsho/reports/fitsho_200_profiles_eval_report.pdf"
+    print(f"Rendering PDF with WeasyPrint to {pdf_path} (this will render all 200 profile cards)...")
+    weasyprint.HTML(string=html_content).write_pdf(pdf_path)
+    size_mb = os.path.getsize(pdf_path) / (1024 * 1024)
+    print(f"PDF generated successfully at {pdf_path} ({size_mb:.2f} MB)")
+
+
+if __name__ == "__main__":
+    main()
+
