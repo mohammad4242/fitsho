@@ -3,11 +3,17 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import UUID
 
+from app.exercises.enums import ExerciseType, MovementPattern, MuscleGroup
 from app.profile.enums import ExperienceLevel
 from app.workouts.program_engine.enums import SplitType
 from app.workouts.program_engine.schemas import ProgramGenerationResult, SplitPlan
-from scripts.audit_supported_profile_catalog import audit_supported_catalog
+from app.workouts.program_engine.session_builder import SlotSpec
+from scripts.audit_supported_profile_catalog import (
+    audit_required_slot_catalog,
+    audit_supported_catalog,
+)
 from scripts.generate_200_profiles_eval import generate_200_supported_profiles
 from scripts.program_engine_audit_support import (
     build_profile_audit_record,
@@ -51,9 +57,7 @@ def test_unsupported_profiles_are_separate_from_the_success_denominator() -> Non
         _profile(experience_level=ExperienceLevel.ADVANCED, training_days_per_week=2)
     )
     results = [
-        build_profile_audit_record(
-            _profile(), supported, status="SUCCESS", failure_info=None
-        ),
+        build_profile_audit_record(_profile(), supported, status="SUCCESS", failure_info=None),
         build_profile_audit_record(
             _profile(), supported, status="FAILED", failure_info={"root_cause": "CATALOG_GAP"}
         ),
@@ -162,6 +166,75 @@ def test_catalog_audit_keeps_supported_catalog_gap_as_a_failure() -> None:
     assert records[0]["catalog_gap"] is True
     assert records[0]["status"] == "FAILED"
     assert records[1]["cohort"] == "unsupported"
+
+
+def test_required_slot_audit_distinguishes_safe_catalog_gap_from_greedy_dead_end() -> None:
+    candidate = SimpleNamespace(
+        id=UUID(int=101),
+        slug="push-up-equipment-blocked",
+        name="Push-Up",
+        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+        primary_muscle=MuscleGroup.CHEST,
+        secondary_muscles=(),
+        exercise_type=ExerciseType.COMPOUND,
+        labels=(),
+        equipment=(),
+    )
+    slot = SlotSpec(
+        patterns=frozenset({MovementPattern.HORIZONTAL_PUSH}),
+        required=True,
+        target_muscle=MuscleGroup.CHEST,
+    )
+
+    evidence = audit_required_slot_catalog(
+        _profile(),
+        focus="chest_triceps",
+        day_index=1,
+        slot=slot,
+        eligible=(),
+        rejected_by_id={candidate.id: ("EXERCISE_REJECTED_MISSING_EQUIPMENT",)},
+        catalog=(candidate,),
+    )
+
+    assert evidence["safe_catalog_gap"] is True
+    assert evidence["greedy_dead_end_proven"] is False
+    assert evidence["candidate_pool_at_session_start"] == 0
+    assert evidence["equipment_blocked_candidate_count"] == 1
+    assert evidence["consumed_by_greedy_choice"] == 0
+    assert evidence["alternative_ordering_possible"] is False
+
+
+def test_required_slot_audit_does_not_call_a_present_candidate_a_catalog_gap() -> None:
+    candidate = SimpleNamespace(
+        id=UUID(int=102),
+        slug="push-up-available",
+        name="Push-Up",
+        movement_pattern=MovementPattern.HORIZONTAL_PUSH,
+        primary_muscle=MuscleGroup.CHEST,
+        secondary_muscles=(),
+        exercise_type=ExerciseType.COMPOUND,
+        labels=(),
+        equipment=(),
+    )
+    slot = SlotSpec(
+        patterns=frozenset({MovementPattern.HORIZONTAL_PUSH}),
+        required=True,
+        target_muscle=MuscleGroup.CHEST,
+    )
+
+    evidence = audit_required_slot_catalog(
+        _profile(),
+        focus="chest_triceps",
+        day_index=1,
+        slot=slot,
+        eligible=(candidate,),
+        rejected_by_id={},
+        catalog=(candidate,),
+    )
+
+    assert evidence["safe_catalog_gap"] is False
+    assert evidence["greedy_dead_end_proven"] is None
+    assert evidence["candidate_pool_at_session_start"] == 1
 
 
 def test_200_supported_profile_cohort_is_deterministic_and_exact() -> None:
