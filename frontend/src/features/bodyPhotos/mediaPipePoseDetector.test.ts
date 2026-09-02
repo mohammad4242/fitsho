@@ -66,7 +66,7 @@ describe("MediaPipePoseLandmarkDetector", () => {
       numPoses: 2,
       runningMode: "IMAGE",
       minPoseDetectionConfidence: 0.4,
-      minPosePresenceConfidence: 0.55,
+      minPosePresenceConfidence: 0.35,
     }));
   });
 });

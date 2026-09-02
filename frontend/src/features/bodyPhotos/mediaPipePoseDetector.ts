@@ -62,7 +62,9 @@ export function createMediaPipePoseLandmarkerLoader(
       runningMode: "IMAGE",
       numPoses: 2,
       minPoseDetectionConfidence: 0.4,
-      minPosePresenceConfidence: 0.55,
+      // Let difficult side profiles reach the domain validator, which still
+      // requires every needed body landmark to be clearly visible.
+      minPosePresenceConfidence: 0.35,
     });
   };
 }
