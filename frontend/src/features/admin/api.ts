@@ -20,6 +20,8 @@ import type {
   AdminAiAgentAuthSession,
   AdminAiAgentAuthCancellation,
   AdminAiAgentName,
+  AdminAiAgentServiceProxy,
+  AdminAiAgentServiceProxyUpdate,
   AdminAiAgentTaskSmoke,
   AdminAiAgentServiceCapabilities,
   AdminAiAgentServiceTest,
@@ -398,6 +400,19 @@ export function getAdminAiAgentServiceCapabilities(
   return request<AdminAiAgentServiceCapabilities>(
     `/api/v1/admin/ai/agent-service/capabilities${query}`,
   );
+}
+
+export function getAdminAiAgentServiceProxy(): Promise<AdminAiAgentServiceProxy> {
+  return request<AdminAiAgentServiceProxy>("/api/v1/admin/ai/agent-service/proxy");
+}
+
+export function saveAdminAiAgentServiceProxy(
+  input: AdminAiAgentServiceProxyUpdate,
+): Promise<AdminAiAgentServiceProxy> {
+  return request<AdminAiAgentServiceProxy>("/api/v1/admin/ai/agent-service/proxy", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
 }
 
 export function testAdminAiAgentService(

@@ -34,6 +34,14 @@ _PROXY_ENVIRONMENT_KEYS = (
     "https_proxy",
     "all_proxy",
 )
+_DEFAULT_PROXY_STATUS_KEYS = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+)
 _PROXY_SCHEMES = frozenset({"http", "https", "socks5", "socks5h"})
 
 
@@ -106,8 +114,14 @@ class ProxyRuntime:
             selected_url = (
                 self._custom_proxy_url
                 if self._source is ProxySource.CUSTOM
-                else self._default_proxy_values.get("HTTP_PROXY")
-                or self._default_proxy_values.get("HTTPS_PROXY")
+                else next(
+                    (
+                        self._default_proxy_values[key]
+                        for key in _DEFAULT_PROXY_STATUS_KEYS
+                        if key in self._default_proxy_values
+                    ),
+                    None,
+                )
             )
             default_configured = any(self._default_proxy_values.values())
             return ProxyRuntimeStatus(

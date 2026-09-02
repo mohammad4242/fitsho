@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   getAdminAiTaskConfigs: vi.fn(),
   getAdminAiTaskModels: vi.fn(),
   getAdminAiAgentServiceCapabilities: vi.fn(),
+  getAdminAiAgentServiceProxy: vi.fn(),
   startAdminAiAgentAuth: vi.fn(),
   getAdminAiAgentAuthSession: vi.fn(),
   submitAdminAiAgentAuthInput: vi.fn(),
@@ -18,6 +19,7 @@ const api = vi.hoisted(() => ({
   testAdminAiAgentService: vi.fn(),
   testAdminAiAgentTask: vi.fn(),
   refreshAdminAiModels: vi.fn(),
+  saveAdminAiAgentServiceProxy: vi.fn(),
 }));
 
 vi.mock("./api", () => api);
@@ -89,6 +91,28 @@ beforeEach(() => {
     ],
   });
   api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [] });
+  api.getAdminAiAgentServiceProxy.mockResolvedValue({
+    enabled: true,
+    source: "deployment_default",
+    configured: true,
+    default_configured: true,
+    masked_proxy_url: "http://default-proxy:1080",
+    applied: true,
+    agent_service_available: true,
+    last_applied_at: null,
+    last_apply_error: null,
+  });
+  api.saveAdminAiAgentServiceProxy.mockResolvedValue({
+    enabled: true,
+    source: "deployment_default",
+    configured: true,
+    default_configured: true,
+    masked_proxy_url: "http://default-proxy:1080",
+    applied: true,
+    agent_service_available: true,
+    last_applied_at: null,
+    last_apply_error: null,
+  });
   api.cancelAdminAiAgentAuthSession.mockResolvedValue(undefined);
 });
 
@@ -98,6 +122,70 @@ it("shows the settings load error instead of staying on the loading state", asyn
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Unable to load AI settings.");
   expect(screen.queryByText("Loading AI settings…")).not.toBeInTheDocument();
+});
+
+it("shows the deployment proxy as the default and saves the disable switch", async () => {
+  api.saveAdminAiAgentServiceProxy.mockResolvedValue({
+    enabled: false,
+    source: "deployment_default",
+    configured: true,
+    default_configured: true,
+    masked_proxy_url: "http://default-proxy:1080",
+    applied: true,
+    agent_service_available: true,
+    last_applied_at: null,
+    last_apply_error: null,
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  expect(await screen.findByRole("heading", { name: "Agent Service proxy" })).toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: "Use proxy for Agent Service" })).toBeChecked();
+  expect(
+    await screen.findByText("Deployment proxy: http://default-proxy:1080"),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByRole("checkbox", { name: "Use proxy for Agent Service" }));
+  await user.click(screen.getByRole("button", { name: "Save proxy settings" }));
+
+  expect(api.saveAdminAiAgentServiceProxy).toHaveBeenCalledWith({
+    enabled: false,
+    source: "deployment_default",
+  });
+  expect(await screen.findByText("Proxy settings saved")).toBeInTheDocument();
+});
+
+it("lets an admin replace the deployment proxy with a custom proxy", async () => {
+  api.saveAdminAiAgentServiceProxy.mockResolvedValue({
+    enabled: true,
+    source: "custom",
+    configured: true,
+    default_configured: true,
+    masked_proxy_url: "http://****:****@custom-proxy:8080",
+    applied: true,
+    agent_service_available: true,
+    last_applied_at: null,
+    last_apply_error: null,
+  });
+  const user = userEvent.setup();
+  renderPage();
+
+  await user.click(await screen.findByRole("radio", { name: "Use custom proxy" }));
+  await user.type(
+    screen.getByLabelText("Custom proxy URL"),
+    "http://admin:secret@custom-proxy:8080",
+  );
+  await user.click(screen.getByRole("button", { name: "Save proxy settings" }));
+
+  expect(api.saveAdminAiAgentServiceProxy).toHaveBeenCalledWith({
+    enabled: true,
+    source: "custom",
+    proxy_url: "http://admin:secret@custom-proxy:8080",
+  });
+  expect(
+    await screen.findByText("Saved proxy: http://****:****@custom-proxy:8080"),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("admin:secret")).not.toBeInTheDocument();
 });
 
 it("shows task-specific vision models and capability details", async () => {

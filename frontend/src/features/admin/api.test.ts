@@ -20,6 +20,8 @@ import {
   cancelAdminAiAgentAuthActive,
   cancelAdminAiAgentAuthSession,
   getAdminAiAgentServiceCapabilities,
+  getAdminAiAgentServiceProxy,
+  saveAdminAiAgentServiceProxy,
   testAdminAiAgentTask,
   uploadAdminMealImage,
   updateAdminAiRouting,
@@ -224,6 +226,48 @@ it("requests task-scoped Agent profiles and posts a profile smoke test", async (
         task_type: "food_price_search",
         agent: "antigravity",
         profile_id: smoke.profile_id,
+      }),
+    }),
+  );
+});
+
+it("reads and updates the Agent Service proxy through the admin boundary", async () => {
+  const proxy = {
+    enabled: true,
+    source: "custom" as const,
+    configured: true,
+    default_configured: true,
+    masked_proxy_url: "http://****:****@proxy:8080",
+    applied: true,
+    agent_service_available: true,
+    last_applied_at: null,
+    last_apply_error: null,
+  };
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse(proxy))
+    .mockResolvedValueOnce(jsonResponse(proxy));
+
+  await expect(getAdminAiAgentServiceProxy()).resolves.toEqual(proxy);
+  await expect(saveAdminAiAgentServiceProxy({
+    enabled: true,
+    source: "custom",
+    proxy_url: "http://admin:secret@proxy:8080",
+  })).resolves.toEqual(proxy);
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/admin/ai/agent-service/proxy",
+    expect.objectContaining({ credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/admin/ai/agent-service/proxy",
+    expect.objectContaining({
+      method: "PUT",
+      body: JSON.stringify({
+        enabled: true,
+        source: "custom",
+        proxy_url: "http://admin:secret@proxy:8080",
       }),
     }),
   );

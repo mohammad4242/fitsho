@@ -18,6 +18,7 @@ import {
 import { AiModelSelector } from "./AiModelSelector";
 import { AgentAuthDialog } from "./AgentAuthDialog";
 import { AgentServicePanel } from "./AgentServicePanel";
+import { AgentServiceProxySettings } from "./AgentServiceProxySettings";
 import type {
   AdminAiCatalogModel,
   AdminAiAgentModelProfile,
@@ -375,6 +376,8 @@ export function AdminAiSettingsPage() {
           <span>{backLabel}</span>
         </Link>
       </header>
+
+      <AgentServiceProxySettings />
 
       <nav className="admin-ai-task-tabs" aria-label={t("admin.aiSettings.taskNav")}>
         {configs.map((item) => (

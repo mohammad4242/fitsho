@@ -410,6 +410,26 @@ export type AdminAiAgentServiceCapabilities = {
   runners: AdminAiAgentRunnerCapability[];
 };
 
+export type AdminAiAgentServiceProxySource = "deployment_default" | "custom";
+
+export type AdminAiAgentServiceProxy = {
+  enabled: boolean;
+  source: AdminAiAgentServiceProxySource;
+  configured: boolean;
+  default_configured: boolean;
+  masked_proxy_url: string | null;
+  applied: boolean;
+  agent_service_available: boolean;
+  last_applied_at: string | null;
+  last_apply_error: string | null;
+};
+
+export type AdminAiAgentServiceProxyUpdate = {
+  enabled: boolean;
+  source: AdminAiAgentServiceProxySource;
+  proxy_url?: string;
+};
+
 export type AdminAiAgentServiceTest = {
   ok: boolean;
   agent: AdminAiAgentName;

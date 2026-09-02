@@ -10,6 +10,14 @@ from app.config import Settings
 TOKEN = "a" * 32
 
 
+def test_proxy_runtime_reports_an_all_proxy_deployment_default() -> None:
+    runtime = ProxyRuntime({"PATH": "/usr/bin", "ALL_PROXY": "socks5h://default-proxy:1080"})
+
+    assert runtime.status().configured is True
+    assert runtime.status().default_configured is True
+    assert runtime.status().masked_proxy_url == "socks5h://default-proxy:1080"
+
+
 def test_proxy_runtime_preserves_deployment_default_and_can_switch_modes() -> None:
     runtime = ProxyRuntime(
         {
