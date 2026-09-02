@@ -559,6 +559,9 @@ async def research_single_food_price(
         canonical_unit=canonical_unit,
         quotes=quotes,
         status="success" if candidate_price is not None else "no_quotes",
+        message=None
+        if candidate_price is not None
+        else "قیمتی در فروشگاه‌های آنلاین برای این ماده غذایی یافت نشد.",
     )
 
 

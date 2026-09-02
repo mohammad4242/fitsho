@@ -100,6 +100,11 @@ Rules:
 20. If fewer reliable independent sources exist than requested, return only
     the reliable sources you actually found.
 
+21. Keep searches focused and bounded. Perform at most 3 to 4 targeted search
+    queries or store page inspections. If after 3 to 4 searches no clear Iranian retail
+    price quote is found, stop searching and return quotes: [] immediately.
+    Never enter long or exhaustive search loops for rare, niche, or unlisted foods.
+
 Return only one JSON object matching the supplied response schema.
 """
 
@@ -457,7 +462,7 @@ class AgentFoodPriceResearcher:
             expanded=False,
         )
 
-        if self._has_trusted_initial_cluster(evidence):
+        if not evidence or self._has_trusted_initial_cluster(evidence):
             return AgentFoodPriceResearchResult(tuple(evidence), tuple(request_ids), False)
 
         additional_count = min(MAX_RESEARCH_SOURCES - len(domains), MAX_RESEARCH_SOURCES)

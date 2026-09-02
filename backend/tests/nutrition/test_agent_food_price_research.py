@@ -279,3 +279,14 @@ def test_research_uses_current_date_and_no_user_pii() -> None:
     assert request.input_payload["as_of_date"] == datetime.now(UTC).date().isoformat()
     assert "email" not in repr(request.input_payload).lower()
     assert "password" not in repr(request.input_payload).lower()
+
+
+def test_zero_evidence_first_pass_does_not_expand() -> None:
+    provider = FakeStructuredProvider([output()])
+
+    result = run_research(provider)
+
+    assert len(provider.requests) == 1
+    assert len(result.evidence) == 0
+    assert result.expanded is False
+
