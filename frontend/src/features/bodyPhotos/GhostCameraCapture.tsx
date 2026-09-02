@@ -10,7 +10,7 @@ import {
   type LivePoseGuidance,
   type LivePoseGuideFactory,
 } from "./livePoseGuide";
-import type { BodyPhotoView } from "./types";
+import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 export type CameraFallbackReason =
   | "unsupported"
@@ -23,6 +23,7 @@ type CameraFacingMode = "user" | "environment";
 
 type GhostCameraCaptureProps = {
   sex?: Sex | null;
+  sideProfile?: BodyPhotoSide;
   view: BodyPhotoView;
   onFileCaptured: (file: File) => void | Promise<void>;
   onFallback: (reason: CameraFallbackReason) => void;
@@ -43,6 +44,7 @@ const cameraConstraints = {
 
 export function GhostCameraCapture({
   sex,
+  sideProfile,
   view,
   onFileCaptured,
   onFallback,
@@ -320,7 +322,7 @@ export function GhostCameraCapture({
             alt={t("bodyPhotos.camera.capturedAlt", { view: t(`bodyPhotos.views.${view}`) })}
           />
         )}
-        <GhostOverlayGuide sex={sex} scale={ghostScale} view={view} />
+        <GhostOverlayGuide sex={sex} scale={ghostScale} sideProfile={sideProfile} view={view} />
       </div>
       <canvas ref={canvasRef} className="ghost-camera__canvas" aria-hidden="true" />
       {capturedFile === null ? (

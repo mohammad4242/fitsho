@@ -11,7 +11,7 @@ import {
   type GhostPhotoRenderer,
 } from "./GhostPhotoEditor";
 import { GhostPhotoEditor } from "./GhostPhotoEditor";
-import type { BodyPhotoView } from "./types";
+import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 const sourceFile = new File(["source"], "side.png", { type: "image/png" });
 
@@ -72,6 +72,23 @@ it("changes only the Ghost size while keeping the photo framing fixed", () => {
 
   expect(ghost).toHaveStyle({ transform: "scale(0.95)" });
   expect(image.style.transform).toBe(initialImageTransform);
+});
+
+it("shows the left side Ghost without changing photo framing", () => {
+  const { container } = render(
+    <GhostPhotoEditor
+      file={sourceFile}
+      view="side"
+      sideProfile="left"
+      onConfirm={vi.fn()}
+      onCancel={vi.fn()}
+      renderPhoto={renderPhoto}
+    />,
+  );
+
+  expect(container.querySelector(".ghost-overlay__asset-frame")).toHaveStyle({
+    transform: "scaleX(-1) scale(1)",
+  });
 });
 
 it("allows a quarter-turn through the rotation slider", () => {

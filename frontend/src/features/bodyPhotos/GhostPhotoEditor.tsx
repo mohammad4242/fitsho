@@ -12,7 +12,7 @@ import {
   renderGhostPhoto,
   type GhostPhotoTransform,
 } from "./ghostPhotoEditor";
-import type { BodyPhotoView } from "./types";
+import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 export type GhostPhotoRenderer = (
   file: File,
@@ -22,6 +22,7 @@ export type GhostPhotoRenderer = (
 type GhostPhotoEditorProps = {
   file: File;
   sex?: Sex | null;
+  sideProfile?: BodyPhotoSide;
   view: BodyPhotoView;
   onConfirm: (file: File) => void | Promise<void>;
   onCancel: () => void;
@@ -54,6 +55,7 @@ const rotationStep = 1;
 export function GhostPhotoEditor({
   file,
   sex,
+  sideProfile,
   view,
   onConfirm,
   onCancel,
@@ -173,7 +175,7 @@ export function GhostPhotoEditor({
             style={{ transform: ghostPhotoTransformStyle(transform) }}
           />
         )}
-        <GhostOverlayGuide sex={sex} scale={ghostScale} view={view} />
+        <GhostOverlayGuide sex={sex} scale={ghostScale} sideProfile={sideProfile} view={view} />
       </div>
       <p className="ghost-photo-editor__privacy-note">{t("bodyPhotos.editor.privacyNote")}</p>
       <p className="ghost-photo-editor__status" role="status">

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import i18n from "../../i18n";
 import type { LivePoseGuideFactory } from "./livePoseGuide";
 import { GhostCameraCapture, type CameraFallbackReason } from "./GhostCameraCapture";
+import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 const track = { stop: vi.fn() };
 const getUserMedia = vi.fn();
@@ -31,11 +32,16 @@ function prepareVideo() {
   return video;
 }
 
-function renderCamera(onFileCaptured = vi.fn().mockResolvedValue(undefined)) {
+function renderCamera(
+  onFileCaptured = vi.fn().mockResolvedValue(undefined),
+  sideProfile: BodyPhotoSide = "right",
+  view: BodyPhotoView = "front",
+) {
   const onFallback = vi.fn<(reason: CameraFallbackReason) => void>();
   const rendered = render(
     <GhostCameraCapture
-      view="front"
+      view={view}
+      sideProfile={sideProfile}
       onFileCaptured={onFileCaptured}
       onFallback={onFallback}
       onClose={vi.fn()}
@@ -148,6 +154,19 @@ it("changes only the centered Ghost size in uniform five-percent steps", () => {
   expect(larger).toBeDisabled();
 
   rendered.unmount();
+});
+
+it("shows the left side Ghost in guided camera mode", () => {
+  const { container, unmount } = renderCamera(
+    vi.fn().mockResolvedValue(undefined),
+    "left",
+    "side",
+  );
+
+  expect(container.querySelector(".ghost-overlay__asset-frame")).toHaveStyle({
+    transform: "scaleX(-1) scale(1)",
+  });
+  unmount();
 });
 
 it("captures a fixed privacy crop, mirrors the user camera, and returns a JPEG file", async () => {
