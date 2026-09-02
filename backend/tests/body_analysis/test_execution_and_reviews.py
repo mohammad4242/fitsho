@@ -807,6 +807,32 @@ def test_stale_analysis_is_recovered_but_retry_attempts_are_bounded(db: Session)
         service.retry(recovered.id, user.id, config)
 
 
+def test_provider_change_reopens_retry_budget_for_same_stored_photos(db: Session) -> None:
+    user, session = _submitted_session(db)
+    service = BodyAnalysisService(db)
+    old_config = _config()
+    failed = service.queue(session.id, user.id, old_config)
+    for attempt in range(3):
+        failed.status = BodyAnalysisStatus.FAILED
+        db.commit()
+        if attempt < 2:
+            failed = service.retry(failed.id, user.id, old_config)
+
+    codex_config = old_config.model_copy(
+        update={
+            "provider_name": "agent_service:codex",
+            "primary_model": "gpt-5.6-luna",
+        }
+    )
+    retried = service.retry(failed.id, user.id, codex_config)
+
+    assert retried.revision == 4
+    assert retried.replaces_analysis_id == failed.id
+    assert retried.provider == "agent_service:codex"
+    assert retried.model_id == "gpt-5.6-luna"
+    assert retried.raw_result == failed.raw_result
+
+
 def test_low_confidence_and_cost_limited_results_fail_safely(db: Session) -> None:
     user, session = _submitted_session(db)
     service = BodyAnalysisService(db)
