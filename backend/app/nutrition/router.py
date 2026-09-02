@@ -160,6 +160,7 @@ from app.nutrition.price_execution import (
 from app.nutrition.price_overrides import create_price_override
 from app.nutrition.price_providers import configured_providers
 from app.nutrition.price_update_service import run_price_update_async
+from app.nutrition.pricing import floor_price_to_thousand_toman
 from app.nutrition.program_catalogue import (
     ProgramLifecycle,
     ProgramWriteError,
@@ -523,14 +524,11 @@ async def research_single_food_price(
         values = [e.normalized_normal_price_toman for e in accepted]
         indexes = median_band_indices(values)
         trusted = [accepted[i] for i in indexes] if indexes else accepted
-        candidate_price = Decimal(
-            int(
-                round(
-                    sum((e.normalized_normal_price_toman for e in trusted), Decimal())
-                    / Decimal(len(trusted))
-                )
-            )
+        average_price = sum(
+            (e.normalized_normal_price_toman for e in trusted), Decimal()
         )
+        average_price /= Decimal(len(trusted))
+        candidate_price = floor_price_to_thousand_toman(average_price)
         canonical_unit = trusted[0].canonical_unit
 
     if apply and candidate_price is not None and canonical_unit is not None:

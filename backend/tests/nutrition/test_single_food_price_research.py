@@ -114,9 +114,9 @@ def test_research_single_food_success_and_apply(
     payload = {
         "food_slug": food.slug,
         "quotes": [
-            _quote("store-a.ir", 120000),
-            _quote("store-b.ir", 125000),
-            _quote("store-c.ir", 122000),
+            _quote("store-a.ir", 235000),
+            _quote("store-b.ir", 236000),
+            _quote("store-c.ir", 236000),
         ],
     }
     fake_provider = FakeStructuredProvider([payload])
@@ -142,9 +142,10 @@ def test_research_single_food_success_and_apply(
     assert data["food_name_fa"] == food.name_fa
     assert data["canonical_unit"] == "TOMAN_PER_KG"
     assert data["candidate_reference_price_toman"] is not None
+    assert data["candidate_reference_price_toman"] == "235000"
     assert len(data["quotes"]) == 3
     assert data["quotes"][0]["source_domain"] == "store-a.ir"
-    assert data["quotes"][0]["normal_price_toman"] == "120000"
+    assert data["quotes"][0]["normal_price_toman"] == "235000"
 
     # Verify no override was created yet
     override_count = db.scalar(
@@ -161,6 +162,7 @@ def test_research_single_food_success_and_apply(
     assert resp_applied.status_code == 200
     applied_data = resp_applied.json()
     assert applied_data["status"] == "success"
+    assert applied_data["candidate_reference_price_toman"] == "235000"
 
     # Verify override is now created in db
     override = db.scalar(
