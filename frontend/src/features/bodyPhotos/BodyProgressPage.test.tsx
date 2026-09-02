@@ -7,11 +7,29 @@ import i18n from "../../i18n";
 
 const api = vi.hoisted(() => ({
   deleteBodyPhotoSession: vi.fn(),
-  getBodyPhotoSessions: vi.fn(),
+  getBodyProgressTimeline: vi.fn(),
 }));
 vi.mock("./api", () => api);
 
 import { BodyProgressPage } from "./BodyProgressPage";
+
+function timelineResponse(sessions: Array<Record<string, unknown>>) {
+  return {
+    schema_version: "1.0",
+    items: sessions.map((session) => ({
+      session,
+      photos: session.photos,
+      analysis: null,
+      snapshot: null,
+      comparison: null,
+      review_state: {
+        coach: { role: "coach", decision: null, reviewed_at: null, reviewed_result_version: null },
+        doctor: { role: "doctor", decision: null, reviewed_at: null, reviewed_result_version: null },
+        fully_reviewed: false,
+      },
+    })),
+  };
+}
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -23,8 +41,7 @@ afterEach(() => {
 });
 
 it("links each photo session to its result and keeps the workflow optional", async () => {
-  api.getBodyPhotoSessions.mockResolvedValue({
-    items: [{
+  api.getBodyProgressTimeline.mockResolvedValue(timelineResponse([{
       id: "session-1",
       purpose: "initial_plan",
       state: "review_pending",
@@ -39,8 +56,7 @@ it("links each photo session to its result and keeps the workflow optional", asy
       submitted_at: "2026-08-03T10:00:00Z",
       created_at: "2026-08-03T10:00:00Z",
       updated_at: "2026-08-03T10:00:00Z",
-    }],
-  });
+    }]));
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
   expect(await screen.findByRole("link", { name: /view analysis/i })).toHaveAttribute(
@@ -48,13 +64,13 @@ it("links each photo session to its result and keeps the workflow optional", asy
     "/body-progress/session-1",
   );
   expect(screen.getByRole("heading", { name: "Body Analysis" })).toBeInTheDocument();
-  expect(screen.getByRole("list", { name: "Body Analysis" })).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "My body over time" })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Latest progress photo" })).toHaveAttribute("src", "/api/v1/body-photos/photos/photo-1/content");
   expect(screen.getByText(/Optional — add standardized/i)).toBeInTheDocument();
 });
 
 it("shows an actionable empty state without the deprecated scanner visual", async () => {
-  api.getBodyPhotoSessions.mockResolvedValue({ items: [] });
+  api.getBodyProgressTimeline.mockResolvedValue(timelineResponse([]));
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: "No photo registered" })).toBeInTheDocument();
@@ -68,8 +84,7 @@ it("shows an actionable empty state without the deprecated scanner visual", asyn
 });
 
 it("separates incomplete uploads from submitted analyses and marks the latest analysis", async () => {
-  api.getBodyPhotoSessions.mockResolvedValue({
-    items: [
+  api.getBodyProgressTimeline.mockResolvedValue(timelineResponse([
       {
         id: "incomplete-1",
         purpose: "progress_check",
@@ -88,12 +103,11 @@ it("separates incomplete uploads from submitted analyses and marks the latest an
         created_at: "2026-08-03T10:00:00Z",
         updated_at: "2026-08-03T10:00:00Z",
       },
-    ],
-  });
+    ]));
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: "Incomplete uploads" })).toBeVisible();
-  expect(screen.getByRole("heading", { name: "Saved analyses" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "My body over time" })).toBeVisible();
   expect(screen.getByRole("link", { name: "Continue upload" })).toHaveAttribute(
     "href",
     "/body-progress/new?sessionId=incomplete-1",
@@ -102,15 +116,14 @@ it("separates incomplete uploads from submitted analyses and marks the latest an
     "href",
     "/body-progress/analysis-1",
   );
-  expect(screen.getByText("Latest analysis")).toBeVisible();
-  expect(screen.getAllByText(/1\/3/)).toHaveLength(2);
+  expect(screen.getByText("Latest scan")).toBeVisible();
+  expect(screen.getAllByText(/1 \/ 3/)).toHaveLength(2);
 });
 
 it("deletes an incomplete session after confirmation", async () => {
   const user = userEvent.setup();
   api.deleteBodyPhotoSession.mockResolvedValue(undefined);
-  api.getBodyPhotoSessions.mockResolvedValue({
-    items: [{
+  api.getBodyProgressTimeline.mockResolvedValue(timelineResponse([{
       id: "incomplete-1",
       purpose: "progress_check",
       state: "uploading",
@@ -118,8 +131,7 @@ it("deletes an incomplete session after confirmation", async () => {
       submitted_at: null,
       created_at: "2026-08-04T10:00:00Z",
       updated_at: "2026-08-04T10:00:00Z",
-    }],
-  });
+    }]));
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
   expect(await screen.findByRole("link", { name: "Start photo session" })).toHaveAttribute(
@@ -138,8 +150,7 @@ it("deletes an incomplete session after confirmation", async () => {
 
 it("offers deletion for a saved analysis and restores focus after cancel", async () => {
   const user = userEvent.setup();
-  api.getBodyPhotoSessions.mockResolvedValue({
-    items: [{
+  api.getBodyProgressTimeline.mockResolvedValue(timelineResponse([{
       id: "analysis-1",
       purpose: "initial_plan",
       state: "completed",
@@ -147,8 +158,7 @@ it("offers deletion for a saved analysis and restores focus after cancel", async
       submitted_at: "2026-08-03T10:00:00Z",
       created_at: "2026-08-03T10:00:00Z",
       updated_at: "2026-08-03T10:00:00Z",
-    }],
-  });
+    }]));
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
   const deleteButton = await screen.findByRole("button", { name: "Delete analysis" });
@@ -166,8 +176,7 @@ it("offers deletion for a saved analysis and restores focus after cancel", async
 
 it("closes the delete dialog with Escape", async () => {
   const user = userEvent.setup();
-  api.getBodyPhotoSessions.mockResolvedValue({
-    items: [{
+  api.getBodyProgressTimeline.mockResolvedValue(timelineResponse([{
       id: "incomplete-1",
       purpose: "progress_check",
       state: "uploading",
@@ -175,8 +184,7 @@ it("closes the delete dialog with Escape", async () => {
       submitted_at: null,
       created_at: "2026-08-04T10:00:00Z",
       updated_at: "2026-08-04T10:00:00Z",
-    }],
-  });
+    }]));
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
   await user.click(await screen.findByRole("button", { name: "Delete upload" }));
@@ -191,8 +199,7 @@ it("keeps the dialog open after a deletion failure and allows retry", async () =
   api.deleteBodyPhotoSession
     .mockRejectedValueOnce(new Error("storage unavailable"))
     .mockResolvedValueOnce(undefined);
-  api.getBodyPhotoSessions.mockResolvedValue({
-    items: [{
+  api.getBodyProgressTimeline.mockResolvedValue(timelineResponse([{
       id: "incomplete-1",
       purpose: "progress_check",
       state: "uploading",
@@ -200,8 +207,7 @@ it("keeps the dialog open after a deletion failure and allows retry", async () =
       submitted_at: null,
       created_at: "2026-08-04T10:00:00Z",
       updated_at: "2026-08-04T10:00:00Z",
-    }],
-  });
+    }]));
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
   await user.click(await screen.findByRole("button", { name: "Delete upload" }));

@@ -3,23 +3,23 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { AppIcon } from "../../shared/AppIcon";
-import { deleteBodyPhotoSession, getBodyPhotoSessions } from "./api";
-import type { BodyPhotoSession } from "./types";
+import { deleteBodyPhotoSession, getBodyProgressTimeline } from "./api";
+import { BodyTimeline } from "./BodyTimeline";
+import type { BodyProgressTimelineItem, BodyProgressTimelineResponse } from "./types";
 import "./bodyPhotos.css";
 
 export function BodyProgressPage() {
   const { t, i18n } = useTranslation();
-  const l = (fa: string, en: string) => i18n.resolvedLanguage === "en" ? en : fa;
-  const [sessions, setSessions] = useState<BodyPhotoSession[] | null>(null);
+  const [timeline, setTimeline] = useState<BodyProgressTimelineResponse | null>(null);
   const [failed, setFailed] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<BodyPhotoSession | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BodyProgressTimelineItem["session"] | null>(null);
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [deleteFailed, setDeleteFailed] = useState(false);
   const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    void getBodyPhotoSessions()
-      .then((response) => setSessions(response.items))
+    void getBodyProgressTimeline()
+      .then((response) => setTimeline(response))
       .catch(() => setFailed(true));
   }, []);
 
@@ -41,11 +41,9 @@ export function BodyProgressPage() {
     };
   }, [deleteTarget, deletingSessionId]);
 
-  const incompleteSessions = sessions?.filter((session) => session.submitted_at === null) ?? [];
-  const analysisSessions = sessions?.filter((session) => session.submitted_at !== null) ?? [];
   const locale = i18n.resolvedLanguage === "en" ? "en" : "fa-IR";
 
-  function openDeleteDialog(session: BodyPhotoSession, trigger: HTMLButtonElement) {
+  function openDeleteDialog(session: BodyProgressTimelineItem["session"], trigger: HTMLButtonElement) {
     deleteTriggerRef.current = trigger;
     setDeleteFailed(false);
     setDeleteTarget(session);
@@ -65,7 +63,9 @@ export function BodyProgressPage() {
     setDeleteFailed(false);
     try {
       await deleteBodyPhotoSession(sessionId);
-      setSessions((current) => current?.filter((session) => session.id !== sessionId) ?? current);
+      setTimeline((current) => current === null
+        ? current
+        : { ...current, items: current.items.filter((item) => item.session.id !== sessionId) });
       setDeleteTarget(null);
     } catch {
       setDeleteFailed(true);
@@ -81,12 +81,12 @@ export function BodyProgressPage() {
         <p>{t("bodyPhotos.optionalIntro")}</p>
       </header>
 
-      {sessions === null && !failed && (
+      {timeline === null && !failed && (
         <p className="body-analysis-home__status" role="status">{t("bodyPhotos.loading")}</p>
       )}
       {failed && <p className="form-error body-analysis-home__status" role="alert">{t("bodyPhotos.errors.load")}</p>}
 
-      {sessions?.length === 0 && (
+      {timeline?.items.length === 0 && (
         <section className="body-analysis-empty" aria-labelledby="body-analysis-empty-title">
           <span className="body-analysis-empty__icon" aria-hidden="true"><AppIcon name="camera" /></span>
           <h2 id="body-analysis-empty-title">{t("bodyPhotos.emptyTitle")}</h2>
@@ -95,71 +95,11 @@ export function BodyProgressPage() {
         </section>
       )}
 
-      {incompleteSessions.length > 0 && (
-        <section className="body-analysis-history body-analysis-incomplete" aria-labelledby="body-analysis-incomplete-title">
-          <header>
-            <div>
-              <p>{t("bodyPhotos.incomplete.eyebrow")}</p>
-              <h2 id="body-analysis-incomplete-title">{t("bodyPhotos.incomplete.title")}</h2>
-            </div>
-            {analysisSessions.length === 0 && (
-              <Link className="primary-button" to="/body-progress/new">{t("bodyPhotos.start")}</Link>
-            )}
-          </header>
-          <ul aria-label={t("bodyPhotos.incomplete.title")}>
-            {incompleteSessions.map((session) => (
-              <li className="body-analysis-session body-analysis-session--incomplete" key={session.id}>
-                <div className="body-analysis-session__details">
-                  <strong>{new Intl.DateTimeFormat(locale).format(new Date(session.created_at))}</strong>
-                  <span>{t(`bodyPhotos.status.${session.state}`)}</span>
-                </div>
-                <span>{session.photos.length}/3</span>
-                <div className="body-analysis-session__actions">
-                  <Link to={`/body-progress/new?sessionId=${session.id}`}>{t("bodyPhotos.incomplete.continue")}</Link>
-                  <button
-                    type="button"
-                    onClick={(event) => openDeleteDialog(session, event.currentTarget)}
-                  >
-                    {t("bodyPhotos.deleteDialog.deleteUpload")}
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {analysisSessions.length > 0 && (
-        <section className="body-analysis-history" aria-labelledby="body-analysis-history-title">
-          <header>
-            <div>
-              <p>{t("bodyPhotos.scannerLabel")}</p>
-              <h2 id="body-analysis-history-title">{t("bodyPhotos.historyTitle")}</h2>
-            </div>
-            <Link className="primary-button" to="/body-progress/new">{t("bodyPhotos.start")}</Link>
-          </header>
-          <ul aria-label={t("bodyPhotos.progressTitle")}>
-            {analysisSessions.map((session, index) => (
-              <li className={index === 0 ? "body-analysis-session body-analysis-session--latest" : "body-analysis-session"} key={session.id}>
-                {index === 0 && session.photos[0] && (
-                  <figure><img src={session.photos[0].content_url} alt={l("آخرین عکس تحلیل بدن", "Latest progress photo")} /></figure>
-                )}
-                <div>
-                  {index === 0 && <small>{l("آخرین تحلیل", "Latest analysis")}</small>}
-                  <strong>{new Intl.DateTimeFormat(locale).format(new Date(session.created_at))}</strong>
-                  <span>{t(`bodyPhotos.status.${session.state}`)}</span>
-                </div>
-                <span>{session.photos.length}/3</span>
-                <div className="body-analysis-session__actions">
-                  <Link to={`/body-progress/${session.id}`}>{t("bodyPhotos.results.viewAnalysis")}</Link>
-                  <button type="button" onClick={(event) => openDeleteDialog(session, event.currentTarget)}>
-                    {t("bodyPhotos.deleteDialog.deleteAnalysis")}
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {timeline !== null && timeline.items.length > 0 && (
+        <>
+          <Link className="primary-button body-analysis-home__start" to="/body-progress/new">{t("bodyPhotos.start")}</Link>
+          <BodyTimeline items={timeline.items} onDelete={openDeleteDialog} />
+        </>
       )}
 
       {deleteTarget !== null && (

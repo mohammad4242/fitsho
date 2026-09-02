@@ -1,7 +1,9 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 import {
+  getBodyPhotoComparison,
   getBodyPhotoAnalysis,
+  getBodyProgressTimeline,
   retryBodyPhotoAnalysis,
   startBodyPhotoAnalysis,
   uploadBodyPhoto,
@@ -62,4 +64,18 @@ it("uses the owner-scoped analysis endpoints", async () => {
   expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
     confirm_measurements_current: true,
   });
+});
+
+it("uses the stored comparison and single timeline endpoints", async () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => (
+    new Response(JSON.stringify(null), { status: 200, headers: { "Content-Type": "application/json" } })
+  ));
+
+  await getBodyPhotoComparison("session-1");
+  await getBodyProgressTimeline();
+
+  expect(fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? "GET"])).toEqual([
+    ["/api/v1/body-photo-sessions/session-1/comparison", "GET"],
+    ["/api/v1/body-progress/timeline", "GET"],
+  ]);
 });

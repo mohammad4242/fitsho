@@ -2,6 +2,8 @@ import { request } from "../../shared/apiClient";
 
 import type {
   BodyAnalysis,
+  BodyProgressComparison,
+  BodyProgressTimelineResponse,
   BodyPhotoPurpose,
   BodyPhotoSession,
   BodyPhotoSessionList,
@@ -59,6 +61,14 @@ export function deleteBodyPhotoSession(sessionId: string): Promise<void> {
 
 export function getBodyPhotoAnalysis(sessionId: string): Promise<BodyAnalysis | null> {
   return request<BodyAnalysis | null>(`${basePath}/${sessionId}/analysis`);
+}
+
+export function getBodyPhotoComparison(sessionId: string): Promise<BodyProgressComparison | null> {
+  return request<BodyProgressComparison | null>(`${basePath}/${sessionId}/comparison`);
+}
+
+export function getBodyProgressTimeline(): Promise<BodyProgressTimelineResponse> {
+  return request<BodyProgressTimelineResponse>("/api/v1/body-progress/timeline");
 }
 
 export function startBodyPhotoAnalysis(

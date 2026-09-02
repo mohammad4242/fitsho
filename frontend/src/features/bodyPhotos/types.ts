@@ -82,6 +82,21 @@ export type BodyAnalysisExperienceDirection = {
   reason_codes: string[];
 };
 
+export type BodyAnalysisInputSnapshot = {
+  captured_at: string;
+  confirmed_at: string;
+  profile_updated_at: string;
+  measurement_id: string;
+  measurement_measured_at: string;
+  sex: BodyAnalysisExperienceSex;
+  height_cm: number;
+  weight_kg: number;
+  shoulder_circumference_cm: number;
+  waist_circumference_cm: number;
+  hip_circumference_cm: number;
+  selected_goal: BodyAnalysisExperienceGoal;
+};
+
 export type BodyAnalysisExperienceIndicator = {
   status: string;
   message_key: string;
@@ -107,20 +122,7 @@ export type BodyAnalysisExperienceV4 = {
   schema_version: "4.0";
   presentation_version: "body-analysis-experience-v1";
   assessment_status: VisualAssessmentStatus;
-  input_snapshot: {
-    captured_at: string;
-    confirmed_at: string;
-    profile_updated_at: string;
-    measurement_id: string;
-    measurement_measured_at: string;
-    sex: BodyAnalysisExperienceSex;
-    height_cm: number;
-    weight_kg: number;
-    shoulder_circumference_cm: number;
-    waist_circumference_cm: number;
-    hip_circumference_cm: number;
-    selected_goal: BodyAnalysisExperienceGoal;
-  };
+  input_snapshot: BodyAnalysisInputSnapshot;
   first_impression: BodyAnalysisExperienceMessage;
   direction: BodyAnalysisExperienceDirection;
   indicators: BodyAnalysisExperienceIndicators;
@@ -282,12 +284,177 @@ export type BodyProgressState =
   | "declined_or_less_balanced"
   | "uncertain";
 
-export type OverallBodyProgressState = "improved" | "stable" | "needs_attention" | "insufficient_data";
+export type BodyProgressProvenanceSource =
+  | "body_analysis_input_snapshot"
+  | "cycle_measurement"
+  | "normalized_result"
+  | "unavailable";
 
-export type BodyAreaComparison = {
-  bodyArea: BodyArea;
+export type BodyProgressProvenanceReasonCode =
+  | "exact_analysis_input_snapshot"
+  | "exact_cycle_measurement"
+  | "measurement_unavailable_for_legacy_scan"
+  | "effective_normalized_result";
+
+export type BodyProgressVisualReasonCode =
+  | "classification_changed"
+  | "classification_unchanged"
+  | "missing_previous_observation"
+  | "missing_current_observation"
+  | "incomplete_standardized_views"
+  | "no_common_supporting_view"
+  | "low_confidence"
+  | "specialist_corrected_result";
+
+export type BodyProgressProvenance = {
+  source: BodyProgressProvenanceSource;
+  reference_id: string | null;
+  recorded_at: string | null;
+  reason_code: BodyProgressProvenanceReasonCode;
+};
+
+export type BodyProgressItemProvenance = {
+  previous: BodyProgressProvenance;
+  current: BodyProgressProvenance;
+};
+
+export type BodyProgressMeasurementName =
+  | "weight_kg"
+  | "shoulder_circumference_cm"
+  | "waist_circumference_cm"
+  | "hip_circumference_cm";
+
+export type BodyProgressMeasurementDelta = {
+  measurement: BodyProgressMeasurementName;
+  unit: "kg" | "cm";
+  previous: number | null;
+  current: number | null;
+  delta: number | null;
+  availability: "exact" | "unavailable";
+  provenance: BodyProgressItemProvenance;
+};
+
+export type BodyProgressVisualTransition = {
+  body_area: BodyArea;
   state: BodyProgressState;
-  previousClassification: BodyAnalysisClassification | null;
-  currentClassification: BodyAnalysisClassification | null;
-  confidence: number;
+  previous_classification: BodyAnalysisClassification | null;
+  current_classification: BodyAnalysisClassification | null;
+  change_confidence: number;
+  supporting_views: readonly BodyPhotoView[];
+  reason_codes: readonly BodyProgressVisualReasonCode[];
+  provenance: BodyProgressItemProvenance;
+};
+
+export type BodyProgressPersistentPriority = {
+  body_area: BodyArea;
+  provenance: BodyProgressItemProvenance;
+};
+
+export type NormalizedBodyProgressComparisonV1 = {
+  schema_version: "1.0";
+  overall_confidence: number;
+  previous_session_id: string;
+  current_session_id: string;
+  previous_result_version_id: string;
+  current_result_version_id: string;
+  areas: Array<{
+    body_area: BodyArea;
+    state: BodyProgressState;
+    previous_classification: BodyAnalysisClassification | null;
+    current_classification: BodyAnalysisClassification | null;
+    change_confidence: number;
+    supporting_views: BodyPhotoView[];
+    explanation: string;
+    limitations: string[];
+  }>;
+  summary: string;
+};
+
+export type NormalizedBodyProgressComparisonV2 = {
+  schema_version: "2.0";
+  overall_confidence: number;
+  previous_session_id: string;
+  current_session_id: string;
+  previous_result_version_id: string;
+  current_result_version_id: string;
+  previous_session_date: string;
+  current_session_date: string;
+  interval_days: number;
+  measurement_deltas: BodyProgressMeasurementDelta[];
+  visual_transitions: BodyProgressVisualTransition[];
+  persistent_priorities: BodyProgressPersistentPriority[];
+  measurement_notice_code: "measurements_recorded_by_user";
+  visual_observation_notice_code: "standardized_photo_observation_not_direct_measurement";
+};
+
+export type BodyProgressComparisonQuality = {
+  analysis_confidence: number;
+  all_standardized_views_present: boolean;
+};
+
+export type BodyProgressComparisonContext = {
+  previous_feedback_id?: string | null;
+  current_feedback_id?: string | null;
+  previous_adherence_percent?: number | null;
+  current_adherence_percent?: number | null;
+  previous_performance_feedback_available?: boolean;
+  current_performance_feedback_available?: boolean;
+  current_pain_or_limitation_feedback_available?: boolean;
+  user_reported_measurement_changes: Record<string, {
+    previous: number;
+    current: number;
+    delta: number;
+  }>;
+};
+
+export type BodyProgressComparison = {
+  id: string;
+  previous_session_id: string;
+  current_session_id: string;
+  previous_result_version_id: string;
+  current_result_version_id: string;
+  comparison_version: number;
+  schema_version: "1.0" | "2.0";
+  normalized_result: NormalizedBodyProgressComparisonV1 | NormalizedBodyProgressComparisonV2;
+  quality_snapshot: Record<string, BodyProgressComparisonQuality>;
+  context_snapshot: BodyProgressComparisonContext;
+  created_at: string;
+};
+
+export type BodyProgressTimelineComparison = BodyProgressComparison & {
+  previous_session_date: string;
+  current_session_date: string;
+  interval_days: number;
+  before_photos: BodyPhoto[];
+  after_photos: BodyPhoto[];
+};
+
+export type BodyProgressTimelineSession = {
+  id: string;
+  cycle_id: string | null;
+  purpose: BodyPhotoPurpose;
+  state: BodyPhotoSessionState;
+  submitted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BodyProgressTimelineReviewState = {
+  coach: SpecialistReviewState;
+  doctor: SpecialistReviewState;
+  fully_reviewed: boolean;
+};
+
+export type BodyProgressTimelineItem = {
+  session: BodyProgressTimelineSession;
+  photos: BodyPhoto[];
+  analysis: BodyAnalysis | null;
+  snapshot: BodyAnalysisInputSnapshot | null;
+  comparison: BodyProgressTimelineComparison | null;
+  review_state: BodyProgressTimelineReviewState;
+};
+
+export type BodyProgressTimelineResponse = {
+  schema_version: "1.0";
+  items: BodyProgressTimelineItem[];
 };

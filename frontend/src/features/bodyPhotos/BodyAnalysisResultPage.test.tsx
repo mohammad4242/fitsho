@@ -8,8 +8,8 @@ import type { BodyAnalysis, BodyPhotoSession } from "./types";
 
 const api = vi.hoisted(() => ({
   getBodyPhotoSession: vi.fn(),
-  getBodyPhotoSessions: vi.fn(),
   getBodyPhotoAnalysis: vi.fn(),
+  getBodyPhotoComparison: vi.fn(),
   startBodyPhotoAnalysis: vi.fn(),
   retryBodyPhotoAnalysis: vi.fn(),
 }));
@@ -186,8 +186,8 @@ beforeEach(async () => {
   vi.clearAllMocks();
   await i18n.changeLanguage("en");
   api.getBodyPhotoSession.mockResolvedValue(session);
-  api.getBodyPhotoSessions.mockResolvedValue({ items: [session] });
   api.getBodyPhotoAnalysis.mockResolvedValue(analysis);
+  api.getBodyPhotoComparison.mockResolvedValue(null);
 });
 
 it("shows protected thumbnails, confidence, four labeled finding groups, and review states", async () => {
@@ -255,60 +255,44 @@ it("keeps anonymized photos available when analysis cannot start", async () => {
   expect(screen.getByRole("button", { name: /retry analysis/i })).toBeInTheDocument();
 });
 
-it("compares normalized findings with the most recent prior valid session", async () => {
-  const previousSession = {
-    ...session,
-    id: "session-1",
-    created_at: "2026-07-01T10:00:00Z",
-  };
-  api.getBodyPhotoSessions.mockResolvedValue({ items: [session, previousSession] });
-  api.getBodyPhotoAnalysis.mockImplementation(async (sessionId: string) => (
-    sessionId === "session-1"
-      ? {
-          ...analysis,
-          id: "analysis-1",
-          session_id: "session-1",
-          normalized_result: {
-            ...analysis.normalized_result,
-            findings: [{
-              ...analysis.normalized_result?.findings[2],
-              body_area: "shoulders",
-              classification: "clear_lag",
-              severity: 0.88,
-              confidence: 0.9,
-            }],
-            summary: {
-              visible_strengths: [],
-              priority_areas: ["shoulders"],
-              moderate_attention_areas: [],
-              uncertain_areas: [],
-            },
-          },
-        }
-      : {
-          ...analysis,
-          normalized_result: {
-            ...analysis.normalized_result,
-            findings: [{
-              ...analysis.normalized_result?.findings[2],
-              body_area: "shoulders",
-              classification: "mild_lag",
-              severity: 0.5,
-              confidence: 0.85,
-            }],
-            summary: {
-              visible_strengths: [],
-              priority_areas: [],
-              moderate_attention_areas: ["shoulders"],
-              uncertain_areas: [],
-            },
-          },
-        }
-  ));
+it("renders the stored comparison without fetching prior analyses", async () => {
+  api.getBodyPhotoComparison.mockResolvedValue({
+    id: "comparison-1",
+    previous_session_id: "session-1",
+    current_session_id: "session-2",
+    previous_result_version_id: "version-1",
+    current_result_version_id: "version-2",
+    comparison_version: 1,
+    schema_version: "1.0",
+    normalized_result: {
+      schema_version: "1.0",
+      overall_confidence: 0.8,
+      previous_session_id: "session-1",
+      current_session_id: "session-2",
+      previous_result_version_id: "version-1",
+      current_result_version_id: "version-2",
+      areas: [{
+        body_area: "shoulders",
+        state: "improved",
+        previous_classification: "clear_lag",
+        current_classification: "mild_lag",
+        change_confidence: 0.8,
+        supporting_views: ["front", "back"],
+        explanation: "The standardized visible observation changed.",
+        limitations: [],
+      }],
+      summary: "Visible shoulder observation improved.",
+    },
+    quality_snapshot: {},
+    context_snapshot: { user_reported_measurement_changes: {} },
+    created_at: "2026-08-03T10:02:00Z",
+  });
   renderPage();
 
   expect(await screen.findByRole("heading", { name: /progress comparison/i })).toBeInTheDocument();
   expect(screen.getByText(/appears improved/i)).toBeInTheDocument();
+  expect(api.getBodyPhotoAnalysis).toHaveBeenCalledTimes(1);
+  expect(api.getBodyPhotoComparison).toHaveBeenCalledWith("session-2");
 });
 
 it("offers a retry for failed analysis and preserves a safe error message", async () => {

@@ -3,9 +3,9 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
 import {
+  getBodyPhotoComparison,
   getBodyPhotoAnalysis,
   getBodyPhotoSession,
-  getBodyPhotoSessions,
   retryBodyPhotoAnalysis,
   startBodyPhotoAnalysis,
 } from "./api";
@@ -21,7 +21,7 @@ export function BodyAnalysisResultPage() {
   const { sessionId } = useParams();
   const [session, setSession] = useState<BodyPhotoSession | null>(null);
   const [analysis, setAnalysis] = useState<BodyAnalysis | null>(null);
-  const [previousAnalysis, setPreviousAnalysis] = useState<BodyAnalysis | null>(null);
+  const [comparison, setComparison] = useState<Awaited<ReturnType<typeof getBodyPhotoComparison>>>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
@@ -34,10 +34,10 @@ export function BodyAnalysisResultPage() {
       return;
     }
     try {
-      const [loadedSession, sessionList, loadedAnalysis] = await Promise.all([
+      const [loadedSession, loadedAnalysis, loadedComparison] = await Promise.all([
         getBodyPhotoSession(sessionId),
-        getBodyPhotoSessions(),
         getBodyPhotoAnalysis(sessionId),
+        getBodyPhotoComparison(sessionId).catch(() => null),
       ]);
       setSession(loadedSession);
       let effectiveAnalysis = loadedAnalysis;
@@ -50,7 +50,7 @@ export function BodyAnalysisResultPage() {
         }
       }
       setAnalysis(effectiveAnalysis);
-      setPreviousAnalysis(await findPreviousAnalysis(loadedSession, sessionList.items));
+      setComparison(loadedComparison);
       setFailed(false);
     } catch {
       setFailed(true);
@@ -70,7 +70,14 @@ export function BodyAnalysisResultPage() {
     const timer = window.setTimeout(() => {
       void getBodyPhotoAnalysis(sessionId)
         .then((next) => {
-          if (next !== null) setAnalysis(next);
+          if (next !== null) {
+            setAnalysis(next);
+            if (next.normalized_result !== null) {
+              void getBodyPhotoComparison(sessionId)
+                .then(setComparison)
+                .catch(() => undefined);
+            }
+          }
         })
         .catch(() => undefined);
     }, 3000);
@@ -85,6 +92,11 @@ export function BodyAnalysisResultPage() {
         ? await retryBodyPhotoAnalysis(sessionId)
         : await startBodyPhotoAnalysis(sessionId);
       setAnalysis(next);
+      if (next.normalized_result !== null) {
+        void getBodyPhotoComparison(sessionId)
+          .then(setComparison)
+          .catch(() => undefined);
+      }
       setAnalysisActionFailed(false);
     } catch {
       setAnalysisActionFailed(true);
@@ -185,15 +197,7 @@ export function BodyAnalysisResultPage() {
           {session.photos.map((photo) => <figure key={photo.id}><img src={photo.content_url} alt={t("bodyPhotos.results.photoAlt", { view: t(`bodyPhotos.views.${photo.view}`) })} /><figcaption>{t(`bodyPhotos.views.${photo.view}`)}</figcaption></figure>)}
         </section>
       </details>
-      {analysis?.normalized_result !== null
-        && analysis?.normalized_result !== undefined
-        && previousAnalysis?.normalized_result !== null
-        && previousAnalysis?.normalized_result !== undefined && (
-        <ProgressComparison
-          previous={previousAnalysis.normalized_result}
-          current={analysis.normalized_result}
-        />
-      )}
+      {comparison !== null && <ProgressComparison comparison={comparison} />}
       {analysis?.normalized_result !== null && analysis?.normalized_result !== undefined && (
         <Link className="primary-button body-analysis-plan-link" to="/workout-plan">
           {t("bodyPhotos.results.viewWorkoutPlan")}
@@ -201,32 +205,4 @@ export function BodyAnalysisResultPage() {
       )}
     </main>
   );
-}
-
-async function findPreviousAnalysis(
-  current: BodyPhotoSession,
-  sessions: BodyPhotoSession[],
-): Promise<BodyAnalysis | null> {
-  const previousSessions = sessions
-    .filter((session) => (
-      session.id !== current.id
-      && session.submitted_at !== null
-      && new Date(session.created_at).getTime() < new Date(current.created_at).getTime()
-      && session.state !== "deleted"
-    ))
-    .sort((left, right) => (
-      new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-    ));
-
-  for (const session of previousSessions) {
-    try {
-      const candidate = await getBodyPhotoAnalysis(session.id);
-      if (candidate?.normalized_result !== null && candidate?.normalized_result !== undefined) {
-        return candidate;
-      }
-    } catch {
-      // A missing or inaccessible prior analysis is not a current-page failure.
-    }
-  }
-  return null;
 }
