@@ -448,6 +448,7 @@ def test_catalogue_retirement_preserves_children_price_history_and_meal_referenc
         NutritionFoodPriceHistory,
         NutritionFoodPriceReference,
     )
+    from app.nutrition.plan_service import _planner_foods
 
     _register_with_mode(
         client,
@@ -541,6 +542,8 @@ def test_catalogue_retirement_preserves_children_price_history_and_meal_referenc
     assert db.get(NutritionCatalogueMealItem, meal_item.id) is not None
     assert db.get(NutritionFoodPriceReference, food.id) is not None
     assert db.get(NutritionFoodPriceHistory, history.id) is not None
+    planner_foods, _, _ = _planner_foods(db)
+    assert all(candidate.slug != "chicken-breast" for candidate in planner_foods)
 
     meal_item_count = db.scalar(
         select(func.count())
