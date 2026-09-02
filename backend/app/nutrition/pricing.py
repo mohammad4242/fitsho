@@ -5,7 +5,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_FLOOR, Decimal
 from enum import StrEnum
 from statistics import median
 from typing import Protocol
@@ -101,6 +101,10 @@ _UNITS: dict[str, tuple[str, Decimal]] = {
     "unit": ("TOMAN_PER_UNIT", Decimal("1")),
     "item": ("TOMAN_PER_UNIT", Decimal("1")),
 }
+
+
+def floor_price_to_thousand_toman(value: Decimal) -> Decimal:
+    return (value / Decimal("1000")).to_integral_value(rounding=ROUND_FLOOR) * Decimal("1000")
 
 
 def normalize_observation(observation: PriceObservation) -> NormalizedPriceQuote:

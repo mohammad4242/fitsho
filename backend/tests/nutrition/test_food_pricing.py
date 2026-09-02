@@ -66,6 +66,21 @@ def test_normalizes_liters_and_units_and_keeps_promotion_separate() -> None:
     assert eggs.is_promotional is True
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (Decimal("235566"), Decimal("235000")),
+        (Decimal("432345"), Decimal("432000")),
+        (Decimal("432999"), Decimal("432000")),
+        (Decimal("432000"), Decimal("432000")),
+    ],
+)
+def test_floor_price_to_thousand_toman(value: Decimal, expected: Decimal) -> None:
+    from app.nutrition.pricing import floor_price_to_thousand_toman
+
+    assert floor_price_to_thousand_toman(value) == expected
+
+
 def test_rejects_invalid_package_size() -> None:
     from app.nutrition.pricing import PriceValidationError, normalize_observation
 
