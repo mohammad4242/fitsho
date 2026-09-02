@@ -716,6 +716,7 @@ def test_agent_service_capabilities_require_admin_and_normalize_runner_metadata(
                                 "supports_text_input": True,
                                 "supports_image_input": True,
                                 "supports_structured_output": True,
+                                "supports_live_web": True,
                             }
                         ],
                     },
@@ -752,6 +753,7 @@ def test_agent_service_capabilities_require_admin_and_normalize_runner_metadata(
                         "supports_text_input": True,
                         "supports_image_input": True,
                         "supports_structured_output": True,
+                        "supports_live_web": True,
                     }
                 ],
             },
