@@ -120,6 +120,19 @@ describe("BrowserBodyPhotoProcessor", () => {
     );
   });
 
+  it("accepts a front view when wrists are not visible", async () => {
+    const { processor } = setup({
+      mutate: (value) => {
+        value[15]!.visibility = 0.1;
+        value[16]!.visibility = 0.1;
+      },
+    });
+
+    await expect(processor.process(inputFile(), "front")).resolves.toMatchObject({
+      validation: { expectedView: "front" },
+    });
+  });
+
   it("accepts a side view with hidden far-side landmarks outside the frame", async () => {
     const hiddenFarSide = [12, 14, 16, 24, 26, 28, 32];
     const { processor } = setup({

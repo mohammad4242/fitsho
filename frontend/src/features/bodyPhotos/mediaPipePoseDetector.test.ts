@@ -65,6 +65,8 @@ describe("MediaPipePoseLandmarkDetector", () => {
     expect(createFromOptions).toHaveBeenCalledWith("fileset", expect.objectContaining({
       numPoses: 2,
       runningMode: "IMAGE",
+      minPoseDetectionConfidence: 0.4,
+      minPosePresenceConfidence: 0.55,
     }));
   });
 });

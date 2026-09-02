@@ -261,7 +261,13 @@ function validateLandmarks(
 ): ValidatedPose {
   const landmarks = selectPrimaryPose(detection.poses);
   const required = requiredLandmarksForView(landmarks, expectedView);
-  if (required.some((landmark) => !insideFrame(landmark))) {
+  const frameLandmarks = expectedView === "front"
+    ? [
+      ...required,
+      ...landmarkGroups.wrists.map((index) => landmarks[index]!),
+    ]
+    : required;
+  if (frameLandmarks.some((landmark) => !insideFrame(landmark))) {
     throw new BodyPhotoProcessingError("body_out_of_frame");
   }
 
@@ -314,14 +320,18 @@ function requiredLandmarksForView(
 
   requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
   requireVisible(landmarks, landmarkGroups.elbows, "arms_not_visible");
-  requireVisible(landmarks, landmarkGroups.wrists, "arms_not_visible");
   requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
   requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
   requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
   requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
-  return Object.values(landmarkGroups)
-    .flat()
-    .map((index) => landmarks[index]!);
+  return [
+    ...landmarkGroups.shoulders,
+    ...landmarkGroups.elbows,
+    ...landmarkGroups.hips,
+    ...landmarkGroups.knees,
+    ...landmarkGroups.ankles,
+    ...landmarkGroups.feet,
+  ].map((index) => landmarks[index]!);
 }
 
 function mostVisible(

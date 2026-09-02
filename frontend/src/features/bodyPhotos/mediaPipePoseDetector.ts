@@ -61,7 +61,7 @@ export function createMediaPipePoseLandmarkerLoader(
       baseOptions: { modelAssetPath: assets.modelAssetPath },
       runningMode: "IMAGE",
       numPoses: 2,
-      minPoseDetectionConfidence: 0.55,
+      minPoseDetectionConfidence: 0.4,
       minPosePresenceConfidence: 0.55,
     });
   };
