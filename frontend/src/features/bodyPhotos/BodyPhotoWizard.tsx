@@ -11,6 +11,7 @@ import {
   submitBodyPhotoSession,
   uploadBodyPhoto,
 } from "./api";
+import { GhostCameraCapture, type CameraFallbackReason } from "./GhostCameraCapture";
 import { BodyAnalysisRequirementsStep } from "./BodyAnalysisRequirementsStep";
 import {
   browserBodyPhotoProcessor,
@@ -24,6 +25,7 @@ import "./bodyPhotos.css";
 const views: BodyPhotoView[] = ["front", "side", "back"];
 
 type WizardState = "capture" | "confirm" | "complete" | "skipped";
+type CaptureMode = "upload" | "camera";
 
 type SelectedPhotoPreview = {
   view: BodyPhotoView;
@@ -51,6 +53,7 @@ export function BodyPhotoWizard({
   const [modelTrainingConsent, setModelTrainingConsent] = useState(false);
   const [state, setState] = useState<WizardState>("capture");
   const [requirementsConfirmed, setRequirementsConfirmed] = useState(false);
+  const [captureMode, setCaptureMode] = useState<CaptureMode>("upload");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -149,6 +152,21 @@ export function BodyPhotoWizard({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (file !== undefined) void processFile(file);
+  }
+
+  function openCamera() {
+    setError(null);
+    setCaptureMode("camera");
+  }
+
+  function handleCameraFallback(reason: CameraFallbackReason) {
+    setCaptureMode("upload");
+    setError(t(`bodyPhotos.cameraFallback.${reason}`));
+  }
+
+  function handleCameraFile(file: File) {
+    setCaptureMode("upload");
+    void processFile(file);
   }
 
   function retake() {
@@ -343,18 +361,32 @@ export function BodyPhotoWizard({
         <h2 id={`body-photo-${view}`}>{t("bodyPhotos.captureTitle", { view: t(`bodyPhotos.views.${view}`) })}</h2>
         <p>{instructions[view]}</p>
         <p className="body-photo-muted">{t("bodyPhotos.cameraGuidance")}</p>
-        <HeadlessPhotoGuide />
+        {captureMode === "upload" && <HeadlessPhotoGuide />}
         <div className="body-photo-source-actions">
-          <label className="body-photo-upload-control">
-            <span>{t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}</span>
-            <input
-              aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
-              accept="image/jpeg,image/png,image/webp"
-              type="file"
-              onChange={selectFile}
-              disabled={busy || sessionLoading}
+          {captureMode === "camera" ? (
+            <GhostCameraCapture
+              view={view}
+              onFileCaptured={handleCameraFile}
+              onFallback={handleCameraFallback}
+              onClose={() => setCaptureMode("upload")}
             />
-          </label>
+          ) : (
+            <>
+              <button className="secondary-button" type="button" onClick={openCamera} disabled={busy || sessionLoading}>
+                {t("bodyPhotos.useCamera")}
+              </button>
+              <label className="body-photo-upload-control">
+                <span>{t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}</span>
+                <input
+                  aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
+                  accept="image/jpeg,image/png,image/webp"
+                  type="file"
+                  onChange={selectFile}
+                  disabled={busy || sessionLoading}
+                />
+              </label>
+            </>
+          )}
         </div>
         {selectedPreview?.view === view && (
           <div className="body-photo-source-preview">

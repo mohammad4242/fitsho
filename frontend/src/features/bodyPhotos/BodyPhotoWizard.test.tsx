@@ -117,6 +117,16 @@ it("requires operational consent before the confirm upload action is enabled", a
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeEnabled();
 });
 
+it("returns to the existing upload control when the guided camera is unavailable", async () => {
+  const user = userEvent.setup();
+  renderWizard();
+
+  await user.click(screen.getByRole("button", { name: /use guided camera/i }));
+
+  expect(await screen.findByLabelText(/front photo upload/i)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(/camera access needs a secure fitsho address/i);
+});
+
 it("explains how to recover when the phone origin is not trusted", async () => {
   const user = userEvent.setup();
   const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("front")) };
