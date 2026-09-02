@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
+import { GhostScaleControls } from "./GhostScaleControls";
 import {
   clampGhostPhotoTransform,
   GHOST_EDITOR_DEFAULT_TRANSFORM,
@@ -64,6 +65,7 @@ export function GhostPhotoEditor({
   const pointersRef = useRef(new Map<number, GhostPhotoPoint>());
   const pinchRef = useRef<PinchGesture | null>(null);
   const [transform, setTransform] = useState<GhostPhotoTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
+  const [ghostScale, setGhostScale] = useState(1);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -171,7 +173,7 @@ export function GhostPhotoEditor({
             style={{ transform: ghostPhotoTransformStyle(transform) }}
           />
         )}
-        <GhostOverlayGuide sex={sex} view={view} />
+        <GhostOverlayGuide sex={sex} scale={ghostScale} view={view} />
       </div>
       <p className="ghost-photo-editor__privacy-note">{t("bodyPhotos.editor.privacyNote")}</p>
       <p className="ghost-photo-editor__status" role="status">
@@ -180,6 +182,7 @@ export function GhostPhotoEditor({
           : t("bodyPhotos.editor.framingApproximate")}
       </p>
       <div className="ghost-photo-editor__controls" aria-label={t("bodyPhotos.editor.controlsLabel")}>
+        <GhostScaleControls disabled={confirming} onScaleChange={setGhostScale} scale={ghostScale} />
         <div className="ghost-photo-editor__button-row">
           <button
             className="secondary-button"

@@ -62,6 +62,18 @@ it("supports keyboard-accessible zoom, rotation, and reset controls", () => {
   expect(image.style.transform).toBe(ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM));
 });
 
+it("changes only the Ghost size while keeping the photo framing fixed", () => {
+  renderEditor();
+  const image = screen.getByRole("img", { name: /photo being aligned/i });
+  const ghost = screen.getByRole("img", { name: /loose front body-position silhouette/i });
+  const initialImageTransform = image.style.transform;
+
+  fireEvent.click(screen.getByRole("button", { name: /make ghost smaller/i }));
+
+  expect(ghost).toHaveStyle({ transform: "scale(0.95)" });
+  expect(image.style.transform).toBe(initialImageTransform);
+});
+
 it("allows a quarter-turn through the rotation slider", () => {
   renderEditor();
   const image = screen.getByRole("img", { name: /photo being aligned/i });

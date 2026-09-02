@@ -24,8 +24,8 @@
 .ghost-camera__warnings { display: grid; gap: .35rem; margin: 0; padding: .7rem .9rem; border-inline-start: .25rem solid var(--fitsho-amber); border-radius: var(--fitsho-radius-sm); color: var(--fitsho-ink); background: rgb(242 184 91 / 10%); }
 .ghost-camera__countdown { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 2.75rem; font-weight: 850; }
 .ghost-camera__actions { display: flex; flex-wrap: wrap; gap: .65rem; }
-.ghost-camera__scale-controls { display: grid; gap: .55rem; color: var(--fitsho-muted); font-size: .86rem; font-weight: 800; }
-.ghost-camera__scale-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.ghost-scale-controls { display: grid; gap: .55rem; color: var(--fitsho-muted); font-size: .86rem; font-weight: 800; }
+.ghost-scale-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
 .ghost-camera__close { justify-self: start; }
 .ghost-photo-editor { display: grid; gap: .8rem; padding: .8rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface-subtle); }
 .ghost-photo-editor__heading { display: grid; gap: .35rem; }
