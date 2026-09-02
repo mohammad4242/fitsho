@@ -833,12 +833,20 @@ def test_agent_coherent_three_sources_persist_distinct_providers_and_accept_refe
     assert run.status == PriceUpdateRunStatus.COMPLETED
     assert run.foods_updated == 1
     assert reference is not None
-    assert reference.reference_price_toman == Decimal("197666.66666667")
+    assert reference.reference_price_toman == Decimal("197000")
     assert reference.sample_count == 3
     assert len({item.provider_code for item in quotes}) == 3
     assert len(providers) == 3
     assert all(item.raw_quote["source_url"].startswith("https://") for item in quotes)
     assert history is not None
+    assert history.reference_price_toman == Decimal("197000")
+    assert reference.reference_price_toman % Decimal("1000") == 0
+    assert history.reference_price_toman % Decimal("1000") == 0
+    assert sorted(item.normal_price_irr for item in quotes) == [
+        Decimal("1900000"),
+        Decimal("1980000"),
+        Decimal("2050000"),
+    ]
     assert len(history.source_quote_ids) == 3
     assert len(history.accepted_quote_ids) == 3
     assert history.rejected_quote_ids == []
@@ -894,7 +902,7 @@ def test_agent_disagreement_expands_and_accepts_only_final_trusted_cluster(db) -
     assert provider.requests[1].input_payload["requested_source_count"] == 2
     assert reference is not None
     assert reference.sample_count == 4
-    assert reference.reference_price_toman == Decimal("197500")
+    assert reference.reference_price_toman == Decimal("197000")
     assert len(quotes) == 5
     rejected = next(item for item in quotes if item.normal_price_irr == Decimal("4300000"))
     assert history is not None
@@ -915,7 +923,7 @@ def test_agent_five_disagreeing_sources_create_review_and_preserve_previous_refe
     previous = NutritionFoodPriceReference(
         food_id=food.id,
         canonical_unit="TOMAN_PER_KG",
-        reference_price_toman=Decimal("180000"),
+        reference_price_toman=Decimal("180500"),
         sample_count=3,
         confidence=EstimateConfidence.HIGH,
         status=PriceReferenceStatus.ACCEPTED,
@@ -958,8 +966,9 @@ def test_agent_five_disagreeing_sources_create_review_and_preserve_previous_refe
     )
     assert provider.requests[1].input_payload["requested_source_count"] == 2
     assert run.status == PriceUpdateRunStatus.COMPLETED_WITH_ERRORS
-    assert previous.reference_price_toman == Decimal("180000")
+    assert previous.reference_price_toman == Decimal("180500")
     assert review is not None
+    assert review.candidate_reference_price_toman == Decimal("180000")
     assert "source_disagreement" in review.reason_codes
     assert "insufficient_sources" in review.reason_codes
     assert len(review.source_quote_ids) == 5

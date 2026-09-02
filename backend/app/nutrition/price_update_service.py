@@ -51,6 +51,7 @@ from app.nutrition.pricing import (
     PriceReviewReason,
     PriceValidationError,
     decide_reference_price,
+    floor_price_to_thousand_toman,
     normalize_observation,
     retry_quotes,
 )
@@ -710,6 +711,9 @@ async def run_price_update_async(
             if values
             else None
         )
+        final_reference_price: Decimal | None = None
+        if decision is not None and decision.reference_price is not None:
+            final_reference_price = floor_price_to_thousand_toman(decision.reference_price)
         reasons = (
             list(decision.review_reasons) if decision else [PriceReviewReason.INSUFFICIENT_SAMPLES]
         )
@@ -724,14 +728,19 @@ async def run_price_update_async(
             reasons.append(PriceReviewReason.UNIT_PARSE_ERROR)
         if ambiguous_mapping:
             reasons.append(PriceReviewReason.AMBIGUOUS_MATCH)
-        if decision is not None and decision.accepted and unit is not None:
+        if (
+            decision is not None
+            and decision.accepted
+            and unit is not None
+            and final_reference_price is not None
+        ):
             estimate_confidence = (
                 EstimateConfidence.HIGH if decision.sample_count >= 3 else EstimateConfidence.MEDIUM
             )
             reference = NutritionFoodPriceReference(
                 food_id=food_id,
                 canonical_unit=unit,
-                reference_price_toman=decision.reference_price,
+                reference_price_toman=final_reference_price,
                 sample_count=decision.sample_count,
                 confidence=estimate_confidence,
                 status=PriceReferenceStatus.ACCEPTED,
@@ -762,7 +771,7 @@ async def run_price_update_async(
                 NutritionFoodPriceHistory(
                     food_id=food_id,
                     canonical_unit=unit,
-                    reference_price_toman=decision.reference_price,
+                    reference_price_toman=final_reference_price,
                     sample_count=decision.sample_count,
                     confidence=estimate_confidence,
                     accepted_at=now,
@@ -780,9 +789,7 @@ async def run_price_update_async(
                     run_id=run.id,
                     food_id=food_id,
                     reason_codes=[reason.value for reason in dict.fromkeys(reasons)],
-                    candidate_reference_price_toman=(
-                        decision.reference_price if decision else None
-                    ),
+                    candidate_reference_price_toman=final_reference_price,
                     source_quote_ids=[str(quote.id) for quote in saved],
                 )
             )
