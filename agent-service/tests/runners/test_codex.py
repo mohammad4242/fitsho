@@ -10,7 +10,7 @@ import pytest
 
 from app.process import ProcessResult, ProcessTimeoutError
 from app.runners.base import RunnerError, RunnerRequest
-from app.runners.codex import CodexRunner
+from app.runners.codex import CodexRunner, _codex_strict_schema
 from app.schemas import AgentName
 
 
@@ -188,6 +188,25 @@ def test_response_schema_is_normalized_for_codex_strict_output(
     monkeypatch.setattr(codex, "run_process", fake_run_process)
     result = run(CodexRunner(workspace=tmp_path).run(make_request(response_schema=schema)))
     assert result.payload == {"answer": "ok", "metadata": {"ok": True}}
+
+
+def test_decimal_schema_pattern_is_compatible_with_codex_regex_support() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "price": {
+                "type": "string",
+                "pattern": r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$",
+            }
+        },
+        "required": ["price"],
+    }
+
+    normalized = _codex_strict_schema(schema)
+
+    assert normalized["properties"]["price"]["pattern"] == (
+        r"^[+-]?(0*[0-9]+(\.[0-9]*)?|\.[0-9]+)$"
+    )
 
 
 def test_high_effort_profile_uses_codex_reasoning_config(

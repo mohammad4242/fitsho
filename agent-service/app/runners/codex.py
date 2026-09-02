@@ -17,6 +17,9 @@ from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, Runner
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult, resolve_image_paths
 from .probes import CliMetadataProbe
 
+_PYDANTIC_DECIMAL_PATTERN = r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$"
+_CODEX_DECIMAL_PATTERN = r"^[+-]?(0*[0-9]+(\.[0-9]*)?|\.[0-9]+)$"
+
 
 class CodexRunner(AgentRunner):
     """Run the pinned Codex CLI through its non-interactive JSON contract."""
@@ -429,6 +432,8 @@ def _normalize_codex_schema_node(value: Any) -> Any:
         return value
 
     normalized = {key: _normalize_codex_schema_node(item) for key, item in value.items()}
+    if normalized.get("pattern") == _PYDANTIC_DECIMAL_PATTERN:
+        normalized["pattern"] = _CODEX_DECIMAL_PATTERN
     properties = normalized.get("properties")
     if normalized.get("type") == "object" or isinstance(properties, dict):
         normalized["additionalProperties"] = False
