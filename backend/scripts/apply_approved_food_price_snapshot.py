@@ -12,6 +12,7 @@ from app.database.session import get_engine
 from app.nutrition.approved_price_snapshot import (
     APPROVED_PRICE_SNAPSHOT,
     PRICE_SNAPSHOT_VERSION,
+    ApprovedPriceSnapshotCatalogueValidation,
     ApprovedPriceSnapshotError,
     apply_approved_price_snapshot,
     resolve_snapshot_admin,
@@ -37,7 +38,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_validation(report) -> None:
+def _print_validation(report: ApprovedPriceSnapshotCatalogueValidation) -> None:
     snapshot = report.snapshot
     print(f"snapshot version = {PRICE_SNAPSHOT_VERSION}")
     print(f"snapshot entries = {snapshot.entry_count}")

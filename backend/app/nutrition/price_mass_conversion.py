@@ -165,19 +165,20 @@ def planner_price_irr_per_gram(
             source_reference="canonical-unit:TOMAN_PER_KG",
         )
     else:
-        basis = PRICE_MASS_BASES.get(food_slug)
-        if basis is None:
+        catalogue_basis = PRICE_MASS_BASES.get(food_slug)
+        if catalogue_basis is None:
             raise PriceMassConversionMissingError(
                 food_slug=food_slug,
                 canonical_unit=canonical_unit,
                 detail="no approved grams_per_price_unit metadata exists",
             )
-        if basis.canonical_unit != typed_unit:
+        if catalogue_basis.canonical_unit != typed_unit:
             raise PriceMassConversionUnitMismatchError(
                 food_slug=food_slug,
                 canonical_unit=canonical_unit,
-                detail=f"metadata is for {basis.canonical_unit}",
+                detail=f"metadata is for {catalogue_basis.canonical_unit}",
             )
+        basis = catalogue_basis
 
     price_irr_per_gram = (
         reference_price_toman * TOMAN_TO_IRR / basis.grams_per_price_unit
