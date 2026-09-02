@@ -1266,6 +1266,7 @@ const en = {
       uploadExistingPhoto: "Upload a {{view}} photo",
       inputLabel: "{{view}} photo upload",
       cameraGuidance: "When taking the photo, keep the camera at mid-torso height, keep your full body in frame, and use even lighting.",
+      sideProfile: { right: "Right profile", left: "Left profile", toggleLabel: "Side profile: {{side}}" },
       headlessInstruction: "Place your photo under the Ghost guide",
       headlessGuideLabel: "Ghost photo framing guide",
       headlessGuideIntro: "Keep your full body visible. The editor removes the top privacy region before processing:",

@@ -25,12 +25,14 @@ const ghostEditor = vi.hoisted(() => ({
 
 vi.mock("./api", () => api);
 vi.mock("./GhostPhotoEditor", () => ({
-  GhostPhotoEditor: ({ onCancel, onConfirm }: {
+  GhostPhotoEditor: ({ onCancel, onConfirm, sideProfile }: {
     onCancel: () => void;
     onConfirm: (file: File) => void;
+    sideProfile?: "right" | "left";
   }) => (
     <section aria-labelledby="mock-ghost-editor-title">
       <h3 id="mock-ghost-editor-title">Align your photo</h3>
+      <output data-testid="ghost-side-profile">{sideProfile ?? "right"}</output>
       <button type="button" onClick={onCancel}>Cancel editing</button>
       <button type="button" onClick={() => onConfirm(ghostEditor.editedFile)}>Use this photo</button>
     </section>
@@ -165,6 +167,30 @@ it("opens the Ghost editor for uploads and processes only its confirmed output",
   await user.click(screen.getByRole("button", { name: /use this photo/i }));
 
   await waitFor(() => expect(processor.process).toHaveBeenCalledWith(ghostEditor.editedFile, "front"));
+});
+
+it("toggles the side Ghost from right to left and keeps the selection for upload editing", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = {
+    process: vi.fn().mockImplementation((_, selectedView) => processed(selectedView)),
+  };
+  renderWizard(processor);
+
+  await screen.findByLabelText(/front photo upload/i);
+  expect(screen.queryByRole("button", { name: /side profile/i })).not.toBeInTheDocument();
+
+  await uploadPhoto(user, "front");
+  await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
+  await user.click(screen.getByRole("button", { name: /confirm and upload front/i }));
+
+  const toggle = await screen.findByRole("button", { name: /side profile: right profile/i });
+  expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await user.click(toggle);
+  expect(toggle).toHaveAttribute("aria-pressed", "true");
+  expect(toggle).toHaveTextContent("Left profile");
+
+  await user.upload(screen.getByLabelText(/side photo upload/i), file);
+  expect(await screen.findByTestId("ghost-side-profile")).toHaveTextContent("left");
 });
 
 it("returns to the existing upload control when the guided camera is unavailable", async () => {

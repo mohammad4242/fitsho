@@ -21,7 +21,7 @@ import {
   type BodyPhotoProcessor,
   type ProcessedBodyPhoto,
 } from "./processor";
-import type { BodyPhotoPurpose, BodyPhotoSession, BodyPhotoView } from "./types";
+import type { BodyPhotoPurpose, BodyPhotoSession, BodyPhotoSide, BodyPhotoView } from "./types";
 import "./bodyPhotos.css";
 
 const views: BodyPhotoView[] = ["front", "side", "back"];
@@ -58,6 +58,7 @@ export function BodyPhotoWizard({
   const [state, setState] = useState<WizardState>("capture");
   const [requirementsConfirmed, setRequirementsConfirmed] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>("upload");
+  const [sideProfile, setSideProfile] = useState<BodyPhotoSide>("right");
   const [editorFile, setEditorFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -374,10 +375,25 @@ export function BodyPhotoWizard({
         <h2 id={`body-photo-${view}`}>{t("bodyPhotos.captureTitle", { view: t(`bodyPhotos.views.${view}`) })}</h2>
         <p>{instructions[view]}</p>
         <p className="body-photo-muted">{t("bodyPhotos.cameraGuidance")}</p>
+        {view === "side" && (
+          <button
+            className="secondary-button"
+            type="button"
+            aria-label={t("bodyPhotos.sideProfile.toggleLabel", {
+              side: t(`bodyPhotos.sideProfile.${sideProfile}`),
+            })}
+            aria-pressed={sideProfile === "left"}
+            onClick={() => setSideProfile((current) => current === "right" ? "left" : "right")}
+            disabled={busy || sessionLoading}
+          >
+            {t(`bodyPhotos.sideProfile.${sideProfile}`)}
+          </button>
+        )}
         {editorFile !== null ? (
           <GhostPhotoEditor
             file={editorFile}
             sex={profileSex}
+            sideProfile={sideProfile}
             view={view}
             onConfirm={handleEditorConfirm}
             onCancel={() => setEditorFile(null)}
@@ -389,6 +405,7 @@ export function BodyPhotoWizard({
               {captureMode === "camera" ? (
                 <GhostCameraCapture
                   sex={profileSex}
+                  sideProfile={sideProfile}
                   view={view}
                   onFileCaptured={handleCameraFile}
                   onFallback={handleCameraFallback}

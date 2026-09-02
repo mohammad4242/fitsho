@@ -1268,6 +1268,7 @@ const fa = {
       uploadExistingPhoto: "بارگذاری عکس {{view}}",
       inputLabel: "بارگذاری عکس {{view}}",
       cameraGuidance: "هنگام عکس‌گرفتن، دوربین را هم‌ارتفاع میان‌تنه بگذار، کل بدن را داخل کادر نگه دار و از نور یکنواخت استفاده کن.",
+      sideProfile: { right: "نیمرخ راست", left: "نیمرخ چپ", toggleLabel: "جهت نیمرخ: {{side}}" },
       headlessInstruction: "عکس را زیر راهنمای Ghost قرار بده",
       headlessGuideLabel: "راهنمای کادر عکس Ghost",
       headlessGuideIntro: "کل بدن را در عکس نگه دار. ناحیه بالای حریم خصوصی پیش از پردازش حذف می‌شود؛ این بخش‌ها باید کامل بمانند:",
