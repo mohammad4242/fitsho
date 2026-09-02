@@ -228,7 +228,8 @@ def retire_catalogue_food(db: Session, slug: str) -> None:
     food = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == slug))
     if food is None:
         raise ValueError("Food not found")
-    food.verification_status = FoodVerificationStatus.RETIRED
+    if food.verification_status is not FoodVerificationStatus.RETIRED:
+        food.verification_status = FoodVerificationStatus.RETIRED
     db.commit()
 
 
@@ -384,7 +385,10 @@ def seed_base_iranian_food_catalogue(
         if food is None:
             food = NutritionCatalogueFood(slug=item.slug)
             db.add(food)
+            preserve_retirement = False
         else:
+            preserve_retirement = food.verification_status is FoodVerificationStatus.RETIRED
+        if not preserve_retirement:
             food.roles.clear()
             food.aliases.clear()
             food.compositions.clear()
@@ -410,55 +414,60 @@ def seed_base_iranian_food_catalogue(
         food.source_access_date = (
             date.fromisoformat(compositions[0].source_access_date) if compositions else None
         )
-        composition_codes = {composition.nutrient_code for composition in compositions}
-        food.verification_status = (
-            FoodVerificationStatus.VERIFIED
-            if not REQUIRED_PRIMARY_NUTRIENTS - composition_codes
-            else FoodVerificationStatus.DRAFT
-        )
         food.dietary_patterns = _dietary_patterns_for_slug(item.slug)
-        food.roles = [NutritionCatalogueFoodRole(role=FoodRoleEnum(role)) for role in item.roles]
-        food.aliases = [
-            NutritionCatalogueFoodAlias(
-                alias=alias,
-                normalized_alias=normalize_food_alias(alias),
-                language="fa" if any("\u0600" <= char <= "\u06ff" for char in alias) else "en",
+        if preserve_retirement:
+            food.verification_status = FoodVerificationStatus.RETIRED
+        else:
+            composition_codes = {composition.nutrient_code for composition in compositions}
+            food.verification_status = (
+                FoodVerificationStatus.VERIFIED
+                if not REQUIRED_PRIMARY_NUTRIENTS - composition_codes
+                else FoodVerificationStatus.DRAFT
             )
-            for alias in dict.fromkeys(item.aliases)
-        ]
-        food.compositions = [
-            NutritionFoodComposition(
-                nutrient_code=composition.nutrient_code,
-                value_per_100g=composition.value_per_100g,
-                unit=NUTRIENT_UNITS[composition.nutrient_code],
-                unit_form=(
-                    "dietary_folate_equivalents"
-                    if composition.nutrient_code == "folate_dfe_mcg"
-                    else "nutrient_mass"
-                ),
-                source_name=composition.source_name,
-                source_reference=composition.source_reference,
-                source_food_id=item.source_food_id,
-                data_version=composition.data_version,
-                source_access_date=date.fromisoformat(composition.source_access_date),
-                confidence=EstimateConfidence.HIGH,
-            )
-            for composition in compositions
-        ]
-        food.portions = [
-            NutritionFoodPortion(
-                code=portion.code,
-                quantity=portion.quantity,
-                label_fa=portion.label_fa,
-                label_en=portion.label_en,
-                grams=portion.grams,
-                is_default=portion.is_default,
-                sort_order=portion.sort_order,
-                source_name=portion.source_name,
-                source_reference=portion.source_reference,
-            )
-            for portion in item.portions
-        ]
+            food.roles = [
+                NutritionCatalogueFoodRole(role=FoodRoleEnum(role)) for role in item.roles
+            ]
+            food.aliases = [
+                NutritionCatalogueFoodAlias(
+                    alias=alias,
+                    normalized_alias=normalize_food_alias(alias),
+                    language="fa" if any("\u0600" <= char <= "\u06ff" for char in alias) else "en",
+                )
+                for alias in dict.fromkeys(item.aliases)
+            ]
+            food.compositions = [
+                NutritionFoodComposition(
+                    nutrient_code=composition.nutrient_code,
+                    value_per_100g=composition.value_per_100g,
+                    unit=NUTRIENT_UNITS[composition.nutrient_code],
+                    unit_form=(
+                        "dietary_folate_equivalents"
+                        if composition.nutrient_code == "folate_dfe_mcg"
+                        else "nutrient_mass"
+                    ),
+                    source_name=composition.source_name,
+                    source_reference=composition.source_reference,
+                    source_food_id=item.source_food_id,
+                    data_version=composition.data_version,
+                    source_access_date=date.fromisoformat(composition.source_access_date),
+                    confidence=EstimateConfidence.HIGH,
+                )
+                for composition in compositions
+            ]
+            food.portions = [
+                NutritionFoodPortion(
+                    code=portion.code,
+                    quantity=portion.quantity,
+                    label_fa=portion.label_fa,
+                    label_en=portion.label_en,
+                    grams=portion.grams,
+                    is_default=portion.is_default,
+                    sort_order=portion.sort_order,
+                    source_name=portion.source_name,
+                    source_reference=portion.source_reference,
+                )
+                for portion in item.portions
+            ]
         seeded.append(food)
     if commit:
         db.commit()

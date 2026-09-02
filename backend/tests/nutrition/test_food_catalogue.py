@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 
 def test_import_rejects_an_unsupported_quantity_unit() -> None:
@@ -424,3 +424,51 @@ def test_seeded_egg_has_a_default_documented_portion(db: Session) -> None:
     assert portion.grams == Decimal("50")
     assert portion.is_default is True
     assert portion.source_reference
+
+
+def test_base_catalogue_seed_does_not_resurrect_retired_food(db: Session) -> None:
+    from app.nutrition.enums import FoodVerificationStatus
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.models import NutritionCatalogueFood
+
+    food = db.scalar(
+        select(NutritionCatalogueFood)
+        .where(NutritionCatalogueFood.slug == "chicken-breast")
+        .options(
+            selectinload(NutritionCatalogueFood.roles),
+            selectinload(NutritionCatalogueFood.aliases),
+            selectinload(NutritionCatalogueFood.compositions),
+            selectinload(NutritionCatalogueFood.portions),
+        )
+    )
+    assert food is not None
+    original_id = food.id
+    original_role_ids = {(role.food_id, role.role) for role in food.roles}
+    original_alias_ids = {alias.id for alias in food.aliases}
+    original_composition_ids = {composition.id for composition in food.compositions}
+    original_portion_ids = {portion.id for portion in food.portions}
+
+    food.verification_status = FoodVerificationStatus.RETIRED
+    db.commit()
+
+    seeded = seed_base_iranian_food_catalogue(db)
+    db.expire_all()
+    preserved = db.scalar(
+        select(NutritionCatalogueFood)
+        .where(NutritionCatalogueFood.slug == "chicken-breast")
+        .options(
+            selectinload(NutritionCatalogueFood.roles),
+            selectinload(NutritionCatalogueFood.aliases),
+            selectinload(NutritionCatalogueFood.compositions),
+            selectinload(NutritionCatalogueFood.portions),
+        )
+    )
+
+    assert len(seeded) == 72
+    assert preserved is not None
+    assert preserved.id == original_id
+    assert preserved.verification_status is FoodVerificationStatus.RETIRED
+    assert {(role.food_id, role.role) for role in preserved.roles} == original_role_ids
+    assert {alias.id for alias in preserved.aliases} == original_alias_ids
+    assert {composition.id for composition in preserved.compositions} == original_composition_ids
+    assert {portion.id for portion in preserved.portions} == original_portion_ids
