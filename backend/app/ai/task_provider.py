@@ -39,6 +39,7 @@ def build_task_provider(
     http_client: httpx.AsyncClient,
     agent_http_client: httpx.AsyncClient | None,
     api_key: SecretStr | str | None = None,
+    timeout_seconds: float | None = None,
 ) -> ConfiguredAIProvider:
     backend = AIExecutionBackend(task.execution_backend)
     preferences = _routing_preferences(task.routing_restrictions)
@@ -81,9 +82,7 @@ def build_task_provider(
     token_value = _secret_value(token)
     if token_value is None:
         raise ValueError("Agent Service token is not configured")
-    if getattr(settings, "app_env", None) == "production" and (
-        len(token_value) < 32
-    ):
+    if getattr(settings, "app_env", None) == "production" and (len(token_value) < 32):
         raise ValueError("production Agent Service mode requires a strong token")
     agent_provider: AIProvider = AgentServiceProvider(
         agent_http_client,
@@ -91,7 +90,9 @@ def build_task_provider(
         token=token,
         agent_name=agent_name,
         profile_id=profile_id,
-        timeout_seconds=float(task.timeout_seconds),
+        timeout_seconds=float(
+            timeout_seconds if timeout_seconds is not None else task.timeout_seconds
+        ),
         max_image_bytes=int(getattr(settings, "agent_service_max_image_bytes", 8 * 1024 * 1024)),
     )
     return ConfiguredAIProvider(

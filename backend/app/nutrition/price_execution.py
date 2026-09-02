@@ -69,3 +69,42 @@ def resolve_price_update_execution(
         max_output_tokens=int(task.max_output_tokens),
     )
     return PriceUpdateExecution((), researcher)
+
+
+def resolve_single_food_price_researcher(
+    db: Session,
+    *,
+    settings: Settings,
+    agent_http_client: httpx.AsyncClient | None,
+    timeout_seconds: float = 300.0,
+) -> AgentFoodPriceResearcher | None:
+    task = db.scalar(
+        select(AITaskConfig).where(AITaskConfig.task_type == AITaskType.FOOD_PRICE_SEARCH)
+    )
+    if task is None or not task.enabled:
+        return None
+
+    if AIExecutionBackend(task.execution_backend) is not AIExecutionBackend.AGENT_SERVICE:
+        raise AIConfigError(
+            "FOOD_PRICE_SEARCH must use Agent Service for production price research"
+        )
+    try:
+        configured = build_task_provider(
+            task,
+            settings=settings,
+            http_client=agent_http_client or httpx.AsyncClient(),
+            agent_http_client=agent_http_client,
+            timeout_seconds=timeout_seconds,
+        )
+    except ValueError as error:
+        raise AIConfigError(str(error)) from error
+    return AgentFoodPriceResearcher(
+        configured.provider,
+        route=ModelRoute(
+            primary_model=configured.primary_model_id,
+            fallback_models=configured.fallback_model_ids,
+        ),
+        preferences=configured.routing_preferences,
+        temperature=float(task.temperature),
+        max_output_tokens=int(task.max_output_tokens),
+    )

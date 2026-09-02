@@ -17,7 +17,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.admin.dependencies import AdminUser
 from app.admin.media import (
@@ -37,7 +37,12 @@ from app.nutrition.adherence_service import (
     adherence_history,
     confirm_target_update,
 )
-from app.nutrition.ai_price_research import canonical_source_domain
+from app.nutrition.ai_price_research import (
+    FoodPriceResearchError,
+    FoodPriceResearchFood,
+    canonical_source_domain,
+    median_band_indices,
+)
 from app.nutrition.catalogue_view import admin_food_catalogue, member_food_catalogue
 from app.nutrition.clinical_service import (
     ClinicalError,
@@ -148,7 +153,10 @@ from app.nutrition.plan_service import (
     weekly_plan_by_id,
     weekly_plan_history,
 )
-from app.nutrition.price_execution import resolve_price_update_execution
+from app.nutrition.price_execution import (
+    resolve_price_update_execution,
+    resolve_single_food_price_researcher,
+)
 from app.nutrition.price_overrides import create_price_override
 from app.nutrition.price_providers import configured_providers
 from app.nutrition.price_update_service import run_price_update_async
@@ -209,6 +217,8 @@ from app.nutrition.schemas import (
     SafetyDecisionResponse,
     SafetyEvaluationResponse,
     SafetyProfileInput,
+    SingleFoodPriceResearchQuoteResponse,
+    SingleFoodPriceResearchResponse,
     StructuredExerciseInput,
     StructuredExerciseResponse,
     SupplementAcknowledgementInput,
@@ -409,6 +419,146 @@ def create_food_price_override(
         canonical_unit=override.canonical_unit,
         reason=override.reason,
         created_at=override.created_at,
+    )
+
+
+@router.post(
+    "/admin/foods/{slug}/price-research",
+    response_model=SingleFoodPriceResearchResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def research_single_food_price(
+    slug: str,
+    request: Request,
+    db: DatabaseSession,
+    admin: AdminUser,
+    settings: AppSettings,
+    apply: bool = False,
+) -> SingleFoodPriceResearchResponse:
+    food = db.scalar(
+        select(NutritionCatalogueFood)
+        .options(selectinload(NutritionCatalogueFood.aliases))
+        .where(
+            NutritionCatalogueFood.slug == slug,
+            NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
+        )
+    )
+    if food is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Food not found")
+
+    researcher = resolve_single_food_price_researcher(
+        db,
+        settings=settings,
+        agent_http_client=getattr(request.app.state, "agent_http_client", None),
+        timeout_seconds=300.0,
+    )
+    if researcher is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Agent Service is not configured or enabled for food price search",
+        )
+
+    aliases = tuple(alias.alias for alias in food.aliases if alias.language == "fa")
+    research_food = FoodPriceResearchFood(
+        slug=food.slug,
+        name_fa=food.name_fa,
+        name_en=food.name_en,
+        category=food.category,
+        aliases=aliases,
+    )
+    try:
+        result = await researcher.research(research_food)
+    except FoodPriceResearchError as error:
+        return SingleFoodPriceResearchResponse(
+            food_slug=food.slug,
+            food_name_fa=food.name_fa,
+            candidate_reference_price_toman=None,
+            canonical_unit=None,
+            quotes=[
+                SingleFoodPriceResearchQuoteResponse(
+                    source_name=e.source_name,
+                    source_url=e.source_url,
+                    source_domain=e.source_domain,
+                    product_title=e.product_title,
+                    normal_price_toman=e.normalized_normal_price_toman,
+                    promotional_price_toman=e.observation.promotional_price,
+                    package_quantity=e.observation.package_quantity,
+                    package_unit=e.observation.package_unit,
+                    match_accepted=e.match_accepted,
+                )
+                for e in error.evidence
+            ],
+            status="failed",
+            message=str(error),
+        )
+    except Exception as error:
+        return SingleFoodPriceResearchResponse(
+            food_slug=food.slug,
+            food_name_fa=food.name_fa,
+            candidate_reference_price_toman=None,
+            canonical_unit=None,
+            quotes=[],
+            status="failed",
+            message=str(error),
+        )
+
+    quotes = [
+        SingleFoodPriceResearchQuoteResponse(
+            source_name=e.source_name,
+            source_url=e.source_url,
+            source_domain=e.source_domain,
+            product_title=e.product_title,
+            normal_price_toman=e.normalized_normal_price_toman,
+            promotional_price_toman=e.observation.promotional_price,
+            package_quantity=e.observation.package_quantity,
+            package_unit=e.observation.package_unit,
+            match_accepted=e.match_accepted,
+        )
+        for e in result.evidence
+    ]
+    accepted = [e for e in result.evidence if e.match_accepted]
+    candidate_price: Decimal | None = None
+    canonical_unit: str | None = None
+    if accepted:
+        values = [e.normalized_normal_price_toman for e in accepted]
+        indexes = median_band_indices(values)
+        trusted = [accepted[i] for i in indexes] if indexes else accepted
+        candidate_price = Decimal(
+            int(
+                round(
+                    sum((e.normalized_normal_price_toman for e in trusted), Decimal())
+                    / Decimal(len(trusted))
+                )
+            )
+        )
+        canonical_unit = trusted[0].canonical_unit
+
+    if apply and candidate_price is not None and canonical_unit is not None:
+        unit_literal = (
+            "TOMAN_PER_KG"
+            if "KG" in canonical_unit
+            else "TOMAN_PER_LITER"
+            if "LITER" in canonical_unit
+            else "TOMAN_PER_UNIT"
+        )
+        create_price_override(
+            db,
+            food=food,
+            admin_user_id=admin.id,
+            payload=FoodPriceOverrideInput(
+                reference_price_toman=candidate_price,
+                canonical_unit=unit_literal,
+                reason="استعلام خودکار و تأیید قیمت با ایجنت",
+            ),
+        )
+
+    return SingleFoodPriceResearchResponse(
+        food_slug=food.slug,
+        food_name_fa=food.name_fa,
+        candidate_reference_price_toman=candidate_price,
+        canonical_unit=canonical_unit,
+        quotes=quotes,
+        status="success" if candidate_price is not None else "no_quotes",
     )
 
 
@@ -731,9 +881,7 @@ def _review_quote_evidence(
                 "product_title": product_title,
                 "normal_price_toman": _monitoring_toman(quote.normal_price_irr),
                 "promotional_price_toman": _monitoring_toman(quote.promotional_price_irr),
-                "normalized_normal_price_toman": _monitoring_toman(
-                    quote.normalized_normal_irr
-                ),
+                "normalized_normal_price_toman": _monitoring_toman(quote.normalized_normal_irr),
                 "package_quantity": format(quote.package_quantity, "f").rstrip("0").rstrip("."),
                 "package_unit": quote.package_unit,
                 "observed_at": quote.observed_at,

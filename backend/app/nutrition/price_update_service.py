@@ -554,12 +554,12 @@ async def run_price_update_async(
                 tuple[NutritionFoodPriceQuote, Decimal, FoodPriceResearchEvidence]
             ] = []
             for evidence in evidence_items:
-                provider = _ensure_agent_provider(db, evidence, now=now)
+                agent_db_provider = _ensure_agent_provider(db, evidence, now=now)
                 quote = _agent_quote(
                     db,
                     food_id=food_id,
                     evidence=evidence,
-                    provider=provider,
+                    provider=agent_db_provider,
                     now=now,
                 )
                 saved.append(quote)
@@ -577,9 +577,7 @@ async def run_price_update_async(
                 unit = normalized.canonical_unit
                 if normalized.normalized_normal_price is not None:
                     agent_valid_match_count += 1
-                    agent_entries.append(
-                        (quote, normalized.normalized_normal_price, evidence)
-                    )
+                    agent_entries.append((quote, normalized.normalized_normal_price, evidence))
             if agent_entries:
                 values = [value for _, value, _ in agent_entries]
                 trusted_indexes = median_band_indices(values)
@@ -834,7 +832,9 @@ async def run_price_update_async(
         and agent_research_failures == 0
         and usable_observation_count > 0
     )
-    if (successful_probes and not failures and usable_observation_count > 0) or agent_update_succeeded:
+    if (
+        successful_probes and not failures and usable_observation_count > 0
+    ) or agent_update_succeeded:
         expire_active_overrides(db, run=run, expired_at=run.finished_at)
     record_operational_event(
         db,

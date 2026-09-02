@@ -431,6 +431,28 @@ class FoodPriceOverrideResponse(BaseModel):
     created_at: datetime
 
 
+class SingleFoodPriceResearchQuoteResponse(BaseModel):
+    source_name: str
+    source_url: str
+    source_domain: str
+    product_title: str
+    normal_price_toman: Decimal
+    promotional_price_toman: Decimal | None = None
+    package_quantity: Decimal
+    package_unit: str
+    match_accepted: bool
+
+
+class SingleFoodPriceResearchResponse(BaseModel):
+    food_slug: str
+    food_name_fa: str
+    candidate_reference_price_toman: Decimal | None = None
+    canonical_unit: str | None = None
+    quotes: list[SingleFoodPriceResearchQuoteResponse] = Field(default_factory=list)
+    status: Literal["success", "no_quotes", "failed"]
+    message: str | None = None
+
+
 class CatalogueMealItemInput(BaseModel):
     food_id: UUID
     reference_grams: Decimal = Field(gt=0, max_digits=20, decimal_places=8)
