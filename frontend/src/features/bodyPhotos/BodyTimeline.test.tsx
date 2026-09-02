@@ -131,7 +131,8 @@ it("renders the longitudinal scan timeline and deterministic comparison entry", 
 
   expect(screen.getByRole("heading", { name: "My body over time" })).toBeInTheDocument();
   expect(screen.getByText(/14 days/i)).toBeInTheDocument();
-  expect(screen.getAllByText(/Based on measurements recorded by you/i).length).toBeGreaterThan(0);
+  expect(screen.getByRole("heading", { name: "Biggest change" })).toBeInTheDocument();
+  expect(screen.queryByText(/Based on measurements recorded by you/i)).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "View analysis" })).toHaveAttribute(
     "href",
     "/body-progress/session-current",
