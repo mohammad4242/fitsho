@@ -228,8 +228,8 @@ export function GhostPhotoEditor({
           <span>{t("bodyPhotos.editor.rotationLabel")}</span>
           <input
             type="range"
-            min="-15"
-            max="15"
+            min="-180"
+            max="180"
             step="1"
             value={transform.rotation}
             aria-label={t("bodyPhotos.editor.rotationLabel")}

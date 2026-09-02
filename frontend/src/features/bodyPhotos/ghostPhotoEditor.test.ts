@@ -28,13 +28,24 @@ describe("ghost photo transform", () => {
       offsetX: 9999,
       offsetY: -9999,
       scale: 99,
-      rotation: -99,
+      rotation: -999,
     })).toEqual({
       offsetX: 900,
       offsetY: -900,
       scale: 2.5,
-      rotation: -15,
+      rotation: -180,
     });
+  });
+
+  it("allows a quarter-turn rotation for landscape and portrait photos", () => {
+    expect(clampGhostPhotoTransform({
+      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
+      rotation: 90,
+    }).rotation).toBe(90);
+    expect(clampGhostPhotoTransform({
+      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
+      rotation: -90,
+    }).rotation).toBe(-90);
   });
 
   it("reports a soft 15 percent framing tolerance without rejecting edits", () => {

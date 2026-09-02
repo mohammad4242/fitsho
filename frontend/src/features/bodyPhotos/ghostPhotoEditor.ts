@@ -11,8 +11,8 @@ export const GHOST_EDITOR_TOLERANCE = 0.15;
 
 const minimumScale = 0.75;
 const maximumScale = 2.5;
-const minimumRotation = -15;
-const maximumRotation = 15;
+const minimumRotation = -180;
+const maximumRotation = 180;
 const maximumOffset = 900;
 
 export type GhostPhotoTransform = {

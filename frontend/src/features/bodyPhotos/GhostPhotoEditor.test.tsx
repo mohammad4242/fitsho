@@ -62,6 +62,19 @@ it("supports keyboard-accessible zoom, rotation, and reset controls", () => {
   expect(image.style.transform).toBe(ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM));
 });
 
+it("allows a quarter-turn through the rotation slider", () => {
+  renderEditor();
+  const image = screen.getByRole("img", { name: /photo being aligned/i });
+  const rotationSlider = screen.getByRole("slider", { name: /rotation/i });
+
+  expect(rotationSlider).toHaveAttribute("min", "-180");
+  expect(rotationSlider).toHaveAttribute("max", "180");
+
+  fireEvent.change(rotationSlider, { target: { value: "90" } });
+
+  expect(image.style.transform).toContain("rotate(90deg)");
+});
+
 it("moves the image with a pointer drag and reports the soft framing status", () => {
   renderEditor();
   const stage = screen.getByRole("application", { name: /photo framing editor/i });
