@@ -33,6 +33,9 @@ _SAFE_MESSAGES: dict[ProviderErrorCode, str] = {
     ProviderErrorCode.UNAUTHORIZED: "The Agent Service credential was rejected.",
     ProviderErrorCode.RATE_LIMITED: "The Agent Service is busy. Please try again.",
     ProviderErrorCode.PROVIDER_UNAVAILABLE: "The Agent Service is temporarily unavailable.",
+    ProviderErrorCode.LOCATION_UNSUPPORTED: (
+        "The provider does not support the current network location."
+    ),
     ProviderErrorCode.INVALID_REQUEST: "The Agent Service rejected the request.",
     ProviderErrorCode.MALFORMED_RESPONSE: "The Agent Service returned a malformed response.",
     ProviderErrorCode.INVALID_OUTPUT: "The Agent Service returned invalid structured output.",
@@ -48,6 +51,7 @@ _SERVICE_CODE_MAP: dict[str, ProviderErrorCode] = {
     "invalid_output": ProviderErrorCode.INVALID_OUTPUT,
     "model_not_found": ProviderErrorCode.MODEL_NOT_FOUND,
     "provider_unavailable": ProviderErrorCode.PROVIDER_UNAVAILABLE,
+    "location_unsupported": ProviderErrorCode.LOCATION_UNSUPPORTED,
 }
 
 _IMAGE_SUFFIXES = {
@@ -569,8 +573,10 @@ class AgentServiceProvider:
 
     @staticmethod
     def _status_code(status_code: int) -> ProviderErrorCode:
-        if status_code in {401, 403}:
+        if status_code == 401:
             return ProviderErrorCode.UNAUTHORIZED
+        if status_code == 403:
+            return ProviderErrorCode.LOCATION_UNSUPPORTED
         if status_code in {408, 504}:
             return ProviderErrorCode.TIMEOUT
         if status_code == 429:

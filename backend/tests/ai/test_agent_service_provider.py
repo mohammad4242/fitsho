@@ -307,6 +307,7 @@ def test_get_model_capabilities_rejects_unknown_model_with_safe_code() -> None:
     ("status_code", "service_code", "expected"),
     [
         (401, "unauthorized", ProviderErrorCode.UNAUTHORIZED),
+        (403, "location_unsupported", ProviderErrorCode.LOCATION_UNSUPPORTED),
         (408, "timeout", ProviderErrorCode.TIMEOUT),
         (429, "rate_limited", ProviderErrorCode.RATE_LIMITED),
         (502, "provider_unavailable", ProviderErrorCode.PROVIDER_UNAVAILABLE),
