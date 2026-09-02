@@ -66,8 +66,47 @@ def test_proxy_runtime_preserves_deployment_default_and_can_switch_modes() -> No
     assert custom.masked_proxy_url == "http://****:****@custom-proxy:8080"
     assert custom_environment["HTTP_PROXY"] == "http://admin:secret@custom-proxy:8080"
     assert custom_environment["HTTPS_PROXY"] == "http://admin:secret@custom-proxy:8080"
+    assert custom_environment["http_proxy"] == "http://admin:secret@custom-proxy:8080"
+    assert custom_environment["https_proxy"] == "http://admin:secret@custom-proxy:8080"
     assert "secret" not in custom.masked_proxy_url
     assert "ALL_PROXY" not in custom_environment
+
+
+def test_proxy_runtime_normalizes_uppercase_deployment_defaults() -> None:
+    proxy = "http://default-proxy:1080"
+    runtime = ProxyRuntime(
+        {
+            "PATH": "/usr/bin",
+            "HTTP_PROXY": proxy,
+            "HTTPS_PROXY": proxy,
+        }
+    )
+
+    environment = runtime.environment()
+
+    assert environment["HTTP_PROXY"] == proxy
+    assert environment["HTTPS_PROXY"] == proxy
+    assert environment["http_proxy"] == proxy
+    assert environment["https_proxy"] == proxy
+
+
+def test_proxy_runtime_normalizes_lowercase_deployment_defaults() -> None:
+    http_proxy = "http://http-default:1080"
+    https_proxy = "http://https-default:1080"
+    runtime = ProxyRuntime(
+        {
+            "PATH": "/usr/bin",
+            "http_proxy": http_proxy,
+            "https_proxy": https_proxy,
+        }
+    )
+
+    environment = runtime.environment()
+
+    assert environment["HTTP_PROXY"] == http_proxy
+    assert environment["http_proxy"] == http_proxy
+    assert environment["HTTPS_PROXY"] == https_proxy
+    assert environment["https_proxy"] == https_proxy
 
 
 def test_proxy_runtime_api_requires_internal_auth_and_never_returns_proxy_secret(

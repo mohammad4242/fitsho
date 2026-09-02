@@ -42,6 +42,7 @@ _DEFAULT_PROXY_STATUS_KEYS = (
     "https_proxy",
     "all_proxy",
 )
+_PROXY_CASE_PAIRS = (("HTTP_PROXY", "http_proxy"), ("HTTPS_PROXY", "https_proxy"))
 _PROXY_SCHEMES = frozenset({"http", "https", "socks5", "socks5h"})
 
 
@@ -106,8 +107,17 @@ class ProxyRuntime:
                     assert self._custom_proxy_url is not None
                     result["HTTP_PROXY"] = self._custom_proxy_url
                     result["HTTPS_PROXY"] = self._custom_proxy_url
+                    result["http_proxy"] = self._custom_proxy_url
+                    result["https_proxy"] = self._custom_proxy_url
                 else:
                     result.update(self._default_proxy_values)
+                    for uppercase_key, lowercase_key in _PROXY_CASE_PAIRS:
+                        uppercase_value = self._default_proxy_values.get(uppercase_key)
+                        lowercase_value = self._default_proxy_values.get(lowercase_key)
+                        if uppercase_value is not None and lowercase_value is None:
+                            result[lowercase_key] = uppercase_value
+                        elif lowercase_value is not None and uppercase_value is None:
+                            result[uppercase_key] = lowercase_value
         return result
 
     def environment(self) -> dict[str, str]:
