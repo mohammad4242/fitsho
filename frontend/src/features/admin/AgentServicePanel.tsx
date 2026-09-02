@@ -13,6 +13,8 @@ export type AgentServicePanelProps = {
   selectedModelLabel?: string | null;
   onSelectAgent: (agent: AdminAiAgentName) => void;
   onAuthenticate: (agent: AdminAiAgentName) => void;
+  onReauthenticate: (agent: AdminAiAgentName) => void;
+  onLogout: (agent: AdminAiAgentName) => void;
   onTest: () => void;
   testDisabled: boolean;
 };
@@ -26,6 +28,8 @@ export function AgentServicePanel({
   selectedModelLabel,
   onSelectAgent,
   onAuthenticate,
+  onReauthenticate,
+  onLogout,
   onTest,
   testDisabled,
 }: AgentServicePanelProps) {
@@ -62,7 +66,8 @@ export function AgentServicePanel({
           const runner = runnerByAgent.get(agent) ?? unavailableRunner(agent);
           const label = t(`admin.aiSettings.agents.${agent}`);
           const authSupported = runner.auth_mode === "browser_link";
-          const authAction = runner.auth_state === "authenticated" && authSupported
+          const authenticated = runner.auth_state === "authenticated" && authSupported;
+          const authAction = authenticated
             ? t("admin.aiSettings.agentService.reauthenticate")
             : t("admin.aiSettings.agentService.authenticate");
           return (
@@ -106,11 +111,20 @@ export function AgentServicePanel({
                 className="admin-agent-card__auth"
                 type="button"
                 disabled={!runner.installed || !authSupported || loading || unavailable}
-                onClick={() => onAuthenticate(agent)}
+                onClick={() => (authenticated ? onReauthenticate(agent) : onAuthenticate(agent))}
                 aria-label={`${authAction} ${label}`}
               >
                 {authAction}
               </button>
+              {authenticated && <button
+                className="admin-agent-card__logout"
+                type="button"
+                disabled={loading || unavailable}
+                onClick={() => onLogout(agent)}
+                aria-label={`${t("admin.aiSettings.agentService.logout")} ${label}`}
+              >
+                {t("admin.aiSettings.agentService.logout")}
+              </button>}
               {runner.installed && !authSupported && <p className="admin-agent-card__auth-note" role="note">
                 {t("admin.aiSettings.agentService.browserAuthUnavailable")}
               </p>}

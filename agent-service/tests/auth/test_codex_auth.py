@@ -1,7 +1,16 @@
+import asyncio
+from collections.abc import Coroutine
 from pathlib import Path
+from typing import Any
 
 from app.auth.adapters.codex import CodexAuthAdapter
 from app.auth.schemas import AuthSessionStatus
+from app.process import ProcessResult
+from app.schemas import AuthState
+
+
+def run[T](coro: Coroutine[Any, Any, T]) -> T:
+    return asyncio.run(coro)
 
 
 def test_codex_uses_the_pinned_device_auth_command_without_a_pty() -> None:
@@ -59,6 +68,43 @@ def test_codex_exit_status_is_safe_and_deterministic() -> None:
     adapter = CodexAuthAdapter()
     assert adapter.classify_exit(0, "private token") is AuthSessionStatus.AUTHENTICATED
     assert adapter.classify_exit(143, "private stderr") is AuthSessionStatus.FAILED
+
+
+def test_codex_status_probe_uses_the_persistent_home_and_status_command(
+    tmp_path: Path, monkeypatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        captured["command"] = command
+        captured.update(kwargs)
+        return ProcessResult(0, "", "")
+
+    import app.auth.adapters.codex as codex
+
+    monkeypatch.setattr(codex, "run_process", fake_run_process)
+    environment = {"HOME": str(tmp_path), "PATH": "/usr/bin"}
+    adapter = CodexAuthAdapter(workspace=tmp_path)
+
+    assert run(adapter.probe_auth_state(environment)) is AuthState.AUTHENTICATED
+    assert captured["command"] == ["codex", "login", "status"]
+    assert captured["env"]["HOME"] == str(tmp_path)
+    assert captured["workspace"] == tmp_path
+
+
+def test_codex_status_probe_keeps_probe_errors_unknown(monkeypatch, tmp_path: Path) -> None:
+    async def failing_run_process(*args: Any, **kwargs: Any) -> ProcessResult:
+        del args, kwargs
+        raise RuntimeError("status probe failed")
+
+    import app.auth.adapters.codex as codex
+
+    monkeypatch.setattr(codex, "run_process", failing_run_process)
+
+    assert (
+        run(CodexAuthAdapter(workspace=tmp_path).probe_auth_state({"HOME": str(tmp_path)}))
+        is AuthState.UNKNOWN
+    )
 
 
 def test_codex_preserves_saved_credentials_across_interrupted_login(tmp_path: Path) -> None:

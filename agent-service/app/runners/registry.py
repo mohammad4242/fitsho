@@ -134,8 +134,7 @@ class RunnerRegistry:
                         probed_state = await probe()
                     except Exception:
                         probed_state = AuthState.UNKNOWN
-                    if probed_state is not AuthState.UNKNOWN:
-                        state = probed_state
+                    state = probed_state
             self._auth_states[runner.name] = state
             result.append(capabilities.model_copy(update={"auth_state": state}))
         return result

@@ -138,9 +138,26 @@ it("keeps the Antigravity browser link visible while waiting for its authorizati
   render(<AgentAuthDialog agent="antigravity" onClose={vi.fn()} onAuthenticated={vi.fn()} />);
 
   expect(await screen.findByText(antigravitySession.verification_url!)).toBeInTheDocument();
-  expect(api.startAdminAiAgentAuth).toHaveBeenCalledWith("antigravity", { forceReauth: true });
+  expect(api.startAdminAiAgentAuth).toHaveBeenCalledWith("antigravity");
   expect(screen.getByRole("button", { name: "Open authentication page" })).toBeInTheDocument();
   expect(screen.getByLabelText("Authorization code")).toBeInTheDocument();
+});
+
+it("only requests reauthentication when the dialog was opened by the explicit action", async () => {
+  render(
+    <AgentAuthDialog
+      agent="antigravity"
+      forceReauth
+      onClose={vi.fn()}
+      onAuthenticated={vi.fn()}
+    />,
+  );
+
+  await waitFor(() => {
+    expect(api.startAdminAiAgentAuth).toHaveBeenCalledWith("antigravity", {
+      forceReauth: true,
+    });
+  });
 });
 
 it("polls until authenticated, notifies once, and stops at the terminal state", async () => {

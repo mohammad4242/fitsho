@@ -41,6 +41,8 @@ it("renders all agent cards, service status, and selected routing", async () => 
   const user = userEvent.setup();
   const onSelectAgent = vi.fn();
   const onAuthenticate = vi.fn();
+  const onReauthenticate = vi.fn();
+  const onLogout = vi.fn();
 
   render(
     <AgentServicePanel
@@ -51,6 +53,8 @@ it("renders all agent cards, service status, and selected routing", async () => 
       selectedModelId={null}
       onSelectAgent={onSelectAgent}
       onAuthenticate={onAuthenticate}
+      onReauthenticate={onReauthenticate}
+      onLogout={onLogout}
       onTest={vi.fn()}
       testDisabled={true}
     />,
@@ -65,11 +69,41 @@ it("renders all agent cards, service status, and selected routing", async () => 
   expect(screen.getByText("Selected model: None")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Authenticate Claude" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Authenticate Antigravity" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Logout Codex" })).toBeEnabled();
 
   await user.click(screen.getByRole("button", { name: "Select Codex" }));
   expect(onSelectAgent).toHaveBeenCalledWith("codex");
   await user.click(screen.getByRole("button", { name: "Re-authenticate Codex" }));
-  expect(onAuthenticate).toHaveBeenCalledWith("codex");
+  expect(onReauthenticate).toHaveBeenCalledWith("codex");
+  await user.click(screen.getByRole("button", { name: "Logout Codex" }));
+  expect(onLogout).toHaveBeenCalledWith("codex");
+});
+
+it("shows connected status and separates reauthentication from logout", async () => {
+  const user = userEvent.setup();
+  const onReauthenticate = vi.fn();
+  const onLogout = vi.fn();
+  render(
+    <AgentServicePanel
+      runners={[{ ...runners[0], auth_state: "authenticated" }]}
+      loading={false}
+      unavailable={false}
+      selectedAgent="antigravity"
+      selectedModelId={null}
+      onSelectAgent={vi.fn()}
+      onAuthenticate={vi.fn()}
+      onReauthenticate={onReauthenticate}
+      onLogout={onLogout}
+      onTest={vi.fn()}
+      testDisabled
+    />,
+  );
+
+  expect(screen.getByRole("group", { name: "Antigravity" })).toHaveTextContent("Connected");
+  await user.click(screen.getByRole("button", { name: "Re-authenticate Antigravity" }));
+  await user.click(screen.getByRole("button", { name: "Logout Antigravity" }));
+  expect(onReauthenticate).toHaveBeenCalledWith("antigravity");
+  expect(onLogout).toHaveBeenCalledWith("antigravity");
 });
 
 it("disables authentication when a runner is explicitly manual-only", () => {
@@ -82,6 +116,8 @@ it("disables authentication when a runner is explicitly manual-only", () => {
       selectedModelId={null}
       onSelectAgent={vi.fn()}
       onAuthenticate={vi.fn()}
+      onReauthenticate={vi.fn()}
+      onLogout={vi.fn()}
       onTest={vi.fn()}
       testDisabled
     />,
@@ -101,6 +137,8 @@ it("shows unavailable status and keeps the panel compact while loading", () => {
       selectedModelId={null}
       onSelectAgent={vi.fn()}
       onAuthenticate={vi.fn()}
+      onReauthenticate={vi.fn()}
+      onLogout={vi.fn()}
       onTest={vi.fn()}
       testDisabled
     />,
@@ -116,6 +154,8 @@ it("shows unavailable status and keeps the panel compact while loading", () => {
       selectedModelId={null}
       onSelectAgent={vi.fn()}
       onAuthenticate={vi.fn()}
+      onReauthenticate={vi.fn()}
+      onLogout={vi.fn()}
       onTest={vi.fn()}
       testDisabled
     />,

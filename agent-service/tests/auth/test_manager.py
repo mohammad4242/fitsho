@@ -121,6 +121,17 @@ class PreservingAuthAdapter(FakeAuthAdapter):
         return True
 
 
+class StatusAwareAuthAdapter(PreservingAuthAdapter):
+    def __init__(self, script: Path, state: AuthState) -> None:
+        super().__init__(script)
+        self.state = state
+        self.probe_environments: list[dict[str, str]] = []
+
+    def probe_auth_state(self, environment: dict[str, str]) -> AuthState:
+        self.probe_environments.append(environment)
+        return self.state
+
+
 class CredentialRequiredAuthAdapter(FakeAuthAdapter):
     def has_saved_credentials(self, environment: dict[str, str]) -> bool:
         del environment
@@ -423,6 +434,85 @@ def test_manager_force_reauth_clears_saved_credentials_before_start(tmp_path: Pa
 
     run(scenario())
     assert adapter.reset_environments == [{"HOME": str(tmp_path), "PATH": os.environ["PATH"]}]
+
+
+def test_manager_reuses_authenticated_saved_credentials_without_starting_process(
+    tmp_path: Path,
+) -> None:
+    script = write_script(tmp_path, "raise AssertionError('a new auth process is not allowed')\n")
+    adapter = StatusAwareAuthAdapter(script, AuthState.AUTHENTICATED)
+    environment = {"HOME": str(tmp_path), "PATH": os.environ["PATH"]}
+
+    def fail_process_factory(*args: Any, **kwargs: Any) -> Any:
+        del args, kwargs
+        raise AssertionError("a new auth process is not allowed")
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.CODEX: adapter},
+            workspace=tmp_path,
+            environment=environment,
+            process_factory=fail_process_factory,
+        )
+        try:
+            view = await manager.start(AgentName.CODEX)
+            assert view.status is AuthSessionStatus.AUTHENTICATED
+        finally:
+            await manager.shutdown()
+
+    run(scenario())
+    assert adapter.probe_environments == [environment]
+    assert adapter.backup_calls == 0
+
+
+def test_manager_normal_login_does_not_clear_existing_credentials(tmp_path: Path) -> None:
+    script = write_script(tmp_path, "import time\nprint('READY', flush=True)\ntime.sleep(60)\n")
+    adapter = ResettablePtyAuthAdapter(script)
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: adapter},
+            workspace=tmp_path,
+            environment={"HOME": str(tmp_path), "PATH": os.environ["PATH"]},
+        )
+        try:
+            view = await manager.start(AgentName.ANTIGRAVITY)
+            assert view.status in {
+                AuthSessionStatus.STARTING,
+                AuthSessionStatus.WAITING_FOR_USER,
+            }
+        finally:
+            await manager.shutdown()
+
+    run(scenario())
+    assert adapter.reset_environments == []
+
+
+def test_manager_logout_removes_saved_credentials_and_reports_unauthenticated(
+    tmp_path: Path,
+) -> None:
+    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("saved-token", encoding="utf-8")
+    states: list[tuple[AgentName, AuthState]] = []
+    adapter = AntigravityAuthAdapter()
+
+    async def scenario() -> None:
+        manager = AuthManager(
+            {AgentName.ANTIGRAVITY: adapter},
+            workspace=tmp_path,
+            environment={"HOME": str(tmp_path), "PATH": os.environ["PATH"]},
+            state_callback=lambda agent, state: states.append((agent, state)),
+        )
+        try:
+            await manager.logout(AgentName.ANTIGRAVITY)
+        finally:
+            await manager.shutdown()
+
+    run(scenario())
+    assert not token_path.exists()
+    assert adapter.probe_auth_state({"HOME": str(tmp_path)}) is AuthState.UNAUTHENTICATED
+    assert states == [(AgentName.ANTIGRAVITY, AuthState.UNAUTHENTICATED)]
 
 
 def test_manager_cancels_active_pty_auth_with_escape_and_releases_slot(tmp_path: Path) -> None:

@@ -11,7 +11,7 @@ import pytest
 from app.process import ProcessResult, ProcessTimeoutError
 from app.runners.antigravity import AntigravityRunner
 from app.runners.base import RunnerError, RunnerRequest
-from app.schemas import AgentName
+from app.schemas import AgentName, AuthState
 
 
 def run[T](coro: Coroutine[Any, Any, T]) -> T:
@@ -128,6 +128,43 @@ def test_capabilities_mark_missing_executable_uninstalled(tmp_path: Path) -> Non
     )
 
     assert capabilities.installed is False
+
+
+def test_status_probe_reads_persistent_antigravity_credentials_from_runner_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text(
+        json.dumps(
+            {
+                "auth_method": "oauth",
+                "token": {
+                    "access_token": "access-token",
+                    "expiry": "2099-01-01T00:00:00Z",
+                    "refresh_token": "refresh-token",
+                    "token_type": "Bearer",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    runner = AntigravityRunner(workspace=tmp_path, executable="missing-agy")
+
+    assert run(runner.probe_auth_state()) is AuthState.AUTHENTICATED
+
+
+def test_status_probe_reports_unknown_for_unreadable_antigravity_credential_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text("not-json", encoding="utf-8")
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert run(AntigravityRunner(workspace=tmp_path).probe_auth_state()) is AuthState.UNKNOWN
 
 
 def test_run_parses_structured_output_and_uses_exact_model_argv(

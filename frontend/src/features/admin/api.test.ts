@@ -19,6 +19,7 @@ import {
   submitAdminAiAgentAuthInput,
   cancelAdminAiAgentAuthActive,
   cancelAdminAiAgentAuthSession,
+  logoutAdminAiAgentAuth,
   getAdminAiAgentServiceCapabilities,
   getAdminAiAgentServiceProxy,
   saveAdminAiAgentServiceProxy,
@@ -311,6 +312,25 @@ it("cancels the active agent authentication through the backend", async () => {
     expect.objectContaining({
       method: "POST",
       body: JSON.stringify({ agent: "codex" }),
+      credentials: "include",
+    }),
+  );
+});
+
+it("logs out an agent through the explicit credential-removal endpoint", async () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch")
+    .mockResolvedValue(jsonResponse({ agent: "antigravity", auth_state: "unauthenticated" }));
+
+  await expect(logoutAdminAiAgentAuth("antigravity")).resolves.toEqual({
+    agent: "antigravity",
+    auth_state: "unauthenticated",
+  });
+
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/v1/admin/ai/agent-service/auth/logout",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ agent: "antigravity" }),
       credentials: "include",
     }),
   );

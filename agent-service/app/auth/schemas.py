@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..schemas import AgentName
+from ..schemas import AgentName, AuthState
 
 
 class AuthSessionStatus(StrEnum):
@@ -47,6 +47,19 @@ class AuthActiveCancellationResponse(BaseModel):
 
     agent: AgentName
     canceled: bool
+
+
+class AuthLogoutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AgentName
+
+
+class AuthLogoutResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AgentName
+    auth_state: AuthState
 
 
 class AuthInputRequest(BaseModel):

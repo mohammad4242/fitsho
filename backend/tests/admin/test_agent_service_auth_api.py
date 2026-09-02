@@ -195,6 +195,46 @@ def test_agent_auth_proxy_forwards_antigravity_force_reauth(
     assert seen == [b'{"agent":"antigravity","force_reauth":true}']
 
 
+def test_agent_auth_proxy_logs_out_only_through_explicit_logout_action(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _admin(client, db, "logout-agent-auth-admin@example.com")
+    test_settings.agent_service_token = TOKEN
+    seen: list[tuple[str, str, bytes]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, request.url.path, request.content))
+        assert request.headers["authorization"] == f"Bearer {TOKEN}"
+        assert request.method == "POST"
+        assert request.url.path.endswith("/v1/auth/logout")
+        assert request.content == b'{"agent":"antigravity"}'
+        return httpx.Response(
+            200,
+            json={"agent": "antigravity", "auth_state": "unauthenticated"},
+        )
+
+    replacement = _mock_agent_service(client, httpx.MockTransport(handler))
+    try:
+        without_origin = client.post(
+            "/api/v1/admin/ai/agent-service/auth/logout",
+            json={"agent": "antigravity"},
+        )
+        logged_out = client.post(
+            "/api/v1/admin/ai/agent-service/auth/logout",
+            headers=ORIGIN,
+            json={"agent": "antigravity"},
+        )
+    finally:
+        _restore_agent_service(client, replacement)
+
+    assert without_origin.status_code == 403
+    assert logged_out.status_code == 200, logged_out.text
+    assert logged_out.json() == {"agent": "antigravity", "auth_state": "unauthenticated"}
+    assert [method for method, _path, _body in seen] == ["POST"]
+
+
 def test_cancel_active_agent_auth_proxy_is_admin_origin_protected_and_safe(
     client: TestClient,
     db: Session,

@@ -30,6 +30,8 @@ from app.body_analysis.admin_config.models import (
 from app.body_analysis.admin_config.schemas import (
     AgentServiceAuthActiveCancellationResponse,
     AgentServiceAuthInputRequest,
+    AgentServiceAuthLogoutRequest,
+    AgentServiceAuthLogoutResponse,
     AgentServiceAuthSessionResponse,
     AgentServiceAuthStartRequest,
     AgentServiceCapabilitiesResponse,
@@ -919,6 +921,29 @@ async def cancel_active_agent_service_auth(
     )
     try:
         return AgentServiceAuthActiveCancellationResponse.model_validate(response_payload)
+    except ValidationError as error:
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+        ) from error
+
+
+async def logout_agent_service_auth(
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+    payload: AgentServiceAuthLogoutRequest,
+) -> AgentServiceAuthLogoutResponse:
+    response_payload = await _agent_service_json(
+        client,
+        settings=settings,
+        method="POST",
+        path="/v1/auth/logout",
+        json_body={"agent": payload.agent.value},
+        preserve_auth_errors=True,
+    )
+    try:
+        return AgentServiceAuthLogoutResponse.model_validate(response_payload)
     except ValidationError as error:
         raise AIProviderError(
             ProviderErrorCode.MALFORMED_RESPONSE,

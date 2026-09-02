@@ -11,6 +11,7 @@ from typing import Any, cast
 
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
+from ..auth.adapters.antigravity import AntigravityAuthAdapter
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
 from ..profiles import (
     AgentModelProfile,
@@ -88,6 +89,7 @@ class AntigravityRunner(AgentRunner):
         self.shared_media_root = shared_media_root
         self.proxy_runtime = proxy_runtime or ProxyRuntime()
         self.log_root = log_root
+        self._auth_adapter = AntigravityAuthAdapter(self.executable)
         self._profiles_cache: tuple[AgentModelProfile, ...] = ()
         self._profiles_cached_at = 0.0
         self._metadata = CliMetadataProbe(
@@ -152,7 +154,7 @@ class AntigravityRunner(AgentRunner):
         return self._profiles_cache
 
     async def probe_auth_state(self) -> AuthState:
-        return AuthState.UNKNOWN
+        return self._auth_adapter.probe_auth_state(self._subprocess_environment())
 
     def _is_installed(self) -> bool:
         executable = Path(self.executable)

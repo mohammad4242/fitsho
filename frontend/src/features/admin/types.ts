@@ -297,6 +297,11 @@ export type AdminAiAgentAuthCancellation = {
   canceled: boolean;
 };
 
+export type AdminAiAgentAuthLogout = {
+  agent: AdminAiAgentName;
+  auth_state: "unauthenticated";
+};
+
 export type AdminAiCredentialStatus = {
   configured: boolean;
   masked: string | null;

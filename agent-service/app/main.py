@@ -17,6 +17,8 @@ from .auth.manager import AuthManager, AuthManagerError
 from .auth.schemas import (
     AuthActiveCancellationResponse,
     AuthInputRequest,
+    AuthLogoutRequest,
+    AuthLogoutResponse,
     AuthSessionView,
     AuthStartRequest,
 )
@@ -31,16 +33,17 @@ from .schemas import (
     AgentGenerationInput,
     AgentGenerationOutput,
     AgentName,
+    AuthState,
     CapabilitiesResponse,
     ErrorCode,
     ErrorDetail,
     ErrorEnvelope,
-    ProxyRuntimeStatus as ProxyRuntimeStatusSchema,
     ProxyRuntimeUpdate,
     StoredImageGenerationInput,
     TestOutput,
     TestRequest,
 )
+from .schemas import ProxyRuntimeStatus as ProxyRuntimeStatusSchema
 from .security import require_internal_auth
 from .service import AgentService
 from .workspace import WorkspaceLimits
@@ -64,7 +67,10 @@ def create_app(
             AgentName.ANTIGRAVITY: AntigravityAuthAdapter(
                 effective_settings.agent_antigravity_executable
             ),
-            AgentName.CODEX: CodexAuthAdapter(effective_settings.agent_codex_executable),
+            AgentName.CODEX: CodexAuthAdapter(
+                effective_settings.agent_codex_executable,
+                workspace=Path(effective_settings.agent_workspace_root),
+            ),
             AgentName.CLAUDE: ClaudeAuthAdapter(effective_settings.agent_claude_executable),
         },
         workspace=Path(effective_settings.agent_workspace_root),
@@ -289,6 +295,20 @@ def create_app(
         request.state.task_kind = "auth"
         canceled = await effective_auth_manager.cancel_active(payload.agent)
         return AuthActiveCancellationResponse(agent=payload.agent, canceled=canceled)
+
+    @app.post("/v1/auth/logout", response_model=AuthLogoutResponse)
+    async def auth_logout(
+        request: Request,
+        payload: AuthLogoutRequest,
+        _: None = Depends(require_internal_auth),
+    ) -> AuthLogoutResponse:
+        request.state.agent = payload.agent.value
+        request.state.task_kind = "auth"
+        await effective_auth_manager.logout(payload.agent)
+        return AuthLogoutResponse(
+            agent=payload.agent,
+            auth_state=AuthState.UNAUTHENTICATED,
+        )
 
     @app.get("/v1/auth/{session_id}", response_model=AuthSessionView)
     async def auth_status(

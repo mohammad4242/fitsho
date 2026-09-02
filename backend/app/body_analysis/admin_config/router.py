@@ -15,6 +15,8 @@ from app.body_analysis.admin_config.models import AIAgentProfileVerification
 from app.body_analysis.admin_config.schemas import (
     AgentServiceAuthActiveCancellationResponse,
     AgentServiceAuthInputRequest,
+    AgentServiceAuthLogoutRequest,
+    AgentServiceAuthLogoutResponse,
     AgentServiceAuthSessionResponse,
     AgentServiceAuthStartRequest,
     AgentServiceCapabilitiesResponse,
@@ -44,6 +46,7 @@ from app.body_analysis.admin_config.service import (
     get_credential,
     list_models,
     list_task_configs,
+    logout_agent_service_auth,
     refresh_model_catalog,
     save_agent_service_proxy,
     save_task_config,
@@ -389,6 +392,30 @@ async def start_agent_authentication(
 ) -> AgentServiceAuthSessionResponse:
     try:
         return await start_agent_service_auth(
+            client=_agent_client(request),
+            settings=settings,
+            payload=payload,
+        )
+    except AIConfigError as error:
+        raise _agent_not_configured(error) from None
+    except AgentServiceAuthError as error:
+        raise _agent_auth_error(error) from None
+    except AIProviderError as error:
+        raise _agent_provider_error(error) from None
+
+
+@router.post(
+    "/agent-service/auth/logout",
+    response_model=AgentServiceAuthLogoutResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def logout_agent_authentication(
+    payload: AgentServiceAuthLogoutRequest,
+    request: Request,
+    settings: AppSettings,
+) -> AgentServiceAuthLogoutResponse:
+    try:
+        return await logout_agent_service_auth(
             client=_agent_client(request),
             settings=settings,
             payload=payload,

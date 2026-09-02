@@ -375,6 +375,19 @@ class AgentServiceAuthActiveCancellationResponse(BaseModel):
     canceled: bool
 
 
+class AgentServiceAuthLogoutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AIAgentName
+
+
+class AgentServiceAuthLogoutResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AIAgentName
+    auth_state: Literal["unauthenticated"]
+
+
 class AgentServiceAuthInputRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -1,9 +1,11 @@
+import json
 import os
 import re
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 
-from ...schemas import AgentName
+from ...schemas import AgentName, AuthState
 from ..base import AuthCommand, ParsedAuthUpdate
 from ..schemas import AuthInputLabel, AuthSafeErrorMessage, AuthSessionStatus
 from . import parse_browser_handoff
@@ -46,6 +48,50 @@ class AntigravityAuthAdapter:
     def auth_path(self, environment: Mapping[str, str]) -> Path:
         home = environment.get("HOME")
         return Path(home or ".") / self._AUTH_RELATIVE_PATH
+
+    def probe_auth_state(self, environment: Mapping[str, str]) -> AuthState:
+        """Validate AGY's persisted OAuth record without mutating it.
+
+        AGY 1.1.22 has no login-status command. A missing file means logout;
+        an unreadable or malformed record is an unknown probe result so it is
+        never treated as a reason to delete credentials.
+        """
+
+        if not environment.get("HOME"):
+            return AuthState.UNKNOWN
+        try:
+            payload = json.loads(self.auth_path(environment).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return AuthState.UNAUTHENTICATED
+        except (OSError, TypeError, ValueError):
+            return AuthState.UNKNOWN
+        if not isinstance(payload, dict):
+            return AuthState.UNKNOWN
+        auth_method = payload.get("auth_method")
+        token = payload.get("token")
+        if not isinstance(auth_method, str) or not auth_method.strip():
+            return AuthState.UNKNOWN
+        if not isinstance(token, dict):
+            return AuthState.UNKNOWN
+        required_fields = ("access_token", "expiry", "refresh_token", "token_type")
+        if any(not isinstance(token.get(field), str) for field in required_fields):
+            return AuthState.UNKNOWN
+        access_token = token["access_token"]
+        expiry = token["expiry"]
+        refresh_token = token["refresh_token"]
+        token_type = token["token_type"]
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (access_token, expiry, refresh_token, token_type)
+        ):
+            return AuthState.UNKNOWN
+        try:
+            parsed_expiry = datetime.fromisoformat(expiry.replace("Z", "+00:00"))
+        except ValueError:
+            return AuthState.UNKNOWN
+        if parsed_expiry.tzinfo is None:
+            return AuthState.UNKNOWN
+        return AuthState.AUTHENTICATED
 
     def backup_path(self, environment: Mapping[str, str]) -> Path:
         return self.auth_path(environment).with_name(self._BACKUP_NAME)
@@ -110,7 +156,7 @@ class AntigravityAuthAdapter:
         return (stat.st_ino, stat.st_mtime_ns, stat.st_size)
 
     def has_saved_credentials(self, environment: Mapping[str, str]) -> bool:
-        return self.saved_credentials_marker(environment) is not None
+        return self.probe_auth_state(environment) is AuthState.AUTHENTICATED
 
     def parse_output(self, text: str) -> ParsedAuthUpdate:
         if _OAUTH_FAILURE_PATTERN.search(text):

@@ -10,6 +10,7 @@ import {
   getAdminAiTaskConfigs,
   getAdminAiTaskModels,
   getAdminAiAgentServiceCapabilities,
+  logoutAdminAiAgentAuth,
   refreshAdminAiModels,
   saveAdminAiTaskConfig,
   testAdminAiAgentTask,
@@ -31,6 +32,7 @@ import type {
 import "./admin.css";
 
 type AiSettingsOperation = "save" | "test" | "refresh";
+type AgentAuthDialogState = { agent: AdminAiAgentName; forceReauth: boolean };
 
 const agentTasks: AdminAiTaskType[] = [
   "workout_plan_generation",
@@ -48,7 +50,7 @@ export function AdminAiSettingsPage() {
   const [agentCapabilities, setAgentCapabilities] = useState<AdminAiAgentRunnerCapability[]>([]);
   const [agentCapabilitiesLoading, setAgentCapabilitiesLoading] = useState(false);
   const [agentCapabilitiesError, setAgentCapabilitiesError] = useState(false);
-  const [authAgent, setAuthAgent] = useState<AdminAiAgentName | null>(null);
+  const [authAgent, setAuthAgent] = useState<AgentAuthDialogState | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [configsLoading, setConfigsLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -141,6 +143,12 @@ export function AdminAiSettingsPage() {
           && taskEpoch.current === epochAtStart
         ) setAgentCapabilitiesLoading(false);
       });
+  }
+
+  function handleAgentLogout(agent: AdminAiAgentName) {
+    void logoutAdminAiAgentAuth(agent)
+      .then(() => loadAgentCapabilities())
+      .catch(() => setError(t("admin.aiSettings.connectionFailed")));
   }
 
   useEffect(() => {
@@ -448,7 +456,9 @@ export function AdminAiSettingsPage() {
             selectedModelId={config.agent_model_id}
             selectedModelLabel={selectedProfile?.display_name ?? config.agent_model_id}
             onSelectAgent={(agent) => patchConfig({ agent_name: agent, agent_model_id: null, agent_profile_id: null })}
-            onAuthenticate={setAuthAgent}
+            onAuthenticate={(agent) => setAuthAgent({ agent, forceReauth: false })}
+            onReauthenticate={(agent) => setAuthAgent({ agent, forceReauth: true })}
+            onLogout={handleAgentLogout}
             onTest={handleConnectionTest}
             testDisabled={busy !== null || !targetAgentIsReady(config)}
           />}
@@ -518,7 +528,8 @@ export function AdminAiSettingsPage() {
         <div className="admin-ai-settings-actions"><button type="submit" disabled={busy !== null || (agentMode && config.enabled && selectedProfile?.verification_status !== "passed")}>{t("admin.aiSettings.save")}</button><button type="button" disabled={busy !== null} onClick={handleDisable}>{t("admin.aiSettings.disable")}</button></div>
       </form>
       {authAgent && <AgentAuthDialog
-        agent={authAgent}
+        agent={authAgent.agent}
+        forceReauth={authAgent.forceReauth}
         onClose={() => setAuthAgent(null)}
         onAuthenticated={loadAgentCapabilities}
       />}

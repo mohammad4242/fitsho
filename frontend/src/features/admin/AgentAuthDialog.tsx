@@ -51,11 +51,17 @@ const errorKeys: Record<string, string> = {
 
 export type AgentAuthDialogProps = {
   agent: AdminAiAgentName;
+  forceReauth?: boolean;
   onClose: () => void;
   onAuthenticated: () => void;
 };
 
-export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDialogProps) {
+export function AgentAuthDialog({
+  agent,
+  forceReauth = false,
+  onClose,
+  onAuthenticated,
+}: AgentAuthDialogProps) {
   const { t } = useTranslation();
   const [session, setSession] = useState<AdminAiAgentAuthSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -148,7 +154,7 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
     const start = async () => {
       const responseId = ++requestVersion.current;
       try {
-        const next = agent === "antigravity"
+        const next = forceReauth
           ? await startAdminAiAgentAuth(agent, { forceReauth: true })
           : await startAdminAiAgentAuth(agent);
         if (!isCurrent()) {
@@ -181,7 +187,7 @@ export function AgentAuthDialog({ agent, onClose, onAuthenticated }: AgentAuthDi
         void cancelAdminAiAgentAuthSession(current.session_id).catch(() => undefined);
       }
     };
-  }, [agent, applySession, clearTimer, t]);
+  }, [agent, applySession, clearTimer, forceReauth, t]);
 
   const safeUrl = session ? getSafeVerificationUrl(agent, session.verification_url) : null;
   const status = session?.status ?? null;

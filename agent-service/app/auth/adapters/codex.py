@@ -2,7 +2,8 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 
-from ...schemas import AgentName
+from ...process import ProcessExecutionError, ProcessTimeoutError, run_process
+from ...schemas import AgentName, AuthState
 from ..base import AuthCommand, ParsedAuthUpdate
 from ..schemas import AuthSessionStatus
 from . import CODEX_AUTH_HOSTS, parse_browser_handoff
@@ -14,8 +15,30 @@ class CodexAuthAdapter:
     _AUTH_RELATIVE_PATH = Path(".codex") / "auth.json"
     _BACKUP_NAME = ".auth.json.fitsho-backup"
 
-    def __init__(self, executable: str = "codex") -> None:
+    def __init__(self, executable: str = "codex", *, workspace: Path | None = None) -> None:
         self.executable = executable
+        self.workspace = workspace
+
+    async def probe_auth_state(self, environment: Mapping[str, str]) -> AuthState:
+        if self.workspace is None:
+            return AuthState.UNKNOWN
+        try:
+            self.workspace.mkdir(parents=True, exist_ok=True, mode=0o700)
+            result = await run_process(
+                [self.executable, "login", "status"],
+                workspace=self.workspace,
+                timeout_seconds=3,
+                env=environment,
+                inherit_environment=False,
+            )
+        except (OSError, ProcessExecutionError, ProcessTimeoutError, RuntimeError, ValueError):
+            return AuthState.UNKNOWN
+        text = (result.stdout + "\n" + result.stderr).lower()
+        if result.returncode == 0:
+            return AuthState.AUTHENTICATED
+        if "not logged in" in text or "not authenticated" in text:
+            return AuthState.UNAUTHENTICATED
+        return AuthState.UNKNOWN
 
     def command(self) -> AuthCommand:
         return AuthCommand(

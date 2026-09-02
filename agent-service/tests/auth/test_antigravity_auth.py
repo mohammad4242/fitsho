@@ -1,7 +1,29 @@
+import json
 from pathlib import Path
 
 from app.auth.adapters.antigravity import AntigravityAuthAdapter
 from app.auth.schemas import AuthInputLabel, AuthSessionStatus
+from app.schemas import AuthState
+
+
+def _write_valid_token(home: Path) -> Path:
+    token_path = home / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
+    token_path.parent.mkdir(parents=True)
+    token_path.write_text(
+        json.dumps(
+            {
+                "auth_method": "oauth",
+                "token": {
+                    "access_token": "access-token",
+                    "expiry": "2099-01-01T00:00:00Z",
+                    "refresh_token": "refresh-token",
+                    "token_type": "Bearer",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return token_path
 
 
 def test_antigravity_uses_hidden_remote_browser_auth_flow() -> None:
@@ -21,9 +43,7 @@ def test_antigravity_uses_hidden_remote_browser_auth_flow() -> None:
 def test_antigravity_clears_only_its_saved_oauth_token_for_reauthentication(
     tmp_path: Path,
 ) -> None:
-    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
-    token_path.parent.mkdir(parents=True)
-    token_path.write_text("credential", encoding="utf-8")
+    token_path = _write_valid_token(tmp_path)
     unrelated = tmp_path / "unrelated.txt"
     unrelated.write_text("keep", encoding="utf-8")
 
@@ -38,14 +58,25 @@ def test_antigravity_reports_non_empty_saved_oauth_credentials(tmp_path: Path) -
 
     assert adapter.has_saved_credentials({"HOME": str(tmp_path)}) is False
 
-    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
-    token_path.parent.mkdir(parents=True)
-    token_path.write_text("credential", encoding="utf-8")
+    token_path = _write_valid_token(tmp_path)
     assert adapter.has_saved_credentials({"HOME": str(tmp_path)}) is True
     marker = adapter.saved_credentials_marker({"HOME": str(tmp_path)})
     assert marker is not None
 
-    token_path.write_text("updated-credential", encoding="utf-8")
+    token_path.write_text(
+        json.dumps(
+            {
+                "auth_method": "oauth",
+                "token": {
+                    "access_token": "updated-access-token",
+                    "expiry": "2099-01-01T00:00:00Z",
+                    "refresh_token": "updated-refresh-token",
+                    "token_type": "Bearer",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     assert adapter.saved_credentials_marker({"HOME": str(tmp_path)}) != marker
 
     token_path.write_text("", encoding="utf-8")
@@ -57,15 +88,13 @@ def test_antigravity_preserves_saved_credentials_across_interrupted_login(
 ) -> None:
     adapter = AntigravityAuthAdapter()
     environment = {"HOME": str(tmp_path)}
-    token_path = tmp_path / ".gemini" / "antigravity-cli" / "antigravity-oauth-token"
-    token_path.parent.mkdir(parents=True)
-    token_path.write_text("keep", encoding="utf-8")
+    token_path = _write_valid_token(tmp_path)
 
     adapter.backup_saved_credentials(environment)
     token_path.unlink()
     adapter.restore_saved_credentials(environment)
 
-    assert token_path.read_text(encoding="utf-8") == "keep"
+    assert json.loads(token_path.read_text(encoding="utf-8"))["auth_method"] == "oauth"
     adapter.finalize_saved_credentials(environment)
     assert not adapter.backup_path(environment).exists()
 
@@ -84,6 +113,39 @@ def test_antigravity_parser_exposes_only_google_url_and_code_prompt() -> None:
     assert handoff.input_label == AuthInputLabel.AUTHORIZATION_CODE.value
     assert handoff.user_code is None
     assert "private" not in repr(handoff)
+
+
+def test_antigravity_status_probe_survives_a_new_adapter_with_persistent_home(
+    tmp_path: Path,
+) -> None:
+    environment = {"HOME": str(tmp_path)}
+    adapter = AntigravityAuthAdapter()
+
+    assert adapter.probe_auth_state(environment) is AuthState.UNAUTHENTICATED
+    _write_valid_token(tmp_path)
+    assert adapter.probe_auth_state(environment) is AuthState.AUTHENTICATED
+    assert AntigravityAuthAdapter().probe_auth_state(environment) is AuthState.AUTHENTICATED
+
+
+def test_antigravity_status_probe_distinguishes_malformed_credentials_from_logout(
+    tmp_path: Path,
+) -> None:
+    token_path = _write_valid_token(tmp_path)
+    token_path.write_text("not-json", encoding="utf-8")
+
+    assert AntigravityAuthAdapter().probe_auth_state({"HOME": str(tmp_path)}) is AuthState.UNKNOWN
+
+
+def test_antigravity_status_probe_rejects_invalid_expiry_without_deleting_token(
+    tmp_path: Path,
+) -> None:
+    token_path = _write_valid_token(tmp_path)
+    payload = json.loads(token_path.read_text(encoding="utf-8"))
+    payload["token"]["expiry"] = "invalid"
+    token_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert AntigravityAuthAdapter().probe_auth_state({"HOME": str(tmp_path)}) is AuthState.UNKNOWN
+    assert token_path.exists()
 
 
 def test_antigravity_parser_strips_terminal_hyperlink_controls_from_url() -> None:

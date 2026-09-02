@@ -154,6 +154,27 @@ def test_successful_test_marks_runner_authenticated_without_model_quota_probe(
     assert capabilities.json()["runners"][0]["auth_state"] == "authenticated"
 
 
+def test_auth_probe_error_is_exposed_as_unknown_instead_of_stale_unauthenticated(
+    tmp_path: Path,
+) -> None:
+    class ProbeUnknownRunner(FakeRunner):
+        async def probe_auth_state(self) -> AuthState:
+            return AuthState.UNKNOWN
+
+    settings = Settings(agent_service_token=SecretStr(TOKEN), agent_workspace_root=tmp_path)
+    runner = ProbeUnknownRunner()
+    registry = RunnerRegistry([runner])
+    registry.set_auth_state(AgentName.ANTIGRAVITY, AuthState.UNAUTHENTICATED)
+    client = TestClient(create_app(settings, registry=registry))
+
+    capabilities = client.get(
+        "/v1/capabilities", headers={"Authorization": f"Bearer {TOKEN}"}
+    )
+
+    assert capabilities.status_code == 200
+    assert capabilities.json()["runners"][0]["auth_state"] == "unknown"
+
+
 def test_unauthorized_test_marks_runner_unauthenticated(tmp_path: Path) -> None:
     class UnauthorizedRunner(FakeRunner):
         async def run(self, request: RunnerRequest) -> RunnerResult:

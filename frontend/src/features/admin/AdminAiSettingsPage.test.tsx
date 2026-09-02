@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   getAdminAiTaskConfigs: vi.fn(),
   getAdminAiTaskModels: vi.fn(),
   getAdminAiAgentServiceCapabilities: vi.fn(),
+  logoutAdminAiAgentAuth: vi.fn(),
   getAdminAiAgentServiceProxy: vi.fn(),
   startAdminAiAgentAuth: vi.fn(),
   getAdminAiAgentAuthSession: vi.fn(),

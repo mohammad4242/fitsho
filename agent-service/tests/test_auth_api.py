@@ -2,7 +2,7 @@ import asyncio
 import sys
 from collections.abc import Coroutine
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -28,6 +28,7 @@ class FakeAuthAdapter:
 
     def __init__(self, script: Path) -> None:
         self.script = script
+        self.clear_calls: list[dict[str, str]] = []
 
     def command(self) -> AuthCommand:
         return AuthCommand(sys.executable, (str(self.script),), use_pty=False)
@@ -46,6 +47,9 @@ class FakeAuthAdapter:
     def classify_exit(self, returncode: int, final_text: str) -> AuthSessionStatus:
         del final_text
         return AuthSessionStatus.AUTHENTICATED if returncode == 0 else AuthSessionStatus.FAILED
+
+    def clear_saved_credentials(self, environment: dict[str, str]) -> None:
+        self.clear_calls.append(environment)
 
 
 class ManualOnlyAuthAdapter(FakeAuthAdapter):
@@ -79,6 +83,24 @@ def test_auth_routes_require_bearer_and_reject_unknown_agent(tmp_path: Path) -> 
         )
         assert response.status_code == 422
         assert "unknown" not in response.text
+    finally:
+        run(manager.shutdown())
+
+
+def test_explicit_logout_clears_credentials_and_returns_unauthenticated_state(
+    tmp_path: Path,
+) -> None:
+    client, manager = make_client(tmp_path)
+    try:
+        response = client.post(
+            "/v1/auth/logout",
+            headers={"Authorization": f"Bearer {TOKEN}"},
+            json={"agent": "codex"},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"agent": "codex", "auth_state": "unauthenticated"}
+        adapter = manager.adapters[AgentName.CODEX]
+        assert cast(Any, adapter).clear_calls == [{"PATH": "/usr/bin"}]
     finally:
         run(manager.shutdown())
 

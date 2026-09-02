@@ -19,6 +19,7 @@ import type {
   AdminAiCatalogResponse,
   AdminAiAgentAuthSession,
   AdminAiAgentAuthCancellation,
+  AdminAiAgentAuthLogout,
   AdminAiAgentName,
   AdminAiAgentServiceProxy,
   AdminAiAgentServiceProxyUpdate,
@@ -466,6 +467,18 @@ export function cancelAdminAiAgentAuthActive(
 ): Promise<AdminAiAgentAuthCancellation> {
   return request<AdminAiAgentAuthCancellation>(
     "/api/v1/admin/ai/agent-service/auth/cancel-active",
+    {
+      method: "POST",
+      body: JSON.stringify({ agent }),
+    },
+  );
+}
+
+export function logoutAdminAiAgentAuth(
+  agent: AdminAiAgentName,
+): Promise<AdminAiAgentAuthLogout> {
+  return request<AdminAiAgentAuthLogout>(
+    "/api/v1/admin/ai/agent-service/auth/logout",
     {
       method: "POST",
       body: JSON.stringify({ agent }),
