@@ -524,11 +524,17 @@ def test_run_classifies_provider_error_written_only_to_cli_log(
 
     async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
         del command, kwargs
-        (log_root / "cli-current.log").write_text(
+        current_log = log_root / "cli-current.log"
+        other_log = log_root / "cli-other.log"
+        current_log.write_text(
             "calling model: FAILED_PRECONDITION (code 400): "
             "User location is not supported for the API use.",
             encoding="utf-8",
         )
+        other_log.write_text("background diagnostics", encoding="utf-8")
+        same_mtime_ns = 1_900_000_000_000_000_000
+        os.utime(current_log, ns=(same_mtime_ns, same_mtime_ns))
+        os.utime(other_log, ns=(same_mtime_ns, same_mtime_ns))
         return ProcessResult(
             1,
             json.dumps({"status": "ERROR", "response": ""}),

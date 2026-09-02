@@ -319,7 +319,7 @@ class AntigravityRunner(AgentRunner):
             return ""
 
         diagnostics: list[str] = []
-        for _, path in sorted(changed_logs, reverse=True)[:3]:
+        for _, path in sorted(changed_logs, key=lambda item: item[0], reverse=True)[:3]:
             try:
                 diagnostics.append(path.read_bytes()[-65_536:].decode(errors="replace"))
             except OSError:
