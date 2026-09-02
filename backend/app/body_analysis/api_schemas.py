@@ -67,15 +67,15 @@ class BodyAnalysisExperienceIndicator(BaseModel):
     status: str
     message_key: str
     parameters: dict[str, object] = Field(default_factory=dict)
+    score_percent: int | None = Field(default=None, ge=0, le=100)
 
 
 class BodyAnalysisExperienceIndicators(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    body_proportion: BodyAnalysisExperienceIndicator
     upper_lower_balance: BodyAnalysisExperienceIndicator
     visible_symmetry: BodyAnalysisExperienceIndicator
-    current_development_focus: BodyAnalysisExperienceIndicator
+    body_shape: BodyAnalysisExperienceIndicator
 
 
 class BodyAnalysisExperienceRegion(BaseModel):
@@ -98,7 +98,7 @@ class BodyAnalysisExperienceV4(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: Literal["4.0"]
-    presentation_version: Literal["body-analysis-experience-v1"]
+    presentation_version: Literal["body-analysis-experience-v2"]
     assessment_status: Literal["complete", "partial"]
     input_snapshot: BodyAnalysisInputSnapshotResponse
     first_impression: BodyAnalysisExperienceMessage

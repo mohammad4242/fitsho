@@ -152,8 +152,16 @@ def test_v4_analysis_result_exposes_deterministic_experience_read_model(
     assert payload["visual_result"] is None
     assert payload["experience_result"]["schema_version"] == "4.0"
     assert payload["experience_result"]["presentation_version"] == (
-        "body-analysis-experience-v1"
+        "body-analysis-experience-v2"
     )
+    assert set(payload["experience_result"]["indicators"]) == {
+        "upper_lower_balance",
+        "visible_symmetry",
+        "body_shape",
+    }
+    assert payload["experience_result"]["indicators"]["upper_lower_balance"]["score_percent"] == 90
+    assert payload["experience_result"]["indicators"]["visible_symmetry"]["score_percent"] == 90
+    assert payload["experience_result"]["indicators"]["body_shape"]["score_percent"] == 85
     assert len(payload["experience_result"]["regions"]) == 11
     assert "raw_result" not in result.text
 
