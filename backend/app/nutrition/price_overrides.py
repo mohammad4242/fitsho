@@ -111,6 +111,7 @@ def create_price_override(
     admin_user_id: UUID,
     payload: FoodPriceOverrideInput,
     created_at: datetime | None = None,
+    commit: bool = True,
 ) -> NutritionFoodPriceOverride:
     timestamp = created_at or datetime.now(UTC)
     active = db.scalars(
@@ -132,6 +133,9 @@ def create_price_override(
         active=True,
     )
     db.add(override)
-    db.commit()
-    db.refresh(override)
+    if commit:
+        db.commit()
+        db.refresh(override)
+    else:
+        db.flush()
     return override

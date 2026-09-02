@@ -158,6 +158,7 @@ def test_planner_includes_unit_and_liter_priced_foods_with_audited_conversion(db
     from app.auth.models import User
     from app.nutrition.models import NutritionCatalogueFood, NutritionFoodPriceOverride
     from app.nutrition.plan_service import _planner_foods
+    from app.nutrition.planner_policy import PLANNER_VERSION
 
     prices = {
         "egg": ("21000", "TOMAN_PER_UNIT"),
@@ -204,3 +205,4 @@ def test_planner_includes_unit_and_liter_priced_foods_with_audited_conversion(db
     assert candidates_by_slug["egg"].price_irr_per_gram == Decimal("4200")
     assert snapshots_by_slug["egg"]["canonical_unit"] == "TOMAN_PER_UNIT"
     assert snapshots_by_slug["egg"]["grams_per_price_unit"] == "50"
+    assert PLANNER_VERSION == "deterministic-heuristic-v2"

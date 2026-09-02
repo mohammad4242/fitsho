@@ -14,6 +14,12 @@ def _user(db, *, email: str, is_admin: bool):
     return user
 
 
+def _seed_approved_catalogue(db) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+
+    seed_base_iranian_food_catalogue(db, commit=False)
+
+
 def test_snapshot_has_exact_approved_food_set_and_valid_values() -> None:
     from app.nutrition.approved_price_snapshot import (
         APPROVED_PRICE_SNAPSHOT,
@@ -35,7 +41,9 @@ def test_snapshot_has_exact_approved_food_set_and_valid_values() -> None:
     assert report.invalid_prices == ()
     assert report.invalid_units == ()
     assert report.missing_price_mass_conversions == ()
-    assert all(isinstance(entry.reference_price_toman, Decimal) for entry in APPROVED_PRICE_SNAPSHOT)
+    assert all(
+        isinstance(entry.reference_price_toman, Decimal) for entry in APPROVED_PRICE_SNAPSHOT
+    )
     assert all(entry.reference_price_toman > Decimal("0") for entry in APPROVED_PRICE_SNAPSHOT)
     assert {
         entry.canonical_unit for entry in APPROVED_PRICE_SNAPSHOT
@@ -64,6 +72,7 @@ def test_apply_creates_one_manual_override_for_each_verified_food(db) -> None:
     from app.nutrition.approved_price_snapshot import apply_approved_price_snapshot
     from app.nutrition.models import NutritionFoodPriceOverride
 
+    _seed_approved_catalogue(db)
     _user(db, email="snapshot-admin@example.com", is_admin=True)
 
     result = apply_approved_price_snapshot(db, admin_email="snapshot-admin@example.com")
@@ -85,6 +94,7 @@ def test_apply_preserves_automatic_reference_and_price_history(db) -> None:
         NutritionFoodPriceReference,
     )
 
+    _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-preserve-admin@example.com", is_admin=True)
     food = db.scalar(
         select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg")
@@ -125,6 +135,7 @@ def test_apply_replaces_previous_override_without_deleting_it(db) -> None:
     from app.nutrition.approved_price_snapshot import apply_approved_price_snapshot
     from app.nutrition.models import NutritionCatalogueFood, NutritionFoodPriceOverride
 
+    _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-replace-admin@example.com", is_admin=True)
     food = db.scalar(
         select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg")
@@ -166,6 +177,7 @@ def test_apply_is_idempotent_for_same_snapshot_version(db) -> None:
     from app.nutrition.approved_price_snapshot import apply_approved_price_snapshot
     from app.nutrition.models import NutritionFoodPriceOverride
 
+    _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-idempotent-admin@example.com", is_admin=True)
 
     first = apply_approved_price_snapshot(db, admin_email=admin.email)
@@ -189,6 +201,7 @@ def test_apply_missing_catalogue_food_fails_before_any_partial_override(db) -> N
     from app.nutrition.enums import FoodVerificationStatus
     from app.nutrition.models import NutritionCatalogueFood, NutritionFoodPriceOverride
 
+    _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-missing-admin@example.com", is_admin=True)
     food = db.scalar(
         select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "melon")
@@ -210,6 +223,7 @@ def test_apply_rejects_non_admin_user_without_mutation(db) -> None:
     )
     from app.nutrition.models import NutritionFoodPriceOverride
 
+    _seed_approved_catalogue(db)
     member = _user(db, email="snapshot-member@example.com", is_admin=False)
 
     with pytest.raises(ApprovedPriceSnapshotAdminError, match="admin"):
@@ -221,6 +235,7 @@ def test_apply_rejects_non_admin_user_without_mutation(db) -> None:
 def test_apply_resolves_exactly_one_admin_when_email_is_omitted(db) -> None:
     from app.nutrition.approved_price_snapshot import apply_approved_price_snapshot
 
+    _seed_approved_catalogue(db)
     _user(db, email="only-snapshot-admin@example.com", is_admin=True)
 
     result = apply_approved_price_snapshot(db)
@@ -236,6 +251,7 @@ def test_after_apply_all_snapshot_foods_have_effective_prices(db) -> None:
     from app.nutrition.models import NutritionCatalogueFood
     from app.nutrition.price_overrides import effective_prices
 
+    _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-effective-admin@example.com", is_admin=True)
     apply_approved_price_snapshot(db, admin_email=admin.email)
     foods = db.scalars(
@@ -255,6 +271,7 @@ def test_applied_snapshot_keeps_non_kg_units_and_planner_mass_audit(db) -> None:
     from app.nutrition.approved_price_snapshot import apply_approved_price_snapshot
     from app.nutrition.plan_service import _planner_foods
 
+    _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-planner-admin@example.com", is_admin=True)
     apply_approved_price_snapshot(db, admin_email=admin.email)
 
@@ -268,13 +285,41 @@ def test_applied_snapshot_keeps_non_kg_units_and_planner_mass_audit(db) -> None:
 
     expected = {
         "egg": (Decimal("4200"), "TOMAN_PER_UNIT", "50"),
-        "sangak-bread": (Decimal("15500") * Decimal("10") / Decimal("600"), "TOMAN_PER_UNIT", "600"),
-        "barbari-bread": (Decimal("10000") * Decimal("10") / Decimal("550"), "TOMAN_PER_UNIT", "550"),
-        "lavash-bread": (Decimal("2700") * Decimal("10") / Decimal("130"), "TOMAN_PER_UNIT", "130"),
-        "taftoon-bread": (Decimal("4500") * Decimal("10") / Decimal("320"), "TOMAN_PER_UNIT", "320"),
-        "milk": (Decimal("120000") * Decimal("10") / Decimal("1030"), "TOMAN_PER_LITER", "1030"),
-        "olive-oil": (Decimal("1400000") * Decimal("10") / Decimal("913"), "TOMAN_PER_LITER", "913"),
-        "vegetable-oil": (Decimal("410000") * Decimal("10") / Decimal("920"), "TOMAN_PER_LITER", "920"),
+        "sangak-bread": (
+            Decimal("15500") * Decimal("10") / Decimal("600"),
+            "TOMAN_PER_UNIT",
+            "600",
+        ),
+        "barbari-bread": (
+            Decimal("10000") * Decimal("10") / Decimal("550"),
+            "TOMAN_PER_UNIT",
+            "550",
+        ),
+        "lavash-bread": (
+            Decimal("2700") * Decimal("10") / Decimal("130"),
+            "TOMAN_PER_UNIT",
+            "130",
+        ),
+        "taftoon-bread": (
+            Decimal("4500") * Decimal("10") / Decimal("320"),
+            "TOMAN_PER_UNIT",
+            "320",
+        ),
+        "milk": (
+            Decimal("120000") * Decimal("10") / Decimal("1030"),
+            "TOMAN_PER_LITER",
+            "1030",
+        ),
+        "olive-oil": (
+            Decimal("1400000") * Decimal("10") / Decimal("913"),
+            "TOMAN_PER_LITER",
+            "913",
+        ),
+        "vegetable-oil": (
+            Decimal("410000") * Decimal("10") / Decimal("920"),
+            "TOMAN_PER_LITER",
+            "920",
+        ),
     }
     assert set(expected) <= candidates_by_slug.keys()
     for slug, (price, unit, grams) in expected.items():
