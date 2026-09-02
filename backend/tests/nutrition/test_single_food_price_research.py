@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import pytest
@@ -11,7 +12,10 @@ from app.body_analysis.providers.models import (
     StructuredGenerationRequest,
     StructuredGenerationResponse,
 )
-from app.nutrition.ai_price_research import AgentFoodPriceResearcher
+from app.nutrition.ai_price_research import (
+    AgentFoodPriceResearcher,
+    FoodPriceResearchFood,
+)
 from app.nutrition.enums import FoodVerificationStatus
 from app.nutrition.models import NutritionCatalogueFood, NutritionFoodPriceOverride
 from app.profile.enums import ProductMode
@@ -166,3 +170,31 @@ def test_research_single_food_success_and_apply(
     assert override.active is True
     assert override.created_by_user_id == admin.id
     assert override.canonical_unit == "TOMAN_PER_KG"
+
+
+def test_single_food_inquiry_can_stop_after_first_evidence_pass() -> None:
+    payload = {
+        "food_slug": "rice-for-inquiry",
+        "quotes": [_quote("store-a.ir", 120000)],
+    }
+    fake_provider = FakeStructuredProvider([payload])
+    researcher = AgentFoodPriceResearcher(
+        fake_provider,  # type: ignore[arg-type]
+        route=ModelRoute(primary_model="test-agent"),
+    )
+
+    result = asyncio.run(
+        researcher.research(
+            FoodPriceResearchFood(
+                slug="rice-for-inquiry",
+                name_fa="برنج هاشمی",
+                name_en="Hashemi Rice",
+                category="grains",
+            ),
+            expand_sources=False,
+        )
+    )
+
+    assert len(fake_provider.requests) == 1
+    assert result.expanded is False
+    assert len(result.evidence) == 1

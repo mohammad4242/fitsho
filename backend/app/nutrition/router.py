@@ -467,7 +467,7 @@ async def research_single_food_price(
         aliases=aliases,
     )
     try:
-        result = await researcher.research(research_food)
+        result = await researcher.research(research_food, expand_sources=False)
     except FoodPriceResearchError as error:
         return SingleFoodPriceResearchResponse(
             food_slug=food.slug,

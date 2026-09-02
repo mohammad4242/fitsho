@@ -8,8 +8,9 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from hashlib import sha256
+from secrets import token_hex
 from typing import Literal
-from urllib.parse import SplitResult, urlsplit, urlunsplit
+from urllib.parse import SplitResult, urlencode, urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -36,76 +37,40 @@ INITIAL_RESEARCH_SOURCES = 3
 
 FOOD_PRICE_RESEARCH_SYSTEM_PROMPT = """You are Fitsho's public Iranian food-price research agent.
 
-Use live web search/browser tools for this request.
-Do not answer from model memory.
+This is a bounded evidence task. Return only one JSON object matching the
+supplied response schema.
 
-Your only job is to collect current, publicly verifiable retail price evidence
-for the exact canonical food described in the input.
+Use live web search/browser tools, but only the browser tool for live research.
+Here the browser operation is the URL content tool, which accepts a `Url`
+argument. The input contains `food`, `search_url`, `requested_source_count`,
+and `excluded_domains`. If `input.excluded_domains` contains `torob.com`,
+return the input food slug with `quotes: []` and use no tool.
 
-Search the current Iranian retail market.
+Otherwise make at most one URL content call, exactly:
+`{"Url": input.search_url}`. Use `input.search_url` exactly; do not construct
+another URL. It is a compact public Torob JSON search endpoint beginning with
+`https://api.torob.com/v4/base-product/search/?`, already encoded for the
+canonical Persian food name. Inspect the returned JSON. The URL content tool
+saves its response to a file; call `view_file` exactly once on that returned
+file to inspect the complete response. Do not read chunks. Do not request
+offsets, pagination, scrolling, product or seller pages; do not inspect another
+domain or retry. The first response is the only web evidence. Return
+immediately after it. If the URL content/browser tool fails or is unavailable,
+return `quotes: []` immediately.
 
-Rules:
+From that response, return up to `requested_source_count` reliable product-card
+quotes for the exact food. For Torob JSON use `name1`, `price`, `price_text`,
+and `web_client_absolute_url`; make a relative product URL absolute with
+`https://torob.com`. Use at most one quote per independent domain. Preserve the
+exact product title, package quantity/unit, normal non-promotional price, any
+separate promotional price, explicit currency (`TOMAN` or `IRR`), and inspected
+public HTTPS product URL. Reject unrelated, prepared, bulk, bundled,
+ambiguous, or memory-based results. Do not answer from model memory.
 
-1. Return prices only from public HTTPS web pages that you actually inspected
-   during this request.
-
-2. Prefer reputable Iranian grocery retailers, supermarkets, marketplaces,
-   price-comparison services, and official/public market sources.
-
-3. Do not use AI-generated summaries, forum posts, social-media posts,
-   old articles, cached historical articles, or unsupported search snippets
-   as final price evidence.
-
-4. A search-result snippet alone is not sufficient when the underlying source
-   page can be inspected. Open and inspect the source page before returning it.
-
-5. Return at most one quote from each independent source domain.
-
-6. Never use any domain listed in input.excluded_domains.
-
-7. Find up to input.requested_source_count independent domains.
-
-8. The listed product must represent the same food described in input.food.
-   Reject unrelated foods, prepared dishes, materially different food forms,
-   wholesale/bulk listings, bundles, or ambiguous matches.
-
-9. For generic foods, ordinary consumer retail products from different brands
-   may be used when they represent the same underlying food form.
-
-10. Preserve the exact product title shown by the source.
-
-11. Preserve the package quantity and package unit shown by the source.
-    If a page explicitly gives a price per kilogram, per liter, or per item,
-    encode that as quantity 1 with the corresponding unit.
-
-12. Return the normal/current non-promotional retail price separately from any
-    promotional price.
-
-13. Do not silently substitute a promotional price for a normal price.
-    If no defensible normal/current retail price can be determined, skip that source.
-
-14. Currency must be explicitly identified as TOMAN or IRR.
-
-15. Return the canonical HTTPS URL of the inspected page.
-
-16. If a page only shows an ambiguous price range and there is no single
-    defensible product price, skip it.
-
-17. Do not invent, interpolate, estimate, average, or infer missing prices.
-
-18. Do not calculate the Fitsho reference price.
-
-19. Do not provide medical advice or personal data.
-
-20. If fewer reliable independent sources exist than requested, return only
-    the reliable sources you actually found.
-
-21. Keep searches focused and bounded. Perform at most 3 to 4 targeted search
-    queries or store page inspections. If after 3 to 4 searches no clear Iranian retail
-    price quote is found, stop searching and return quotes: [] immediately.
-    Never enter long or exhaustive search loops for rare, niche, or unlisted foods.
-
-Return only one JSON object matching the supplied response schema.
+Do not use Bing, Google, DuckDuckGo, `search_web`, Trawler, terminal, local
+workspace tools, or any other web/API tool. Do not calculate the Fitsho
+reference price. Do not invent, estimate, or average it. Do not provide medical
+advice or personal data.
 """
 
 _IRANIAN_MULTI_LABEL_SUFFIXES = {
@@ -303,6 +268,8 @@ def build_food_price_research_request(
     normalized_excluded_domains = sorted(
         {_canonical_excluded_domain(value) for value in excluded_domains}
     )
+    search_session = token_hex(16)
+    food_name_fa = food.name_fa.strip()
     input_payload = {
         "task": "research_current_iran_food_retail_prices",
         "as_of_date": (as_of_date or datetime.now(UTC).date()).isoformat(),
@@ -314,6 +281,24 @@ def build_food_price_research_request(
             "category": food.category,
             "aliases": list(food.aliases),
         },
+        "search_url": (
+            "https://api.torob.com/v4/base-product/search/?"
+            + urlencode(
+                {
+                    "page": 1,
+                    "sort": "popularity",
+                    "size": 3,
+                    "query": food_name_fa,
+                    "q": food_name_fa,
+                    "_landing_page": f"search_{food_name_fa}",
+                    "source": "next_desktop",
+                    "rank_offset": 0,
+                    "_bt__experiment": "sir23__a",
+                    "suid": search_session,
+                    "init_suid": search_session,
+                }
+            )
+        ),
         "requested_source_count": requested_source_count,
         "excluded_domains": normalized_excluded_domains,
     }
@@ -354,9 +339,7 @@ def median_band_indices(
     if centre <= 0:
         raise ValueError("Median must be positive")
     return tuple(
-        index
-        for index, value in enumerate(values)
-        if abs(value - centre) / centre <= fraction
+        index for index, value in enumerate(values) if abs(value - centre) / centre <= fraction
     )
 
 
@@ -438,7 +421,12 @@ class AgentFoodPriceResearcher:
         self.temperature = temperature
         self.max_output_tokens = max_output_tokens
 
-    async def research(self, food: FoodPriceResearchFood) -> AgentFoodPriceResearchResult:
+    async def research(
+        self,
+        food: FoodPriceResearchFood,
+        *,
+        expand_sources: bool = True,
+    ) -> AgentFoodPriceResearchResult:
         evidence: list[FoodPriceResearchEvidence] = []
         domains: set[str] = set()
         request_ids: list[str] = []
@@ -462,7 +450,7 @@ class AgentFoodPriceResearcher:
             expanded=False,
         )
 
-        if not evidence or self._has_trusted_initial_cluster(evidence):
+        if not evidence or self._has_trusted_initial_cluster(evidence) or not expand_sources:
             return AgentFoodPriceResearchResult(tuple(evidence), tuple(request_ids), False)
 
         additional_count = min(MAX_RESEARCH_SOURCES - len(domains), MAX_RESEARCH_SOURCES)

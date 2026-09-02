@@ -5,6 +5,7 @@ import re
 import shutil
 import tempfile
 import time
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 
@@ -15,9 +16,27 @@ from ..profiles import (
     AgentModelProfile,
     antigravity_profiles_from_output,
 )
-from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
-from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult, resolve_image_paths
+from ..schemas import (
+    AgentName,
+    AuthMode,
+    AuthState,
+    RunnerCapabilities,
+    RunnerModelCapabilities,
+)
+from .base import (
+    AgentRunner,
+    RunnerError,
+    RunnerRequest,
+    RunnerResult,
+    resolve_image_paths,
+)
 from .probes import CliMetadataProbe
+
+_PYDANTIC_DECIMAL_PATTERN = r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$"
+_RE2_DECIMAL_PATTERN = r"^[+-]?(0*[0-9]+(\.[0-9]*)?|\.[0-9]+)$"
+_AGY_CACHE_HOME = "/home/agent/.gemini/antigravity-cli/fitsho-cache"
+_AGY_PLAYWRIGHT_BROWSERS_PATH = f"{_AGY_CACHE_HOME}/playwright"
+_AGY_PLAYWRIGHT_DRIVER_PATH = f"{_AGY_CACHE_HOME}/playwright-driver"
 
 
 class AntigravityRunner(AgentRunner):
@@ -44,6 +63,8 @@ class AntigravityRunner(AgentRunner):
             "https_proxy",
             "SSL_CERT_FILE",
             "SSL_CERT_DIR",
+            "PLAYWRIGHT_BROWSERS_PATH",
+            "PLAYWRIGHT_DRIVER_PATH",
         }
     )
 
@@ -163,7 +184,11 @@ class AntigravityRunner(AgentRunner):
                 delete=False,
             ) as schema_file:
                 schema_path = Path(schema_file.name)
-                json.dump(request.response_schema, schema_file, ensure_ascii=False)
+                json.dump(
+                    _agy_compatible_schema(request.response_schema),
+                    schema_file,
+                    ensure_ascii=False,
+                )
 
             command = [
                 self.executable,
@@ -250,11 +275,16 @@ class AntigravityRunner(AgentRunner):
 
     @classmethod
     def _subprocess_environment(cls) -> dict[str, str]:
-        return {
-            key: value
-            for key, value in os.environ.items()
-            if key in cls._SAFE_ENVIRONMENT_KEYS
+        environment = {
+            key: value for key, value in os.environ.items() if key in cls._SAFE_ENVIRONMENT_KEYS
         }
+        # /tmp is mounted noexec and the compose volume can leave the default
+        # cache root-owned. Keep browser and embedded-tool caches on the
+        # writable Agent Service volume where executables can run.
+        environment["XDG_CACHE_HOME"] = _AGY_CACHE_HOME
+        environment["PLAYWRIGHT_BROWSERS_PATH"] = _AGY_PLAYWRIGHT_BROWSERS_PATH
+        environment["PLAYWRIGHT_DRIVER_PATH"] = _AGY_PLAYWRIGHT_DRIVER_PATH
+        return environment
 
     def _image_paths(self, image_paths: tuple[Path, ...], workspace: Path) -> list[Path]:
         return resolve_image_paths(
@@ -314,16 +344,21 @@ class AntigravityRunner(AgentRunner):
         text = " ".join((stdout, stderr)).lower()
         if re.search(r"model[ _-]+not[ _-]+found|unknown model|model does not exist", text):
             return RunnerError("model_not_found", "model was not found")
-        if re.search(
-            r"rate[ -]?limit|usage limit|too many requests|quota exceeded|\b429\b", text
-        ):
+        if re.search(r"rate[ -]?limit|usage limit|too many requests|quota exceeded|\b429\b", text):
             return RunnerError("rate_limited", "runner rate limit reached")
         if re.search(
-            r"unauthori[sz]ed|authentication failed|not authenticated|login required|"
-            r"permission denied|access denied|forbidden",
+            r"unauthori[sz]ed|authentication failed|authentication required|"
+            r"not authenticated|not logged in|login required|permission denied|"
+            r"access denied|forbidden",
             text,
         ):
             return RunnerError("unauthorized", "runner authorization failed")
+        if re.search(
+            r"invalid[ _-]?argument|invalid request|invalid schema|schema.*invalid|"
+            r"invalid.*regex|missing field.*schema",
+            text,
+        ):
+            return RunnerError("invalid_request", "request could not be prepared")
         return RunnerError("provider_unavailable", "provider is unavailable")
 
     @staticmethod
@@ -356,3 +391,20 @@ def _configured_profile(
         version=version,
         supports_image_input=supports_image_input,
     )
+
+
+def _agy_compatible_schema(response_schema: dict[str, Any]) -> dict[str, Any]:
+    compatible_schema = deepcopy(response_schema)
+    _rewrite_unsupported_patterns(compatible_schema)
+    return compatible_schema
+
+
+def _rewrite_unsupported_patterns(value: Any) -> None:
+    if isinstance(value, dict):
+        if value.get("pattern") == _PYDANTIC_DECIMAL_PATTERN:
+            value["pattern"] = _RE2_DECIMAL_PATTERN
+        for child in value.values():
+            _rewrite_unsupported_patterns(child)
+    elif isinstance(value, list):
+        for child in value:
+            _rewrite_unsupported_patterns(child)

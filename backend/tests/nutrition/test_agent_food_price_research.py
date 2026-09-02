@@ -1,6 +1,7 @@
 import asyncio
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -92,10 +93,40 @@ def test_request_targets_three_sources_and_uses_canonical_prompt() -> None:
     assert request.input_payload["task"] == "research_current_iran_food_retail_prices"
     assert request.input_payload["requested_source_count"] == 3
     assert request.input_payload["excluded_domains"] == []
+    search_url = request.input_payload["search_url"]
+    search_params = parse_qs(urlsplit(search_url).query)
+    assert search_url.startswith("https://api.torob.com/v4/base-product/search/?")
+    assert search_params["query"] == ["سینه مرغ"]
+    assert search_params["q"] == ["سینه مرغ"]
+    assert search_params["size"] == ["3"]
+    assert search_params["_bt__experiment"] == ["sir23__a"]
+    assert search_params["suid"] and search_params["suid"] == search_params["init_suid"]
     assert request.input_payload["market"] == "Iran"
     assert "Use live web search/browser tools" in request.system_prompt
+    assert "only the browser tool for live research" in request.system_prompt
+    assert "Here the browser operation is the URL content tool" in request.system_prompt
+    assert "which accepts a `Url`" in request.system_prompt
+    assert "compact public Torob JSON search endpoint" in request.system_prompt
+    assert "https://api.torob.com/v4/base-product/search/?" in request.system_prompt
+    assert "Inspect the returned JSON" in request.system_prompt
+    assert "at most one URL content call" in request.system_prompt
+    assert "Do not read chunks" in request.system_prompt
+    assert "first response is the only web evidence" in request.system_prompt
+    assert "Do not request" in request.system_prompt
+    assert "offsets, pagination" in request.system_prompt
+    assert "Return" in request.system_prompt
+    assert "immediately after it" in request.system_prompt
+    assert "Do not use Bing, Google, DuckDuckGo" in request.system_prompt
+    assert "terminal, local" in request.system_prompt
+    assert "workspace tools" in request.system_prompt
+    assert "If `input.excluded_domains` contains `torob.com`" in request.system_prompt
+    assert "Use `input.search_url`" in request.system_prompt
+    assert "`view_file` exactly once" in request.system_prompt
+    assert "If the URL content/browser tool fails or is unavailable" in request.system_prompt
+    assert "return `quotes: []` immediately" in request.system_prompt
     assert "Do not answer from model memory" in request.system_prompt
-    assert "Do not calculate the Fitsho reference price" in request.system_prompt
+    assert "Do not calculate the Fitsho" in request.system_prompt
+    assert "reference price" in request.system_prompt
     assert "final average" not in request.system_prompt.lower()
     assert "database ID" not in request.system_prompt
     assert request.schema_name == "fitsho_food_price_research_v1"
@@ -106,9 +137,7 @@ def test_output_models_forbid_extra_fields_and_bound_quotes() -> None:
     assert FoodPriceResearchOutput.model_validate(valid).food_slug == FOOD.slug
 
     with pytest.raises(ValueError):
-        FoodPriceResearchOutput.model_validate(
-            {**valid, "unexpected": True}
-        )
+        FoodPriceResearchOutput.model_validate({**valid, "unexpected": True})
 
     with pytest.raises(ValueError):
         FoodPriceResearchOutput.model_validate(
@@ -289,4 +318,3 @@ def test_zero_evidence_first_pass_does_not_expand() -> None:
     assert len(provider.requests) == 1
     assert len(result.evidence) == 0
     assert result.expanded is False
-

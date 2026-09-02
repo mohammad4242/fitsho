@@ -164,6 +164,52 @@ def test_run_parses_structured_output_and_uses_exact_model_argv(
     assert kwargs["workspace"] == tmp_path
 
 
+def test_run_rewrites_pydantic_decimal_pattern_only_for_agy_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured_schema: dict[str, Any] = {}
+    unsupported_pattern = r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$"
+    response_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "price": {
+                "anyOf": [
+                    {"type": "number", "exclusiveMinimum": 0},
+                    {"type": "string", "pattern": unsupported_pattern},
+                ]
+            }
+        },
+        "required": ["price"],
+        "additionalProperties": False,
+    }
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del kwargs
+        schema_path = Path(command[command.index("--json-schema") + 1])
+        captured_schema.update(json.loads(schema_path.read_text()))
+        return ProcessResult(
+            0,
+            success_output(payload={"price": 123}, structured=True),
+            "",
+        )
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setattr(antigravity, "run_process", fake_run_process)
+    request = make_request(response_schema=response_schema)
+
+    result = run(AntigravityRunner(workspace=tmp_path).run(request))
+
+    assert result.payload == {"price": 123}
+    assert (
+        captured_schema["properties"]["price"]["anyOf"][1]["pattern"]
+        == r"^[+-]?(0*[0-9]+(\.[0-9]*)?|\.[0-9]+)$"
+    )
+    assert request.response_schema["properties"]["price"]["anyOf"][1]["pattern"] == (
+        unsupported_pattern
+    )
+
+
 def test_profile_effort_is_passed_to_agy_and_thinking_maps_to_high(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -241,6 +287,33 @@ def test_runner_does_not_pass_agent_service_secrets_to_cli(
     child_env = captured["env"]
     assert "AGENT_SERVICE_TOKEN" not in child_env
     assert captured["inherit_environment"] is False
+
+
+def test_runner_uses_writable_cache_for_headless_cli(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del command
+        captured.update(kwargs)
+        return ProcessResult(0, success_output(structured=True), "")
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
+    monkeypatch.setattr(antigravity, "run_process", fake_run_process)
+    run(AntigravityRunner(workspace=tmp_path).run(make_request()))
+
+    assert captured["env"]["XDG_CACHE_HOME"] == "/home/agent/.gemini/antigravity-cli/fitsho-cache"
+    assert (
+        captured["env"]["PLAYWRIGHT_BROWSERS_PATH"]
+        == "/home/agent/.gemini/antigravity-cli/fitsho-cache/playwright"
+    )
+    assert (
+        captured["env"]["PLAYWRIGHT_DRIVER_PATH"]
+        == "/home/agent/.gemini/antigravity-cli/fitsho-cache/playwright-driver"
+    )
 
 
 def test_run_parses_json_response_and_uses_elapsed_duration_when_outer_duration_invalid(
@@ -448,6 +521,9 @@ def test_malformed_or_schema_invalid_output_is_safe_error(
     [
         ("model not found", "model_not_found"),
         ("unauthorized: please login", "unauthorized"),
+        ("authentication required", "unauthorized"),
+        ("not logged into Antigravity", "unauthorized"),
+        ("INVALID_ARGUMENT: schema is not supported", "invalid_request"),
         ("temporary upstream outage", "provider_unavailable"),
         ("rate limit exceeded", "rate_limited"),
         ("You've hit your usage limit", "rate_limited"),
@@ -475,6 +551,7 @@ def test_error_status_is_classified_without_leaking_provider_text(
         "model was not found",
         "runner authorization failed",
         "runner rate limit reached",
+        "request could not be prepared",
         "provider is unavailable",
     }
     assert status_text not in str(error.value)
