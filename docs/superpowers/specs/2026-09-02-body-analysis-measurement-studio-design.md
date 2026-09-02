@@ -13,12 +13,12 @@ Use a focused "Measurement Studio" treatment: a calm, precise measurement surfac
 like a body-progress calibration step rather than a generic form. The page remains Persian-first,
 mobile-first, and uses existing Fitsho fonts and tokens.
 
-- Canvas: existing light Fitsho canvas `#f7fbf9`.
-- Ink: existing deep petrol `#102422`.
+- Canvas: authenticated Fitsho canvas `#020607`.
+- Ink: Fitsho mist `#e8f4f1`.
 - Primary accent: Fitsho aqua `#50dfce` for active/focus states.
-- Secondary accent: Fitsho coral `#ef826e` for the measurement marker and required attention.
-- Utility accent: existing amber `#f4b942` for the confirmation checkpoint.
-- Surface/line: white surfaces with existing `#d4e4df` and stronger teal lines.
+- Secondary accent: Fitsho coral `#f67859` for the measurement marker and required attention.
+- Utility accent: existing amber `#f2b85b` for the confirmation checkpoint.
+- Surface/line: deep surfaces `#081211` / `#101e1c` with the existing translucent Fitsho lines.
 
 Typography stays on the existing `Vazirmatn Variable` body face and `Lalezar` display face in
 Persian, with no new font or dependency.
@@ -48,7 +48,7 @@ The existing single card becomes a clear studio surface:
 └──────────────────────────────────────────────┘
 ```
 
-The signature detail is a narrow calibration rail and small unit treatment around the field
+The signature detail is a narrow aqua calibration rail and small unit treatment around the field
 groups. It gives the form a recognizable measurement-tool identity without adding illustrations,
 new assets, or distracting animation.
 
