@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -8,6 +8,10 @@ import type { AdminFoodCatalogueItem, AdminFoodCatalogueResponse, FoodCatalogueI
 import "./foodCatalogue.css";
 
 type LoadState = "loading" | "ready" | "error";
+type PriceResearchState =
+  | { status: "researching" }
+  | { status: "error"; message: string };
+type CataloguePriceReferenceUnit = NonNullable<AdminFoodCatalogueItem["price"]["reference_unit"]>;
 
 const primaryNutrientDefinitions = [
   ["energy_kcal", "کالری", "Calories", "kcal"],
@@ -33,7 +37,8 @@ export function FoodCataloguePage() {
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
   const [details, setDetails] = useState<FoodCatalogueItem | null>(null);
-  const [priceFood, setPriceFood] = useState<{ item: AdminFoodCatalogueItem; autoResearch?: boolean } | null>(null);
+  const [priceFood, setPriceFood] = useState<AdminFoodCatalogueItem | null>(null);
+  const [priceResearchStates, setPriceResearchStates] = useState<Record<string, PriceResearchState>>({});
   const [imageFood, setImageFood] = useState<AdminFoodCatalogueItem | null>(null);
   const [deleteFood, setDeleteFood] = useState<AdminFoodCatalogueItem | null>(null);
   const [addingFood, setAddingFood] = useState(false);
@@ -58,6 +63,38 @@ export function FoodCataloguePage() {
     event.preventDefault();
     setPage(1);
     setQuery(searchInput.trim());
+  }
+
+  function researchPrice(food: AdminFoodCatalogueItem) {
+    if (priceResearchStates[food.slug]?.status === "researching") return;
+    setPriceResearchStates((current) => ({ ...current, [food.slug]: { status: "researching" } }));
+    void api.researchFoodPrice(food.slug, true)
+      .then((result) => {
+        const candidatePrice = result.candidate_reference_price_toman?.trim();
+        const canonicalUnit = result.canonical_unit?.trim();
+        const referenceUnit = canonicalUnit ? cataloguePriceReferenceUnit(canonicalUnit) : null;
+        if (result.status === "success" && candidatePrice && canonicalUnit && referenceUnit) {
+          setData((current) => updateAdminCataloguePrice(current, food.slug, candidatePrice, canonicalUnit, referenceUnit));
+          setPriceResearchStates((current) => {
+            const next = { ...current };
+            delete next[food.slug];
+            return next;
+          });
+          return;
+        }
+        const fallback = result.status === "no_quotes"
+          ? l("قیمتی در فروشگاه‌های آنلاین برای این ماده غذایی یافت نشد.", "No prices were found in online stores.")
+          : l("قیمت معتبر از سرویس استعلام دریافت نشد.", "The price inquiry service returned no valid price.");
+        setPriceResearchStates((current) => ({
+          ...current,
+          [food.slug]: { status: "error", message: result.message?.trim() || fallback },
+        }));
+      })
+      .catch((error: unknown) => {
+        const fallback = l("خطا در برقراری ارتباط با سرویس استعلام قیمت.", "Failed to connect to the price inquiry service.");
+        const message = error instanceof Error && error.message.trim() ? error.message : fallback;
+        setPriceResearchStates((current) => ({ ...current, [food.slug]: { status: "error", message } }));
+      });
   }
 
   function saved() {
@@ -113,8 +150,9 @@ export function FoodCataloguePage() {
               language={language}
               onDetails={() => setDetails(food)}
               onImage={isAdminFood(food) ? () => setImageFood(food) : undefined}
-              onPrice={isAdminFood(food) ? () => setPriceFood({ item: food, autoResearch: false }) : undefined}
-              onResearchPrice={isAdminFood(food) ? () => setPriceFood({ item: food, autoResearch: true }) : undefined}
+              onPrice={isAdminFood(food) ? () => setPriceFood(food) : undefined}
+              onResearchPrice={isAdminFood(food) ? () => researchPrice(food) : undefined}
+              researchState={isAdminFood(food) ? priceResearchStates[food.slug] : undefined}
               onDelete={isAdminFood(food) ? () => setDeleteFood(food) : undefined}
             />
           ))}
@@ -126,8 +164,7 @@ export function FoodCataloguePage() {
       {details && <FoodDetails food={details} language={language} onClose={() => setDetails(null)} />}
       {priceFood && (
         <PriceOverrideDialog
-          food={priceFood.item}
-          autoResearch={priceFood.autoResearch}
+          food={priceFood}
           language={language}
           onClose={() => setPriceFood(null)}
           onSaved={saved}
@@ -140,22 +177,23 @@ export function FoodCataloguePage() {
   );
 }
 
-function FoodCard({ food, language, onDetails, onImage, onPrice, onResearchPrice, onDelete }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onImage?: () => void; onPrice?: () => void; onResearchPrice?: () => void; onDelete?: () => void }) {
+function FoodCard({ food, language, onDetails, onImage, onPrice, onResearchPrice, researchState, onDelete }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onImage?: () => void; onPrice?: () => void; onResearchPrice?: () => void; researchState?: PriceResearchState; onDelete?: () => void }) {
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
   const portion = defaultPortion(food);
+  const researching = researchState?.status === "researching";
   return <article className="food-shelf-card" role="listitem">
     <FoodImage food={food} language={language} />
     <div className="food-shelf-card__content">
       <header><div className="food-shelf-card__identity"><span>{categoryLabel(food.category, language)}</span><h2>{fa ? food.name_fa : food.name_en}</h2><small>{fa ? food.name_en : food.name_fa}</small></div><div className="food-shelf-card__calories"><strong>{macroValue(scale(food.macros.energy_kcal, portion), "kcal", language)}</strong><span>{l("کالری", "Calories")}</span></div></header>
       <span className="food-shelf-card__basis">{basisLabel(portion, language)}</span>
-      {isAdminFood(food) && <PriceTicket food={food} language={language} />}
+      {isAdminFood(food) && <PriceTicket food={food} language={language} researchState={researchState} />}
       <div className="food-macro-strip">{cardMacroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong><span>{fa ? faLabel : enLabel}</span></div>)}</div>
       <footer>
         <button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>
         {onImage && <button type="button" onClick={onImage} aria-label={l(`${food.image_url ? "جایگزینی" : "بارگذاری"} تصویر ${food.name_fa}`, `${food.image_url ? "Replace" : "Upload"} image for ${food.name_en}`)}>{l(food.image_url ? "جایگزینی تصویر" : "بارگذاری تصویر", food.image_url ? "Replace image" : "Upload image")}</button>}
         {onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}
-        {onResearchPrice && <button className="food-card-research" type="button" onClick={onResearchPrice} aria-label={l(`استعلام قیمت ${food.name_fa}`, `Inquire price for ${food.name_en}`)}>{l("استعلام قیمت", "Inquire price")}</button>}
+        {onResearchPrice && <button className="food-card-research" disabled={researching} type="button" onClick={onResearchPrice} aria-label={researching ? l(`در حال استعلام قیمت ${food.name_fa}`, `Inquiring price for ${food.name_en}`) : l(`استعلام قیمت ${food.name_fa}`, `Inquire price for ${food.name_en}`)}>{l("استعلام قیمت", "Inquire price")}</button>}
         {onDelete && <button className="food-card-delete" type="button" onClick={onDelete} aria-label={l(`حذف ${food.name_fa}`, `Delete ${food.name_en}`)}>{l("حذف", "Delete")}</button>}
       </footer>
     </div>
@@ -217,17 +255,42 @@ function FoodDetails({ food, language, onClose }: { food: FoodCatalogueItem; lan
   return <div className="food-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section aria-label={l(`جزئیات ${food.name_fa}`, `${food.name_en} details`)} aria-modal="true" className="food-dialog" role="dialog"><button className="food-dialog__close" type="button" onClick={onClose} aria-label={l("بستن", "Close")}>×</button><p className="eyebrow eyebrow--accent">{l("ریز‌مغذی‌ها", "Micronutrients")}</p><h2>{name}</h2>{food.portions.length > 0 && <div className="food-basis-selector"><button type="button" className={portion ? "is-selected" : ""} onClick={() => setPortion(defaultPortion(food))}>{l("واحد معمول", "Common portion")}</button><button type="button" className={!portion ? "is-selected" : ""} onClick={() => setPortion(null)}>{l("۱۰۰ گرم", "100 g")}</button></div>}<p className="food-detail-basis">{basisLabel(portion, language)}{portion && ` · ${portionLabel(portion, language)} ≈ ${formatNumber(Number(portion.grams), language)} ${l("گرم", "g")}`}</p><div className="food-detail-grid">{food.nutrients.map((nutrient) => <article key={nutrient.nutrient_code}><span>{nutrientName(nutrient.nutrient_code, language)}</span><strong>{formatNumber(scale(nutrient.value_per_100g, portion) ?? 0, language)} {nutrient.unit}</strong></article>)}</div><footer><span>{l("منبع", "Source")}: {food.source.name}</span><a href={food.source.reference} target="_blank" rel="noreferrer">{l("مشاهده منبع", "View source")}</a></footer></section></div>;
 }
 
-function PriceTicket({ food, language }: { food: AdminFoodCatalogueItem; language: "fa" | "en" }) { const fa = language === "fa"; const l = (persian: string, english: string) => fa ? persian : english; return <div className={`food-price-ticket${food.price.status === "not_found" ? " is-missing" : ""}`}><span>{l("قیمت این هفته", "This week's price")}</span><strong>{food.price.status === "accepted" && food.price.reference_price_irr ? `${formatNumber(Number(food.price.reference_price_irr) / 10, language)} ${l("تومان", "Toman")}` : l("یافت نشد", "Not found")}</strong>{food.price.reference_unit && <small>{priceUnit(food.price.reference_unit, language)}</small>}{food.price.status === "accepted" && <small>{food.price.source === "manual_override" ? l("جایگزین موقت ادمین", "Temporary admin override") : l("به‌روزرسانی خودکار بازار", "Automatic market update")}{food.price.observed_at ? ` · ${formatDate(food.price.observed_at, language)}` : ""}</small>}</div>; }
+function PriceTicket({ food, language, researchState }: { food: AdminFoodCatalogueItem; language: "fa" | "en"; researchState?: PriceResearchState }) {
+  const fa = language === "fa";
+  const l = (persian: string, english: string) => fa ? persian : english;
+  const researching = researchState?.status === "researching";
+  const priceInToman = food.price.reference_price_toman
+    ? Number(food.price.reference_price_toman)
+    : food.price.reference_price_irr
+      ? Number(food.price.reference_price_irr) / 10
+      : null;
+  const hasPrice = food.price.status === "accepted" && priceInToman !== null;
+  const className = [
+    "food-price-ticket",
+    food.price.status === "not_found" ? "is-missing" : "",
+    researching ? "is-researching" : "",
+    researchState?.status === "error" ? "is-error" : "",
+  ].filter(Boolean).join(" ");
+  return (
+    <div className={className} aria-live={researching ? "polite" : undefined}>
+      <span>{researching ? l("وضعیت استعلام", "Inquiry status") : l("قیمت این هفته", "This week's price")}</span>
+      {researching
+        ? <strong role="status">{l("در حال استعلام…", "Price inquiry in progress…")}</strong>
+        : <strong>{hasPrice ? `${formatNumber(priceInToman, language)} ${l("تومان", "Toman")}` : l("یافت نشد", "Not found")}</strong>}
+      {!researching && food.price.reference_unit && hasPrice && <small>{priceUnit(food.price.reference_unit, language)}</small>}
+      {!researching && hasPrice && <small>{food.price.source === "manual_override" ? l("جایگزین موقت ادمین", "Temporary admin override") : l("به‌روزرسانی خودکار بازار", "Automatic market update")}{food.price.observed_at ? ` · ${formatDate(food.price.observed_at, language)}` : ""}</small>}
+      {researchState?.status === "error" && <small className="food-price-ticket__error" role="alert">{researchState.message}</small>}
+    </div>
+  );
+}
 
 function PriceOverrideDialog({
   food,
-  autoResearch,
   language,
   onClose,
   onSaved,
 }: {
   food: AdminFoodCatalogueItem;
-  autoResearch?: boolean;
   language: "fa" | "en";
   onClose: () => void;
   onSaved: () => void;
@@ -243,7 +306,6 @@ function PriceOverrideDialog({
   const [researching, setResearching] = useState(false);
   const [researchResult, setResearchResult] = useState<api.SingleFoodPriceResearchResponse | null>(null);
   const [researchError, setResearchError] = useState<string | null>(null);
-  const autoResearchedRef = useRef(false);
 
   const runResearch = useCallback(async () => {
     setResearching(true);
@@ -266,13 +328,6 @@ function PriceOverrideDialog({
       setResearching(false);
     }
   }, [fa, food.slug]);
-
-  useEffect(() => {
-    if (autoResearch && !autoResearchedRef.current) {
-      autoResearchedRef.current = true;
-      void runResearch();
-    }
-  }, [autoResearch, runResearch]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -401,6 +456,39 @@ function DialogFrame({ children, label, onClose }: { children: ReactNode; label:
 function formatNumber(value: number, language: "fa" | "en") { return new Intl.NumberFormat(language === "fa" ? "fa-IR" : "en-US", { maximumFractionDigits: 1 }).format(value); }
 function macroValue(value: string | number | null, unit: string, language: "fa" | "en") { return value === null ? "—" : `${formatNumber(Number(value), language)} ${language === "fa" && unit === "g" ? "گرم" : unit}`; }
 function isAdminFood(food: FoodCatalogueItem): food is AdminFoodCatalogueItem { return "price" in food; }
+function cataloguePriceReferenceUnit(unit: string): CataloguePriceReferenceUnit | null {
+  const units: Record<string, CataloguePriceReferenceUnit> = {
+    TOMAN_PER_KG: "IRR_PER_KG",
+    TOMAN_PER_LITER: "IRR_PER_LITER",
+    TOMAN_PER_UNIT: "IRR_PER_UNIT",
+  };
+  return units[unit] ?? null;
+}
+function updateAdminCataloguePrice(
+  current: FoodCatalogueResponse | AdminFoodCatalogueResponse | null,
+  slug: string,
+  referencePriceToman: string,
+  canonicalUnit: string,
+  referenceUnit: CataloguePriceReferenceUnit,
+) {
+  if (!current) return current;
+  return {
+    ...current,
+    items: current.items.map((item) => {
+      if (!isAdminFood(item) || item.slug !== slug) return item;
+      return {
+        ...item,
+        price: {
+          status: "accepted" as const,
+          reference_price_toman: referencePriceToman,
+          canonical_unit: canonicalUnit,
+          reference_unit: referenceUnit,
+          source: "manual_override" as const,
+        },
+      };
+    }),
+  };
+}
 function defaultPortion(food: FoodCatalogueItem) { return food.portions.find((portion) => portion.is_default) ?? null; }
 function scale(value: string | number | null, portion: api.FoodCataloguePortion | null) { return value === null ? null : Number(value) * (portion ? Number(portion.grams) / 100 : 1); }
 function portionLabel(portion: api.FoodCataloguePortion, language: "fa" | "en") { return language === "fa" ? portion.label_fa : portion.label_en; }

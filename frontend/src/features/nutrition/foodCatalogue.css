@@ -400,6 +400,23 @@
   background: rgb(255 255 255 / 4%);
 }
 
+.food-price-ticket.is-researching {
+  color: #ffe6b4;
+  border: 1px solid rgb(255 215 152 / 35%);
+  background: rgb(255 215 152 / 9%);
+}
+
+.food-price-ticket.is-error {
+  border-color: rgb(255 107 107 / 38%);
+  background: rgb(255 107 107 / 8%);
+}
+
+.food-price-ticket__error {
+  grid-column: 1 / -1;
+  color: #ffd5d5;
+  line-height: 1.6;
+}
+
 .food-catalogue-pagination {
   display: flex;
   align-items: center;
