@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -33,7 +33,7 @@ export function FoodCataloguePage() {
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
   const [details, setDetails] = useState<FoodCatalogueItem | null>(null);
-  const [priceFood, setPriceFood] = useState<AdminFoodCatalogueItem | null>(null);
+  const [priceFood, setPriceFood] = useState<{ item: AdminFoodCatalogueItem; autoResearch?: boolean } | null>(null);
   const [imageFood, setImageFood] = useState<AdminFoodCatalogueItem | null>(null);
   const [addingFood, setAddingFood] = useState(false);
 
@@ -96,21 +96,39 @@ export function FoodCataloguePage() {
       {state === "ready" && data?.items.length === 0 && <p className="food-catalogue-state">{l("ماده‌ای با این مشخصات پیدا نشد.", "No food matched these filters.")}</p>}
       {state === "ready" && data && data.items.length > 0 && (
         <section className="food-catalogue-grid" aria-label={l("مواد غذایی", "Foods")} role="list">
-          {data.items.map((food) => <FoodCard food={food} key={food.id} language={language} onDetails={() => setDetails(food)} onImage={isAdminFood(food) ? () => setImageFood(food) : undefined} onPrice={isAdminFood(food) ? () => setPriceFood(food) : undefined} />)}
+          {data.items.map((food) => (
+            <FoodCard
+              food={food}
+              key={food.id}
+              language={language}
+              onDetails={() => setDetails(food)}
+              onImage={isAdminFood(food) ? () => setImageFood(food) : undefined}
+              onPrice={isAdminFood(food) ? () => setPriceFood({ item: food, autoResearch: false }) : undefined}
+              onResearchPrice={isAdminFood(food) ? () => setPriceFood({ item: food, autoResearch: true }) : undefined}
+            />
+          ))}
         </section>
       )}
 
       {state === "ready" && data && pageCount > 1 && <nav className="food-catalogue-pagination" aria-label={l("صفحه‌بندی", "Pagination")}><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} type="button">{l("قبلی", "Previous")}</button><span>{formatNumber(page, language)} / {formatNumber(pageCount, language)}</span><button disabled={page === pageCount} onClick={() => setPage((value) => value + 1)} type="button">{l("بعدی", "Next")}</button></nav>}
 
       {details && <FoodDetails food={details} language={language} onClose={() => setDetails(null)} />}
-      {priceFood && <PriceOverrideDialog food={priceFood} language={language} onClose={() => setPriceFood(null)} onSaved={saved} />}
+      {priceFood && (
+        <PriceOverrideDialog
+          food={priceFood.item}
+          autoResearch={priceFood.autoResearch}
+          language={language}
+          onClose={() => setPriceFood(null)}
+          onSaved={saved}
+        />
+      )}
       {imageFood && <FoodImageDialog food={imageFood} language={language} onClose={() => setImageFood(null)} onSaved={saved} />}
       {addingFood && <AddFoodDialog language={language} onClose={() => setAddingFood(false)} onSaved={saved} />}
     </main>
   );
 }
 
-function FoodCard({ food, language, onDetails, onImage, onPrice }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onImage?: () => void; onPrice?: () => void }) {
+function FoodCard({ food, language, onDetails, onImage, onPrice, onResearchPrice }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onImage?: () => void; onPrice?: () => void; onResearchPrice?: () => void }) {
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
   const portion = defaultPortion(food);
@@ -121,7 +139,12 @@ function FoodCard({ food, language, onDetails, onImage, onPrice }: { food: FoodC
       <span className="food-shelf-card__basis">{basisLabel(portion, language)}</span>
       {isAdminFood(food) && <PriceTicket food={food} language={language} />}
       <div className="food-macro-strip">{cardMacroDefinitions.map(([code, faLabel, enLabel, unit]) => <div key={code}><strong>{macroValue(scale(food.macros[code], portion), unit, language)}</strong><span>{fa ? faLabel : enLabel}</span></div>)}</div>
-      <footer><button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>{onImage && <button type="button" onClick={onImage} aria-label={l(`${food.image_url ? "جایگزینی" : "بارگذاری"} تصویر ${food.name_fa}`, `${food.image_url ? "Replace" : "Upload"} image for ${food.name_en}`)}>{l(food.image_url ? "جایگزینی تصویر" : "بارگذاری تصویر", food.image_url ? "Replace image" : "Upload image")}</button>}{onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}</footer>
+      <footer>
+        <button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>
+        {onImage && <button type="button" onClick={onImage} aria-label={l(`${food.image_url ? "جایگزینی" : "بارگذاری"} تصویر ${food.name_fa}`, `${food.image_url ? "Replace" : "Upload"} image for ${food.name_en}`)}>{l(food.image_url ? "جایگزینی تصویر" : "بارگذاری تصویر", food.image_url ? "Replace image" : "Upload image")}</button>}
+        {onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}
+        {onResearchPrice && <button type="button" onClick={onResearchPrice} aria-label={l(`استعلام قیمت ${food.name_fa}`, `Inquire price for ${food.name_en}`)}>{l("استعلام قیمت", "Inquire price")}</button>}
+      </footer>
     </div>
   </article>;
 }
@@ -149,16 +172,153 @@ function FoodDetails({ food, language, onClose }: { food: FoodCatalogueItem; lan
 
 function PriceTicket({ food, language }: { food: AdminFoodCatalogueItem; language: "fa" | "en" }) { const fa = language === "fa"; const l = (persian: string, english: string) => fa ? persian : english; return <div className={`food-price-ticket${food.price.status === "not_found" ? " is-missing" : ""}`}><span>{l("قیمت این هفته", "This week's price")}</span><strong>{food.price.status === "accepted" && food.price.reference_price_irr ? `${formatNumber(Number(food.price.reference_price_irr) / 10, language)} ${l("تومان", "Toman")}` : l("یافت نشد", "Not found")}</strong>{food.price.reference_unit && <small>{priceUnit(food.price.reference_unit, language)}</small>}{food.price.status === "accepted" && <small>{food.price.source === "manual_override" ? l("جایگزین موقت ادمین", "Temporary admin override") : l("به‌روزرسانی خودکار بازار", "Automatic market update")}{food.price.observed_at ? ` · ${formatDate(food.price.observed_at, language)}` : ""}</small>}</div>; }
 
-function PriceOverrideDialog({ food, language, onClose, onSaved }: { food: AdminFoodCatalogueItem; language: "fa" | "en"; onClose: () => void; onSaved: () => void }) {
+function PriceOverrideDialog({
+  food,
+  autoResearch,
+  language,
+  onClose,
+  onSaved,
+}: {
+  food: AdminFoodCatalogueItem;
+  autoResearch?: boolean;
+  language: "fa" | "en";
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const fa = language === "fa";
-  const l = (persian: string, english: string) => fa ? persian : english;
+  const l = (persian: string, english: string) => (fa ? persian : english);
   const [price, setPrice] = useState(food.price.reference_price_toman ?? "");
   const [unit, setUnit] = useState(food.price.canonical_unit ?? "TOMAN_PER_KG");
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
-  function submit(event: FormEvent) { event.preventDefault(); setSaving(true); setError(false); void api.saveFoodPriceOverride(food.slug, { reference_price_toman: price, canonical_unit: unit, reason }).then(onSaved).catch(() => setError(true)).finally(() => setSaving(false)); }
-  return <DialogFrame label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)} onClose={onClose}><h2>{l("قیمت دستی موقت", "Temporary manual price")}</h2><p>{l("این قیمت با اجرای موفق بعدی بازار منقضی می‌شود.", "This price expires after the next successful market refresh.")}</p><form className="food-admin-form" onSubmit={submit}><label>{l("قیمت (تومان)", "Price (Toman)")}<input inputMode="decimal" min="1" required value={price} onChange={(event) => setPrice(event.target.value)} /></label><label>{l("واحد", "Unit")}<select value={unit} onChange={(event) => setUnit(event.target.value)}><option value="TOMAN_PER_KG">{l("تومان/کیلوگرم", "Toman/kg")}</option><option value="TOMAN_PER_LITER">{l("تومان/لیتر", "Toman/litre")}</option><option value="TOMAN_PER_UNIT">{l("تومان/عدد", "Toman/unit")}</option></select></label><label>{l("دلیل ویرایش", "Reason")}<textarea minLength={5} required value={reason} onChange={(event) => setReason(event.target.value)} /></label>{error && <p role="alert">{l("قیمت ذخیره نشد.", "Price was not saved.")}</p>}<button disabled={saving} type="submit">{saving ? l("در حال ذخیره…", "Saving…") : l("ذخیره قیمت", "Save price")}</button></form></DialogFrame>;
+
+  const [researching, setResearching] = useState(false);
+  const [researchResult, setResearchResult] = useState<api.SingleFoodPriceResearchResponse | null>(null);
+  const [researchError, setResearchError] = useState<string | null>(null);
+
+  const runResearch = useCallback(async () => {
+    setResearching(true);
+    setResearchError(null);
+    try {
+      const res = await api.researchFoodPrice(food.slug);
+      setResearchResult(res);
+      if (res.status === "success" && res.candidate_reference_price_toman) {
+        setPrice(String(res.candidate_reference_price_toman));
+        if (res.canonical_unit) {
+          setUnit(res.canonical_unit);
+        }
+        setReason((prev) => prev || (fa ? "استعلام خودکار از فروشگاه‌های آنلاین توسط ایجنت" : "Automated AI online market inquiry"));
+      } else if (res.status === "failed" || res.status === "no_quotes") {
+        setResearchError(res.message || (fa ? "قیمتی در فروشگاه‌ها یافت نشد." : "No prices found in online stores."));
+      }
+    } catch {
+      setResearchError(fa ? "خطا در برقراری ارتباط با سرویس استعلام قیمت." : "Failed to connect to price inquiry service.");
+    } finally {
+      setResearching(false);
+    }
+  }, [fa, food.slug]);
+
+  useEffect(() => {
+    if (autoResearch) {
+      void runResearch();
+    }
+  }, [autoResearch, runResearch]);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError(false);
+    void api
+      .saveFoodPriceOverride(food.slug, { reference_price_toman: price, canonical_unit: unit, reason })
+      .then(onSaved)
+      .catch(() => setError(true))
+      .finally(() => setSaving(false));
+  }
+
+  return (
+    <DialogFrame label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)} onClose={onClose}>
+      <h2>{l("قیمت و استعلام هوشمند", "Price & AI Inquiry")}</h2>
+      <p>{l("این قیمت با اجرای موفق بعدی بازار منقضی می‌شود.", "This price expires after the next successful market refresh.")}</p>
+
+      <div className="food-ai-research-box">
+        <button
+          type="button"
+          className="food-ai-research-btn"
+          disabled={researching || saving}
+          onClick={() => void runResearch()}
+        >
+          {researching
+            ? l("در حال جستجوی آنلاین قیمت… (ممکن است ۱ تا ۲ دقیقه طول بکشد)", "Searching online markets… (1-2 min)")
+            : l("⚡ استعلام هوشمند قیمت با ایجنت", "⚡ AI Price Inquiry with Agent")}
+        </button>
+
+        {researchError && <p className="food-ai-research-error" role="alert">{researchError}</p>}
+
+        {researchResult && researchResult.quotes.length > 0 && (
+          <div className="food-ai-quotes">
+            <h4>{l("قیمت‌های کشف‌شده در فروشگاه‌ها:", "Discovered store quotes:")}</h4>
+            <ul>
+              {researchResult.quotes.map((q, idx) => (
+                <li key={idx}>
+                  <a href={q.source_url} target="_blank" rel="noreferrer">
+                    {q.source_name} ({q.source_domain}):
+                  </a>{" "}
+                  <strong>
+                    {formatNumber(Number(q.normal_price_toman), language)} {l("تومان", "Toman")}
+                  </strong>{" "}
+                  <small>({formatNumber(Number(q.package_quantity), language)} {q.package_unit})</small>
+                </li>
+              ))}
+            </ul>
+            {researchResult.candidate_reference_price_toman && (
+              <p className="food-ai-suggested-badge">
+                {l("قیمت پیشنهادی بازار:", "Suggested market price:")}{" "}
+                <strong>
+                  {formatNumber(Number(researchResult.candidate_reference_price_toman), language)}{" "}
+                  {l("تومان", "Toman")}
+                </strong>
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <form className="food-admin-form" onSubmit={submit}>
+        <label>
+          {l("قیمت (تومان)", "Price (Toman)")}
+          <input
+            inputMode="decimal"
+            min="1"
+            required
+            value={price}
+            onChange={(event) => setPrice(event.target.value)}
+          />
+        </label>
+        <label>
+          {l("واحد", "Unit")}
+          <select value={unit} onChange={(event) => setUnit(event.target.value)}>
+            <option value="TOMAN_PER_KG">{l("تومان/کیلوگرم", "Toman/kg")}</option>
+            <option value="TOMAN_PER_LITER">{l("تومان/لیتر", "Toman/litre")}</option>
+            <option value="TOMAN_PER_UNIT">{l("تومان/عدد", "Toman/unit")}</option>
+          </select>
+        </label>
+        <label>
+          {l("دلیل ویرایش", "Reason")}
+          <textarea
+            minLength={5}
+            required
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        </label>
+        {error && <p role="alert">{l("قیمت ذخیره نشد.", "Price was not saved.")}</p>}
+        <button disabled={saving || researching} type="submit">
+          {saving ? l("در حال ذخیره…", "Saving…") : l("ذخیره قیمت", "Save price")}
+        </button>
+      </form>
+    </DialogFrame>
+  );
 }
 
 function FoodImageDialog({ food, language, onClose, onSaved }: { food: AdminFoodCatalogueItem; language: "fa" | "en"; onClose: () => void; onSaved: () => void }) {

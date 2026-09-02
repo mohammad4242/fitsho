@@ -251,3 +251,79 @@ it("shows accepted catalogue prices to an admin only", async () => {
   expect(screen.getByText(/8\/9\/26/)).toBeVisible();
   expect(screen.getByText("Toman per kilogram")).toBeVisible();
 });
+
+it("lets an admin inquire food price with AI and save the suggested price", async () => {
+  const user = userEvent.setup();
+  await i18n.changeLanguage("fa");
+  auth.isAdmin = true;
+  vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({
+    ...response,
+    items: [{
+      ...response.items[0],
+      price: {
+        status: "not_found",
+        reference_price_irr: null,
+        reference_unit: null,
+        observed_at: null,
+        accepted_at: null,
+        source: "not_found",
+      },
+    }],
+  });
+  vi.mocked(api.researchFoodPrice).mockResolvedValue({
+    food_slug: "chicken-breast",
+    food_name_fa: "سینه مرغ",
+    status: "success",
+    candidate_reference_price_toman: "385000",
+    canonical_unit: "TOMAN_PER_KG",
+    quotes: [
+      {
+        source_name: "دیجی‌کالا",
+        source_url: "https://digikala.com/product/1",
+        source_domain: "digikala.com",
+        product_title: "سینه مرغ ۱ کیلوگرمی",
+        normal_price_toman: "385000",
+        promotional_price_toman: null,
+        package_quantity: "1",
+        package_unit: "kg",
+        match_accepted: true,
+      },
+    ],
+  });
+  vi.mocked(api.saveFoodPriceOverride).mockResolvedValue({
+    id: "override-1",
+    source: "manual_override",
+  });
+
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  // Check that the "استعلام قیمت" button is visible
+  const inquireButton = await screen.findByRole("button", { name: "استعلام قیمت سینه مرغ" });
+  expect(inquireButton).toBeVisible();
+
+  // Click it
+  await user.click(inquireButton);
+
+  // Verify that researchFoodPrice was called with "chicken-breast"
+  await waitFor(() => expect(api.researchFoodPrice).toHaveBeenCalledWith("chicken-breast"));
+
+  // Verify that the discovered quotes and suggested price appear
+  expect(await screen.findByText(/دیجی‌کالا/)).toBeVisible();
+  expect(screen.getAllByText("۳۸۵٬۰۰۰ تومان").length).toBeGreaterThanOrEqual(1);
+
+  // Price input should now be filled with 385000
+  const priceInput = screen.getByLabelText("قیمت (تومان)");
+  expect(priceInput).toHaveValue("385000");
+
+  // Save the price
+  await user.click(screen.getByRole("button", { name: "ذخیره قیمت" }));
+  await waitFor(() =>
+    expect(api.saveFoodPriceOverride).toHaveBeenCalledWith(
+      "chicken-breast",
+      expect.objectContaining({
+        reference_price_toman: "385000",
+        canonical_unit: "TOMAN_PER_KG",
+      })
+    )
+  );
+});

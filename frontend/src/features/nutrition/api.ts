@@ -129,6 +129,41 @@ export function uploadCatalogueFoodImage(
   });
 }
 
+export interface SingleFoodPriceResearchQuote {
+  source_name: string;
+  source_url: string;
+  source_domain: string;
+  product_title: string;
+  normal_price_toman: string;
+  promotional_price_toman?: string | null;
+  package_quantity: string;
+  package_unit: string;
+  match_accepted: boolean;
+}
+
+export interface SingleFoodPriceResearchResponse {
+  food_slug: string;
+  food_name_fa: string;
+  candidate_reference_price_toman?: string | null;
+  canonical_unit?: string | null;
+  quotes: SingleFoodPriceResearchQuote[];
+  status: "success" | "no_quotes" | "failed";
+  message?: string | null;
+}
+
+export function researchFoodPrice(
+  slug: string,
+  apply: boolean = false,
+): Promise<SingleFoodPriceResearchResponse> {
+  const query = apply ? "?apply=true" : "";
+  return request<SingleFoodPriceResearchResponse>(
+    `${nutritionPath}/admin/foods/${slug}/price-research${query}`,
+    {
+      method: "POST",
+    },
+  );
+}
+
 export function saveFoodPriceOverride(
   slug: string,
   input: { reference_price_toman: string; canonical_unit: string; reason: string },
