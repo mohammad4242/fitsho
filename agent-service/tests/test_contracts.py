@@ -32,6 +32,7 @@ def test_generation_contract_matches_the_backend_boundary() -> None:
         "temperature",
         "max_output_tokens",
         "timeout_seconds",
+        "web_access",
         "image_labels",
     }
     assert set(AgentGenerationOutput.model_fields) == {
@@ -70,6 +71,7 @@ def test_runner_contract_matches_the_frozen_protocol() -> None:
         "timeout_seconds",
         "image_paths",
         "effort",
+        "web_access",
     ]
     assert [field.name for field in fields(RunnerResult)] == [
         "payload",
@@ -86,6 +88,7 @@ def test_capability_and_test_contracts_use_agent_names() -> None:
         "supports_text_input",
         "supports_image_input",
         "supports_structured_output",
+        "supports_live_web",
     }
     assert "agent" in RunnerCapabilities.model_fields
     assert "agent" in schemas.TestRequest.model_fields

@@ -112,6 +112,7 @@ class AntigravityRunner(AgentRunner):
                     supports_text_input=True,
                     supports_image_input=self.supports_image_input,
                     supports_structured_output=True,
+                    supports_live_web=True,
                 )
                 for profile in profiles
             ],
@@ -170,6 +171,8 @@ class AntigravityRunner(AgentRunner):
             "thinking",
         }:
             raise RunnerError("invalid_request", "reasoning effort is invalid")
+        if request.web_access not in {"disabled", "live"}:
+            raise RunnerError("invalid_request", "web access policy is invalid")
         workspace = self._workspace_path()
         image_paths = self._image_paths(request.image_paths, workspace)
         started = time.perf_counter()
@@ -347,6 +350,12 @@ class AntigravityRunner(AgentRunner):
         if image_paths:
             prompt += "\n\nImage files available for this request:\n" + "\n".join(
                 f"- {path}" for path in image_paths
+            )
+        if request.web_access == "live":
+            prompt += (
+                "\n\nlive web research is required for this request. "
+                "Use the browser/web tools available to this runner. "
+                "Do not answer from model memory; return only evidence observed during this request."
             )
         return prompt
 

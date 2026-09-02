@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 from collections.abc import Callable, Coroutine
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -125,6 +126,30 @@ def test_run_uses_exact_safe_codex_contract_and_schema_output_files(
     assert kwargs["inherit_environment"] is False
     assert "shell" not in kwargs
     assert "--dangerously-bypass-approvals-and-sandbox" not in command
+
+
+def test_live_web_enables_native_codex_web_search_per_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[list[str], dict[str, Any]]] = []
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        calls.append((command, kwargs))
+        output_path = Path(command[command.index("--output-last-message") + 1])
+        output_path.write_text('{"answer":"live"}', encoding="utf-8")
+        return ProcessResult(0, "", "")
+
+    import app.runners.codex as codex
+
+    monkeypatch.setattr(codex, "run_process", fake_run_process)
+    request = replace(make_request(), web_access="live")
+    result = run(CodexRunner(workspace=tmp_path).run(request))
+
+    assert result.payload == {"answer": "live"}
+    command, kwargs = calls[0]
+    assert "-c" in command
+    assert 'web_search="live"' in command
+    assert "native live web search" in kwargs["input_text"]
 
 
 def test_response_schema_is_normalized_for_codex_strict_output(

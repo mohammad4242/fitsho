@@ -117,7 +117,9 @@ class AgentService:
             profile_id=request.profile_id,
             model_id=request.model_id,
         )
-        await self._check_capability(resolved.profile, request.agent, image=False)
+        await self._check_capability(
+            resolved.profile, request.agent, image=False, web_access=request.web_access
+        )
         runner_request = self._runner_request(request, resolved=resolved)
         result = await self._run(request.agent, runner_request, request_id)
         return self._output(request, result, request_id, profile_id=request.profile_id)
@@ -144,7 +146,9 @@ class AgentService:
             profile_id=request.profile_id,
             model_id=request.model_id,
         )
-        await self._check_capability(resolved.profile, request.agent, image=True)
+        await self._check_capability(
+            resolved.profile, request.agent, image=True, web_access=request.web_access
+        )
         try:
             async with self.concurrency.slot(request.agent.value):
                 async with RequestWorkspace(root=self.workspace_root) as workspace:
@@ -206,7 +210,9 @@ class AgentService:
             profile_id=generation.profile_id,
             model_id=generation.model_id,
         )
-        await self._check_capability(resolved.profile, generation.agent, image=True)
+        await self._check_capability(
+            resolved.profile, generation.agent, image=True, web_access=generation.web_access
+        )
         try:
             image_paths = self.private_media.resolve_many(request.images)
             for image_path, reference in zip(image_paths, request.images, strict=True):
@@ -393,12 +399,17 @@ class AgentService:
                 supports_text_input=model.supports_text_input,
                 supports_image_input=model.supports_image_input,
                 supports_structured_output=model.supports_structured_output,
+                supports_live_web=model.supports_live_web,
             )
         return ResolvedProfile(profile=profile, model_id=profile.model_id, effort=profile.effort)
 
     @staticmethod
     async def _check_capability(
-        profile: AgentModelProfile, agent: AgentName, *, image: bool
+        profile: AgentModelProfile,
+        agent: AgentName,
+        *,
+        image: bool,
+        web_access: str = "disabled",
     ) -> None:
         if profile.agent is not agent:
             raise AgentServiceError(ErrorCode.INVALID_REQUEST, "agent is not configured", 422)
@@ -406,6 +417,7 @@ class AgentService:
             not profile.supports_text_input
             or not profile.supports_structured_output
             or (image and not profile.supports_image_input)
+            or (web_access == "live" and not profile.supports_live_web)
         ):
             raise AgentServiceError(
                 ErrorCode.INVALID_REQUEST, "requested capability is unavailable", 422
@@ -442,6 +454,7 @@ class AgentService:
             timeout_seconds=request.timeout_seconds,
             image_paths=image_paths,
             effort=(resolved.effort.value if resolved.effort is not None else None),
+            web_access=request.web_access,
         )
 
     @staticmethod

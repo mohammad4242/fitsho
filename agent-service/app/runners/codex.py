@@ -92,6 +92,7 @@ class CodexRunner(AgentRunner):
                     supports_text_input=True,
                     supports_image_input=self.supports_image_input,
                     supports_structured_output=True,
+                    supports_live_web=True,
                 )
                 for model_id in self.configured_models
             ],
@@ -204,6 +205,8 @@ class CodexRunner(AgentRunner):
     def _validate_request(request: RunnerRequest) -> None:
         if not isinstance(request.model_id, str) or not request.model_id.strip():
             raise RunnerError("invalid_request", "model is invalid")
+        if request.web_access not in {"disabled", "live"}:
+            raise RunnerError("invalid_request", "web access policy is invalid")
 
     def _image_paths(self, image_paths: tuple[Path, ...], workspace: Path) -> list[Path]:
         return resolve_image_paths(
@@ -240,6 +243,8 @@ class CodexRunner(AgentRunner):
             if request.effort not in {"low", "medium", "high"}:
                 raise RunnerError("invalid_request", "reasoning effort is invalid")
             command.extend(["-c", f'model_reasoning_effort="{request.effort}"'])
+        if request.web_access == "live":
+            command.extend(["-c", 'web_search="live"'])
         command.extend(["-m", request.model_id])
         for image_path in image_paths:
             command.extend(["--image", str(image_path)])
@@ -252,7 +257,7 @@ class CodexRunner(AgentRunner):
             input_json = json.dumps(request.input_payload, ensure_ascii=False, sort_keys=True)
         except (TypeError, ValueError) as exc:
             raise RunnerError("invalid_request", "request could not be prepared") from exc
-        return (
+        prompt = (
             f"{request.system_prompt}\n\n"
             "Input JSON:\n"
             f"{input_json}\n\n"
@@ -260,6 +265,13 @@ class CodexRunner(AgentRunner):
             "Do not inspect or modify unrelated files. "
             "You may read only the explicitly listed image files for this request."
         )
+        if request.web_access == "live":
+            prompt += (
+                "\n\nLive web research is required for this request. "
+                "Use Codex native live web search. Do not answer from model memory; "
+                "return only evidence observed during this request."
+            )
+        return prompt
 
     @classmethod
     def _parse_result(

@@ -96,6 +96,7 @@ class ClaudeRunner(AgentRunner):
                     supports_text_input=True,
                     supports_image_input=self.supports_image_input,
                     supports_structured_output=True,
+                    supports_live_web=True,
                 )
                 for model_id in self.configured_models
             ],
@@ -206,6 +207,8 @@ class ClaudeRunner(AgentRunner):
     def _validate_request(request: RunnerRequest) -> None:
         if not isinstance(request.model_id, str) or not request.model_id.strip():
             raise RunnerError("invalid_request", "model is invalid")
+        if request.web_access not in {"disabled", "live"}:
+            raise RunnerError("invalid_request", "web access policy is invalid")
 
     def _image_paths(self, image_paths: tuple[Path, ...], workspace: Path) -> list[Path]:
         return resolve_image_paths(
@@ -230,10 +233,10 @@ class ClaudeRunner(AgentRunner):
             request.model_id,
             "--permission-mode",
             "plan",
-            "--json-schema",
-            serialized_schema,
-            "-",
         ]
+        if request.web_access == "live":
+            command.extend(["--allowedTools", "WebSearch", "WebFetch"])
+        command.extend(["--json-schema", serialized_schema, "-"])
         if request.effort is not None:
             if request.effort not in {"low", "medium", "high", "thinking"}:
                 raise RunnerError("invalid_request", "reasoning effort is invalid")
@@ -258,6 +261,12 @@ class ClaudeRunner(AgentRunner):
         if paths:
             prompt += "\n\nImage files available for this request:\n" + "\n".join(
                 f"- {path}" for path in paths
+            )
+        if request.web_access == "live":
+            prompt += (
+                "\n\nlive web research is required for this request. "
+                "Use only the WebSearch and WebFetch tools available to this runner. "
+                "Do not answer from model memory; return only evidence observed during this request."
             )
         return prompt
 

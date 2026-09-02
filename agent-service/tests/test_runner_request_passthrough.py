@@ -7,6 +7,7 @@ from app.runners.antigravity import AntigravityRunner
 from app.runners.base import RunnerError, RunnerRequest, resolve_image_paths
 from app.runners.claude import ClaudeRunner
 from app.runners.codex import CodexRunner
+from app.schemas import AgentName
 
 
 def test_all_cli_runners_receive_backend_prompt_and_payload_without_task_mutation(
@@ -37,6 +38,36 @@ def test_all_cli_runners_receive_backend_prompt_and_payload_without_task_mutatio
     for prompt in prompts:
         assert prompt.startswith(request.system_prompt)
         assert f"Input JSON:\n{input_json}\n\n" in prompt
+
+
+def test_agent_service_generation_contract_carries_live_web_policy_to_runner_request() -> None:
+    from app.profiles import ResolvedProfile, legacy_profile
+    from app.schemas import AgentGenerationInput
+    from app.service import AgentService
+
+    request = AgentGenerationInput.model_validate(
+        {
+            "agent": "antigravity",
+            "model_id": "gemini-test",
+            "system_prompt": "Use live evidence.",
+            "input_payload": {},
+            "response_schema": {"type": "object"},
+            "schema_name": "live_web_test",
+            "temperature": 0,
+            "max_output_tokens": 100,
+            "timeout_seconds": 5,
+            "web_access": "live",
+        }
+    )
+    resolved = ResolvedProfile(
+        profile=legacy_profile(AgentName.ANTIGRAVITY, "gemini-test"),
+        model_id="gemini-test",
+        effort=None,
+    )
+
+    runner_request = AgentService._runner_request(request, resolved=resolved)
+
+    assert runner_request.web_access == "live"
 
 
 def test_runner_image_paths_allow_only_workspace_or_shared_media_root(tmp_path: Path) -> None:

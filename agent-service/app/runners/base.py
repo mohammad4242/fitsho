@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from ..schemas import AgentName, RunnerCapabilities
 
@@ -68,6 +68,7 @@ class RunnerRequest:
     image_paths: tuple[Path, ...] = ()
     # Set only by Agent Service's allow-listed profile resolver.
     effort: str | None = None
+    web_access: Literal["disabled", "live"] = "disabled"
 
 
 @dataclass(frozen=True)

@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 from collections.abc import Callable, Coroutine
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -162,6 +163,32 @@ def test_run_parses_structured_output_and_uses_exact_model_argv(
     ]
     assert "shell" not in kwargs
     assert kwargs["workspace"] == tmp_path
+
+
+def test_live_web_preserves_antigravity_browser_environment_and_prompt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        captured["command"] = command
+        captured.update(kwargs)
+        return ProcessResult(0, success_output(structured=True), "")
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setattr(antigravity, "run_process", fake_run_process)
+    request = replace(make_request(), web_access="live")
+    result = run(AntigravityRunner(workspace=tmp_path).run(request))
+
+    assert result.payload == {"answer": "ok"}
+    assert captured["env"]["PLAYWRIGHT_BROWSERS_PATH"] == (
+        "/home/agent/.gemini/antigravity-cli/fitsho-cache/playwright"
+    )
+    assert "live web research" in captured["command"][2]
+    assert "browser/web tools" in captured["command"][2]
+    assert "--sandbox" in captured["command"]
+    assert "--dangerously-skip-permissions" in captured["command"]
 
 
 def test_run_rewrites_pydantic_decimal_pattern_only_for_agy_schema(
