@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import {
   clampGhostPhotoTransform,
@@ -19,6 +20,7 @@ export type GhostPhotoRenderer = (
 
 type GhostPhotoEditorProps = {
   file: File;
+  sex?: Sex | null;
   view: BodyPhotoView;
   onConfirm: (file: File) => void | Promise<void>;
   onCancel: () => void;
@@ -50,6 +52,7 @@ const rotationStep = 1;
 
 export function GhostPhotoEditor({
   file,
+  sex,
   view,
   onConfirm,
   onCancel,
@@ -168,7 +171,7 @@ export function GhostPhotoEditor({
             style={{ transform: ghostPhotoTransformStyle(transform) }}
           />
         )}
-        <GhostOverlayGuide view={view} />
+        <GhostOverlayGuide sex={sex} view={view} />
       </div>
       <p className="ghost-photo-editor__privacy-note">{t("bodyPhotos.editor.privacyNote")}</p>
       <p className="ghost-photo-editor__status" role="status">

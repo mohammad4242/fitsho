@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { GHOST_PRIVACY_CUT_RATIO } from "./ghostPhotoEditor";
 import {
@@ -20,6 +21,7 @@ export type CameraFallbackReason =
 type CameraFacingMode = "user" | "environment";
 
 type GhostCameraCaptureProps = {
+  sex?: Sex | null;
   view: BodyPhotoView;
   onFileCaptured: (file: File) => void | Promise<void>;
   onFallback: (reason: CameraFallbackReason) => void;
@@ -39,6 +41,7 @@ const cameraConstraints = {
 } as const;
 
 export function GhostCameraCapture({
+  sex,
   view,
   onFileCaptured,
   onFallback,
@@ -315,7 +318,7 @@ export function GhostCameraCapture({
             alt={t("bodyPhotos.camera.capturedAlt", { view: t(`bodyPhotos.views.${view}`) })}
           />
         )}
-        <GhostOverlayGuide view={view} />
+        <GhostOverlayGuide sex={sex} view={view} />
       </div>
       <canvas ref={canvasRef} className="ghost-camera__canvas" aria-hidden="true" />
       {capturedFile === null ? (

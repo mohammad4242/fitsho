@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../shared/apiClient";
+import { useOptionalProfile } from "../profile/ProfileContext";
 
 import {
   createBodyPhotoSession,
@@ -41,6 +42,8 @@ export function BodyPhotoWizard({
   purpose?: BodyPhotoPurpose;
 }) {
   const { t } = useTranslation();
+  const profileContext = useOptionalProfile();
+  const profileSex = profileContext?.profile?.sex ?? null;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editSessionId = searchParams.get("sessionId");
@@ -374,6 +377,7 @@ export function BodyPhotoWizard({
         {editorFile !== null ? (
           <GhostPhotoEditor
             file={editorFile}
+            sex={profileSex}
             view={view}
             onConfirm={handleEditorConfirm}
             onCancel={() => setEditorFile(null)}
@@ -384,6 +388,7 @@ export function BodyPhotoWizard({
             <div className="body-photo-source-actions">
               {captureMode === "camera" ? (
                 <GhostCameraCapture
+                  sex={profileSex}
                   view={view}
                   onFileCaptured={handleCameraFile}
                   onFallback={handleCameraFallback}

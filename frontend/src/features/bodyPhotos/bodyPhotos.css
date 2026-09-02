@@ -44,16 +44,8 @@
 .ghost-overlay { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
 .ghost-overlay__privacy-cut { position: absolute; z-index: 2; inset-inline: 0; top: 18%; border-top: 2px solid var(--fitsho-aqua); color: white; text-align: center; text-shadow: 0 1px 3px rgb(0 0 0 / 85%); }
 .ghost-overlay__privacy-cut span { display: inline-block; margin-top: .35rem; padding: .2rem .45rem; border-radius: 999px; background: rgb(8 18 17 / 72%); font-size: .7rem; font-weight: 850; }
-.ghost-overlay__silhouette { --ghost-line-color: var(--fitsho-aqua); position: absolute; inset: 19% 18% 4%; display: grid; place-items: center; opacity: .72; }
-.ghost-overlay__silhouette svg { width: 100%; height: 100%; overflow: visible; }
-.ghost-overlay__silhouette-fill { fill: color-mix(in srgb, var(--ghost-line-color) 14%, transparent); stroke: none; }
-.ghost-overlay__silhouette-outline { fill: none; stroke: var(--ghost-line-color); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
-.ghost-overlay__silhouette-detail { fill: none; stroke: var(--ghost-line-color); stroke-width: 1.05; stroke-linecap: round; stroke-dasharray: 2.5 2; opacity: .9; }
-.ghost-overlay__silhouette-profile { fill: none; stroke: var(--ghost-line-color); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; opacity: .95; }
-.ghost-overlay__silhouette-centerline { fill: none; stroke: var(--ghost-line-color); stroke-width: .8; stroke-linecap: round; stroke-dasharray: 1.5 2.5; opacity: .8; }
-.ghost-overlay__silhouette--side { inset-inline: 23%; opacity: .75; }
-.ghost-overlay__silhouette--back { --ghost-line-color: var(--fitsho-amber); }
-.ghost-overlay__silhouette--back .ghost-overlay__silhouette-fill { fill: color-mix(in srgb, var(--fitsho-amber) 14%, transparent); }
+.ghost-overlay__asset-frame { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.ghost-overlay__asset { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; opacity: .38; mix-blend-mode: screen; }
 .body-photo-wizard__heading { display: grid; gap: .65rem; }
 .body-photo-wizard h1, .body-photo-wizard h2, .body-progress-page h1 { margin: 0; }
 .body-photo-wizard p, .body-progress-page p { margin: 0; line-height: 1.7; }

@@ -24,11 +24,24 @@ vi.mock("./BodyAnalysisRequirementsStep", async () => {
   }
   return { BodyAnalysisRequirementsStep: MockRequirements };
 });
+vi.mock("../../features/profile/ProfileContext", () => ({
+  useOptionalProfile: () => ({ profile: { sex: "female" } }),
+}));
 vi.mock("./GhostCameraCapture", () => ({
-  GhostCameraCapture: ({ onFileCaptured }: { onFileCaptured: (file: File) => void }) => (
-    <button type="button" onClick={() => onFileCaptured(camera.file)}>
-      Test camera capture
-    </button>
+  GhostCameraCapture: ({
+    onFileCaptured,
+    sex,
+    view,
+  }: {
+    onFileCaptured: (file: File) => void;
+    sex?: string | null;
+    view: string;
+  }) => (
+    <div data-testid="test-camera" data-sex={sex ?? "missing"} data-view={view}>
+      <button type="button" onClick={() => onFileCaptured(camera.file)}>
+        Test camera capture
+      </button>
+    </div>
   ),
 }));
 
@@ -69,6 +82,8 @@ it("sends a camera file through the same processor used by upload", async () => 
   );
 
   await user.click(await screen.findByRole("button", { name: /use guided camera/i }));
+  expect(screen.getByTestId("test-camera")).toHaveAttribute("data-sex", "female");
+  expect(screen.getByTestId("test-camera")).toHaveAttribute("data-view", "front");
   await user.click(screen.getByRole("button", { name: /test camera capture/i }));
 
   await waitFor(() => expect(processor.process).toHaveBeenCalledWith(camera.file, "front"));
