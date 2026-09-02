@@ -60,6 +60,74 @@ export type BodyArea =
   | "symmetry"
   | "visible_alignment_or_posture";
 
+export type BodyAnalysisExperienceSex = "female" | "male" | "other" | "prefer_not_to_say";
+export type BodyAnalysisExperienceGoal =
+  | "lose_weight"
+  | "gain_weight"
+  | "fat_loss"
+  | "build_muscle"
+  | "body_recomposition"
+  | "strength"
+  | "improve_fitness"
+  | "maintain_weight";
+
+export type BodyAnalysisExperienceMessage = {
+  message_key: string;
+  parameters: Record<string, unknown>;
+};
+
+export type BodyAnalysisExperienceDirection = {
+  status: "aligned_with_current_goal" | "goal_confirmation_required";
+  goal: BodyAnalysisExperienceGoal | null;
+  reason_codes: string[];
+};
+
+export type BodyAnalysisExperienceIndicator = {
+  status: string;
+  message_key: string;
+  parameters: Record<string, unknown>;
+};
+
+export type BodyAnalysisExperienceIndicators = {
+  body_proportion: BodyAnalysisExperienceIndicator;
+  upper_lower_balance: BodyAnalysisExperienceIndicator;
+  visible_symmetry: BodyAnalysisExperienceIndicator;
+  current_development_focus: BodyAnalysisExperienceIndicator;
+};
+
+export type BodyAnalysisExperienceRegion = {
+  area: Exclude<BodyArea, "symmetry" | "visible_alignment_or_posture">;
+  display_classification: "stronger" | "balanced" | "room_to_grow" | "primary_priority" | "not_assessable";
+  insight_key: string | null;
+  insight_parameters: Record<string, unknown>;
+  supporting_views: BodyPhotoView[];
+};
+
+export type BodyAnalysisExperienceV4 = {
+  schema_version: "4.0";
+  presentation_version: "body-analysis-experience-v1";
+  assessment_status: VisualAssessmentStatus;
+  input_snapshot: {
+    captured_at: string;
+    confirmed_at: string;
+    profile_updated_at: string;
+    measurement_id: string;
+    measurement_measured_at: string;
+    sex: BodyAnalysisExperienceSex;
+    height_cm: number;
+    weight_kg: number;
+    shoulder_circumference_cm: number;
+    waist_circumference_cm: number;
+    hip_circumference_cm: number;
+    selected_goal: BodyAnalysisExperienceGoal;
+  };
+  first_impression: BodyAnalysisExperienceMessage;
+  direction: BodyAnalysisExperienceDirection;
+  indicators: BodyAnalysisExperienceIndicators;
+  regions: BodyAnalysisExperienceRegion[];
+  review_notice_code: string;
+};
+
 export type BodyAnalysisClassification =
   | "strength"
   | "mild_lag"
@@ -195,6 +263,7 @@ export type BodyAnalysis = {
   result_source: "ai" | "coach" | "doctor" | null;
   normalized_result: NormalizedBodyAnalysis | null;
   visual_result?: VisualPhysiqueAssessment | VisualPhysiqueAssessmentV3 | null;
+  experience_result?: BodyAnalysisExperienceV4 | null;
   overall_confidence: number | null;
   coach_review: SpecialistReviewState;
   doctor_review: SpecialistReviewState;

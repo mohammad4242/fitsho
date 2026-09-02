@@ -111,7 +111,8 @@
 .body-analysis-review small { color: var(--muted); }
 .body-analysis-review--approved { border-color: #8ccab3; background: #effaf5; }
 .body-analysis-review--approved > span { color: #0c6b48; background: #cfeede; }
-.body-analysis-review--changes_required, .body-analysis-review--rejected { border-color: #e6b0ad; background: #fff4f3; }
+.body-analysis-review--pending, .body-analysis-review--changes_required, .body-analysis-review--rejected { border-color: #e6b0ad; background: #fff4f3; }
+.body-analysis-review--pending > span, .body-analysis-review--changes_required > span, .body-analysis-review--rejected > span { color: #a13f32; background: #ffe0dc; }
 .body-analysis-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
 .body-analysis-group { --finding-color: #737f7e; display: grid; align-content: start; gap: .65rem; padding: 1rem; border: 1px solid color-mix(in srgb, var(--finding-color) 40%, white); border-top: .3rem solid var(--finding-color); border-radius: .85rem; background: color-mix(in srgb, var(--finding-color) 6%, white); }
 .body-analysis-group--strength { --finding-color: #24815b; }
@@ -622,3 +623,103 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 /* The authenticated shell owns mobile back navigation and page-scale typography. */
 .body-analysis-page__header h1 { font-size: clamp(1.65rem, 4vw, 2.2rem); letter-spacing: 0; }
 .body-analysis-page__header { padding-block: .5rem .8rem; }
+
+/* V4 result: one quiet reading surface with the map as the signature interaction. */
+.body-analysis-result--v4 { gap: 1.25rem; }
+.body-analysis-v4__first-impression,
+.body-analysis-v4__direction { display: grid; gap: .55rem; padding: clamp(1.1rem, 3vw, 1.7rem); border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-xl); background: linear-gradient(135deg, rgb(80 223 206 / 10%), var(--fitsho-surface)); box-shadow: var(--fitsho-shadow-soft); }
+.body-analysis-v4__first-impression h2,
+.body-analysis-v4__first-impression p,
+.body-analysis-v4__first-impression small,
+.body-analysis-v4__direction h2,
+.body-analysis-v4__direction p { margin: 0; }
+.body-analysis-v4__first-impression h2 { max-width: 14ch; color: var(--fitsho-text); font-size: clamp(1.7rem, 5vw, 3rem); line-height: 1.1; }
+.body-analysis-v4__first-impression > p:not(.eyebrow) { max-width: 38rem; color: var(--fitsho-text); font-size: clamp(1.05rem, 2.4vw, 1.35rem); font-weight: 700; line-height: 1.65; }
+.body-analysis-v4__first-impression small { color: var(--fitsho-muted); }
+.body-analysis-v4__direction { grid-template-columns: minmax(0, 1fr) auto; align-items: end; border-color: color-mix(in srgb, var(--fitsho-aqua) 42%, var(--fitsho-line)); background: linear-gradient(135deg, rgb(80 223 206 / 6%), var(--fitsho-surface)); }
+.body-analysis-v4__direction > strong,
+.body-analysis-v4__direction > p { grid-column: 1 / -1; margin: 0; }
+.body-analysis-v4__direction > strong { color: var(--fitsho-aqua); font-size: 1.05rem; }
+.body-analysis-v4__direction > p { color: var(--fitsho-muted); line-height: 1.65; }
+.body-analysis-v4__indicators,
+.body-analysis-v4__insights { display: grid; gap: .8rem; }
+.body-analysis-v4__indicators > header,
+.body-analysis-v4__insights > header { display: grid; gap: .25rem; }
+.body-analysis-v4__indicators > header p,
+.body-analysis-v4__indicators > header h2,
+.body-analysis-v4__insights > header p,
+.body-analysis-v4__insights > header h2 { margin: 0; }
+.body-analysis-v4__indicator-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+.body-analysis-v4__indicator { display: grid; grid-template-columns: auto 1fr; gap: .7rem; align-items: start; min-width: 0; padding: .9rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
+.body-analysis-v4__indicator-mark { width: .7rem; height: .7rem; margin-top: .35rem; border-radius: 50%; background: var(--fitsho-muted); box-shadow: 0 0 0 .28rem color-mix(in srgb, var(--fitsho-muted) 13%, transparent); }
+.body-analysis-v4__indicator[data-status="available"] .body-analysis-v4__indicator-mark,
+.body-analysis-v4__indicator[data-status="balanced"] .body-analysis-v4__indicator-mark,
+.body-analysis-v4__indicator[data-status="no_clear_difference"] .body-analysis-v4__indicator-mark { background: var(--fitsho-success); box-shadow: 0 0 0 .28rem color-mix(in srgb, var(--fitsho-success) 13%, transparent); }
+.body-analysis-v4__indicator[data-status="primary_priority"] .body-analysis-v4__indicator-mark,
+.body-analysis-v4__indicator[data-status="clear_visible_difference"] .body-analysis-v4__indicator-mark { background: var(--fitsho-danger); box-shadow: 0 0 0 .28rem color-mix(in srgb, var(--fitsho-danger) 13%, transparent); }
+.body-analysis-v4__indicator[data-status="room_to_grow"] .body-analysis-v4__indicator-mark,
+.body-analysis-v4__indicator[data-status="minor_visible_difference"] .body-analysis-v4__indicator-mark { background: var(--fitsho-amber); box-shadow: 0 0 0 .28rem color-mix(in srgb, var(--fitsho-amber) 13%, transparent); }
+.body-analysis-v4__indicator h3,
+.body-analysis-v4__indicator p { margin: 0; }
+.body-analysis-v4__indicator h3 { font-size: .95rem; }
+.body-analysis-v4__indicator p { margin-top: .3rem; color: var(--fitsho-muted); font-size: .84rem; line-height: 1.6; }
+.body-analysis-v4__insights > ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; margin: 0; padding: 0; list-style: none; }
+.body-analysis-v4__insights > ul > li { display: grid; gap: .3rem; padding: .85rem; border: 1px solid var(--fitsho-line); border-inline-start: .3rem solid var(--fitsho-muted); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); }
+.body-analysis-v4__insights > ul > li[data-classification="primary_priority"] { border-inline-start-color: var(--fitsho-danger); }
+.body-analysis-v4__insights > ul > li[data-classification="room_to_grow"] { border-inline-start-color: var(--fitsho-amber); }
+.body-analysis-v4__insights > ul > li[data-classification="stronger"] { border-inline-start-color: var(--fitsho-success); }
+.body-analysis-v4__insights p { margin: 0; color: var(--fitsho-muted); line-height: 1.6; }
+.body-analysis-v4__review-notice { margin: 0; padding: .75rem .9rem; border-inline-start: .3rem solid var(--fitsho-danger); border-radius: var(--fitsho-radius-sm); color: var(--fitsho-text); background: color-mix(in srgb, var(--fitsho-danger) 9%, var(--fitsho-surface)); line-height: 1.6; }
+.body-analysis-v4__review-notice--approved { border-inline-start-color: var(--fitsho-success); background: color-mix(in srgb, var(--fitsho-success) 9%, var(--fitsho-surface)); }
+
+.body-area-map { display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; padding: clamp(.85rem, 2vw, 1.25rem); }
+.body-area-map__header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+.body-area-map__header h2,
+.body-area-map__header p { margin: 0; }
+.body-area-map__header > p { max-width: 20rem; color: var(--fitsho-muted); font-size: .82rem; line-height: 1.55; text-align: end; }
+.body-area-map__views { display: inline-flex; width: fit-content; gap: .25rem; padding: .25rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-pill); background: var(--fitsho-canvas); }
+.body-area-map__view-button { min-height: 2.5rem; padding: .45rem .8rem; border: 0; border-radius: var(--fitsho-radius-pill); color: var(--fitsho-muted); background: transparent; font: inherit; font-size: .82rem; font-weight: 800; cursor: pointer; }
+.body-area-map__view-button[aria-selected="true"] { color: var(--fitsho-text); background: var(--fitsho-aqua); }
+.body-area-map__figure { position: relative; min-height: 30rem; aspect-ratio: 2 / 3; display: grid; place-items: center; overflow: hidden; border-radius: var(--fitsho-radius-lg); background: radial-gradient(circle at 50% 35%, rgb(80 223 206 / 17%), transparent 42%), var(--fitsho-canvas); }
+.body-area-map__svg { width: min(100%, 18rem); height: 100%; display: grid; place-items: center; }
+.body-area-map__svg > svg { width: 100%; height: 100%; overflow: visible; }
+.body-map-hit-paths path { cursor: pointer; fill: transparent; stroke: transparent; pointer-events: all; }
+.body-map-hit-paths path[data-classification="stronger"] { fill: color-mix(in srgb, var(--fitsho-success) 18%, transparent); stroke: var(--fitsho-success); }
+.body-map-hit-paths path[data-classification="room_to_grow"] { fill: color-mix(in srgb, var(--fitsho-amber) 18%, transparent); stroke: var(--fitsho-amber); }
+.body-map-hit-paths path[data-classification="primary_priority"] { fill: color-mix(in srgb, var(--fitsho-danger) 22%, transparent); stroke: var(--fitsho-danger); }
+.body-map-hit-paths path[data-classification="not_assessable"] { fill: color-mix(in srgb, var(--fitsho-muted) 14%, transparent); stroke: var(--fitsho-muted); }
+.body-map-hit-paths path.is-selected { stroke-width: 20; stroke-dasharray: 4 3; }
+.body-map-hit-paths path:focus { outline: none; }
+.body-map-hit-paths path:focus-visible { filter: drop-shadow(0 0 .4rem var(--fitsho-aqua)); stroke: var(--fitsho-aqua); stroke-width: 20; }
+.body-area-map__selection { display: grid; gap: .35rem; padding: .9rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-lg); background: color-mix(in srgb, var(--fitsho-aqua) 7%, var(--fitsho-surface)); }
+.body-area-map__selection h3,
+.body-area-map__selection p,
+.body-area-map__selection small { margin: 0; }
+.body-area-map__selection h3 { font-size: 1.15rem; }
+.body-area-map__selection > p:not(.body-area-map__classification) { color: var(--fitsho-muted); line-height: 1.6; }
+.body-area-map__classification { width: fit-content; padding: .25rem .5rem; border-radius: var(--fitsho-radius-pill); color: var(--fitsho-text); background: var(--fitsho-line); font-size: .78rem; font-weight: 850; }
+.body-area-map__classification[data-classification="primary_priority"] { background: color-mix(in srgb, var(--fitsho-danger) 17%, var(--fitsho-surface)); }
+.body-area-map__classification[data-classification="room_to_grow"] { background: color-mix(in srgb, var(--fitsho-amber) 17%, var(--fitsho-surface)); }
+.body-area-map__classification[data-classification="stronger"] { background: color-mix(in srgb, var(--fitsho-success) 17%, var(--fitsho-surface)); }
+.body-area-map__selection small { color: var(--fitsho-muted); font-size: .76rem; }
+.body-area-map__regions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.body-area-map__region { width: 100%; min-height: 3.3rem; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .6rem; padding: .6rem .7rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); color: var(--fitsho-text); background: var(--fitsho-surface); font: inherit; text-align: start; cursor: pointer; }
+.body-area-map__region:hover,
+.body-area-map__region.is-selected { border-color: var(--fitsho-aqua); background: color-mix(in srgb, var(--fitsho-aqua) 8%, var(--fitsho-surface)); }
+.body-area-map__region-index { display: grid; place-items: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; color: var(--fitsho-text); background: var(--fitsho-line); font-size: .7rem; font-weight: 900; }
+.body-area-map__region[data-classification="primary_priority"] .body-area-map__region-index { color: var(--fitsho-surface); background: var(--fitsho-danger); }
+.body-area-map__region[data-classification="room_to_grow"] .body-area-map__region-index { background: var(--fitsho-amber); }
+.body-area-map__region[data-classification="stronger"] .body-area-map__region-index { background: var(--fitsho-success); }
+.body-area-map__region > span:last-child { display: grid; gap: .15rem; min-width: 0; }
+.body-area-map__region strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.body-area-map__region small { color: var(--fitsho-muted); font-size: .75rem; }
+
+@media (max-width: 640px) {
+  .body-analysis-v4__direction { grid-template-columns: 1fr; }
+  .body-analysis-v4__indicator-grid,
+  .body-analysis-v4__insights > ul,
+  .body-area-map__regions { grid-template-columns: 1fr; }
+  .body-area-map__header { align-items: start; flex-direction: column; }
+  .body-area-map__header > p { text-align: start; }
+  .body-area-map__figure { min-height: 23rem; }
+}

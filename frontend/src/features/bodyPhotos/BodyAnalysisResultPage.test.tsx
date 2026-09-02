@@ -365,6 +365,64 @@ it("shows view-specific retake reasons when photo validation rejects an upload",
   expect(alert).toHaveTextContent("Use brighter, even lighting");
 });
 
+it("uses the v4 experience branch without falling back to legacy confidence or checklist UI", async () => {
+  const v4 = {
+    ...analysis,
+    schema_version: "4.0",
+    normalized_result: null,
+    visual_result: null,
+    overall_confidence: null,
+    experience_result: {
+      schema_version: "4.0",
+      presentation_version: "body-analysis-experience-v1",
+      assessment_status: "complete",
+      input_snapshot: {
+        captured_at: "2026-08-03T10:00:00Z",
+        confirmed_at: "2026-08-03T10:00:00Z",
+        profile_updated_at: "2026-08-03T09:00:00Z",
+        measurement_id: "measurement-1",
+        measurement_measured_at: "2026-08-03T09:00:00Z",
+        sex: "female",
+        height_cm: 165,
+        weight_kg: 62,
+        shoulder_circumference_cm: 100,
+        waist_circumference_cm: 72,
+        hip_circumference_cm: 98,
+        selected_goal: "maintain_weight",
+      },
+      first_impression: {
+        message_key: "body_analysis.first_impression.balanced",
+        parameters: { areas: [] },
+      },
+      direction: {
+        status: "aligned_with_current_goal",
+        goal: "maintain_weight",
+        reason_codes: ["current_goal_preserved"],
+      },
+      indicators: {
+        body_proportion: { status: "available", message_key: "body_analysis.indicators.body_proportion", parameters: { shoulder_to_waist_ratio: 1.39, waist_to_hip_ratio: 0.73 } },
+        upper_lower_balance: { status: "balanced", message_key: "body_analysis.indicators.upper_lower_balance", parameters: { state: "balanced" } },
+        visible_symmetry: { status: "no_clear_difference", message_key: "body_analysis.indicators.visible_symmetry", parameters: { state: "no_clear_difference" } },
+        current_development_focus: { status: "balanced", message_key: "body_analysis.indicators.current_development_focus", parameters: { areas: [] } },
+      },
+      regions: Array.from(["shoulders", "chest", "back", "lats", "arms", "forearms", "waist_midsection", "glutes", "quads", "hamstrings", "calves"] as const, (area) => ({
+        area,
+        display_classification: "balanced" as const,
+        insight_key: null,
+        insight_parameters: {},
+        supporting_views: ["front"] as const,
+      })),
+      review_notice_code: "review_pending",
+    },
+  } as BodyAnalysis;
+  api.getBodyPhotoAnalysis.mockResolvedValue(v4);
+  renderPage();
+
+  expect(await screen.findByRole("heading", { name: "What stands out first" })).toBeInTheDocument();
+  expect(screen.queryByText(/overall confidence/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/three-view checklist/i)).not.toBeInTheDocument();
+});
+
 it("offers editing only for the rejected photo view", async () => {
   api.getBodyPhotoAnalysis.mockResolvedValue({
     ...analysis,

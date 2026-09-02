@@ -53,15 +53,13 @@ it("links each photo session to its result and keeps the workflow optional", asy
   expect(screen.getByText(/Optional — add standardized/i)).toBeInTheDocument();
 });
 
-it("uses the Bod scanner visual and shows an actionable empty state", async () => {
+it("shows an actionable empty state without the deprecated scanner visual", async () => {
   api.getBodyPhotoSessions.mockResolvedValue({ items: [] });
   render(<MemoryRouter><BodyProgressPage /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: "No photo registered" })).toBeInTheDocument();
-  expect(screen.getByRole("img", { name: "Body analysis scanner preview" })).toHaveAttribute(
-    "src",
-    "/body-analysis/Bod.png",
-  );
+  expect(screen.queryByRole("img", { name: "Body analysis scanner preview" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Body scan and tracking")).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Register new photos" })).toHaveAttribute(
     "href",
     "/body-progress/new",

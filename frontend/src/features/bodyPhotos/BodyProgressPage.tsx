@@ -81,21 +81,6 @@ export function BodyProgressPage() {
         <p>{t("bodyPhotos.optionalIntro")}</p>
       </header>
 
-      <figure className="body-analysis-visual">
-        <img
-          alt={t("bodyPhotos.mainVisualAlt")}
-          height="1842"
-          loading="eager"
-          src="/body-analysis/Bod.png"
-          width="854"
-        />
-        <span className="body-analysis-visual__scan-line" aria-hidden="true" />
-        <figcaption>
-          <span aria-hidden="true" />
-          {t("bodyPhotos.scannerLabel")}
-        </figcaption>
-      </figure>
-
       {sessions === null && !failed && (
         <p className="body-analysis-home__status" role="status">{t("bodyPhotos.loading")}</p>
       )}

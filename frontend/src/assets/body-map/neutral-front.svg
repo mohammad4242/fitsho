@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 420">
+  <title>Neutral front body map</title>
+  <desc>Abstract front-facing neutral body artwork with stable anatomical region identifiers.</desc>
+  <g fill="#1c4541" stroke="#50dfce" stroke-width="2" stroke-linejoin="round">
+    <circle cx="120" cy="34" r="20" fill="#102422"/>
+    <path id="region-shoulders" d="M90 66 Q120 57 150 66 L167 91 L152 110 L88 110 L73 91 Z"/>
+    <path id="region-chest" d="M88 90 Q120 78 152 90 L147 132 L93 132 Z"/>
+    <path id="region-back" d="M93 94 L147 94 L152 132 L88 132 Z" opacity=".15"/>
+    <path id="region-lats" d="M88 105 L103 111 L100 157 L84 145 Z"/>
+    <path id="region-arms" d="M74 88 L88 102 L80 151 L64 144 Z M166 88 L152 102 L160 151 L176 144 Z"/>
+    <path id="region-forearms" d="M64 144 L80 151 L68 205 L53 198 Z M176 144 L160 151 L172 205 L187 198 Z"/>
+    <path id="region-waist_midsection" d="M100 130 L140 130 L145 178 L95 178 Z"/>
+    <path id="region-glutes" d="M95 168 L145 168 L150 203 L90 203 Z" opacity=".15"/>
+    <path id="region-quads" d="M95 176 L119 176 L116 273 L91 273 Z M121 176 L145 176 L149 273 L124 273 Z"/>
+    <path id="region-hamstrings" d="M95 176 L119 176 L116 273 L91 273 Z M121 176 L145 176 L149 273 L124 273 Z" opacity=".15"/>
+    <path id="region-calves" d="M91 273 L116 273 L111 375 L91 375 Z M124 273 L149 273 L149 375 L129 375 Z"/>
+  </g>
+  <g class="body-map-hit-paths" fill="transparent" stroke="transparent" stroke-width="16" stroke-linejoin="round" pointer-events="all">
+    <path id="hit-region-shoulders" data-region-id="region-shoulders" d="M90 66 Q120 57 150 66 L167 91 L152 110 L88 110 L73 91 Z"/>
+    <path id="hit-region-chest" data-region-id="region-chest" d="M88 90 Q120 78 152 90 L147 132 L93 132 Z"/>
+    <path id="hit-region-back" data-region-id="region-back" d="M93 94 L147 94 L152 132 L88 132 Z"/>
+    <path id="hit-region-lats" data-region-id="region-lats" d="M88 105 L103 111 L100 157 L84 145 Z M152 105 L137 111 L140 157 L156 145 Z"/>
+    <path id="hit-region-arms" data-region-id="region-arms" d="M74 88 L88 102 L80 151 L64 144 Z M166 88 L152 102 L160 151 L176 144 Z"/>
+    <path id="hit-region-forearms" data-region-id="region-forearms" d="M64 144 L80 151 L68 205 L53 198 Z M176 144 L160 151 L172 205 L187 198 Z"/>
+    <path id="hit-region-waist_midsection" data-region-id="region-waist_midsection" d="M100 130 L140 130 L145 178 L95 178 Z"/>
+    <path id="hit-region-glutes" data-region-id="region-glutes" d="M95 168 L145 168 L150 203 L90 203 Z"/>
+    <path id="hit-region-quads" data-region-id="region-quads" d="M95 176 L119 176 L116 273 L91 273 Z M121 176 L145 176 L149 273 L124 273 Z"/>
+    <path id="hit-region-hamstrings" data-region-id="region-hamstrings" d="M95 176 L119 176 L116 273 L91 273 Z M121 176 L145 176 L149 273 L124 273 Z"/>
+    <path id="hit-region-calves" data-region-id="region-calves" d="M91 273 L116 273 L111 375 L91 375 Z M124 273 L149 273 L149 375 L129 375 Z"/>
+  </g>
+</svg>
