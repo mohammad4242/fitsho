@@ -147,7 +147,7 @@ const limits = {
 const bodySeedConfidenceThreshold = 0.35;
 const bodyProtectionMinConfidence = 0.20;
 const bodyProtectionMaxConfidence = 0.70;
-const backgroundFeatherRatio = 0.08;
+const backgroundFeatherRatio = 0.06;
 
 const landmarkGroups = {
   shoulders: [11, 12],

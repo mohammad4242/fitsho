@@ -315,6 +315,24 @@ describe("compositeBodyOnNeutralBackground", () => {
     expect(farBackground).toEqual([160, 163, 161, 255]);
   });
 
+  it("reaches neutral gray sooner after the preserved near-body band", () => {
+    const size = 100;
+    const source = solidSource(size, size, [20, 30, 40]);
+    const result = compositeBodyOnNeutralBackground(
+      source,
+      size,
+      size,
+      distanceTestMask(size),
+      [160, 163, 161],
+    );
+
+    const nearBody = pixelAt(result, size, 53, 50);
+    const mediumDistance = pixelAt(result, size, 58, 50);
+
+    expect(nearBody[0]).toBeLessThan(mediumDistance[0]);
+    expect(mediumDistance).toEqual([160, 163, 161, 255]);
+  });
+
   it("fails when the segmentation mask has no valid body seed", () => {
     const size = 4;
     const source = solidSource(size, size, [20, 30, 40]);
