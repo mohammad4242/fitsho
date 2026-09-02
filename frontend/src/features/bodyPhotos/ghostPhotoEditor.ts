@@ -1,9 +1,12 @@
+import type { BodyPhotoView } from "./types";
+
 export const GHOST_EDITOR_OUTPUT = {
   width: 1200,
   height: 1800,
 } as const;
 
 export const GHOST_PRIVACY_CUT_RATIO = 0.16;
+export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.08;
 export const GHOST_EDITOR_OUTPUT_HEIGHT = Math.round(
   GHOST_EDITOR_OUTPUT.height * (1 - GHOST_PRIVACY_CUT_RATIO),
 );
@@ -28,6 +31,14 @@ export const GHOST_EDITOR_DEFAULT_TRANSFORM: GhostPhotoTransform = {
   scale: 1,
   rotation: 0,
 };
+
+export function ghostPrivacyCutRatioForView(view: BodyPhotoView): number {
+  return view === "back" ? GHOST_BACK_PRIVACY_CUT_RATIO : GHOST_PRIVACY_CUT_RATIO;
+}
+
+export function ghostEditorOutputHeightForView(view: BodyPhotoView): number {
+  return Math.round(GHOST_EDITOR_OUTPUT.height * (1 - ghostPrivacyCutRatioForView(view)));
+}
 
 export type GhostPhotoRenderPlan = {
   canvasWidth: number;
@@ -107,6 +118,7 @@ export function createGhostPhotoRenderPlan(
   sourceWidth: number,
   sourceHeight: number,
   transform: GhostPhotoTransform,
+  view: BodyPhotoView = "front",
 ): GhostPhotoRenderPlan {
   if (sourceWidth <= 0 || sourceHeight <= 0) {
     throw new Error("Ghost photo source dimensions must be positive");
@@ -116,10 +128,12 @@ export function createGhostPhotoRenderPlan(
     GHOST_EDITOR_OUTPUT.width / sourceWidth,
     GHOST_EDITOR_OUTPUT.height / sourceHeight,
   );
-  const privacyCutPixels = Math.round(GHOST_EDITOR_OUTPUT.height * GHOST_PRIVACY_CUT_RATIO);
+  const privacyCutPixels = Math.round(
+    GHOST_EDITOR_OUTPUT.height * ghostPrivacyCutRatioForView(view),
+  );
   return {
     canvasWidth: GHOST_EDITOR_OUTPUT.width,
-    canvasHeight: GHOST_EDITOR_OUTPUT_HEIGHT,
+    canvasHeight: ghostEditorOutputHeightForView(view),
     sourceWidth,
     sourceHeight,
     baseScale,
@@ -136,11 +150,12 @@ export function createGhostPhotoRenderPlan(
 export async function renderGhostPhoto(
   file: File,
   transform: GhostPhotoTransform,
+  view: BodyPhotoView = "front",
   runtime: GhostPhotoCanvasRuntime = browserGhostPhotoCanvasRuntime,
 ): Promise<File> {
   const image = await runtime.decode(file);
   try {
-    const plan = createGhostPhotoRenderPlan(image.width, image.height, transform);
+    const plan = createGhostPhotoRenderPlan(image.width, image.height, transform, view);
     const canvas = runtime.createCanvas(plan.canvasWidth, plan.canvasHeight);
     canvas.width = plan.canvasWidth;
     canvas.height = plan.canvasHeight;

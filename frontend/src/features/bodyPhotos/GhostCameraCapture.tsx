@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { GhostScaleControls } from "./GhostScaleControls";
-import { GHOST_PRIVACY_CUT_RATIO } from "./ghostPhotoEditor";
+import { ghostPrivacyCutRatioForView } from "./ghostPhotoEditor";
 import {
   createMediaPipeLivePoseGuide,
   type LivePoseGuidance,
@@ -82,7 +82,7 @@ export function GhostCameraCapture({
       onFallback("camera_error");
       return;
     }
-    const sourceY = Math.round(video.videoHeight * GHOST_PRIVACY_CUT_RATIO);
+    const sourceY = Math.round(video.videoHeight * ghostPrivacyCutRatioForView(view));
     const outputHeight = video.videoHeight - sourceY;
     canvas.width = video.videoWidth;
     canvas.height = outputHeight;

@@ -1,3 +1,4 @@
+import { ghostPrivacyCutRatioForView } from "./ghostPhotoEditor";
 import { mediaPipePoseAssets } from "./mediaPipePoseDetector";
 import type { BodyPhotoView } from "./types";
 import type { NormalizedBodyLandmark } from "./processor";
@@ -45,7 +46,6 @@ export type LivePoseGuideFactory = (view: BodyPhotoView) => Promise<LivePoseGuid
 
 const poseBoxIndices = [11, 12, 23, 24, 27, 28] as const;
 const lowResolutionWidth = 256;
-const privacyCutRatio = 0.18;
 
 export class MediaPipeLivePoseGuide implements LivePoseGuide {
   private closed = false;
@@ -147,6 +147,7 @@ function evaluateGuidance(
   video: HTMLVideoElement,
 ): LivePoseWarning[] {
   const warnings: LivePoseWarning[] = [];
+  const privacyCutRatio = ghostPrivacyCutRatioForView(view);
   if (poses.length === 0) warnings.push("person_missing");
   if (poses.length > 1) warnings.push("multiple_people");
 

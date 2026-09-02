@@ -48,6 +48,15 @@ it("applies a uniform centered scale to the Ghost asset frame", () => {
   expect(frame).toHaveStyle({ transform: "scale(0.95)" });
 });
 
+it("places the back privacy line above the unchanged front line", () => {
+  const back = render(<GhostOverlayGuide sex="female" view="back" />);
+  expect(back.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "8%" });
+  back.unmount();
+
+  const front = render(<GhostOverlayGuide sex="female" view="front" />);
+  expect(front.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "16%" });
+});
+
 it("mirrors only the side Ghost for a left profile", () => {
   const { container } = render(
     <GhostOverlayGuide sex="female" view="side" sideProfile="left" scale={0.95} />,

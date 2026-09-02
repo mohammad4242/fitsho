@@ -7,8 +7,18 @@ import {
   createGhostPhotoRenderPlan,
   ghostPhotoTransformStyle,
   isGhostFramingWithinTolerance,
+  type GhostPhotoRenderPlan,
+  type GhostPhotoTransform,
   type GhostPhotoCanvasRuntime,
 } from "./ghostPhotoEditor";
+import type { BodyPhotoView } from "./types";
+
+const createGhostPhotoRenderPlanForView = createGhostPhotoRenderPlan as (
+  sourceWidth: number,
+  sourceHeight: number,
+  transform: GhostPhotoTransform,
+  view: BodyPhotoView,
+) => GhostPhotoRenderPlan;
 
 describe("ghost photo transform", () => {
   it("starts centered with a neutral transform", () => {
@@ -77,6 +87,19 @@ describe("ghost photo transform", () => {
       },
     });
   });
+
+  it("raises the privacy boundary for the back render plan", () => {
+    expect(createGhostPhotoRenderPlanForView(
+      1600,
+      2400,
+      GHOST_EDITOR_DEFAULT_TRANSFORM,
+      "back",
+    )).toMatchObject({
+      canvasHeight: 1656,
+      privacyCutPixels: 144,
+      draw: { translateY: 756 },
+    });
+  });
 });
 
 describe("renderGhostPhoto", () => {
@@ -106,6 +129,7 @@ describe("renderGhostPhoto", () => {
     const output = await renderGhostPhoto(
       new File(["source"], "front.png", { type: "image/png" }),
       GHOST_EDITOR_DEFAULT_TRANSFORM,
+      "front",
       runtime,
     );
 
@@ -114,5 +138,38 @@ describe("renderGhostPhoto", () => {
     expect(canvas.width).toBe(1200);
     expect(canvas.height).toBe(1512);
     expect(calls).toEqual(["fillRect", "save", "translate", "rotate", "scale", "drawImage", "restore"]);
+  });
+
+  it("renders the higher back crop into a taller clean JPEG", async () => {
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ({
+        fillStyle: "",
+        fillRect: () => undefined,
+        save: () => undefined,
+        translate: () => undefined,
+        rotate: () => undefined,
+        scale: () => undefined,
+        drawImage: () => undefined,
+        restore: () => undefined,
+      }),
+    };
+    const runtime: GhostPhotoCanvasRuntime = {
+      decode: async () => ({ source: {} as unknown as CanvasImageSource, width: 1600, height: 2400, dispose: () => undefined }),
+      createCanvas: () => canvas,
+      toJpeg: async () => new Blob(["clean"], { type: "image/jpeg" }),
+    };
+
+    const { renderGhostPhoto } = await import("./ghostPhotoEditor");
+    await renderGhostPhoto(
+      new File(["source"], "back.png", { type: "image/png" }),
+      GHOST_EDITOR_DEFAULT_TRANSFORM,
+      "back",
+      runtime,
+    );
+
+    expect(canvas.width).toBe(1200);
+    expect(canvas.height).toBe(1656);
   });
 });

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { ghostOverlayAssets, resolveGhostOverlayVariant } from "./ghostOverlayAssets";
+import { ghostPrivacyCutRatioForView } from "./ghostPhotoEditor";
 import type { Sex } from "../profile/types";
 import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
@@ -22,7 +23,11 @@ export function GhostOverlayGuide({
     : `scale(${scale})`;
   return (
     <div className="ghost-overlay" aria-label={t("bodyPhotos.camera.overlayLabel")}>
-      <div className="ghost-overlay__privacy-cut" aria-label={t("bodyPhotos.camera.privacyCut")}>
+      <div
+        className="ghost-overlay__privacy-cut"
+        aria-label={t("bodyPhotos.camera.privacyCut")}
+        style={{ top: `${ghostPrivacyCutRatioForView(view) * 100}%` }}
+      >
         <span>{t("bodyPhotos.camera.privacyCut")}</span>
       </div>
       <div

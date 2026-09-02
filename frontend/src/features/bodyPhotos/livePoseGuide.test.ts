@@ -68,4 +68,17 @@ describe("MediaPipeLivePoseGuide", () => {
       warnings: [],
     });
   });
+
+  it("allows a shoulder at the back privacy boundary", () => {
+    const landmarks = pose();
+    landmarks[11]!.y = 0.1;
+    landmarks[12]!.y = 0.1;
+    const guide = new MediaPipeLivePoseGuide(
+      "back",
+      { detectForVideo: vi.fn().mockReturnValue({ landmarks: [landmarks] }) },
+    );
+
+    expect(guide.check({ videoWidth: 720, videoHeight: 1280 } as HTMLVideoElement, 10).warnings)
+      .not.toContain("body_out_of_frame");
+  });
 });

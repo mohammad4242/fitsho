@@ -17,6 +17,7 @@ import type { BodyPhotoSide, BodyPhotoView } from "./types";
 export type GhostPhotoRenderer = (
   file: File,
   transform: GhostPhotoTransform,
+  view: BodyPhotoView,
 ) => Promise<File>;
 
 type GhostPhotoEditorProps = {
@@ -142,7 +143,7 @@ export function GhostPhotoEditor({
     if (confirming) return;
     setConfirming(true);
     setError(null);
-    void renderPhoto(file, transform)
+    void renderPhoto(file, transform, view)
       .then((editedFile) => onConfirm(editedFile))
       .catch(() => setError(t("bodyPhotos.editor.renderError")))
       .finally(() => setConfirming(false));

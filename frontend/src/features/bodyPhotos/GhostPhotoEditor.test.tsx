@@ -149,8 +149,29 @@ it("returns the clean rendered file only after confirmation", async () => {
   await waitFor(() => expect(renderPhoto).toHaveBeenCalledWith(
     sourceFile,
     GHOST_EDITOR_DEFAULT_TRANSFORM,
+    "front",
   ));
   expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ type: "image/jpeg" }));
+});
+
+it("passes the back view to the clean renderer", async () => {
+  render(
+    <GhostPhotoEditor
+      file={sourceFile}
+      view="back"
+      onConfirm={vi.fn()}
+      onCancel={vi.fn()}
+      renderPhoto={renderPhoto}
+    />,
+  );
+
+  await fireEvent.click(screen.getByRole("button", { name: /use this photo/i }));
+
+  await waitFor(() => expect(renderPhoto).toHaveBeenCalledWith(
+    sourceFile,
+    GHOST_EDITOR_DEFAULT_TRANSFORM,
+    "back",
+  ));
 });
 
 it("cancels without rendering or confirming", () => {
