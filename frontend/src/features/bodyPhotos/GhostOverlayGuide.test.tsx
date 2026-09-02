@@ -47,3 +47,12 @@ it("applies a uniform centered scale to the Ghost asset frame", () => {
   expect(frame).not.toBeNull();
   expect(frame).toHaveStyle({ transform: "scale(0.95)" });
 });
+
+it("mirrors only the side Ghost for a left profile", () => {
+  const { container } = render(
+    <GhostOverlayGuide sex="female" view="side" sideProfile="left" scale={0.95} />,
+  );
+  const frame = container.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
+
+  expect(frame).toHaveStyle({ transform: "scaleX(-1) scale(0.95)" });
+});

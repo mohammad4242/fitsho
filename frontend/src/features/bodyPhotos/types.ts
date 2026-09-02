@@ -1,4 +1,5 @@
 export type BodyPhotoView = "front" | "side" | "back";
+export type BodyPhotoSide = "right" | "left";
 export type BodyPhotoPurpose = "initial_plan" | "cycle_completion" | "progress_check";
 export type BodyPhotoSessionState =
   | "draft"
