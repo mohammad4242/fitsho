@@ -372,9 +372,29 @@ it("shows accepted catalogue prices to an admin only", async () => {
   expect(screen.getByText("Toman per kilogram")).toBeVisible();
 });
 
-it("lets an admin inquire food price with AI and save the suggested price", async () => {
+const successfulPriceResearch: api.SingleFoodPriceResearchResponse = {
+  food_slug: "chicken-breast",
+  food_name_fa: "سینه مرغ",
+  status: "success",
+  candidate_reference_price_toman: "385000",
+  canonical_unit: "TOMAN_PER_KG",
+  quotes: [
+    {
+      source_name: "دیجی‌کالا",
+      source_url: "https://digikala.com/product/1",
+      source_domain: "digikala.com",
+      product_title: "سینه مرغ ۱ کیلوگرمی",
+      normal_price_toman: "385000",
+      promotional_price_toman: null,
+      package_quantity: "1",
+      package_unit: "kg",
+      match_accepted: true,
+    },
+  ],
+};
+
+it("runs admin food price inquiry in the background without opening a dialog", async () => {
   const user = userEvent.setup();
-  await i18n.changeLanguage("fa");
   auth.isAdmin = true;
   vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({
     ...response,
@@ -385,60 +405,91 @@ it("lets an admin inquire food price with AI and save the suggested price", asyn
       },
     }],
   });
-  vi.mocked(api.researchFoodPrice).mockResolvedValue({
-    food_slug: "chicken-breast",
-    food_name_fa: "سینه مرغ",
-    status: "success",
-    candidate_reference_price_toman: "385000",
-    canonical_unit: "TOMAN_PER_KG",
-    quotes: [
-      {
-        source_name: "دیجی‌کالا",
-        source_url: "https://digikala.com/product/1",
-        source_domain: "digikala.com",
-        product_title: "سینه مرغ ۱ کیلوگرمی",
-        normal_price_toman: "385000",
-        promotional_price_toman: null,
-        package_quantity: "1",
-        package_unit: "kg",
-        match_accepted: true,
+  let resolveResearch: ((value: api.SingleFoodPriceResearchResponse) => void) | undefined;
+  vi.mocked(api.researchFoodPrice).mockReturnValueOnce(
+    new Promise<api.SingleFoodPriceResearchResponse>((resolve) => {
+      resolveResearch = (value) => resolve(value);
+    }),
+  );
+
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  const inquireButton = await screen.findByRole("button", { name: "استعلام قیمت سینه مرغ" });
+  await user.click(inquireButton);
+
+  await waitFor(() => expect(api.researchFoodPrice).toHaveBeenCalledWith("chicken-breast", true));
+  expect(screen.getByText("در حال استعلام…")).toBeVisible();
+  expect(screen.getByRole("button", { name: "در حال استعلام قیمت سینه مرغ" })).toBeDisabled();
+  expect(screen.queryByRole("dialog", { name: "ویرایش قیمت سینه مرغ" })).not.toBeInTheDocument();
+
+  resolveResearch?.(successfulPriceResearch);
+  await waitFor(() => expect(screen.queryByText("در حال استعلام…")).not.toBeInTheDocument());
+});
+
+it("shows the applied price from a successful background inquiry", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({
+    ...response,
+    items: [{
+      ...response.items[0],
+      price: {
+        status: "not_found",
       },
-    ],
+    }],
   });
-  vi.mocked(api.saveFoodPriceOverride).mockResolvedValue({
-    id: "override-1",
-    source: "manual_override",
+  vi.mocked(api.researchFoodPrice).mockResolvedValue(successfulPriceResearch);
+
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  const inquireButton = await screen.findByRole("button", { name: "استعلام قیمت سینه مرغ" });
+  await user.click(inquireButton);
+
+  expect(await screen.findByText("۳۸۵٬۰۰۰ تومان")).toBeVisible();
+  expect(api.researchFoodPrice).toHaveBeenCalledWith("chicken-breast", true);
+  expect(api.saveFoodPriceOverride).not.toHaveBeenCalled();
+  expect(api.getAdminFoodCatalogue).toHaveBeenCalledTimes(1);
+});
+
+it("shows the backend failure reason and keeps the old price state", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({
+    ...response,
+    items: [{ ...response.items[0], price: { status: "not_found" } }],
+  });
+  vi.mocked(api.researchFoodPrice).mockResolvedValue({
+    ...successfulPriceResearch,
+    status: "failed",
+    candidate_reference_price_toman: null,
+    canonical_unit: null,
+    quotes: [],
+    message: "Agent Service در دسترس نیست",
   });
 
   render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
 
-  // Check that the "استعلام قیمت" button is visible
-  const inquireButton = await screen.findByRole("button", { name: "استعلام قیمت سینه مرغ" });
-  expect(inquireButton).toBeVisible();
+  await user.click(await screen.findByRole("button", { name: "استعلام قیمت سینه مرغ" }));
 
-  // Click it
-  await user.click(inquireButton);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Agent Service در دسترس نیست");
+  expect(screen.getByText("یافت نشد")).toBeVisible();
+  expect(screen.getByRole("button", { name: "استعلام قیمت سینه مرغ" })).toBeEnabled();
+});
 
-  // Verify that researchFoodPrice was called with "chicken-breast"
-  await waitFor(() => expect(api.researchFoodPrice).toHaveBeenCalledWith("chicken-breast"));
+it("shows a connection error when background price inquiry rejects", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({
+    ...response,
+    items: [{ ...response.items[0], price: { status: "not_found" } }],
+  });
+  vi.mocked(api.researchFoodPrice).mockRejectedValueOnce(new Error("اتصال به سرویس برقرار نشد"));
 
-  // Verify that the discovered quotes and suggested price appear
-  expect(await screen.findByText(/دیجی‌کالا/)).toBeVisible();
-  expect(screen.getAllByText("۳۸۵٬۰۰۰ تومان").length).toBeGreaterThanOrEqual(1);
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
 
-  // Price input should now be filled with 385000
-  const priceInput = screen.getByLabelText("قیمت (تومان)");
-  expect(priceInput).toHaveValue("385000");
+  await user.click(await screen.findByRole("button", { name: "استعلام قیمت سینه مرغ" }));
 
-  // Save the price
-  await user.click(screen.getByRole("button", { name: "ذخیره قیمت" }));
-  await waitFor(() =>
-    expect(api.saveFoodPriceOverride).toHaveBeenCalledWith(
-      "chicken-breast",
-      expect.objectContaining({
-        reference_price_toman: "385000",
-        canonical_unit: "TOMAN_PER_KG",
-      })
-    )
-  );
+  expect(await screen.findByRole("alert")).toHaveTextContent("اتصال به سرویس برقرار نشد");
+  expect(screen.getByText("یافت نشد")).toBeVisible();
+  expect(screen.getByRole("button", { name: "استعلام قیمت سینه مرغ" })).toBeEnabled();
 });
