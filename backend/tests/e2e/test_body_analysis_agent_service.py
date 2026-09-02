@@ -165,11 +165,7 @@ def test_body_analysis_agent_service_e2e_uses_current_images_and_normalizes_v4(
         return httpx.Response(
             200,
             json={
-                "payload": (
-                    {"accepted": True, "confidence": 0.99, "issues": []}
-                    if len(calls) == 1
-                    else _v4_payload()
-                ),
+                "payload": _v4_payload(),
                 "agent": "antigravity",
                 "model_id": "gemini-test",
                 "request_id": f"agent-e2e-{len(calls)}",
@@ -211,7 +207,7 @@ def test_body_analysis_agent_service_e2e_uses_current_images_and_normalizes_v4(
         assert analysis.normalized_result["requires_doctor_review"] is True
         session = db.get(BodyPhotoSession, session_id)
         assert session is not None and session.state is BodyPhotoSessionState.REVIEW_PENDING
-        assert len(calls) == 2
+        assert len(calls) == 1
         assert all(path == "/v1/analyze-stored-images" for path, _ in calls)
     finally:
         import asyncio

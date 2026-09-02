@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
 from pydantic import ValidationError
 from sqlalchemy import UniqueConstraint
@@ -235,13 +237,10 @@ def test_normalizes_schema_v4_evidence_and_projects_posture_as_uncertain() -> No
     projector = getattr(normalization, "visual_assessment_v4_to_normalized", None)
     assert normalizer is not None
     assert projector is not None
+    assert tuple(inspect.signature(projector).parameters) == ("assessment",)
 
     evidence = normalizer(_v4_payload())
-    normalized = projector(
-        evidence,
-        preflight_confidence=0.97,
-        usable_views={"front", "side", "back"},
-    )
+    normalized = projector(evidence)
 
     assert evidence.schema_version == "4.0"
     assert len(evidence.area_observations) == 11
@@ -315,11 +314,7 @@ def test_v4_caps_high_evidence_when_an_area_lacks_required_views() -> None:
         "suggested_training_emphasis": ["lat_width"],
     }
 
-    normalized = projector(
-        normalizer(payload),
-        preflight_confidence=1.0,
-        usable_views={"front", "side", "back"},
-    )
+    normalized = projector(normalizer(payload))
     lats = next(finding for finding in normalized.findings if finding.body_area is BodyArea.LATS)
 
     assert lats.classification is BodyAnalysisClassification.MILD_LAG

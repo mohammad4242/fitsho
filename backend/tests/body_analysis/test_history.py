@@ -70,6 +70,7 @@ def _session_with_analysis(
     *,
     created_at: datetime,
     classification: BodyAnalysisClassification,
+    legacy_photo_validation: bool = False,
 ) -> tuple[BodyPhotoSession, BodyAnalysisResultVersion]:
     session = BodyPhotoSession(
         user_id=user.id,
@@ -102,6 +103,17 @@ def _session_with_analysis(
         schema_version="1.0",
         status=BodyAnalysisStatus.REVIEW_PENDING,
         normalized_result=payload,
+        raw_result=(
+            {
+                "photo_validation": {
+                    "accepted": False,
+                    "confidence": 0.94,
+                    "issues": [{"view": "front", "reasons": ["low_lighting"]}],
+                }
+            }
+            if legacy_photo_validation
+            else None
+        ),
         overall_confidence=0.9,
         completed_at=created_at,
         created_at=created_at,
@@ -150,6 +162,7 @@ def test_timeline_is_one_owner_scoped_read_model_with_protected_photos(
         owner,
         created_at=now,
         classification=BodyAnalysisClassification.STRENGTH,
+        legacy_photo_validation=True,
     )
     comparison = BodyProgressComparisonService(db).create_for_result(
         current_version.id,
@@ -168,6 +181,11 @@ def test_timeline_is_one_owner_scoped_read_model_with_protected_photos(
     ]
     latest = payload["items"][0]
     assert latest["analysis"]["id"] == str(current_version.analysis_id)
+    assert latest["analysis"]["photo_validation"] == {
+        "accepted": False,
+        "confidence": 0.94,
+        "issues": [{"view": "front", "reasons": ["low_lighting"]}],
+    }
     assert latest["snapshot"] is None
     assert latest["review_state"]["coach"]["decision"] is None
     assert latest["photos"][0]["content_url"].startswith(

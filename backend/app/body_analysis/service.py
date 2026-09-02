@@ -45,8 +45,6 @@ from app.body_analysis.providers import (
     StructuredGenerationResponse,
 )
 from app.body_analysis.schemas import (
-    BodyPhotoPreflight,
-    BodyPhotoValidationIssue,
     NormalizedBodyAnalysis,
     visual_physique_provider_schema,
     visual_physique_v3_provider_schema,
@@ -247,10 +245,17 @@ suggested_training_emphasis empty. Never provide exercises or programming instru
 is provisional and requires human coach and doctor review."""
 
 _ANALYSIS_V4_PROMPT = """You are Fitsho's evidence-only v4 body analysis assessor.
-Review only the supplied labeled, standardized headless body photos. Return exactly one JSON object
-that matches the supplied schema. The response contains controlled visual observations only: no
-free-form prose, messages, recommendations, diagnoses, posture claims, pain or injury claims,
-body-composition estimates, genetic claims, or comparisons with other people.
+The supplied front, side, and back images have already passed Fitsho's local browser-side photo
+validation and processing pipeline. Do not perform photo acceptance or preflight. Analyze the
+supplied standardized images only for the structured physique evidence requested by the schema.
+Return exactly one JSON object that matches the supplied schema. The response contains controlled
+visual observations only: no free-form prose, messages, recommendations, diagnoses, posture claims,
+pain or injury claims, body-composition estimates, genetic claims, or comparisons with other people.
+
+Do not accept or reject entire photos, return photo-quality decisions, decide scan usability, or
+decide whether enough views are usable. Use low evidence or not_assessable only for a specific
+body-area observation when that observation cannot responsibly be evaluated. For this execution,
+set assessment_status to complete.
 
 Assess these eleven visible areas: shoulders, chest, back, lats, arms, forearms, waist_midsection,
 glutes, quads, hamstrings, and calves. For each area choose only the supplied classification,
@@ -260,31 +265,6 @@ Use high evidence only when the relevant area is clearly supported by its requir
 not_assessable or low evidence when a responsible visual comparison is not possible. Never infer
 sex, goals, measurements, health, posture, strength, training history, or future potential.
 Do not include any field that is not declared by the schema."""
-
-
-_PHOTO_PREFLIGHT_PROMPT = """You validate three user-selected headless body photos standardized
-onto a neutral-gray background before any body-development analysis. Head removal was performed by
-the user before upload as an intentional privacy measure: absence of
-the head is expected and must never trigger full_body_not_visible. For this task, full body means
-the visible body from the neck or shoulder line through the feet; do not require a face, head, or
-hair. Use full_body_not_visible only when a material region such as torso, hips, thighs, knees,
-calves, or feet is actually cropped out. Check each labelled view for exactly one visible person,
-the requested view, usable lighting, adequate sharpness, clothing that does not obscure body
-contours, and a background that does not materially obstruct the body. Fitted
-athletic shorts or underwear are acceptable when the torso, arms, legs, and visible body
-contours remain clear; do not reject them merely for being fitted or dark. Do not reject a photo
-merely because its background is a gym or a room, contains equipment, furniture, a bed, a mirror,
-or is visually cluttered. A mirror selfie is acceptable when exactly one full body is clearly
-visible; a phone is acceptable when it does not cover relevant body regions. Reject background
-only when people or objects materially hide body regions or make the requested view ambiguous.
-Count only real people in the foreground: ignore people shown in posters, wall art, mirrors, gym
-branding, screens, or other background imagery. Do not infer nudity, identity, health, or body
-composition. Reject only when the evidence clearly fails a listed requirement; when uncertain,
-use photo_uncertain rather than guessing. Set accepted to true when at least two views are usable;
-when one view is unusable, include its view-specific reasons in issues so the later assessment can
-be partial. Set accepted to false only when fewer than two views are usable. Return only the
-requested JSON."""
-
 
 class BodyAnalysisService:
     def __init__(self, db: Session) -> None:
@@ -612,44 +592,16 @@ class BodyAnalysisService:
             schema_version=analysis.schema_version,
         )
         response: StructuredGenerationResponse | None = None
-        preflight_response: StructuredGenerationResponse | None = None
         try:
             if (
                 execution_config.schema_version == "4.0"
                 and self._snapshot_from_analysis(analysis) is None
             ):
                 raise BodyAnalysisInputError("analysis input snapshot is missing")
-            analysis.status = BodyAnalysisStatus.VALIDATING
             analysis.attempt_count += 1
             analysis.started_at = datetime.now(UTC)
-            analysis.session.state = BodyPhotoSessionState.VALIDATING
-            self._db.commit()
             images = self._prepare_images(analysis)
             image_inputs = self._image_inputs(images)
-            preflight_response = await provider.analyze_images(
-                self._preflight_request(execution_config),
-                images=image_inputs,
-            )
-            preflight = BodyPhotoPreflight.model_validate(preflight_response.payload)
-            if preflight.accepted and preflight.confidence < execution_config.minimum_confidence:
-                preflight = BodyPhotoPreflight(
-                    accepted=False,
-                    confidence=preflight.confidence,
-                    issues=tuple(
-                        BodyPhotoValidationIssue(view=photo.view, reasons=("photo_uncertain",))
-                        for photo in images
-                    ),
-                )
-            self._validate_response_cost(preflight_response, execution_config)
-            if not preflight.accepted:
-                self._record_photo_rejection(analysis, preflight, preflight_response)
-                return self._analysis(analysis_id)
-            rejected_views = {issue.view for issue in preflight.issues}
-            analysis_images = tuple(
-                image for image in image_inputs if BodyPhotoView(image.label) not in rejected_views
-            )
-            if len(analysis_images) < 2:
-                raise BodyAnalysisInputError("fewer than two photos are usable for analysis")
             analysis.status = BodyAnalysisStatus.ANALYZING
             analysis.session.state = BodyPhotoSessionState.ANALYZING
             self._db.commit()
@@ -663,7 +615,7 @@ class BodyAnalysisService:
                         else self._profile_context(analysis.session.user_id)
                     ),
                 ),
-                images=analysis_images,
+                images=image_inputs,
             )
             visual_result = None
             if execution_config.schema_version == "2.0":
@@ -676,15 +628,10 @@ class BodyAnalysisService:
                 visual_result = visual_v3.model_dump(mode="json")
             elif execution_config.schema_version == "4.0":
                 evidence = normalize_visual_physique_assessment_v4(response.payload)
-                expected_status = "complete" if len(analysis_images) == 3 else "partial"
-                if evidence.assessment_status != expected_status:
+                if evidence.assessment_status != "complete":
                     raise BodyAnalysisInputError("unexpected v4 assessment status")
                 try:
-                    normalized = visual_assessment_v4_to_normalized(
-                        evidence,
-                        preflight_confidence=preflight.confidence,
-                        usable_views={BodyPhotoView(image.label) for image in analysis_images},
-                    )
+                    normalized = visual_assessment_v4_to_normalized(evidence)
                 except ValueError as error:
                     raise BodyAnalysisInputError("v4 evidence projection failed") from error
             else:
@@ -698,7 +645,6 @@ class BodyAnalysisService:
             self._validate_response_cost(response, execution_config)
             analysis.raw_result = self._raw_result_with(
                 analysis,
-                photo_validation=preflight.model_dump(mode="json"),
                 analysis=response.payload,
             )
             analysis.normalized_result = normalized.model_dump(mode="json")
@@ -706,15 +652,9 @@ class BodyAnalysisService:
             analysis.overall_confidence = normalized.overall_confidence
             analysis.model_id = response.model_id
             analysis.provider_request_id = response.provider_request_id
-            analysis.input_tokens = self._sum_optional_int(
-                preflight_response.input_tokens, response.input_tokens
-            )
-            analysis.output_tokens = self._sum_optional_int(
-                preflight_response.output_tokens, response.output_tokens
-            )
-            analysis.request_cost = self._sum_optional_decimal(
-                preflight_response.cost, response.cost
-            )
+            analysis.input_tokens = response.input_tokens
+            analysis.output_tokens = response.output_tokens
+            analysis.request_cost = response.cost
             analysis.error_code = None
             analysis.error_message = None
             analysis.status = BodyAnalysisStatus.REVIEW_PENDING
@@ -755,12 +695,6 @@ class BodyAnalysisService:
                 analysis.input_tokens = response.input_tokens
                 analysis.output_tokens = response.output_tokens
                 analysis.request_cost = response.cost
-            elif preflight_response is not None:
-                analysis.model_id = preflight_response.model_id
-                analysis.provider_request_id = preflight_response.provider_request_id
-                analysis.input_tokens = preflight_response.input_tokens
-                analysis.output_tokens = preflight_response.output_tokens
-                analysis.request_cost = preflight_response.cost
             analysis.status = BodyAnalysisStatus.FAILED
             analysis.error_code = provider_error.code.value
             analysis.error_message = self._safe_failure_message(provider_error.code)
@@ -954,28 +888,6 @@ class BodyAnalysisService:
             for photo in images
         )
 
-    def _record_photo_rejection(
-        self,
-        analysis: BodyAnalysis,
-        preflight: BodyPhotoPreflight,
-        response: StructuredGenerationResponse,
-    ) -> None:
-        analysis.raw_result = self._raw_result_with(
-            analysis,
-            photo_validation=preflight.model_dump(mode="json"),
-        )
-        analysis.model_id = response.model_id
-        analysis.provider_request_id = response.provider_request_id
-        analysis.input_tokens = response.input_tokens
-        analysis.output_tokens = response.output_tokens
-        analysis.request_cost = response.cost
-        analysis.status = BodyAnalysisStatus.FAILED
-        analysis.error_code = "photo_validation_failed"
-        analysis.error_message = "Your photos need to be retaken. Review the view-specific reasons."
-        analysis.completed_at = datetime.now(UTC)
-        analysis.session.state = self._session_state_after_failure(analysis)
-        self._db.commit()
-
     @staticmethod
     def _validate_response_cost(
         response: StructuredGenerationResponse, config: AnalysisExecutionConfig
@@ -986,18 +898,6 @@ class BodyAnalysisService:
             and response.cost > config.max_cost_per_request
         ):
             raise BodyAnalysisInputError("analysis cost exceeds the configured limit")
-
-    @staticmethod
-    def _sum_optional_int(left: int | None, right: int | None) -> int | None:
-        if left is None and right is None:
-            return None
-        return (left or 0) + (right or 0)
-
-    @staticmethod
-    def _sum_optional_decimal(left: Decimal | None, right: Decimal | None) -> Decimal | None:
-        if left is None and right is None:
-            return None
-        return (left or Decimal("0")) + (right or Decimal("0"))
 
     @staticmethod
     def _request(
@@ -1079,22 +979,6 @@ class BodyAnalysisService:
                 else None
             ),
         }
-
-    @staticmethod
-    def _preflight_request(config: AnalysisExecutionConfig) -> StructuredGenerationRequest:
-        return StructuredGenerationRequest(
-            system_prompt=_PHOTO_PREFLIGHT_PROMPT,
-            input_payload={"task": "validate_processed_body_views"},
-            response_schema=BodyPhotoPreflight.model_json_schema(),
-            schema_name="fitsho_body_photo_preflight",
-            route=ModelRoute(
-                primary_model=config.primary_model,
-                fallback_models=config.fallback_models,
-            ),
-            provider_preferences=config.routing_preferences,
-            temperature=0,
-            max_output_tokens=min(config.max_output_tokens, 900),
-        )
 
     @staticmethod
     def _safe_provider_error(provider: AIProvider, error: Exception) -> AIProviderError:

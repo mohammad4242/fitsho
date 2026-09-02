@@ -52,11 +52,7 @@ def test_v4_presentation_uses_deterministic_keys_and_effective_normalized_result
 
     payload = _v4_payload()
     evidence = normalize_visual_physique_assessment_v4(payload)
-    normalized = visual_assessment_v4_to_normalized(
-        evidence,
-        preflight_confidence=0.9,
-        usable_views={"front", "side", "back"},
-    )
+    normalized = visual_assessment_v4_to_normalized(evidence)
     experience = builder(
         normalized_result=normalized,
         evidence=evidence,
@@ -97,18 +93,10 @@ def test_v4_presentation_map_follows_the_current_normalized_version() -> None:
         "suggested_training_emphasis": ["lat_width"],
     }
     evidence = normalize_visual_physique_assessment_v4(payload)
-    normalized = visual_assessment_v4_to_normalized(
-        evidence,
-        preflight_confidence=0.9,
-        usable_views={"front", "side", "back"},
-    )
+    normalized = visual_assessment_v4_to_normalized(evidence)
     corrected_payload = _v4_payload()
     corrected_evidence = normalize_visual_physique_assessment_v4(corrected_payload)
-    corrected_normalized = visual_assessment_v4_to_normalized(
-        corrected_evidence,
-        preflight_confidence=0.9,
-        usable_views={"front", "side", "back"},
-    )
+    corrected_normalized = visual_assessment_v4_to_normalized(corrected_evidence)
 
     experience = builder(
         normalized_result=normalized,

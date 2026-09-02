@@ -10,7 +10,6 @@ def test_agent_service_contains_no_fitsho_production_task_prompts() -> None:
     )
     forbidden_markers = (
         "_ANALYSIS_PROMPT",
-        "_PHOTO_PREFLIGHT_PROMPT",
         "AGENT_BODY_ANALYSIS_PROMPT",
         "CODEX_WORKOUT_PROMPT",
         "CLAUDE_FOOD_PROMPT",

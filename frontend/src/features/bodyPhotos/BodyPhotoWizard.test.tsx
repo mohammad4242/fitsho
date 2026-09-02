@@ -138,6 +138,20 @@ it("requires operational consent before the confirm upload action is enabled", a
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeEnabled();
 });
 
+it("does not upload a photo when browser processing rejects it", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = {
+    process: vi.fn().mockRejectedValue(new BodyPhotoProcessingError("image_too_blurry")),
+  };
+  renderWizard(processor);
+
+  await uploadPhoto(user, "front");
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(/too blurry/i);
+  expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
+  expect(api.uploadBodyPhoto).not.toHaveBeenCalled();
+});
+
 it("opens the Ghost editor for uploads and processes only its confirmed output", async () => {
   const user = userEvent.setup();
   const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("front")) };

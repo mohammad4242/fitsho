@@ -158,18 +158,18 @@ Do not duplicate profile or measurement values in a new table.
 6. Both paths produce a browser `File`.
 7. Both paths call the existing `BrowserBodyPhotoProcessor.process(file, view)`.
 8. The processor performs deterministic format, dimensions, quality, pose, framing, view-family, segmentation, and background normalization.
-9. The existing private upload API stores the processed photo.
-10. Session submission records the existing operational and optional training consents.
-11. `POST /api/v1/body-photo-sessions/{session_id}/analysis` receives:
+9. A failed local validation keeps the user on the current photo step and requires a retake or reselection.
+10. The existing private upload API stores each processed photo only after local validation succeeds.
+11. Session submission records the existing operational and optional training consents.
+12. `POST /api/v1/body-photo-sessions/{session_id}/analysis` receives:
     ```json
     {
       "confirm_measurements_current": true
     }
     ```
-12. In the same queue transaction, the backend validates required fields and captures an immutable input snapshot.
-13. AI preflight checks view usability and returns controlled reason codes.
-14. At least two usable views remain required.
-15. The v4 vision request receives only usable images and view labels. It does not receive sex, goal, BMI, or measurements.
+13. In the same queue transaction, the backend validates required fields and captures an immutable input snapshot.
+14. Analysis starts only when all three browser-approved standardized photos exist: front, side, and back.
+15. The vision model receives all three accepted images and view labels in one v4 evidence-only request. It does not receive sex, goal, BMI, or measurements.
 16. The provider returns structured v4 visual evidence with no final message or goal recommendation.
 17. Fitsho validates the evidence and projects it into the existing normalized 13-area contract.
 18. The normalized result is persisted as result version 1.
@@ -181,6 +181,8 @@ Do not duplicate profile or measurement values in a new table.
     - Current specialist-review state.
 21. The frontend renders the first impression, indicators, body map, sparse insights, and review states.
 22. The workout resolver reads only the normalized result and remains isolated from all presentation changes.
+
+Photo acceptance belongs to the local/browser processing flow. The vision model is called only once, for Body Analysis itself.
 
 ## 6. Exact Responsibility Boundaries
 
@@ -231,13 +233,14 @@ MediaPipe must not:
 
 The vision model owns:
 
-- Final AI preflight usability.
 - Relative visual development observations.
 - Upper/lower visible balance.
 - Visible image-left/image-right difference.
 - Supporting-view selection.
 - Controlled limitation and observation tags.
 - Controlled training-emphasis candidates.
+
+The vision model does not accept or reject photos, make photo-quality decisions, or decide whether a scan is usable. It evaluates body observations in the three standardized images after local acceptance.
 
 It must not generate:
 
@@ -283,6 +286,7 @@ Add `BodyAnalysisEvidenceV4Payload` with `extra="forbid"` and strict validation.
 ```text
 schema_version: "4.0"
 assessment_status: complete | partial
+  (legacy compatibility; new executions must return complete)
 
 area_observations: exactly 11 entries
   area:
@@ -381,7 +385,7 @@ Project the 13 normalized areas as follows:
 - `symmetry` comes from `visible_symmetry`.
 - `visible_alignment_or_posture` is always `uncertain`, has no training emphasis, and receives a visibility limitation. V4 intentionally does not collect posture findings.
 
-For complete accepted scans, normalized overall compatibility confidence is `min(preflight.confidence, 0.85)`. For partial accepted scans, it is `min(preflight.confidence, 0.75)`.
+For new complete v4 executions, normalized overall compatibility confidence uses the deterministic internal ceiling `0.85`. The legacy `partial` literal remains only for backward-compatible stored payloads; new execution does not create a partial analysis path.
 
 ### 7.3 Experience read model
 
@@ -892,7 +896,7 @@ Frontend:
 - Profile updates after queue do not change provider input.
 - Retry without photo changes reuses snapshot.
 - Changed photos require fresh confirmation/snapshot.
-- Snapshot is retained after preflight rejection and provider failure.
+- Snapshot is retained after provider failure.
 - V4 rejects duplicate/missing anatomical areas.
 - V4 rejects free-form extra fields.
 - V4 rejects medical, genetic, body-fat, posture, pain, and diagnosis content structurally.
@@ -1042,7 +1046,7 @@ Actions:
 2. Add required-field validation.
 3. Capture snapshot during queue.
 4. Assign new raw-result dictionaries instead of mutating SQLAlchemy JSON in place.
-5. Preserve snapshot when adding preflight/provider results.
+5. Preserve snapshot when adding the provider result.
 6. Implement retry snapshot rules.
 7. Ensure provider execution reads only the captured snapshot.
 8. Run focused tests, Ruff, and mypy.

@@ -262,7 +262,7 @@ describe("BrowserBodyPhotoProcessor", () => {
     });
   });
 
-  it("allows ambiguous front versus back semantics for AI preflight", async () => {
+  it("allows ambiguous front versus back semantics for local guidance", async () => {
     const { processor } = setup({ viewShape: "front" });
     await expect(processor.process(inputFile(), "back")).resolves.toMatchObject({
       validation: { viewAssessment: "ambiguous" },

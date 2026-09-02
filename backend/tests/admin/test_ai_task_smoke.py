@@ -16,7 +16,6 @@ from app.body_analysis.admin_config.schemas import (
     AgentServiceTaskSmokeRequest,
 )
 from app.body_analysis.admin_config.task_smoke import TaskSmokeResult, run_task_smoke
-from app.body_analysis.enums import BodyArea
 from app.body_analysis.providers.models import (
     ImageInput,
     ModelRoute,
@@ -166,10 +165,8 @@ class _SmokeProvider:
         images: tuple[ImageInput, ...],
     ) -> StructuredGenerationResponse:
         self.requests.append(("image", request, images))
-        if request.schema_name == "fitsho_body_photo_preflight":
-            payload: dict[str, Any] = {"accepted": True, "confidence": 1, "issues": []}
-        elif request.schema_name == "fitsho_physique_assessment_v3":
-            payload = _body_output()
+        if request.schema_name == "fitsho_body_analysis_v4_evidence":
+            payload: dict[str, Any] = _body_output()
         else:
             payload = {
                 "meal_name_guess": "نمونه غذا",
@@ -198,39 +195,44 @@ class _SmokeProvider:
 
 
 def _body_output() -> dict[str, Any]:
-    findings = []
-    for area in BodyArea:
-        findings.append(
-            {
-                "area": area.value,
-                "front": {"rating": "average", "evidence_fa": "نمای روبه‌رو قابل مشاهده است."},
-                "side": {"rating": "average", "evidence_fa": "نمای جانبی قابل مشاهده است."},
-                "back": {"rating": "average", "evidence_fa": "نمای پشت قابل مشاهده است."},
-                "overall_rating": "average",
-                "overall_summary_fa": "مقایسهٔ بصری نمونه انجام شد.",
-                "confidence": 0.8,
-            }
-        )
+    areas = (
+        "shoulders",
+        "chest",
+        "back",
+        "lats",
+        "arms",
+        "forearms",
+        "waist_midsection",
+        "glutes",
+        "quads",
+        "hamstrings",
+        "calves",
+    )
     return {
+        "schema_version": "4.0",
         "assessment_status": "complete",
-        "photo_quality": {
-            "front": {"usable": True, "issues_fa": []},
-            "side": {"usable": True, "issues_fa": []},
-            "back": {"usable": True, "issues_fa": []},
-            "global_limitations_fa": [],
+        "area_observations": [
+            {
+                "area": area,
+                "classification": "balanced",
+                "evidence_strength": "moderate",
+                "supporting_views": ["front", "side"],
+                "observation_tags": ["relative_width"],
+                "limitation_codes": [],
+                "suggested_training_emphasis": [],
+            }
+            for area in areas
+        ],
+        "upper_lower_balance": {
+            "state": "balanced",
+            "evidence_strength": "moderate",
+            "supporting_views": ["front", "side"],
         },
-        "overall_assessment": {
-            "development_pattern": "visually_balanced",
-            "shoulder_to_waist_taper": "moderate",
-            "upper_lower_balance": "balanced",
-            "summary_fa": "خلاصهٔ بصری نمونه.",
+        "visible_symmetry": {
+            "state": "no_clear_difference",
+            "evidence_strength": "moderate",
+            "supporting_views": ["front", "back"],
         },
-        "goal_suggestion": {
-            "suggested_goal": "build_muscle",
-            "reasoning_fa": "هدف نمونه برای آزمون قرارداد انتخاب شد.",
-            "inputs_unavailable_fa": [],
-        },
-        "findings": findings,
     }
 
 
@@ -283,14 +285,18 @@ def test_task_smoke_runs_all_four_safe_fixtures(db: Session, test_settings: Sett
     assert all(result.passed for result, _ in results)
     assert [result.request_id for result, _ in results] == [
         "request-1",
+        "request-2",
         "request-3",
         "request-4",
-        "request-5",
     ]
-    body_images = [images for kind, request, images in provider.requests if kind == "image"]
+    body_images = [
+        images
+        for kind, request, images in provider.requests
+        if kind == "image" and request.schema_name == "fitsho_body_analysis_v4_evidence"
+    ]
+    assert len(body_images) == 1
     assert len(body_images[0]) == 3
-    assert len(body_images[1]) == 3
-    assert len(body_images[2]) == 1
+    assert {image.label for image in body_images[0]} == {"front", "side", "back"}
     food_request = next(
         request
         for kind, request, _ in provider.requests

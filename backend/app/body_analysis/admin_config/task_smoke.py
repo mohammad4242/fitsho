@@ -22,8 +22,8 @@ from app.body_analysis.admin_config.schemas import (
 )
 from app.body_analysis.admin_config.service import get_agent_service_capabilities
 from app.body_analysis.normalization import (
-    normalize_visual_physique_assessment_v3,
-    visual_assessment_v3_to_normalized,
+    normalize_visual_physique_assessment_v4,
+    visual_assessment_v4_to_normalized,
 )
 from app.body_analysis.providers import (
     AgentServiceProvider,
@@ -34,7 +34,6 @@ from app.body_analysis.providers import (
     ProviderErrorCode,
     ProviderRoutingPreferences,
 )
-from app.body_analysis.schemas import BodyPhotoPreflight
 from app.body_analysis.service import AnalysisExecutionConfig, BodyAnalysisService
 from app.config import Settings
 from app.nutrition.ai_price_research import (
@@ -250,26 +249,22 @@ async def _smoke_body(provider: AIProvider, profile: AgentServiceModelProfile) -
     config = AnalysisExecutionConfig(
         provider_name=f"agent_service:{profile.agent.value}",
         primary_model=profile.model_id,
-        prompt_version="body-analysis-v3",
-        schema_version="3.0",
+        prompt_version="body-analysis-v4-evidence",
+        schema_version="4.0",
         temperature=0,
         max_output_tokens=4096,
     )
     images = _body_fixture_images()
-    preflight = await provider.analyze_images(
-        BodyAnalysisService._preflight_request(config), images=images
-    )
-    accepted = BodyPhotoPreflight.model_validate(preflight.payload)
-    if not accepted.accepted:
+    response = await provider.analyze_images(BodyAnalysisService._request(config), images=images)
+    visual = normalize_visual_physique_assessment_v4(response.payload)
+    if visual.assessment_status != "complete":
         raise TaskSmokeFailure(
             "semantic_validation",
             "invalid_output",
-            "The body fixture was rejected by the photo gate.",
+            "The body result was not a complete three-view assessment.",
         )
-    response = await provider.analyze_images(BodyAnalysisService._request(config), images=images)
-    visual = normalize_visual_physique_assessment_v3(response.payload)
-    normalized = visual_assessment_v3_to_normalized(visual)
-    if normalized.schema_version != "3.0" or normalized.overall_confidence <= 0:
+    normalized = visual_assessment_v4_to_normalized(visual)
+    if normalized.schema_version != "4.0" or normalized.overall_confidence <= 0:
         raise TaskSmokeFailure(
             "semantic_validation",
             "invalid_output",

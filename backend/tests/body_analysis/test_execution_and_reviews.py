@@ -36,7 +36,6 @@ from app.body_analysis.providers import (
 from app.body_analysis.runtime import _validate_budget_preflight
 from app.body_analysis.service import (
     _ANALYSIS_PROMPT,
-    _PHOTO_PREFLIGHT_PROMPT,
     AnalysisExecutionConfig,
     BodyAnalysisService,
     BodyAnalysisStateError,
@@ -135,11 +134,7 @@ class _Provider:
         assert all(getattr(image, "base64_data", None) is None for image in images)
         assert all(getattr(image, "storage_scope", None) == "body" for image in images)
         assert all(getattr(image, "storage_key", None) for image in images)
-        payload = (
-            {"accepted": True, "confidence": 0.92, "issues": []}
-            if getattr(request, "schema_name", None) == "fitsho_body_photo_preflight"
-            else self.payload
-        )
+        payload = self.payload
         return StructuredGenerationResponse(
             payload=payload,
             model_id="vision-primary",
@@ -179,27 +174,6 @@ class _FailingProvider(_Provider):
         raise AIProviderError(
             ProviderErrorCode.UNAUTHORIZED,
             "The AI provider credential was rejected.",
-        )
-
-
-class _PreflightRejectingProvider(_Provider):
-    async def analyze_images(self, request: object, *, images: tuple[object, ...]) -> object:
-        self.calls += 1
-        return StructuredGenerationResponse(
-            payload={
-                "accepted": False,
-                "confidence": 0.94,
-                "issues": [
-                    {"view": "front", "reasons": ["full_body_not_visible", "low_lighting"]},
-                    {"view": "side", "reasons": ["low_lighting"]},
-                ],
-            },
-            model_id="vision-primary",
-            attempted_models=("vision-primary",),
-            provider_request_id="req-preflight",
-            input_tokens=80,
-            output_tokens=60,
-            cost=Decimal("0.004"),
         )
 
 
@@ -373,11 +347,11 @@ def test_v4_execution_uses_the_queued_snapshot_after_profile_changes(db: Session
     measurement.weight_kg = Decimal("91.0")
     db.commit()
 
-    provider = _Provider()
+    provider = _V4Provider()
     asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, _v4_config()))
 
-    assert len(provider.requests) == 2
-    assert provider.requests[1].input_payload == {
+    assert len(provider.requests) == 1
+    assert provider.requests[0].input_payload == {
         "task": "analyze_processed_body_views",
         "schema_version": "4.0",
     }
@@ -432,21 +406,6 @@ def test_v4_retry_after_photo_change_requires_fresh_confirmation(db: Session) ->
     assert replacement_keys[changed_photo.view.value] != previous_keys[changed_photo.view.value]
 
 
-def test_v4_snapshot_survives_preflight_rejection(db: Session) -> None:
-    user, session = _submitted_session(db)
-    _complete_body_profile(db, user)
-    config = _v4_config()
-    service = BodyAnalysisService(db)
-    analysis = service.queue(session.id, user.id, config, confirm_measurements_current=True)
-
-    failed = asyncio.run(service.execute(analysis.id, _PreflightRejectingProvider(), config))
-
-    assert failed.status is BodyAnalysisStatus.FAILED
-    assert isinstance(failed.raw_result, dict)
-    assert "input_snapshot" in failed.raw_result
-    assert "photo_validation" in failed.raw_result
-
-
 def test_v4_snapshot_survives_provider_failure(db: Session) -> None:
     user, session = _submitted_session(db)
     _complete_body_profile(db, user)
@@ -479,14 +438,6 @@ def test_queue_is_idempotent_for_same_session(db: Session) -> None:
     ]
 
 
-def test_photo_preflight_ignores_people_in_background_artwork() -> None:
-    request = BodyAnalysisService._preflight_request(_config())
-    normalized_prompt = " ".join(request.system_prompt.split())
-
-    assert "posters, wall art, mirrors, gym branding" in normalized_prompt
-    assert "Count only real people in the foreground" in normalized_prompt
-
-
 def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> None:
     user, session = _submitted_session(db)
     provider = _Provider()
@@ -498,7 +449,7 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
 
     assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
     assert repeated.id == completed.id
-    assert provider.calls == 2
+    assert provider.calls == 1
     assert completed.model_id == "vision-primary"
     assert completed.error_message is None
     versions = db.scalars(
@@ -532,9 +483,52 @@ def test_v4_execution_persists_evidence_projection_without_legacy_visual_result(
     assert completed.normalized_result is not None
     assert completed.normalized_result["schema_version"] == "4.0"
     assert completed.raw_result["analysis"]["schema_version"] == "4.0"
+    assert "photo_validation" not in completed.raw_result
 
 
-def test_execution_uses_one_provider_for_preflight_and_analysis_without_cost(db: Session) -> None:
+def test_v4_execution_accounts_tokens_and_cost_from_one_provider_response(db: Session) -> None:
+    user, session = _submitted_session(db)
+    _complete_body_profile(db, user)
+    provider = _V4Provider()
+    config = _v4_config()
+    analysis = BodyAnalysisService(db).queue(
+        session.id,
+        user.id,
+        config,
+        confirm_measurements_current=True,
+    )
+
+    completed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, config))
+
+    assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
+    assert provider.calls == 1
+    assert completed.input_tokens == 100
+    assert completed.output_tokens == 200
+    assert completed.request_cost == Decimal("0.012")
+
+
+def test_v4_execution_rejects_partial_provider_status(db: Session) -> None:
+    user, session = _submitted_session(db)
+    _complete_body_profile(db, user)
+    payload = _v4_evidence_payload()
+    payload["assessment_status"] = "partial"
+    provider = _Provider(payload)
+    config = _v4_config()
+    analysis = BodyAnalysisService(db).queue(
+        session.id,
+        user.id,
+        config,
+        confirm_measurements_current=True,
+    )
+
+    failed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider, config))
+
+    assert failed.status is BodyAnalysisStatus.FAILED
+    assert provider.calls == 1
+    assert provider.requests[0].schema_name == "fitsho_body_analysis_v4_evidence"
+
+
+def test_execution_uses_one_provider_for_body_analysis_without_cost(db: Session) -> None:
     user, session = _submitted_session(db)
     provider = _CostlessProvider()
     config = _config().model_copy(update={"max_cost_per_request": Decimal("0.01")})
@@ -544,8 +538,10 @@ def test_execution_uses_one_provider_for_preflight_and_analysis_without_cost(db:
     completed = asyncio.run(service.execute(analysis.id, provider, config))
 
     assert completed.status is BodyAnalysisStatus.REVIEW_PENDING
-    assert provider.schema_names == ["fitsho_body_photo_preflight", "fitsho_body_analysis"]
-    assert provider.calls == 2
+    assert provider.schema_names == ["fitsho_body_analysis"]
+    assert provider.calls == 1
+    assert completed.input_tokens == 100
+    assert completed.output_tokens == 200
     assert completed.request_cost is None
 
 
@@ -585,6 +581,8 @@ def test_body_requests_and_processed_image_labels_are_backend_independent(
 
     api_requests, api_images, api_keys = captured[0]
     agent_requests, agent_images, agent_keys = captured[1]
+    assert len(api_requests) == 1
+    assert len(agent_requests) == 1
     assert [request.model_dump() for request in api_requests] == [
         request.model_dump() for request in agent_requests
     ]
@@ -597,34 +595,8 @@ def test_body_requests_and_processed_image_labels_are_backend_independent(
             ] == [
                 (view, "image/jpeg", "body", keys[view]) for view in expected_views
             ]
-    assert [request.system_prompt for request in api_requests] == [
-        _PHOTO_PREFLIGHT_PROMPT,
-        _ANALYSIS_PROMPT,
-    ]
-    assert api_requests[1].input_payload["profile_context"] == profile_context
-
-
-def test_execution_stops_after_rejected_photo_preflight_and_preserves_view_reasons(
-    db: Session,
-) -> None:
-    user, session = _submitted_session(db)
-    provider = _PreflightRejectingProvider()
-    analysis = BodyAnalysisService(db).queue(session.id, user.id, _config())
-
-    failed = asyncio.run(BodyAnalysisService(db).execute(analysis.id, provider))
-
-    assert failed.status is BodyAnalysisStatus.FAILED
-    assert provider.calls == 1
-    assert failed.raw_result == {
-        "photo_validation": {
-            "accepted": False,
-            "confidence": 0.94,
-            "issues": [
-                {"view": "front", "reasons": ["full_body_not_visible", "low_lighting"]},
-                {"view": "side", "reasons": ["low_lighting"]},
-            ],
-        },
-    }
+    assert api_requests[0].system_prompt == _ANALYSIS_PROMPT
+    assert api_requests[0].input_payload["profile_context"] == profile_context
 
 
 def test_execution_creates_a_progress_comparison_for_the_new_result(
@@ -932,17 +904,6 @@ def test_replacing_a_photo_resets_the_analysis_retry_budget(db: Session) -> None
     assert retried.replaces_analysis_id == failed.id
 
 
-def test_photo_preflight_allows_fitted_clothing_and_nonblocking_backgrounds() -> None:
-    normalized_prompt = " ".join(_PHOTO_PREFLIGHT_PROMPT.split())
-
-    assert "Fitted athletic shorts or underwear are acceptable" in normalized_prompt
-    assert "performed by the user before upload" in normalized_prompt
-    assert "must never trigger full_body_not_visible" in normalized_prompt
-    assert "Do not reject a photo merely because its background is a gym or a room" in (
-        normalized_prompt
-    )
-
-
 def test_analysis_prompt_requires_a_full_schema_compatible_coach_scan() -> None:
     normalized_prompt = " ".join(_ANALYSIS_PROMPT.split())
 
@@ -1008,6 +969,10 @@ def test_v4_provider_request_is_evidence_only() -> None:
         "schema_version": "4.0",
     }
     assert request.system_prompt.startswith("You are Fitsho's evidence-only v4 body analysis")
+    normalized_prompt = " ".join(request.system_prompt.split())
+    assert "already passed Fitsho's local browser-side photo validation" in normalized_prompt
+    assert "Do not perform photo acceptance or preflight" in normalized_prompt
+    assert "set assessment_status to complete" in normalized_prompt
 
 
 def test_retry_rejects_nonlatest_revision(db: Session) -> None:

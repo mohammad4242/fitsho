@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 from app.body_analysis.enums import (
@@ -119,25 +119,18 @@ _V4_HIGH_EVIDENCE_REQUIRED_VIEWS: dict[BodyArea, frozenset[BodyPhotoView]] = {
 
 def visual_assessment_v4_to_normalized(
     assessment: BodyAnalysisEvidenceV4Payload,
-    *,
-    preflight_confidence: float = 1.0,
-    usable_views: Collection[BodyPhotoView | str] | None = None,
 ) -> NormalizedBodyAnalysis:
     """Project controlled v4 evidence into the stable 13-area engine contract."""
 
-    if not 0 <= preflight_confidence <= 1:
-        raise ValueError("preflight confidence must be between 0 and 1")
-    normalized_usable_views = (
-        {BodyPhotoView(view) for view in usable_views} if usable_views is not None else None
-    )
+    available_views = set(BodyPhotoView)
     findings = [
-        _v4_observation_to_finding(observation, normalized_usable_views)
+        _v4_observation_to_finding(observation, available_views)
         for area in _V4_EVIDENCE_AREA_ORDER
         for observation in assessment.area_observations
         if observation.area == area.value
     ]
-    findings.append(_v4_symmetry_to_finding(assessment, normalized_usable_views))
-    findings.append(_v4_posture_finding(assessment, normalized_usable_views))
+    findings.append(_v4_symmetry_to_finding(assessment, available_views))
+    findings.append(_v4_posture_finding(assessment, available_views))
     if len(findings) != len(BodyArea):
         raise ValueError("v4 projection must produce all 13 normalized body areas")
 
@@ -145,7 +138,7 @@ def visual_assessment_v4_to_normalized(
     normalized_findings = tuple(findings)
     return NormalizedBodyAnalysis(
         schema_version="4.0",
-        overall_confidence=min(preflight_confidence, confidence_ceiling),
+        overall_confidence=confidence_ceiling,
         findings=normalized_findings,
         summary=_summary_for_findings(normalized_findings),
         requires_coach_review=True,
@@ -155,10 +148,10 @@ def visual_assessment_v4_to_normalized(
 
 def _v4_observation_to_finding(
     observation: BodyAnalysisEvidenceV4Observation,
-    usable_views: set[BodyPhotoView] | None,
+    available_views: set[BodyPhotoView],
 ) -> BodyAnalysisFinding:
     supporting_views = tuple(observation.supporting_views)
-    _validate_v4_supporting_views(supporting_views, usable_views)
+    _validate_v4_supporting_views(supporting_views, available_views)
     strength = _v4_effective_strength(
         observation.evidence_strength,
         observation.area,
@@ -203,11 +196,11 @@ def _v4_observation_to_finding(
 
 def _v4_symmetry_to_finding(
     assessment: BodyAnalysisEvidenceV4Payload,
-    usable_views: set[BodyPhotoView] | None,
+    available_views: set[BodyPhotoView],
 ) -> BodyAnalysisFinding:
     symmetry = assessment.visible_symmetry
     supporting_views = tuple(symmetry.supporting_views)
-    _validate_v4_supporting_views(supporting_views, usable_views)
+    _validate_v4_supporting_views(supporting_views, available_views)
     strength = _v4_effective_strength(
         symmetry.evidence_strength,
         BodyArea.SYMMETRY,
@@ -245,15 +238,14 @@ def _v4_symmetry_to_finding(
 
 def _v4_posture_finding(
     assessment: BodyAnalysisEvidenceV4Payload,
-    usable_views: set[BodyPhotoView] | None,
+    available_views: set[BodyPhotoView],
 ) -> BodyAnalysisFinding:
     supporting_views = tuple(
         view
         for view in (BodyPhotoView.FRONT, BodyPhotoView.SIDE, BodyPhotoView.BACK)
         if any(view in observation.supporting_views for observation in assessment.area_observations)
     )
-    if usable_views is not None:
-        supporting_views = tuple(view for view in supporting_views if view in usable_views)
+    _validate_v4_supporting_views(supporting_views, available_views)
     supporting_views = supporting_views or (BodyPhotoView.FRONT,)
     return BodyAnalysisFinding(
         body_area=BodyArea.VISIBLE_ALIGNMENT_OR_POSTURE,
@@ -270,10 +262,10 @@ def _v4_posture_finding(
 
 def _validate_v4_supporting_views(
     supporting_views: tuple[BodyPhotoView, ...],
-    usable_views: set[BodyPhotoView] | None,
+    available_views: set[BodyPhotoView],
 ) -> None:
-    if usable_views is not None and not set(supporting_views).issubset(usable_views):
-        raise ValueError("v4 evidence can reference only usable photo views")
+    if not set(supporting_views).issubset(available_views):
+        raise ValueError("v4 evidence can reference only known photo views")
 
 
 def _v4_effective_strength(

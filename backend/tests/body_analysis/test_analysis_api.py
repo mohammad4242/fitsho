@@ -101,6 +101,31 @@ def test_analysis_result_exposes_a_safe_error_code_for_actionable_feedback(
     assert result.json()["error_code"] == "invalid_output"
 
 
+def test_analysis_result_preserves_legacy_photo_validation_payload(
+    client: TestClient, db: Session
+) -> None:
+    email = f"legacy-photo-validation-{uuid4()}@example.com"
+    _register(client, email)
+    owner = db.scalar(select(User).where(User.email == email))
+    assert owner is not None
+    _, photo_session = _submitted_session(db, owner)
+    analysis = BodyAnalysisService(db).queue(photo_session.id, owner.id, _config())
+    legacy_photo_validation = {
+        "accepted": False,
+        "confidence": 0.94,
+        "issues": [{"view": "front", "reasons": ["low_lighting"]}],
+    }
+    analysis.status = BodyAnalysisStatus.FAILED
+    analysis.raw_result = {"photo_validation": legacy_photo_validation}
+    photo_session.state = BodyPhotoSessionState.FAILED
+    db.commit()
+
+    result = client.get(f"/api/v1/body-photo-sessions/{photo_session.id}/analysis")
+
+    assert result.status_code == 200
+    assert result.json()["photo_validation"] == legacy_photo_validation
+
+
 def test_v4_analysis_result_exposes_deterministic_experience_read_model(
     client: TestClient, db: Session
 ) -> None:
