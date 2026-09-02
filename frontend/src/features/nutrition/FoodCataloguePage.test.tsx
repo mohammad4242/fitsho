@@ -262,11 +262,6 @@ it("lets an admin inquire food price with AI and save the suggested price", asyn
       ...response.items[0],
       price: {
         status: "not_found",
-        reference_price_irr: null,
-        reference_unit: null,
-        observed_at: null,
-        accepted_at: null,
-        source: "not_found",
       },
     }],
   });

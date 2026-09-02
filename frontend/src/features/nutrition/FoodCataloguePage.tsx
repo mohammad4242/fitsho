@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useCallback, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
@@ -196,6 +196,7 @@ function PriceOverrideDialog({
   const [researching, setResearching] = useState(false);
   const [researchResult, setResearchResult] = useState<api.SingleFoodPriceResearchResponse | null>(null);
   const [researchError, setResearchError] = useState<string | null>(null);
+  const autoResearchedRef = useRef(false);
 
   const runResearch = useCallback(async () => {
     setResearching(true);
@@ -220,7 +221,8 @@ function PriceOverrideDialog({
   }, [fa, food.slug]);
 
   useEffect(() => {
-    if (autoResearch) {
+    if (autoResearch && !autoResearchedRef.current) {
+      autoResearchedRef.current = true;
       void runResearch();
     }
   }, [autoResearch, runResearch]);
