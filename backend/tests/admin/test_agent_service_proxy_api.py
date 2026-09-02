@@ -46,15 +46,23 @@ def _restore_agent_service(client: TestClient, replacement: httpx.AsyncClient) -
     asyncio.run(replacement.aclose())
 
 
-def _status(source: str = "deployment_default", *, enabled: bool = True) -> dict[str, object]:
+def _status(
+    source: str = "deployment_default", *, enabled: bool | None = None
+) -> dict[str, object]:
+    if enabled is None:
+        enabled = source == "custom"
     return {
         "enabled": enabled,
         "source": source,
         "configured": source == "custom" or enabled,
-        "default_configured": source == "deployment_default",
-        "masked_proxy_url": "http://default-proxy:1080"
-        if source == "deployment_default"
-        else "http://****:****@custom-proxy:8080",
+        "default_configured": source == "deployment_default" and enabled,
+        "masked_proxy_url": (
+            "http://default-proxy:1080"
+            if source == "deployment_default" and enabled
+            else "http://****:****@custom-proxy:8080"
+            if source == "custom"
+            else None
+        ),
     }
 
 
@@ -74,7 +82,7 @@ def test_agent_service_proxy_is_admin_only_and_requires_trusted_origin_for_write
     assert response.status_code == 403
 
 
-def test_agent_service_proxy_defaults_to_deployment_proxy(
+def test_agent_service_proxy_defaults_to_disabled_without_deployment_proxy(
     client: TestClient, db: Session, test_settings
 ) -> None:
     _admin(client, db)
@@ -97,11 +105,11 @@ def test_agent_service_proxy_defaults_to_deployment_proxy(
 
     assert response.status_code == 200, response.text
     assert response.json() == {
-        "enabled": True,
+        "enabled": False,
         "source": "deployment_default",
-        "configured": True,
-        "default_configured": True,
-        "masked_proxy_url": "http://default-proxy:1080",
+        "configured": False,
+        "default_configured": False,
+        "masked_proxy_url": None,
         "applied": True,
         "agent_service_available": True,
         "last_applied_at": None,

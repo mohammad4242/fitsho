@@ -518,7 +518,7 @@ def _proxy_detail(
     runtime: AgentServiceProxyRuntimeStatus | None,
     agent_service_available: bool,
 ) -> AgentServiceProxyDetail:
-    enabled = setting.enabled if setting is not None else True
+    enabled = setting.enabled if setting is not None else False
     source = setting.source if setting is not None else AIAgentServiceProxySource.DEPLOYMENT_DEFAULT
     if runtime is not None:
         configured = runtime.configured

@@ -92,7 +92,7 @@ class ProxyRuntime:
             for key, value in base_environment.items()
             if key in _PROXY_ENVIRONMENT_KEYS and isinstance(value, str) and value.strip()
         }
-        self._enabled = True
+        self._enabled = False
         self._source = ProxySource.DEPLOYMENT_DEFAULT
         self._custom_proxy_url: str | None = None
         self._lock = RLock()

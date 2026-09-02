@@ -32,7 +32,23 @@ vi.mock("../../shared/MemberHeaderMedia", () => ({
 }));
 
 import { AdminAiSettingsPage } from "./AdminAiSettingsPage";
-import type { AdminAiCatalogResponse, AdminAiTaskConfig } from "./types";
+import type {
+  AdminAiAgentServiceProxy,
+  AdminAiCatalogResponse,
+  AdminAiTaskConfig,
+} from "./types";
+
+const defaultAgentServiceProxy: AdminAiAgentServiceProxy = {
+  enabled: false,
+  source: "deployment_default",
+  configured: false,
+  default_configured: false,
+  masked_proxy_url: null,
+  applied: true,
+  agent_service_available: true,
+  last_applied_at: null,
+  last_apply_error: null,
+};
 
 const bodyConfig: AdminAiTaskConfig = {
   task_type: "body_photo_analysis",
@@ -92,17 +108,7 @@ beforeEach(() => {
     ],
   });
   api.getAdminAiAgentServiceCapabilities.mockResolvedValue({ runners: [] });
-  api.getAdminAiAgentServiceProxy.mockResolvedValue({
-    enabled: true,
-    source: "deployment_default",
-    configured: true,
-    default_configured: true,
-    masked_proxy_url: "http://default-proxy:1080",
-    applied: true,
-    agent_service_available: true,
-    last_applied_at: null,
-    last_apply_error: null,
-  });
+  api.getAdminAiAgentServiceProxy.mockResolvedValue(defaultAgentServiceProxy);
   api.saveAdminAiAgentServiceProxy.mockResolvedValue({
     enabled: true,
     source: "deployment_default",
@@ -125,9 +131,25 @@ it("shows the settings load error instead of staying on the loading state", asyn
   expect(screen.queryByText("Loading AI settings…")).not.toBeInTheDocument();
 });
 
-it("shows the deployment proxy as the default and saves the disable switch", async () => {
+it("starts the Agent Service proxy toggle off before status loads", async () => {
+  let resolveProxy: ((value: AdminAiAgentServiceProxy) => void) | undefined;
+  api.getAdminAiAgentServiceProxy.mockReturnValue(
+    new Promise<AdminAiAgentServiceProxy>((resolve) => {
+      resolveProxy = resolve;
+    }),
+  );
+  renderPage();
+
+  const checkbox = await screen.findByRole("checkbox", { name: "Use proxy for Agent Service" });
+  expect(checkbox).not.toBeChecked();
+
+  resolveProxy?.(defaultAgentServiceProxy);
+  await waitFor(() => expect(checkbox).not.toBeChecked());
+});
+
+it("shows the deployment proxy disabled by default and saves enabling it", async () => {
   api.saveAdminAiAgentServiceProxy.mockResolvedValue({
-    enabled: false,
+    enabled: true,
     source: "deployment_default",
     configured: true,
     default_configured: true,
@@ -141,16 +163,17 @@ it("shows the deployment proxy as the default and saves the disable switch", asy
   renderPage();
 
   expect(await screen.findByRole("heading", { name: "Agent Service proxy" })).toBeInTheDocument();
-  expect(screen.getByRole("checkbox", { name: "Use proxy for Agent Service" })).toBeChecked();
+  const checkbox = screen.getByRole("checkbox", { name: "Use proxy for Agent Service" });
+  expect(checkbox).not.toBeChecked();
   expect(
-    await screen.findByText("Deployment proxy: http://default-proxy:1080"),
+    await screen.findByText("No deployment proxy is configured."),
   ).toBeInTheDocument();
 
-  await user.click(screen.getByRole("checkbox", { name: "Use proxy for Agent Service" }));
+  await user.click(checkbox);
   await user.click(screen.getByRole("button", { name: "Save proxy settings" }));
 
   expect(api.saveAdminAiAgentServiceProxy).toHaveBeenCalledWith({
-    enabled: false,
+    enabled: true,
     source: "deployment_default",
   });
   expect(await screen.findByText("Proxy settings saved")).toBeInTheDocument();
@@ -172,6 +195,7 @@ it("lets an admin replace the deployment proxy with a custom proxy", async () =>
   renderPage();
 
   await user.click(await screen.findByRole("radio", { name: "Use custom proxy" }));
+  await user.click(screen.getByRole("checkbox", { name: "Use proxy for Agent Service" }));
   await user.type(
     screen.getByLabelText("Custom proxy URL"),
     "http://admin:secret@custom-proxy:8080",

@@ -25,10 +25,6 @@ services:
       AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
       HOME: /home/agent
       AGENT_SHARED_PRIVATE_MEDIA_ROOT: /shared-private-media
-      HTTP_PROXY: http://100.97.78.5:10809
-      HTTPS_PROXY: http://100.97.78.5:10809
-      http_proxy: http://100.97.78.5:10809
-      https_proxy: http://100.97.78.5:10809
       NO_PROXY: ${AGENT_NO_PROXY:-agent-service,db,localhost,127.0.0.1}
       AGENT_WORKSPACE_ROOT: /tmp/fitsho-agent
       AGENT_AUTH_SESSION_TTL_SECONDS: ${AGENT_AUTH_SESSION_TTL_SECONDS:-600}

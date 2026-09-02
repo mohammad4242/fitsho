@@ -15,7 +15,7 @@ import type {
 export function AgentServiceProxySettings() {
   const { t } = useTranslation();
   const [settings, setSettings] = useState<AdminAiAgentServiceProxy | null>(null);
-  const [enabled, setEnabled] = useState(true);
+  const [enabled, setEnabled] = useState(false);
   const [source, setSource] = useState<AdminAiAgentServiceProxySource>("deployment_default");
   const [proxyUrl, setProxyUrl] = useState("");
   const [loading, setLoading] = useState(true);

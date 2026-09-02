@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -10,8 +11,50 @@ from app.proxy import ProxyRuntime, ProxySource
 TOKEN = "a" * 32
 
 
+def test_proxy_runtime_defaults_to_disabled() -> None:
+    runtime = ProxyRuntime({"PATH": "/usr/bin"})
+
+    status = runtime.status()
+
+    assert status.enabled is False
+    assert status.source is ProxySource.DEPLOYMENT_DEFAULT
+    assert status.configured is False
+    assert status.default_configured is False
+    assert status.masked_proxy_url is None
+    assert runtime.environment() == {"PATH": "/usr/bin"}
+
+
+def test_proxy_runtime_does_not_apply_proxy_until_enabled() -> None:
+    runtime = ProxyRuntime(
+        {
+            "PATH": "/usr/bin",
+            "HTTP_PROXY": "http://default-proxy:1080",
+            "HTTPS_PROXY": "http://default-proxy:1080",
+            "http_proxy": "http://default-proxy:1080",
+            "https_proxy": "http://default-proxy:1080",
+            "ALL_PROXY": "socks5h://default-proxy:1080",
+            "all_proxy": "socks5h://default-proxy:1080",
+        }
+    )
+
+    environment = runtime.environment()
+
+    assert all(
+        key not in environment
+        for key in {
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "http_proxy",
+            "https_proxy",
+            "ALL_PROXY",
+            "all_proxy",
+        }
+    )
+
+
 def test_proxy_runtime_reports_an_all_proxy_deployment_default() -> None:
     runtime = ProxyRuntime({"PATH": "/usr/bin", "ALL_PROXY": "socks5h://default-proxy:1080"})
+    runtime.update(enabled=True, source=ProxySource.DEPLOYMENT_DEFAULT)
 
     assert runtime.status().configured is True
     assert runtime.status().default_configured is True
@@ -28,6 +71,7 @@ def test_proxy_runtime_preserves_deployment_default_and_can_switch_modes() -> No
             "ALL_PROXY": "http://default-proxy:1080",
         }
     )
+    runtime.update(enabled=True, source=ProxySource.DEPLOYMENT_DEFAULT)
 
     assert runtime.status().enabled is True
     assert runtime.status().source is ProxySource.DEPLOYMENT_DEFAULT
@@ -81,6 +125,7 @@ def test_proxy_runtime_normalizes_uppercase_deployment_defaults() -> None:
             "HTTPS_PROXY": proxy,
         }
     )
+    runtime.update(enabled=True, source=ProxySource.DEPLOYMENT_DEFAULT)
 
     environment = runtime.environment()
 
@@ -100,6 +145,7 @@ def test_proxy_runtime_normalizes_lowercase_deployment_defaults() -> None:
             "https_proxy": https_proxy,
         }
     )
+    runtime.update(enabled=True, source=ProxySource.DEPLOYMENT_DEFAULT)
 
     environment = runtime.environment()
 
@@ -110,8 +156,17 @@ def test_proxy_runtime_normalizes_lowercase_deployment_defaults() -> None:
 
 
 def test_proxy_runtime_api_requires_internal_auth_and_never_returns_proxy_secret(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    for key in (
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+    ):
+        monkeypatch.delenv(key, raising=False)
     settings = Settings(
         agent_service_token=SecretStr(TOKEN),
         agent_workspace_root=tmp_path,
