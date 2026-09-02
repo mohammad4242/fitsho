@@ -11,8 +11,8 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
-from ..proxy import ProxyRuntime
 from ..profiles import codex_profiles
+from ..proxy import ProxyRuntime
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult, resolve_image_paths
 from .probes import CliMetadataProbe

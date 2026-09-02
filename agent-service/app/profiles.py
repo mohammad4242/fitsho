@@ -58,6 +58,7 @@ def legacy_profile(
     supports_text_input: bool = True,
     supports_image_input: bool = False,
     supports_structured_output: bool = True,
+    supports_live_web: bool = False,
 ) -> AgentModelProfile:
     """Represent an old model-only client request during the contract transition."""
 
@@ -70,7 +71,10 @@ def legacy_profile(
         supports_image_input=supports_image_input,
         supports_text_input=supports_text_input,
         supports_structured_output=supports_structured_output,
-        task_kinds=tuple(AgentTaskKind),
+        task_kinds=tuple(
+            kind for kind in AgentTaskKind if kind is not AgentTaskKind.FOOD_PRICE_SEARCH
+        ),
+        supports_live_web=supports_live_web,
     )
 
 
@@ -83,6 +87,7 @@ def _fingerprint(
     effort: ReasoningEffort | None,
     task_kinds: Iterable[AgentTaskKind],
     supports_image_input: bool,
+    supports_live_web: bool,
 ) -> str:
     material = "|".join(
         (
@@ -93,6 +98,7 @@ def _fingerprint(
             effort.value if effort else "none",
             ",".join(kind.value for kind in task_kinds),
             str(supports_image_input),
+            str(supports_live_web),
         )
     )
     return hashlib.sha256(material.encode("utf-8")).hexdigest()[:16]
@@ -108,9 +114,17 @@ def _profile(
     supports_text_input: bool = True,
     supports_image_input: bool = False,
     supports_structured_output: bool = True,
+    supports_live_web: bool = False,
     task_kinds: tuple[AgentTaskKind, ...] | None = None,
 ) -> AgentModelProfile:
-    kinds = task_kinds or tuple(AgentTaskKind)
+    requested_kinds = task_kinds if task_kinds is not None else tuple(AgentTaskKind)
+    kinds = tuple(
+        kind
+        for kind in requested_kinds
+        if supports_live_web or kind is not AgentTaskKind.FOOD_PRICE_SEARCH
+    )
+    if not kinds:
+        raise ValueError("a profile must support at least one task")
     identifier = profile_id_for(agent, model_id, effort)
     return AgentModelProfile(
         profile_id=identifier,
@@ -127,10 +141,12 @@ def _profile(
             effort=effort,
             task_kinds=kinds,
             supports_image_input=supports_image_input,
+            supports_live_web=supports_live_web,
         ),
         supports_text_input=supports_text_input,
         supports_image_input=supports_image_input,
         supports_structured_output=supports_structured_output,
+        supports_live_web=supports_live_web,
     )
 
 
@@ -164,6 +180,7 @@ def antigravity_profiles_from_output(
                 effort=_effort_from_model_id(model_id),
                 version=version,
                 supports_image_input=supports_image_input,
+                supports_live_web=True,
             )
         )
     return tuple(parsed)
@@ -191,6 +208,7 @@ def codex_profiles(
             effort=effort,
             version=version,
             supports_image_input=supports_image_input,
+            supports_live_web=True,
         )
         for model in models
         for effort in (ReasoningEffort.LOW, ReasoningEffort.MEDIUM, ReasoningEffort.HIGH)
@@ -212,6 +230,7 @@ def claude_profiles(
                 effort=effort,
                 version=version,
                 supports_image_input=supports_image_input,
+                supports_live_web=True,
             )
         )
     return tuple(profiles)

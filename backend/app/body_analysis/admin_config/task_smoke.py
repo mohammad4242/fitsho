@@ -122,12 +122,14 @@ async def run_task_smoke(
                 "backend_request", "invalid_request", "The profile does not support image input."
             )
         if task_type is AITaskType.FOOD_PRICE_SEARCH and (
-            not profile.supports_text_input or not profile.supports_structured_output
+            not profile.supports_text_input
+            or not profile.supports_structured_output
+            or not profile.supports_live_web
         ):
             raise TaskSmokeFailure(
                 "backend_request",
                 "invalid_request",
-                "The profile does not support structured text input.",
+                "The profile does not support live web research.",
             )
         if provider is None:
             provider = AgentServiceProvider(

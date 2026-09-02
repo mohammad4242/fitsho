@@ -67,6 +67,7 @@ def test_capabilities_are_owned_by_runners_and_do_not_run_generation(tmp_path: P
                         "supports_text_input": True,
                         "supports_image_input": False,
                         "supports_structured_output": True,
+                        "supports_live_web": False,
                         "supports_temperature": False,
                         "supports_max_output_tokens": False,
                     }

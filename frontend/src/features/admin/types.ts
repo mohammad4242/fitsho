@@ -377,6 +377,7 @@ export type AdminAiAgentModelCapability = {
   supports_text_input: boolean;
   supports_image_input: boolean;
   supports_structured_output: boolean;
+  supports_live_web: boolean;
 };
 
 export type AdminAiAgentModelProfile = {
@@ -390,6 +391,7 @@ export type AdminAiAgentModelProfile = {
   supports_text_input: boolean;
   supports_image_input: boolean;
   supports_structured_output: boolean;
+  supports_live_web: boolean;
   verification_status: "unverified" | "passed" | "failed" | "stale";
   verified_at: string | null;
   verification_error_code: string | null;

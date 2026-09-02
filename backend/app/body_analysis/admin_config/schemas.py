@@ -148,6 +148,7 @@ class AgentServiceModelCapability(BaseModel):
     supports_text_input: bool
     supports_image_input: bool
     supports_structured_output: bool
+    supports_live_web: bool = False
     # Agent Service exposes these runner-parameter flags for future UI support.
     # Backend v1 accepts them at the boundary but deliberately keeps them out of
     # the public admin contract until each runner is verified and wired.
@@ -182,6 +183,7 @@ class AgentServiceModelProfile(BaseModel):
     supports_text_input: bool
     supports_image_input: bool
     supports_structured_output: bool
+    supports_live_web: bool = False
     verification_status: Literal["unverified", "passed", "failed", "stale"] = "unverified"
     verified_at: datetime | None = None
     verification_error_code: str | None = None

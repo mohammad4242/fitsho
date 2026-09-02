@@ -17,6 +17,7 @@ def test_capabilities_accept_runner_parameter_fields_from_agent_service() -> Non
                             "supports_text_input": True,
                             "supports_image_input": True,
                             "supports_structured_output": True,
+                            "supports_live_web": True,
                             "supports_temperature": False,
                             "supports_max_output_tokens": False,
                         }
@@ -33,6 +34,7 @@ def test_capabilities_accept_runner_parameter_fields_from_agent_service() -> Non
                             "supports_text_input": True,
                             "supports_image_input": True,
                             "supports_structured_output": True,
+                            "supports_live_web": True,
                         }
                     ],
                 }
@@ -46,3 +48,4 @@ def test_capabilities_accept_runner_parameter_fields_from_agent_service() -> Non
     assert response.runners[0].profiles[0].profile_id == (
         "antigravity-gemini-3.7-flash-high"
     )
+    assert response.runners[0].profiles[0].supports_live_web is True

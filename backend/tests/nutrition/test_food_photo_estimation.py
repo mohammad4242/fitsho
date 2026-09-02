@@ -139,6 +139,7 @@ def test_food_photo_request_builder_is_the_canonical_task_contract() -> None:
     assert request.provider_preferences == ProviderRoutingPreferences(zdr=True)
     assert request.temperature == 0.2
     assert request.max_output_tokens == 777
+    assert request.web_access == "disabled"
 
 
 def _register(client: TestClient) -> None:

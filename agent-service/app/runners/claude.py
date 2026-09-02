@@ -13,8 +13,8 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
-from ..proxy import ProxyRuntime
 from ..profiles import claude_profiles
+from ..proxy import ProxyRuntime
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult, resolve_image_paths
 from .probes import CliMetadataProbe
@@ -266,7 +266,8 @@ class ClaudeRunner(AgentRunner):
             prompt += (
                 "\n\nlive web research is required for this request. "
                 "Use only the WebSearch and WebFetch tools available to this runner. "
-                "Do not answer from model memory; return only evidence observed during this request."
+                "Do not answer from model memory; return only evidence observed "
+                "during this request."
             )
         return prompt
 

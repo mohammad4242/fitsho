@@ -11,6 +11,9 @@ from app.profiles import (
     ProfileCatalog,
     ReasoningEffort,
     antigravity_profiles_from_output,
+    claude_profiles,
+    codex_profiles,
+    legacy_profile,
     profile_id_for,
 )
 from app.runners.base import AgentRunner, RunnerRequest, RunnerResult
@@ -39,6 +42,47 @@ def test_profile_id_is_stable_and_combines_model_and_effort() -> None:
     assert profile_id_for(AgentName.CODEX, "gpt-5.6-luna", ReasoningEffort.HIGH) == (
         "codex-gpt-5.6-luna-high"
     )
+
+
+def test_current_runner_profiles_truthfully_advertise_live_web() -> None:
+    profiles = (
+        codex_profiles(
+            version="codex-cli 0.151.0",
+            configured_models=("gpt-5.6-luna",),
+            supports_image_input=False,
+        )[0],
+        claude_profiles(
+            version="2.1.220 (Claude Code)",
+            configured_models=("claude-sonnet-4-6",),
+            supports_image_input=False,
+        )[0],
+        antigravity_profiles_from_output(
+            "gemini-3.7-flash-high Gemini 3.7 Flash (High)",
+            version="1.1.22",
+        )[0],
+    )
+
+    for profile in profiles:
+        assert profile.supports_live_web is True
+        assert AgentTaskKind.FOOD_PRICE_SEARCH in profile.task_kinds
+
+
+def test_legacy_model_profiles_do_not_advertise_unverified_live_web() -> None:
+    profile = legacy_profile(AgentName.CODEX, "gpt-5.6-luna")
+
+    assert profile.supports_live_web is False
+    assert AgentTaskKind.FOOD_PRICE_SEARCH not in profile.task_kinds
+
+
+def test_profile_fingerprint_changes_with_live_web_capability() -> None:
+    current = codex_profiles(
+        version="codex-cli 0.151.0",
+        configured_models=("gpt-5.6-luna",),
+        supports_image_input=False,
+    )[0]
+    legacy = legacy_profile(AgentName.CODEX, "gpt-5.6-luna", version="codex-cli 0.151.0")
+
+    assert current.fingerprint != legacy.fingerprint
 
 
 def test_catalog_rejects_unknown_profile_before_runner_execution() -> None:

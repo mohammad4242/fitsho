@@ -564,9 +564,11 @@ function toAgentCatalogModels(
       .filter((profile) => {
         if (!runner.installed || !profile.task_kinds.includes(task)) return false;
         const needsImage = task === "body_photo_analysis" || task === "food_photo_estimation";
+        const needsLiveWeb = task === "food_price_search";
         return profile.supports_structured_output
           && profile.supports_text_input
-          && (!needsImage || profile.supports_image_input);
+          && (!needsImage || profile.supports_image_input)
+          && (!needsLiveWeb || profile.supports_live_web);
       })
       .map((profile) => ({
         provider: `agent_service:${runner.agent}`,
@@ -586,8 +588,10 @@ function toAgentCatalogModels(
     .filter((model) => {
       if (!runner.installed) return false;
       const needsImage = task === "body_photo_analysis" || task === "food_photo_estimation";
+      const needsLiveWeb = task === "food_price_search";
       return model.supports_structured_output
-        && (needsImage ? model.supports_image_input : model.supports_text_input);
+        && (needsImage ? model.supports_image_input : model.supports_text_input)
+        && (!needsLiveWeb || model.supports_live_web);
     })
     .map((model) => ({
       provider: `agent_service:${runner.agent}`,

@@ -639,22 +639,42 @@ it("shows Food price search as Agent-only and gates enablement on its smoke", as
       auth_state: "authenticated",
       auth_mode: "browser_link",
       models: [],
-      profiles: [{
-        profile_id: "antigravity-price-high",
-        agent: "antigravity",
-        display_name: "Price research (High)",
-        model_id: "price-research",
-        effort: "high",
-        task_kinds: ["food_price_search"],
-        fingerprint: "b".repeat(64),
-        supports_text_input: true,
-        supports_image_input: false,
-        supports_structured_output: true,
-        verification_status: "unverified",
-        verified_at: null,
-        verification_error_code: null,
-        verification_safe_error_message: null,
-      }],
+      profiles: [
+        {
+          profile_id: "antigravity-price-high",
+          agent: "antigravity",
+          display_name: "Price research (High)",
+          model_id: "price-research",
+          effort: "high",
+          task_kinds: ["food_price_search"],
+          fingerprint: "b".repeat(64),
+          supports_text_input: true,
+          supports_image_input: false,
+          supports_structured_output: true,
+          supports_live_web: true,
+          verification_status: "unverified",
+          verified_at: null,
+          verification_error_code: null,
+          verification_safe_error_message: null,
+        },
+        {
+          profile_id: "antigravity-legacy-price-high",
+          agent: "antigravity",
+          display_name: "Legacy price profile",
+          model_id: "legacy-price",
+          effort: "high",
+          task_kinds: ["food_price_search"],
+          fingerprint: "c".repeat(64),
+          supports_text_input: true,
+          supports_image_input: false,
+          supports_structured_output: true,
+          supports_live_web: false,
+          verification_status: "unverified",
+          verified_at: null,
+          verification_error_code: null,
+          verification_safe_error_message: null,
+        },
+      ],
     }],
   });
   api.testAdminAiAgentTask.mockResolvedValue({
@@ -684,6 +704,7 @@ it("shows Food price search as Agent-only and gates enablement on its smoke", as
   expect(screen.getByLabelText("API")).toBeDisabled();
   await user.click(screen.getByRole("combobox", { name: "Model" }));
   expect(await screen.findByRole("option", { name: /Price research/ })).toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: /Legacy price profile/ })).not.toBeInTheDocument();
   await user.click(screen.getByRole("option", { name: /Price research/ }));
   expect(screen.getByRole("checkbox", { name: "Enabled" })).toBeDisabled();
 

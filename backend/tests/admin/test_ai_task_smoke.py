@@ -75,6 +75,7 @@ def _profile() -> AgentServiceModelProfile:
         supports_text_input=True,
         supports_image_input=True,
         supports_structured_output=True,
+        supports_live_web=True,
     )
 
 
@@ -329,10 +330,40 @@ def test_task_smoke_runs_all_four_safe_fixtures(db: Session, test_settings: Sett
         temperature=0,
         max_output_tokens=1024,
     )
+    assert price_request.web_access == "live"
     after_price_rows = tuple(
         db.scalar(select(func.count()).select_from(model)) or 0 for model in price_models
     )
     assert after_price_rows == before_price_rows
+
+
+def test_food_price_smoke_rejects_profile_without_live_web(
+    db: Session, test_settings: Settings
+) -> None:
+    test_settings.agent_service_token = "agent-service-test-token"
+    profile = _profile().model_copy(update={"supports_live_web": False})
+    provider = _SmokeProvider()
+    client = httpx.AsyncClient(transport=httpx.MockTransport(_capabilities_handler(profile)))
+
+    try:
+        result, _ = asyncio.run(
+            run_task_smoke(
+                db,
+                task_type=AITaskType.FOOD_PRICE_SEARCH,
+                agent=AIAgentName.ANTIGRAVITY,
+                profile_id=profile.profile_id,
+                settings=test_settings,
+                client=client,
+                provider=provider,
+            )
+        )
+    finally:
+        asyncio.run(client.aclose())
+
+    assert result.passed is False
+    assert result.stage == "backend_request"
+    assert result.error_code == "invalid_request"
+    assert provider.requests == []
 
 
 def test_task_smoke_verification_record_is_task_scoped(db: Session) -> None:

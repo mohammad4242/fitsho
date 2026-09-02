@@ -355,7 +355,8 @@ class AntigravityRunner(AgentRunner):
             prompt += (
                 "\n\nlive web research is required for this request. "
                 "Use the browser/web tools available to this runner. "
-                "Do not answer from model memory; return only evidence observed during this request."
+                "Do not answer from model memory; return only evidence observed "
+                "during this request."
             )
         return prompt
 
@@ -447,6 +448,7 @@ def _configured_profile(
         effort=_effort_from_model_id(model_id),
         version=version,
         supports_image_input=supports_image_input,
+        supports_live_web=True,
     )
 
 

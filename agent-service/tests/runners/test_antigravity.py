@@ -86,6 +86,9 @@ def test_capabilities_default_to_text_and_no_image_support(tmp_path: Path) -> No
     assert capabilities.models[0].supports_text_input is True
     assert capabilities.models[0].supports_image_input is False
     assert capabilities.models[0].supports_structured_output is True
+    assert capabilities.models[0].supports_live_web is True
+    assert capabilities.profiles is not None
+    assert capabilities.profiles[0].supports_live_web is True
 
 
 def test_capabilities_discover_models_when_configuration_is_empty(
