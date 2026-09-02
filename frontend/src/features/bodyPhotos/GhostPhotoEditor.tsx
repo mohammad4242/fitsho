@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
@@ -44,13 +44,17 @@ export function GhostPhotoEditor({
   renderPhoto = renderGhostPhoto,
 }: GhostPhotoEditorProps) {
   const { t } = useTranslation();
-  const previewUrl = useMemo(() => URL.createObjectURL(file), [file]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const [transform, setTransform] = useState<GhostPhotoTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => () => URL.revokeObjectURL(previewUrl), [previewUrl]);
+  useEffect(() => {
+    const nextPreviewUrl = URL.createObjectURL(file);
+    setPreviewUrl(nextPreviewUrl);
+    return () => URL.revokeObjectURL(nextPreviewUrl);
+  }, [file]);
 
   function updateTransform(update: (current: GhostPhotoTransform) => GhostPhotoTransform) {
     setTransform((current) => clampGhostPhotoTransform(update(current)));
@@ -112,13 +116,15 @@ export function GhostPhotoEditor({
         onPointerUp={finishPointerDrag}
         onPointerCancel={finishPointerDrag}
       >
-        <img
-          className="ghost-photo-editor__image"
-          src={previewUrl}
-          alt={t("bodyPhotos.editor.imageAlt", { view: t(`bodyPhotos.views.${view}`) })}
-          draggable={false}
-          style={{ transform: ghostPhotoTransformStyle(transform) }}
-        />
+        {previewUrl !== null && (
+          <img
+            className="ghost-photo-editor__image"
+            src={previewUrl}
+            alt={t("bodyPhotos.editor.imageAlt", { view: t(`bodyPhotos.views.${view}`) })}
+            draggable={false}
+            style={{ transform: ghostPhotoTransformStyle(transform) }}
+          />
+        )}
         <GhostOverlayGuide view={view} />
       </div>
       <p className="ghost-photo-editor__privacy-note">{t("bodyPhotos.editor.privacyNote")}</p>

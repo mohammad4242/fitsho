@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 
@@ -119,4 +120,26 @@ it("releases its source preview URL when it unmounts", () => {
   rendered.unmount();
 
   expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:editor-source");
+});
+
+it("keeps the live preview URL usable under React StrictMode", () => {
+  vi.mocked(URL.createObjectURL)
+    .mockReset()
+    .mockReturnValueOnce("blob:strict-first")
+    .mockReturnValue("blob:strict-live");
+
+  render(
+    <StrictMode>
+      <GhostPhotoEditor
+        file={sourceFile}
+        view="front"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+        renderPhoto={renderPhoto}
+      />
+    </StrictMode>,
+  );
+
+  expect(screen.getByRole("img", { name: /photo being aligned/i })).toHaveAttribute("src", "blob:strict-live");
+  expect(URL.revokeObjectURL).not.toHaveBeenCalledWith("blob:strict-live");
 });
