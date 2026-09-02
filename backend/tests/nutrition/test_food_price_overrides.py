@@ -150,3 +150,57 @@ def test_planner_uses_active_override_without_mutating_automatic_reference(db) -
     assert candidate.price_irr_per_gram == Decimal("6000")
     assert reference["source"] == "manual_override"
     assert reference["reference_id"] == str(override.id)
+
+
+def test_planner_includes_unit_and_liter_priced_foods_with_audited_conversion(db) -> None:
+    from sqlalchemy import select
+
+    from app.auth.models import User
+    from app.nutrition.models import NutritionCatalogueFood, NutritionFoodPriceOverride
+    from app.nutrition.plan_service import _planner_foods
+
+    prices = {
+        "egg": ("21000", "TOMAN_PER_UNIT"),
+        "sangak-bread": ("15500", "TOMAN_PER_UNIT"),
+        "barbari-bread": ("10000", "TOMAN_PER_UNIT"),
+        "lavash-bread": ("2700", "TOMAN_PER_UNIT"),
+        "taftoon-bread": ("4500", "TOMAN_PER_UNIT"),
+        "milk": ("120000", "TOMAN_PER_LITER"),
+        "olive-oil": ("1400000", "TOMAN_PER_LITER"),
+        "vegetable-oil": ("410000", "TOMAN_PER_LITER"),
+    }
+    admin = User(email="planner-non-kg-admin@example.com", password_hash="hash", is_admin=True)
+    foods = db.scalars(
+        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug.in_(prices))
+    ).all()
+    assert {food.slug for food in foods} == set(prices)
+    db.add(admin)
+    db.flush()
+    db.add_all(
+        [
+            NutritionFoodPriceOverride(
+                food_id=food.id,
+                reference_price_toman=Decimal(price),
+                canonical_unit=unit,
+                reason="قیمت دستی تأییدشده برای تست Planner",
+                created_by_user_id=admin.id,
+                active=True,
+            )
+            for food in foods
+            for price, unit in [prices[food.slug]]
+        ]
+    )
+    db.flush()
+
+    candidates, snapshot, _manifest = _planner_foods(db)
+
+    candidates_by_slug = {candidate.slug: candidate for candidate in candidates}
+    snapshots_by_slug = {
+        item["slug"]: item
+        for item in snapshot["references"]
+        if isinstance(item, dict) and "slug" in item
+    }
+    assert set(prices).issubset(candidates_by_slug)
+    assert candidates_by_slug["egg"].price_irr_per_gram == Decimal("4200")
+    assert snapshots_by_slug["egg"]["canonical_unit"] == "TOMAN_PER_UNIT"
+    assert snapshots_by_slug["egg"]["grams_per_price_unit"] == "50"
