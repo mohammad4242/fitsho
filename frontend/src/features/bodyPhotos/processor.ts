@@ -144,6 +144,11 @@ const limits = {
   neutralGray: [160, 163, 161] as const,
 } as const;
 
+const bodySeedConfidenceThreshold = 0.35;
+const bodyProtectionMinConfidence = 0.20;
+const bodyProtectionMaxConfidence = 0.70;
+const backgroundFeatherRatio = 0.08;
+
 const landmarkGroups = {
   shoulders: [11, 12],
   elbows: [13, 14],
@@ -598,23 +603,144 @@ export function compositeBodyOnNeutralBackground(
   mask: BodySegmentationMask,
   background: readonly [number, number, number],
 ): Uint8ClampedArray {
-  if (source.length !== width * height * 4 || mask.confidence.length !== mask.width * mask.height) {
+  if (
+    width <= 0
+    || height <= 0
+    || mask.width <= 0
+    || mask.height <= 0
+    || source.length !== width * height * 4
+    || mask.confidence.length !== mask.width * mask.height
+  ) {
     throw new BodyPhotoProcessingError("segmentation_unavailable");
   }
+  const distanceField = buildBodyDistanceField(mask, width, height);
+  const featherRadius = Math.max(1, Math.min(width, height) * backgroundFeatherRatio);
   const output = new Uint8ClampedArray(source.length);
   for (let y = 0; y < height; y += 1) {
-    const maskY = Math.min(mask.height - 1, Math.floor((y / height) * mask.height));
     for (let x = 0; x < width; x += 1) {
-      const maskX = Math.min(mask.width - 1, Math.floor((x / width) * mask.width));
-      const confidence = Math.min(1, Math.max(0, mask.confidence[maskY * mask.width + maskX]!));
+      const confidence = clampConfidence(sampleMaskValue(
+        mask.confidence,
+        mask.width,
+        mask.height,
+        width,
+        height,
+        x,
+        y,
+      ));
+      const distanceFromBody = sampleMaskValue(
+        distanceField,
+        mask.width,
+        mask.height,
+        width,
+        height,
+        x,
+        y,
+      );
+      const bodyProtection = smoothstep(
+        bodyProtectionMinConfidence,
+        bodyProtectionMaxConfidence,
+        confidence,
+      );
+      const distanceFade = smoothstep(0, featherRadius, distanceFromBody);
+      const grayMix = (1 - bodyProtection) * distanceFade;
       const index = (y * width + x) * 4;
-      output[index] = Math.round(source[index]! * confidence + background[0] * (1 - confidence));
-      output[index + 1] = Math.round(source[index + 1]! * confidence + background[1] * (1 - confidence));
-      output[index + 2] = Math.round(source[index + 2]! * confidence + background[2] * (1 - confidence));
+      output[index] = Math.round(source[index]! * (1 - grayMix) + background[0] * grayMix);
+      output[index + 1] = Math.round(source[index + 1]! * (1 - grayMix) + background[1] * grayMix);
+      output[index + 2] = Math.round(source[index + 2]! * (1 - grayMix) + background[2] * grayMix);
       output[index + 3] = 255;
     }
   }
   return output;
+}
+
+function buildBodyDistanceField(
+  mask: BodySegmentationMask,
+  outputWidth: number,
+  outputHeight: number,
+): Float32Array {
+  const distances = new Float32Array(mask.width * mask.height);
+  distances.fill(Number.POSITIVE_INFINITY);
+  let hasBodySeed = false;
+  for (let y = 0; y < mask.height; y += 1) {
+    for (let x = 0; x < mask.width; x += 1) {
+      const index = y * mask.width + x;
+      if (clampConfidence(mask.confidence[index]!) >= bodySeedConfidenceThreshold) {
+        distances[index] = 0;
+        hasBodySeed = true;
+      }
+    }
+  }
+  if (!hasBodySeed) throw new BodyPhotoProcessingError("segmentation_unavailable");
+
+  const horizontalStep = outputWidth / mask.width;
+  const verticalStep = outputHeight / mask.height;
+  const diagonalStep = Math.hypot(horizontalStep, verticalStep);
+  for (let y = 0; y < mask.height; y += 1) {
+    for (let x = 0; x < mask.width; x += 1) {
+      const index = y * mask.width + x;
+      let distance = distances[index]!;
+      if (x > 0) distance = Math.min(distance, distances[index - 1]! + horizontalStep);
+      if (y > 0) distance = Math.min(distance, distances[index - mask.width]! + verticalStep);
+      if (x > 0 && y > 0) {
+        distance = Math.min(distance, distances[index - mask.width - 1]! + diagonalStep);
+      }
+      if (x + 1 < mask.width && y > 0) {
+        distance = Math.min(distance, distances[index - mask.width + 1]! + diagonalStep);
+      }
+      distances[index] = distance;
+    }
+  }
+  for (let y = mask.height - 1; y >= 0; y -= 1) {
+    for (let x = mask.width - 1; x >= 0; x -= 1) {
+      const index = y * mask.width + x;
+      let distance = distances[index]!;
+      if (x + 1 < mask.width) distance = Math.min(distance, distances[index + 1]! + horizontalStep);
+      if (y + 1 < mask.height) distance = Math.min(distance, distances[index + mask.width]! + verticalStep);
+      if (x + 1 < mask.width && y + 1 < mask.height) {
+        distance = Math.min(distance, distances[index + mask.width + 1]! + diagonalStep);
+      }
+      if (x > 0 && y + 1 < mask.height) {
+        distance = Math.min(distance, distances[index + mask.width - 1]! + diagonalStep);
+      }
+      distances[index] = distance;
+    }
+  }
+  return distances;
+}
+
+function sampleMaskValue(
+  values: Float32Array,
+  maskWidth: number,
+  maskHeight: number,
+  outputWidth: number,
+  outputHeight: number,
+  x: number,
+  y: number,
+): number {
+  const mappedX = Math.min(maskWidth - 1, Math.max(0, ((x + 0.5) / outputWidth) * maskWidth - 0.5));
+  const mappedY = Math.min(maskHeight - 1, Math.max(0, ((y + 0.5) / outputHeight) * maskHeight - 0.5));
+  const left = Math.floor(mappedX);
+  const top = Math.floor(mappedY);
+  const right = Math.min(maskWidth - 1, left + 1);
+  const bottom = Math.min(maskHeight - 1, top + 1);
+  const xWeight = mappedX - left;
+  const yWeight = mappedY - top;
+  const topLeft = values[top * maskWidth + left]!;
+  const topRight = values[top * maskWidth + right]!;
+  const bottomLeft = values[bottom * maskWidth + left]!;
+  const bottomRight = values[bottom * maskWidth + right]!;
+  const topValue = topLeft + (topRight - topLeft) * xWeight;
+  const bottomValue = bottomLeft + (bottomRight - bottomLeft) * xWeight;
+  return topValue + (bottomValue - topValue) * yWeight;
+}
+
+function smoothstep(edgeStart: number, edgeEnd: number, value: number): number {
+  const normalized = Math.min(1, Math.max(0, (value - edgeStart) / (edgeEnd - edgeStart)));
+  return normalized * normalized * (3 - 2 * normalized);
+}
+
+function clampConfidence(value: number): number {
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 }
 
 const browserBodyPhotoRuntime = new BrowserBodyPhotoRuntime();

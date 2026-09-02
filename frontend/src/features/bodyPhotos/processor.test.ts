@@ -279,22 +279,78 @@ describe("BrowserBodyPhotoProcessor", () => {
 });
 
 describe("compositeBodyOnNeutralBackground", () => {
-  it("changes only color values and preserves pixel coordinates", () => {
-    const source = new Uint8ClampedArray([
-      10, 20, 30, 255,
-      100, 110, 120, 255,
-    ]);
+  it("keeps high-confidence body pixels unchanged and preserves dimensions and alpha", () => {
+    const size = 100;
+    const source = solidSource(size, size, [20, 30, 40]);
     const result = compositeBodyOnNeutralBackground(
       source,
-      2,
-      1,
-      { width: 2, height: 1, confidence: new Float32Array([0, 1]) },
-      [183, 186, 184],
+      size,
+      size,
+      distanceTestMask(size),
+      [160, 163, 161],
     );
 
-    expect(Array.from(result)).toEqual([
-      183, 186, 184, 255,
-      100, 110, 120, 255,
-    ]);
+    expect(result.length).toBe(source.length);
+    expect(pixelAt(result, size, 50, 50)).toEqual([20, 30, 40, 255]);
+    expect(Array.from(result).every((value, index) => index % 4 !== 3 || value === 255)).toBe(true);
+  });
+
+  it("fades background toward gray as distance from the body increases", () => {
+    const size = 100;
+    const source = solidSource(size, size, [20, 30, 40]);
+    const result = compositeBodyOnNeutralBackground(
+      source,
+      size,
+      size,
+      distanceTestMask(size),
+      [160, 163, 161],
+    );
+
+    const nearBody = pixelAt(result, size, 53, 50);
+    const middleDistance = pixelAt(result, size, 56, 50);
+    const farBackground = pixelAt(result, size, 70, 50);
+
+    expect(nearBody[0]).toBeLessThan(middleDistance[0]);
+    expect(middleDistance[0]).toBeLessThan(farBackground[0]);
+    expect(farBackground).toEqual([160, 163, 161, 255]);
+  });
+
+  it("fails when the segmentation mask has no valid body seed", () => {
+    const size = 4;
+    const source = solidSource(size, size, [20, 30, 40]);
+
+    expect(() => compositeBodyOnNeutralBackground(
+      source,
+      size,
+      size,
+      { width: size, height: size, confidence: new Float32Array(size * size).fill(0.34) },
+      [160, 163, 161],
+    )).toThrowError("segmentation_unavailable");
   });
 });
+
+function solidSource(width: number, height: number, rgb: readonly [number, number, number]) {
+  const source = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < source.length; index += 4) {
+    source[index] = rgb[0];
+    source[index + 1] = rgb[1];
+    source[index + 2] = rgb[2];
+    source[index + 3] = 255;
+  }
+  return source;
+}
+
+function distanceTestMask(size: number) {
+  const confidence = new Float32Array(size * size);
+  for (let y = 40; y < 60; y += 1) {
+    for (let x = 48; x < 53; x += 1) {
+      confidence[y * size + x] = 1;
+    }
+  }
+  return { width: size, height: size, confidence };
+}
+
+function pixelAt(source: Uint8ClampedArray, width: number, x: number, y: number) {
+  const index = (y * width + x) * 4;
+  return [source[index]!, source[index + 1]!, source[index + 2]!, source[index + 3]!];
+}
