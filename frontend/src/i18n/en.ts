@@ -1162,7 +1162,7 @@ const en = {
       editor: {
         eyebrow: "Photo framing",
         title: "Align your photo",
-        body: "Move your photo below the Ghost guide. Approximate framing is okay.",
+        body: "Drag with one finger. Pinch with two fingers to zoom and rotate. Approximate framing is okay.",
         stageLabel: "Photo framing editor",
         imageAlt: "Photo being aligned for {{view}}",
         privacyNote: "The Ghost is only a guide. The top privacy region is removed before processing.",

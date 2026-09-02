@@ -33,6 +33,18 @@ type DragState = {
   originY: number;
 };
 
+type GhostPhotoPoint = {
+  x: number;
+  y: number;
+};
+
+type PinchGesture = {
+  initialCenter: GhostPhotoPoint;
+  initialDistance: number;
+  initialAngle: number;
+  initialTransform: GhostPhotoTransform;
+};
+
 const zoomStep = 0.1;
 const rotationStep = 1;
 
@@ -46,6 +58,8 @@ export function GhostPhotoEditor({
   const { t } = useTranslation();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  const pointersRef = useRef(new Map<number, GhostPhotoPoint>());
+  const pinchRef = useRef<PinchGesture | null>(null);
   const [transform, setTransform] = useState<GhostPhotoTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +77,13 @@ export function GhostPhotoEditor({
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (confirming) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const points = firstTwoPointerPoints(pointersRef.current);
+    if (pointersRef.current.size >= 2 && points !== null) {
+      dragRef.current = null;
+      pinchRef.current = createPinchGesture(points[0], points[1], transform);
+      return;
+    }
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -73,6 +94,16 @@ export function GhostPhotoEditor({
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const pointers = pointersRef.current;
+    if (!pointers.has(event.pointerId)) return;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const pinch = pinchRef.current;
+    const points = firstTwoPointerPoints(pointers);
+    if (pinch !== null && points !== null) {
+      event.preventDefault();
+      setTransform(clampGhostPhotoTransform(applyPinchGesture(pinch, points[0], points[1])));
+      return;
+    }
     const drag = dragRef.current;
     if (drag === null || drag.pointerId !== event.pointerId) return;
     updateTransform((current) => ({
@@ -83,8 +114,20 @@ export function GhostPhotoEditor({
   }
 
   function finishPointerDrag(event: React.PointerEvent<HTMLDivElement>) {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
-    dragRef.current = null;
+    pointersRef.current.delete(event.pointerId);
+    pinchRef.current = null;
+    if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+    const remaining = Array.from(pointersRef.current.entries())[0];
+    if (remaining !== undefined) {
+      const [pointerId, point] = remaining;
+      dragRef.current = {
+        pointerId,
+        startX: point.x,
+        startY: point.y,
+        originX: transform.offsetX,
+        originY: transform.offsetY,
+      };
+    }
     event.currentTarget.releasePointerCapture?.(event.pointerId);
   }
 
@@ -214,4 +257,60 @@ export function GhostPhotoEditor({
       </div>
     </section>
   );
+}
+
+function firstTwoPointerPoints(
+  pointers: Map<number, GhostPhotoPoint>,
+): [GhostPhotoPoint, GhostPhotoPoint] | null {
+  const points = Array.from(pointers.values());
+  if (points.length < 2) return null;
+  return [points[0]!, points[1]!];
+}
+
+function createPinchGesture(
+  first: GhostPhotoPoint,
+  second: GhostPhotoPoint,
+  transform: GhostPhotoTransform,
+): PinchGesture {
+  return {
+    initialCenter: midpoint(first, second),
+    initialDistance: distance(first, second),
+    initialAngle: angle(first, second),
+    initialTransform: transform,
+  };
+}
+
+function applyPinchGesture(
+  gesture: PinchGesture,
+  first: GhostPhotoPoint,
+  second: GhostPhotoPoint,
+): GhostPhotoTransform {
+  const currentCenter = midpoint(first, second);
+  const initialDistance = gesture.initialDistance;
+  const scaleRatio = initialDistance === 0 ? 1 : distance(first, second) / initialDistance;
+  const rotationDelta = shortestAngleDelta(angle(first, second) - gesture.initialAngle);
+  return {
+    offsetX: gesture.initialTransform.offsetX + currentCenter.x - gesture.initialCenter.x,
+    offsetY: gesture.initialTransform.offsetY + currentCenter.y - gesture.initialCenter.y,
+    scale: gesture.initialTransform.scale * scaleRatio,
+    rotation: gesture.initialTransform.rotation + (rotationDelta * 180) / Math.PI,
+  };
+}
+
+function midpoint(first: GhostPhotoPoint, second: GhostPhotoPoint): GhostPhotoPoint {
+  return { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
+}
+
+function distance(first: GhostPhotoPoint, second: GhostPhotoPoint): number {
+  return Math.hypot(second.x - first.x, second.y - first.y);
+}
+
+function angle(first: GhostPhotoPoint, second: GhostPhotoPoint): number {
+  return Math.atan2(second.y - first.y, second.x - first.x);
+}
+
+function shortestAngleDelta(delta: number): number {
+  if (delta > Math.PI) return delta - 2 * Math.PI;
+  if (delta < -Math.PI) return delta + 2 * Math.PI;
+  return delta;
 }

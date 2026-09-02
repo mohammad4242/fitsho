@@ -75,6 +75,21 @@ it("moves the image with a pointer drag and reports the soft framing status", ()
   expect(screen.getByRole("status")).toHaveTextContent(/approximate framing is okay/i);
 });
 
+it("uses two active pointers to pinch-zoom and rotate the photo", () => {
+  renderEditor();
+  const stage = screen.getByRole("application", { name: /photo framing editor/i });
+  const image = screen.getByRole("img", { name: /photo being aligned/i });
+
+  fireEvent.pointerDown(stage, { pointerId: 1, clientX: 100, clientY: 100 });
+  fireEvent.pointerDown(stage, { pointerId: 2, clientX: 200, clientY: 100 });
+  fireEvent.pointerMove(stage, { pointerId: 1, clientX: 95, clientY: 95 });
+  fireEvent.pointerMove(stage, { pointerId: 2, clientX: 205, clientY: 105 });
+
+  expect(image.style.transform).toContain("translate(0px, 0px)");
+  expect(image.style.transform).toContain("rotate(5.194deg)");
+  expect(image.style.transform).toContain("scale(1.105)");
+});
+
 it("returns the clean rendered file only after confirmation", async () => {
   const onConfirm = vi.fn();
   render(
