@@ -1108,6 +1108,17 @@ const en = {
         body: "Enter the measurements that match your body today. They are saved with this photo session and used as its measurement snapshot.",
         snapshotNote: "Use a tape measure without tightening it. Body Analysis will not start until you confirm these values are current.",
         confirmLabel: "I confirm these measurements are current for this photo session",
+        status: {
+          pending: "Waiting for confirmation",
+          pendingHint: "Review today’s values",
+          confirmed: "Ready to continue",
+          confirmedHint: "These values will be saved with this scan",
+        },
+        fieldsLegend: "Measurement set",
+        essentialTitle: "Essential measurements",
+        essentialBody: "Height and weight set the baseline for this scan.",
+        proportionsTitle: "Body proportions",
+        proportionsBody: "Keep the tape relaxed and measure each area at its widest point.",
         fields: {
           shoulderCircumference: "Shoulder circumference (cm)",
           waistCircumference: "Waist circumference (cm)",

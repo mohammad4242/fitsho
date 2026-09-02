@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import type { InputHTMLAttributes } from "react";
 
 import type {
   BodyAnalysisMeasurementErrors,
@@ -191,8 +192,10 @@ type MeasurementFieldsProps = {
   errors: BodyAnalysisMeasurementErrors;
   disabled?: boolean;
   onChange: (field: MeasurementField, value: string) => void;
+  showPrimaryMeasurements?: boolean;
   showCircumferences?: boolean;
   requiredCircumferences?: boolean;
+  showUnits?: boolean;
   idPrefix?: string;
 };
 
@@ -201,55 +204,61 @@ export function MeasurementFields({
   errors,
   disabled = false,
   onChange,
+  showPrimaryMeasurements = true,
   showCircumferences = true,
   requiredCircumferences = false,
+  showUnits = false,
   idPrefix = "profile",
 }: MeasurementFieldsProps) {
   const { t } = useTranslation();
   return (
     <>
-      <div className="profile-field profile-field--paired">
-        <div>
-          <label htmlFor={`${idPrefix}-height`}>{t("onboarding.fields.height")}</label>
-          <input
-            id={`${idPrefix}-height`}
-            name="height_cm"
-            type="number"
-            inputMode="numeric"
-            autoComplete="off"
-            min={120}
-            max={230}
-            step={1}
-            required
-            value={values.height_cm}
-            aria-invalid={errors.height_cm !== undefined}
-            aria-describedby={describedBy("height_cm", errors.height_cm)}
-            onChange={(event) => onChange("height_cm", event.target.value)}
-            disabled={disabled}
-          />
-          <FieldError field="height_cm" error={errors.height_cm} />
+      {showPrimaryMeasurements && (
+        <div className="profile-field profile-field--paired">
+          <div>
+            <label htmlFor={`${idPrefix}-height`}>{t("onboarding.fields.height")}</label>
+            <MeasurementInput
+              unit={showUnits ? "cm" : undefined}
+              id={`${idPrefix}-height`}
+              name="height_cm"
+              type="number"
+              inputMode="numeric"
+              autoComplete="off"
+              min={120}
+              max={230}
+              step={1}
+              required
+              value={values.height_cm}
+              aria-invalid={errors.height_cm !== undefined}
+              aria-describedby={describedBy("height_cm", errors.height_cm)}
+              onChange={(event) => onChange("height_cm", event.target.value)}
+              disabled={disabled}
+            />
+            <FieldError field="height_cm" error={errors.height_cm} />
+          </div>
+          <div>
+            <label htmlFor={`${idPrefix}-current-weight`}>{t("onboarding.fields.weight")}</label>
+            <MeasurementInput
+              unit={showUnits ? "kg" : undefined}
+              id={`${idPrefix}-current-weight`}
+              name="current_weight_kg"
+              type="number"
+              inputMode="decimal"
+              autoComplete="off"
+              min={35}
+              max={300}
+              step={0.01}
+              required
+              value={values.current_weight_kg}
+              aria-invalid={errors.current_weight_kg !== undefined}
+              aria-describedby={describedBy("current_weight_kg", errors.current_weight_kg)}
+              onChange={(event) => onChange("current_weight_kg", event.target.value)}
+              disabled={disabled}
+            />
+            <FieldError field="current_weight_kg" error={errors.current_weight_kg} />
+          </div>
         </div>
-        <div>
-          <label htmlFor={`${idPrefix}-current-weight`}>{t("onboarding.fields.weight")}</label>
-          <input
-            id={`${idPrefix}-current-weight`}
-            name="current_weight_kg"
-            type="number"
-            inputMode="decimal"
-            autoComplete="off"
-            min={35}
-            max={300}
-            step={0.01}
-            required
-            value={values.current_weight_kg}
-            aria-invalid={errors.current_weight_kg !== undefined}
-            aria-describedby={describedBy("current_weight_kg", errors.current_weight_kg)}
-            onChange={(event) => onChange("current_weight_kg", event.target.value)}
-            disabled={disabled}
-          />
-          <FieldError field="current_weight_kg" error={errors.current_weight_kg} />
-        </div>
-      </div>
+      )}
 
       {showCircumferences && (
         <div className="profile-field profile-field--measurements">
@@ -264,7 +273,8 @@ export function MeasurementFields({
                   ? t(`bodyPhotos.measurements.fields.${label}`)
                   : t(`onboarding.fields.${label}`)}
               </label>
-              <input
+              <MeasurementInput
+                unit={showUnits ? "cm" : undefined}
                 id={`${idPrefix}-${field}`}
                 name={field}
                 type="number"
@@ -289,6 +299,21 @@ export function MeasurementFields({
         </div>
       )}
     </>
+  );
+}
+
+function MeasurementInput({
+  unit,
+  ...inputProps
+}: InputHTMLAttributes<HTMLInputElement> & { unit?: string }) {
+  if (unit === undefined) {
+    return <input {...inputProps} />;
+  }
+  return (
+    <div className="measurement-input">
+      <input {...inputProps} />
+      <span aria-hidden="true">{unit}</span>
+    </div>
   );
 }
 

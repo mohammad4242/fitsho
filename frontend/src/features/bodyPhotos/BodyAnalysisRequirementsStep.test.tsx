@@ -60,6 +60,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it("presents measurements as grouped studio panels with a confirmation status", async () => {
+  render(<BodyAnalysisRequirementsStep onConfirmed={vi.fn()} onCancel={vi.fn()} />);
+
+  expect(
+    await screen.findByRole("region", { name: /essential measurements/i }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: /body proportions/i })).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent(/waiting for confirmation/i);
+  expect(screen.getByLabelText(/height/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/current weight/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/shoulder circumference/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/waist circumference/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/hip circumference/i)).toBeInTheDocument();
+});
+
+it("updates the studio status when current measurements are confirmed", async () => {
+  const user = userEvent.setup();
+  render(<BodyAnalysisRequirementsStep onConfirmed={vi.fn()} onCancel={vi.fn()} />);
+
+  await screen.findByLabelText(/height/i);
+  await user.click(screen.getByRole("checkbox", { name: /measurements are current/i }));
+
+  expect(screen.getByRole("status")).toHaveTextContent(/ready to continue/i);
+});
+
 it("requires current circumferences and an explicit confirmation before continuing", async () => {
   const user = userEvent.setup();
   const onConfirmed = vi.fn();

@@ -125,24 +125,88 @@ export function BodyAnalysisRequirementsStep({
 
   return (
     <section className="body-photo-wizard body-analysis-requirements" aria-labelledby="body-analysis-requirements-title">
-      <p className="eyebrow eyebrow--accent">{t("bodyPhotos.measurements.eyebrow")}</p>
-      <h1 id="body-analysis-requirements-title" className="fitsho-display">
-        {t("bodyPhotos.measurements.title")}
-      </h1>
-      <p>{t("bodyPhotos.measurements.body")}</p>
-      <form onSubmit={(event) => void submit(event)}>
-        <fieldset className="profile-fieldset" disabled={busy}>
-          <legend>{t("onboarding.steps.bodyGoal")}</legend>
-          <MeasurementFields
-            values={values}
-            errors={validationErrors}
-            onChange={changeMeasurement}
-            requiredCircumferences
-            idPrefix="body-analysis"
-          />
+      <header className="body-analysis-requirements__header">
+        <div className="body-analysis-requirements__heading">
+          <p className="eyebrow eyebrow--accent">{t("bodyPhotos.measurements.eyebrow")}</p>
+          <h1 id="body-analysis-requirements-title" className="fitsho-display">
+            {t("bodyPhotos.measurements.title")}
+          </h1>
+          <p>{t("bodyPhotos.measurements.body")}</p>
+        </div>
+        <div
+          className="body-analysis-requirements__status"
+          data-state={confirmed ? "confirmed" : "pending"}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="body-analysis-requirements__status-mark" aria-hidden="true">
+            {confirmed ? "✓" : "01"}
+          </span>
+          <span className="body-analysis-requirements__status-copy">
+            <strong>
+              {t(`bodyPhotos.measurements.status.${confirmed ? "confirmed" : "pending"}`)}
+            </strong>
+            <small>
+              {t(`bodyPhotos.measurements.status.${confirmed ? "confirmedHint" : "pendingHint"}`)}
+            </small>
+          </span>
+        </div>
+      </header>
+      <form className="body-analysis-requirements__form" onSubmit={(event) => void submit(event)}>
+        <fieldset className="profile-fieldset body-analysis-measurement-panel" disabled={busy}>
+          <legend>{t("bodyPhotos.measurements.fieldsLegend")}</legend>
+          <div className="body-analysis-measurement-panel__rail" aria-hidden="true" />
+          <section
+            className="body-analysis-requirements__group body-analysis-requirements__group--essential"
+            aria-labelledby="body-analysis-essential-title"
+          >
+            <header className="body-analysis-requirements__group-header">
+              <span className="body-analysis-requirements__group-step" aria-hidden="true">01</span>
+              <div>
+                <h2 id="body-analysis-essential-title">
+                  {t("bodyPhotos.measurements.essentialTitle")}
+                </h2>
+                <p>{t("bodyPhotos.measurements.essentialBody")}</p>
+              </div>
+            </header>
+            <MeasurementFields
+              values={values}
+              errors={validationErrors}
+              onChange={changeMeasurement}
+              showCircumferences={false}
+              showUnits
+              idPrefix="body-analysis"
+            />
+          </section>
+          <section
+            className="body-analysis-requirements__group body-analysis-requirements__group--proportions"
+            aria-labelledby="body-analysis-proportions-title"
+          >
+            <header className="body-analysis-requirements__group-header">
+              <span className="body-analysis-requirements__group-step" aria-hidden="true">02</span>
+              <div>
+                <h2 id="body-analysis-proportions-title">
+                  {t("bodyPhotos.measurements.proportionsTitle")}
+                </h2>
+                <p>{t("bodyPhotos.measurements.proportionsBody")}</p>
+              </div>
+            </header>
+            <MeasurementFields
+              values={values}
+              errors={validationErrors}
+              onChange={changeMeasurement}
+              showPrimaryMeasurements={false}
+              requiredCircumferences
+              showUnits
+              idPrefix="body-analysis"
+            />
+          </section>
         </fieldset>
-        <p className="body-photo-muted">{t("bodyPhotos.measurements.snapshotNote")}</p>
-        <label className="body-photo-consent">
+        <div className="body-analysis-requirements__note">
+          <span className="body-analysis-requirements__note-mark" aria-hidden="true">i</span>
+          <p className="body-photo-muted">{t("bodyPhotos.measurements.snapshotNote")}</p>
+        </div>
+        <label className="body-photo-consent body-analysis-requirements__consent">
           <input
             type="checkbox"
             checked={confirmed}
