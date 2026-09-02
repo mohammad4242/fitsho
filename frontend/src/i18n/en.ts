@@ -1531,6 +1531,13 @@ const en = {
     },
     bodyAnalysis: {
       unavailable: "This reading is not available yet.",
+      summary: {
+        title: "Key summary",
+        weaknesses: "Important weaknesses",
+        strengths: "Important strengths",
+        noWeaknesses: "No clear weakness was recorded for now.",
+        noStrengths: "No clear strength was recorded for now.",
+      },
       assessmentStatus: { complete: "Three views available", partial: "Partial view set" },
       firstImpression: {
         eyebrow: "First look",
@@ -1623,7 +1630,7 @@ const en = {
       },
       disclaimer: {
         title: "Visible-development analysis only",
-        body: "This result describes visible proportions and development in these photos only. It does not diagnose a medical condition, determine body fat, or measure actual strength.",
+        body: "AI analysis can be wrong. Wait for a doctor and coach review for a more specialized analysis.",
       },
     },
     workoutPlan: {

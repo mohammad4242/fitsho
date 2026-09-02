@@ -15,7 +15,7 @@ export function SpecialistReviewStatus({ review }: { review: SpecialistReviewSta
         state: t(`bodyPhotos.results.reviewStates.${state}`),
       })}
     >
-      <span aria-hidden="true">{approved ? "✓" : "!"}</span>
+      <span className="body-analysis-review__dot" aria-hidden="true" />
       <div>
         <strong>{t(`bodyPhotos.results.reviewRoles.${review.role}`)}</strong>
         <small>{t(`bodyPhotos.results.reviewStates.${state}`)}</small>

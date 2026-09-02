@@ -7,7 +7,7 @@ import type { BodyAnalysis, BodyAnalysisExperienceV4 } from "./types";
 
 const experience: BodyAnalysisExperienceV4 = {
   schema_version: "4.0",
-  presentation_version: "body-analysis-experience-v1",
+  presentation_version: "body-analysis-experience-v2",
   assessment_status: "complete",
   input_snapshot: {
     captured_at: "2026-08-03T10:00:00Z",
@@ -33,25 +33,23 @@ const experience: BodyAnalysisExperienceV4 = {
     reason_codes: ["current_goal_preserved"],
   },
   indicators: {
-    body_proportion: {
-      status: "available",
-      message_key: "body_analysis.indicators.body_proportion",
-      parameters: { shoulder_to_waist_ratio: 1.45, waist_to_hip_ratio: 0.86 },
-    },
     upper_lower_balance: {
       status: "balanced",
       message_key: "body_analysis.indicators.upper_lower_balance",
       parameters: { state: "balanced" },
+      score_percent: 90,
     },
     visible_symmetry: {
       status: "no_clear_difference",
       message_key: "body_analysis.indicators.visible_symmetry",
       parameters: { state: "no_clear_difference" },
+      score_percent: 90,
     },
-    current_development_focus: {
-      status: "primary_priority",
-      message_key: "body_analysis.indicators.current_development_focus",
-      parameters: { areas: ["shoulders"] },
+    body_shape: {
+      status: "available",
+      message_key: "body_analysis.indicators.body_shape",
+      parameters: {},
+      score_percent: 82,
     },
   },
   regions: [
@@ -65,8 +63,8 @@ const experience: BodyAnalysisExperienceV4 = {
     {
       area: "chest",
       display_classification: "balanced",
-      insight_key: null,
-      insight_parameters: {},
+      insight_key: "body_analysis.insights.balanced",
+      insight_parameters: { area: "chest" },
       supporting_views: ["front"],
     },
   ],
@@ -101,26 +99,29 @@ beforeEach(async () => {
   await i18n.changeLanguage("en");
 });
 
-it("renders the deterministic first impression, direction, and four indicators", () => {
+it("renders first look, the route, and exactly three display scores", () => {
   render(<BodyAnalysisV4Result analysis={analysis} experience={experience} />);
 
-  expect(screen.getByRole("heading", { name: "What stands out first" })).toBeInTheDocument();
-  expect(screen.getByText(/clearest direction is shoulders/i)).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Your direction" })).toBeInTheDocument();
-  expect(screen.getByText(/supports your current muscle-building direction/i)).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Four useful signals" })).toBeInTheDocument();
-  expect(screen.getByText("Body proportion")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "First look" })).toBeInTheDocument();
+  expect(screen.getByText(/clearest focus is shoulders/i)).toBeInTheDocument();
+  expect(screen.getByText(/current muscle-building direction/i)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Symmetry & proportion" })).toBeInTheDocument();
+  expect(screen.getAllByTestId("body-analysis-score-row")).toHaveLength(3);
+  expect(screen.getByText("82%")).toBeInTheDocument();
   expect(screen.getByText("Upper / lower balance")).toBeInTheDocument();
   expect(screen.getByText("Visible symmetry")).toBeInTheDocument();
-  expect(screen.getByText("Current development focus")).toBeInTheDocument();
+  expect(screen.getByText("Body shape")).toBeInTheDocument();
+  expect(screen.queryByText("Four useful signals")).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Your direction" })).not.toBeInTheDocument();
 });
 
-it("renders meaningful v4 insights without numeric confidence percentages", () => {
+it("renders two concise summary cards and compact review states", () => {
   render(<BodyAnalysisV4Result analysis={analysis} experience={experience} />);
 
-  expect(screen.getByText(/primary area to work on is shoulders/i)).toBeInTheDocument();
-  expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
-  expect(screen.getByRole("alert")).toHaveTextContent(/provisional/i);
-  expect(screen.getByText(/pending review/i)).toBeInTheDocument();
-  expect(screen.getByText(/visible proportions and development/i)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Important weaknesses" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Important strengths" })).toBeInTheDocument();
+  expect(screen.getByText(/AI analysis can be wrong/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/Coach review pending/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/Doctor review pending/i)).toBeInTheDocument();
+  expect(screen.queryByText(/confidence/i)).not.toBeInTheDocument();
 });
