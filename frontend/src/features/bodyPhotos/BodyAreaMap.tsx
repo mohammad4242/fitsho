@@ -72,7 +72,7 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
   }
 
   return (
-    <section className="body-area-map" aria-labelledby="body-area-map-title">
+    <section className="body-area-map body-area-map--interactive" aria-labelledby="body-area-map-title">
       <header className="body-area-map__header">
         <div>
           <p className="eyebrow eyebrow--accent">{t("bodyAnalysis.map.eyebrow")}</p>
