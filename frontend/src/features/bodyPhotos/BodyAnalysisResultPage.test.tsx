@@ -290,7 +290,8 @@ it("renders the stored comparison without fetching prior analyses", async () => 
   renderPage();
 
   expect(await screen.findByRole("heading", { name: /progress comparison/i })).toBeInTheDocument();
-  expect(screen.getByText(/appears improved/i)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /biggest change/i })).toBeInTheDocument();
+  expect(screen.getByText(/biggest positive change/i)).toBeInTheDocument();
   expect(api.getBodyPhotoAnalysis).toHaveBeenCalledTimes(1);
   expect(api.getBodyPhotoComparison).toHaveBeenCalledWith("session-2");
 });
@@ -358,7 +359,7 @@ it("uses the v4 experience branch without falling back to legacy confidence or c
     overall_confidence: null,
     experience_result: {
       schema_version: "4.0",
-      presentation_version: "body-analysis-experience-v1",
+      presentation_version: "body-analysis-experience-v2",
       assessment_status: "complete",
       input_snapshot: {
         captured_at: "2026-08-03T10:00:00Z",
@@ -384,15 +385,14 @@ it("uses the v4 experience branch without falling back to legacy confidence or c
         reason_codes: ["current_goal_preserved"],
       },
       indicators: {
-        body_proportion: { status: "available", message_key: "body_analysis.indicators.body_proportion", parameters: { shoulder_to_waist_ratio: 1.39, waist_to_hip_ratio: 0.73 } },
-        upper_lower_balance: { status: "balanced", message_key: "body_analysis.indicators.upper_lower_balance", parameters: { state: "balanced" } },
-        visible_symmetry: { status: "no_clear_difference", message_key: "body_analysis.indicators.visible_symmetry", parameters: { state: "no_clear_difference" } },
-        current_development_focus: { status: "balanced", message_key: "body_analysis.indicators.current_development_focus", parameters: { areas: [] } },
+        upper_lower_balance: { status: "balanced", message_key: "body_analysis.indicators.upper_lower_balance", parameters: { state: "balanced" }, score_percent: 90 },
+        visible_symmetry: { status: "no_clear_difference", message_key: "body_analysis.indicators.visible_symmetry", parameters: { state: "no_clear_difference" }, score_percent: 90 },
+        body_shape: { status: "available", message_key: "body_analysis.indicators.body_shape", parameters: {}, score_percent: 85 },
       },
       regions: Array.from(["shoulders", "chest", "back", "lats", "arms", "forearms", "waist_midsection", "glutes", "quads", "hamstrings", "calves"] as const, (area) => ({
         area,
         display_classification: "balanced" as const,
-        insight_key: null,
+        insight_key: "body_analysis.insights.balanced",
         insight_parameters: {},
         supporting_views: ["front"] as const,
       })),
@@ -402,7 +402,7 @@ it("uses the v4 experience branch without falling back to legacy confidence or c
   api.getBodyPhotoAnalysis.mockResolvedValue(v4);
   renderPage();
 
-  expect(await screen.findByRole("heading", { name: "What stands out first" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "First look" })).toBeInTheDocument();
   expect(screen.queryByText(/overall confidence/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/three-view checklist/i)).not.toBeInTheDocument();
 });

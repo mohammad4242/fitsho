@@ -80,20 +80,26 @@ beforeEach(async () => {
   await i18n.changeLanguage("en");
 });
 
-it("renders exact measurement deltas with measurement provenance", () => {
+it("renders one compact measurement chart without repeated provenance", () => {
   render(<ProgressComparison comparison={comparison} />);
 
   expect(screen.getByRole("heading", { name: "Progress comparison" })).toBeInTheDocument();
-  expect(screen.getByText(/Waist.*84.*82/i)).toBeInTheDocument();
-  expect(screen.getByText(/-2.*cm/i)).toBeInTheDocument();
-  expect(screen.getAllByText(/Based on measurements recorded by you/i).length).toBeGreaterThan(0);
+  expect(screen.getByRole("heading", { name: "Measurements" })).toBeInTheDocument();
+  expect(screen.getByText("Waist circumference")).toBeInTheDocument();
+  expect(screen.getByText(/84.*cm/i)).toBeInTheDocument();
+  expect(screen.getByText(/82.*cm/i)).toBeInTheDocument();
+  expect(screen.getAllByTestId("body-progress-measurement-row")).toHaveLength(4);
+  expect(screen.queryByText(/Based on measurements recorded by you/i)).not.toBeInTheDocument();
 });
 
-it("renders visual transitions and labels them as photo observations", () => {
+it("renders only the biggest meaningful visual change", () => {
   render(<ProgressComparison comparison={comparison} />);
 
+  expect(screen.getByRole("heading", { name: "Biggest change" })).toBeInTheDocument();
   expect(screen.getByText("Shoulders")).toBeInTheDocument();
-  expect(screen.getByText("Appears improved")).toBeInTheDocument();
-  expect(screen.getAllByText(/Visual observation from standardized photos/i).length).toBeGreaterThan(0);
-  expect(screen.getByText(/Lats remain a primary priority/i)).toBeInTheDocument();
+  expect(screen.getByText(/had the biggest positive change/i)).toBeInTheDocument();
+  expect(screen.queryByText(/Appears improved/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Lats remain a primary priority/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Visual observation from standardized photos/i)).not.toBeInTheDocument();
+  expect(screen.queryByTestId("body-progress-visual-list")).not.toBeInTheDocument();
 });

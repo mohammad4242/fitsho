@@ -191,13 +191,13 @@ export function BodyAnalysisResultPage() {
       )}
 
       {analysis !== null && <BodyAnalysisResult analysis={analysis} />}
+      {comparison !== null && <ProgressComparison comparison={comparison} />}
       <details className="body-analysis-photo-details">
         <summary>{t("bodyPhotos.results.photosLabel")}</summary>
         <section className="body-analysis-photos" aria-label={t("bodyPhotos.results.photosLabel")}>
           {session.photos.map((photo) => <figure key={photo.id}><img src={photo.content_url} alt={t("bodyPhotos.results.photoAlt", { view: t(`bodyPhotos.views.${photo.view}`) })} /><figcaption>{t(`bodyPhotos.views.${photo.view}`)}</figcaption></figure>)}
         </section>
       </details>
-      {comparison !== null && <ProgressComparison comparison={comparison} />}
       {analysis?.normalized_result !== null && analysis?.normalized_result !== undefined && (
         <Link className="primary-button body-analysis-plan-link" to="/workout-plan">
           {t("bodyPhotos.results.viewWorkoutPlan")}

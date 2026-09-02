@@ -1,12 +1,11 @@
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 
 import type {
-  BodyAnalysisClassification,
+  BodyArea,
   BodyProgressComparison,
   BodyProgressMeasurementDelta,
-  BodyProgressProvenance,
+  BodyProgressState,
   BodyProgressVisualTransition,
   NormalizedBodyProgressComparisonV1,
   NormalizedBodyProgressComparisonV2,
@@ -24,14 +23,12 @@ export function ProgressComparison({ comparison }: { comparison: BodyProgressCom
       <header>
         <p className="eyebrow eyebrow--accent">{t("bodyPhotos.comparison.eyebrow")}</p>
         <h2 id={titleId}>{t("bodyPhotos.comparison.title")}</h2>
-        {isV2 ? (
+        {isV2 && (
           <p>{t("bodyPhotos.comparison.interval", {
             previous: formatDate(normalized.previous_session_date, locale),
             current: formatDate(normalized.current_session_date, locale),
             days: normalized.interval_days,
           })}</p>
-        ) : (
-          <p>{t("bodyPhotos.comparison.disclaimer")}</p>
         )}
       </header>
       {isV2 ? (
@@ -52,147 +49,140 @@ function V2Comparison({
 }) {
   const { t } = useTranslation();
   const measurementsId = useId();
-  const visualId = useId();
-  const prioritiesId = useId();
+  const exactMeasurements = comparison.measurement_deltas.filter(isExactMeasurement);
+  const biggestChange = selectBiggestChange(comparison.visual_transitions);
+
   return (
     <>
+      <BiggestChange transition={biggestChange} />
       <section className="body-progress-comparison__group" aria-labelledby={measurementsId}>
         <header>
-          <p className="eyebrow eyebrow--accent">{t("bodyPhotos.comparison.measurementsEyebrow")}</p>
           <h3 id={measurementsId}>{t("bodyPhotos.comparison.measurementsTitle")}</h3>
-          <p>{t("bodyPhotos.comparison.measurementNotice")}</p>
         </header>
-        <ul className="body-progress-comparison__measurement-list">
-          {comparison.measurement_deltas.map((delta) => (
-            <MeasurementDelta key={delta.measurement} delta={delta} locale={locale} />
-          ))}
-        </ul>
-      </section>
-      <section className="body-progress-comparison__group" aria-labelledby={visualId}>
-        <header>
-          <p className="eyebrow eyebrow--accent">{t("bodyPhotos.comparison.visualEyebrow")}</p>
-          <h3 id={visualId}>{t("bodyPhotos.comparison.visualTitle")}</h3>
-          <p>{t("bodyPhotos.comparison.visualObservationNotice")}</p>
-        </header>
-        <ul className="body-progress-comparison__visual-list">
-          {comparison.visual_transitions.map((transition) => (
-            <VisualTransition key={transition.body_area} transition={transition} />
-          ))}
-        </ul>
-      </section>
-      {comparison.persistent_priorities.length > 0 && (
-        <section className="body-progress-comparison__priorities" aria-labelledby={prioritiesId}>
-          <h3 id={prioritiesId}>{t("bodyPhotos.comparison.prioritiesTitle")}</h3>
-          <ul>
-            {comparison.persistent_priorities.map((priority) => (
-              <li key={priority.body_area}>
-                <strong>{t("bodyPhotos.comparison.persistentPriority", {
-                  area: t(`bodyPhotos.results.areas.${priority.body_area}`),
-                })}</strong>
-                <small>{provenancePairLabel(t, priority.provenance.previous, priority.provenance.current)}</small>
-              </li>
+        {exactMeasurements.length > 0 ? (
+          <ul className="body-progress-comparison__measurement-chart">
+            {exactMeasurements.map((delta) => (
+              <MeasurementDelta
+                delta={delta}
+                key={delta.measurement}
+                locale={locale}
+                maximum={measurementMaximum(exactMeasurements)}
+              />
             ))}
           </ul>
-        </section>
-      )}
+        ) : (
+          <p className="body-progress-comparison__empty">{t("bodyPhotos.comparison.noMeasurements")}</p>
+        )}
+      </section>
     </>
+  );
+}
+
+function BiggestChange({
+  transition,
+}: {
+  transition: { body_area: BodyArea; state: BodyProgressState } | null;
+}) {
+  const { t } = useTranslation();
+  const messageKey = transition?.state === "improved"
+    ? "bodyPhotos.comparison.biggestChangePositive"
+    : transition?.state === "declined_or_less_balanced"
+      ? "bodyPhotos.comparison.biggestChangeNegative"
+      : null;
+
+  return (
+    <section className="body-progress-comparison__biggest-change" aria-labelledby="body-progress-biggest-change-title">
+      <h3 id="body-progress-biggest-change-title">{t("bodyPhotos.comparison.biggestChangeTitle")}</h3>
+      {transition !== null && messageKey !== null ? (
+        <div className="body-progress-comparison__biggest-content" data-state={transition.state}>
+          <strong>{t(`bodyPhotos.results.areas.${transition.body_area}`)}</strong>
+          <p>{t(messageKey)}</p>
+        </div>
+      ) : (
+        <p>{t("bodyPhotos.comparison.biggestChangeNone")}</p>
+      )}
+    </section>
   );
 }
 
 function MeasurementDelta({
   delta,
   locale,
+  maximum,
 }: {
   delta: BodyProgressMeasurementDelta;
   locale: string;
+  maximum: number;
 }) {
   const { t } = useTranslation();
   const measurement = t(`bodyPhotos.comparison.measurements.${delta.measurement}`);
   const unit = t(`bodyPhotos.comparison.units.${delta.unit}`);
-  if (delta.availability !== "exact" || delta.previous === null || delta.current === null || delta.delta === null) {
-    return (
-      <li className="body-progress-comparison__measurement" data-state="unavailable">
-        <strong>{t("bodyPhotos.comparison.measurementUnavailable", { measurement })}</strong>
-        <small>{provenancePairLabel(t, delta.provenance.previous, delta.provenance.current)}</small>
-      </li>
-    );
-  }
+  const previous = delta.previous ?? 0;
+  const current = delta.current ?? 0;
+  const previousWidth = (previous / maximum) * 100;
+  const currentWidth = (current / maximum) * 100;
 
   return (
-    <li className="body-progress-comparison__measurement" data-state="exact">
-      <strong>{t("bodyPhotos.comparison.measurementLine", {
-        measurement,
-        previous: formatNumber(delta.previous, locale),
-        current: formatNumber(delta.current, locale),
-        delta: formatSignedNumber(delta.delta, locale),
-        unit,
-      })}</strong>
-      <small>{provenancePairLabel(t, delta.provenance.previous, delta.provenance.current)}</small>
-    </li>
-  );
-}
-
-function VisualTransition({ transition }: { transition: BodyProgressVisualTransition }) {
-  const { t } = useTranslation();
-  return (
-    <li className="body-progress-comparison__visual" data-state={transition.state}>
-      <strong>{t(`bodyPhotos.results.areas.${transition.body_area}`)}</strong>
-      <span>{t(`bodyPhotos.comparison.states.${transition.state}`)}</span>
-      <small>{t("bodyPhotos.comparison.visualTransition", {
-        previous: classificationLabel(t, transition.previous_classification),
-        current: classificationLabel(t, transition.current_classification),
-      })}</small>
-      <small>{t("bodyPhotos.comparison.visualObservationNotice")}</small>
-      {transition.supporting_views.length > 0 && (
-        <small>{t("bodyPhotos.comparison.supportingViews", {
-          views: transition.supporting_views.map((view) => t(`bodyPhotos.views.${view}`)).join(" · "),
-        })}</small>
-      )}
-      <small>{t("bodyPhotos.comparison.visualReasons", {
-        reasons: transition.reason_codes.map((reason) => t(`bodyPhotos.comparison.reasons.${reason}`)).join(" · "),
-      })}</small>
-      <small>{provenancePairLabel(t, transition.provenance.previous, transition.provenance.current)}</small>
+    <li className="body-progress-comparison__measurement" data-testid="body-progress-measurement-row">
+      <div className="body-progress-comparison__measurement-heading">
+        <strong>{measurement}</strong>
+        <span>{unit}</span>
+      </div>
+      <div
+        aria-label={t("bodyPhotos.comparison.measurementChartAria", { measurement })}
+        className="body-progress-comparison__measurement-bars"
+        role="img"
+      >
+        <span
+          className="body-progress-comparison__measurement-bar body-progress-comparison__measurement-bar--previous"
+          style={{ inlineSize: `${previousWidth}%` }}
+        />
+        <span
+          className="body-progress-comparison__measurement-bar body-progress-comparison__measurement-bar--current"
+          style={{ inlineSize: `${currentWidth}%` }}
+        />
+      </div>
+      <div className="body-progress-comparison__measurement-values">
+        <span>
+          <i className="body-progress-comparison__legend-dot body-progress-comparison__legend-dot--previous" aria-hidden="true" />
+          {t("bodyPhotos.comparison.previousLabel")}: {formatNumber(previous, locale)} {unit}
+        </span>
+        <span>
+          <i className="body-progress-comparison__legend-dot body-progress-comparison__legend-dot--current" aria-hidden="true" />
+          {t("bodyPhotos.comparison.currentLabel")}: {formatNumber(current, locale)} {unit}
+        </span>
+      </div>
     </li>
   );
 }
 
 function LegacyComparison({ comparison }: { comparison: NormalizedBodyProgressComparisonV1 }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <p className="body-progress-comparison__legacy-notice">{t("bodyPhotos.comparison.disclaimer")}</p>
-      <ul>
-        {comparison.areas.map((area) => (
-          <li key={area.body_area} data-state={area.state}>
-            <strong>{t(`bodyPhotos.results.areas.${area.body_area}`)}</strong>
-            <span>{t(`bodyPhotos.comparison.states.${area.state}`)}</span>
-            <small>{t("bodyPhotos.comparison.visualTransition", {
-              previous: classificationLabel(t, area.previous_classification),
-              current: classificationLabel(t, area.current_classification),
-            })}</small>
-            <small>{t("bodyPhotos.comparison.visualObservationNotice")}</small>
-          </li>
-        ))}
-      </ul>
-    </>
+  return <BiggestChange transition={selectBiggestChange(comparison.areas)} />;
+}
+
+function isExactMeasurement(delta: BodyProgressMeasurementDelta) {
+  return delta.availability === "exact"
+    && delta.previous !== null
+    && delta.current !== null;
+}
+
+function measurementMaximum(measurements: BodyProgressMeasurementDelta[]) {
+  return Math.max(
+    1,
+    ...measurements.flatMap((delta) => [delta.previous ?? 0, delta.current ?? 0]),
   );
 }
 
-function classificationLabel(t: TFunction, classification: BodyAnalysisClassification | null) {
-  return classification === null
-    ? t("bodyPhotos.comparison.unknown")
-    : t(`bodyPhotos.results.classifications.${classification}`);
-}
-
-function provenancePairLabel(t: TFunction, previous: BodyProgressProvenance, current: BodyProgressProvenance) {
-  return t("bodyPhotos.comparison.provenancePair", {
-    previous: provenanceLabel(t, previous),
-    current: provenanceLabel(t, current),
-  });
-}
-
-function provenanceLabel(t: TFunction, provenance: BodyProgressProvenance) {
-  return t(`bodyPhotos.comparison.provenance.${provenance.source}`);
+function selectBiggestChange(
+  transitions: Array<Pick<BodyProgressVisualTransition, "body_area" | "state" | "change_confidence">>
+    | NormalizedBodyProgressComparisonV1["areas"],
+): { body_area: BodyArea; state: BodyProgressState } | null {
+  const meaningful = transitions.filter((transition) => (
+    transition.state === "improved" || transition.state === "declined_or_less_balanced"
+  ));
+  if (meaningful.length === 0) return null;
+  const biggest = [...meaningful].sort((left, right) => right.change_confidence - left.change_confidence)[0];
+  return biggest === undefined ? null : { body_area: biggest.body_area, state: biggest.state };
 }
 
 function formatDate(value: string, locale: string) {
@@ -201,9 +191,4 @@ function formatDate(value: string, locale: string) {
 
 function formatNumber(value: number, locale: string) {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
-}
-
-function formatSignedNumber(value: number, locale: string) {
-  const formatted = formatNumber(Math.abs(value), locale);
-  return value > 0 ? `+${formatted}` : value < 0 ? `-${formatted}` : formatted;
 }
