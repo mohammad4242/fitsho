@@ -268,6 +268,7 @@ class AgentServiceProvider:
             "schema_name": request.schema_name,
             "temperature": request.temperature,
             "max_output_tokens": request.max_output_tokens,
+            "web_access": request.web_access,
             "timeout_seconds": self._timeout_seconds,
         }
         if self._profile_id is not None:

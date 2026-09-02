@@ -140,6 +140,10 @@ def test_task_provider_factory_uses_agent_service_without_cost_accounting() -> N
     _run(scenario())
 
 
+def test_structured_generation_defaults_to_disabled_web_access() -> None:
+    assert _request().web_access == "disabled"
+
+
 def test_openrouter_catalog_normalizes_and_filters_model_capabilities() -> None:
     seen: dict[str, str] = {}
 

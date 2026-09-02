@@ -123,6 +123,7 @@ class StructuredGenerationRequest(BaseModel):
     )
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     max_output_tokens: int = Field(default=4096, ge=1, le=65_536)
+    web_access: Literal["disabled", "live"] = "disabled"
 
 
 class StructuredGenerationResponse(BaseModel):

@@ -8,9 +8,8 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from hashlib import sha256
-from secrets import token_hex
 from typing import Literal
-from urllib.parse import SplitResult, urlencode, urlsplit, urlunsplit
+from urllib.parse import SplitResult, urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -37,40 +36,31 @@ INITIAL_RESEARCH_SOURCES = 3
 
 FOOD_PRICE_RESEARCH_SYSTEM_PROMPT = """You are Fitsho's public Iranian food-price research agent.
 
-This is a bounded evidence task. Return only one JSON object matching the
-supplied response schema.
+This is a bounded evidence task and requires live web research. Use the live web/search/fetch tool exposed by your runner for this request. Do not
+answer from model memory. Return only one JSON object matching the supplied
+response schema and only evidence actually observed during this request. Do not answer from model memory.
 
-Use live web search/browser tools, but only the browser tool for live research.
-Here the browser operation is the URL content tool, which accepts a `Url`
-argument. The input contains `food`, `search_url`, `requested_source_count`,
-and `excluded_domains`. If `input.excluded_domains` contains `torob.com`,
-return the input food slug with `quotes: []` and use no tool.
+The input contains `task`, `as_of_date`, `market`, `food`,
+`requested_source_count`, and `excluded_domains`. Research the exact food in
+the stated public Iranian retail market. In the first pass, return no more than
+the requested source count (normally three). If the first pass does not form a
+coherent independent-source cluster, the Backend may make one bounded
+expansion request for the remaining sources, up to five total.
 
-Otherwise make at most one URL content call, exactly:
-`{"Url": input.search_url}`. Use `input.search_url` exactly; do not construct
-another URL. It is a compact public Torob JSON search endpoint beginning with
-`https://api.torob.com/v4/base-product/search/?`, already encoded for the
-canonical Persian food name. Inspect the returned JSON. The URL content tool
-saves its response to a file; call `view_file` exactly once on that returned
-file to inspect the complete response. Do not read chunks. Do not request
-offsets, pagination, scrolling, product or seller pages; do not inspect another
-domain or retry. The first response is the only web evidence. Return
-immediately after it. If the URL content/browser tool fails or is unavailable,
-return `quotes: []` immediately.
+For every quote, preserve the exact observed product or listing title, package
+quantity and unit, normal non-promotional price, any separate promotional
+price, explicit currency (`TOMAN` or `IRR`), source name, and a real public
+public HTTPS URL observed during this request. Use at most one quote from each
+canonical domain, with at most one quote from each independent domain. Never use
+a domain listed in `excluded_domains`.
+Prefer public, current retail evidence. Reject unrelated, prepared, bulk,
+bundled, ambiguous, or stale results. Do not turn a search result into a
+product URL, and do not invent, estimate, copy from memory, or fabricate a
+price, product, source, or URL.
 
-From that response, return up to `requested_source_count` reliable product-card
-quotes for the exact food. For Torob JSON use `name1`, `price`, `price_text`,
-and `web_client_absolute_url`; make a relative product URL absolute with
-`https://torob.com`. Use at most one quote per independent domain. Preserve the
-exact product title, package quantity/unit, normal non-promotional price, any
-separate promotional price, explicit currency (`TOMAN` or `IRR`), and inspected
-public HTTPS product URL. Reject unrelated, prepared, bulk, bundled,
-ambiguous, or memory-based results. Do not answer from model memory.
-
-Do not use Bing, Google, DuckDuckGo, `search_web`, Trawler, terminal, local
-workspace tools, or any other web/API tool. Do not calculate the Fitsho
-reference price. Do not invent, estimate, or average it. Do not provide medical
-advice or personal data.
+The Backend owns food matching, normalization, unit comparability, validation,
+median calculation, reference-price promotion, and review decisions. Do not calculate the Fitsho reference price or return it. Return only observed evidence;
+do not provide medical advice or personal data.
 """
 
 _IRANIAN_MULTI_LABEL_SUFFIXES = {
@@ -268,8 +258,6 @@ def build_food_price_research_request(
     normalized_excluded_domains = sorted(
         {_canonical_excluded_domain(value) for value in excluded_domains}
     )
-    search_session = token_hex(16)
-    food_name_fa = food.name_fa.strip()
     input_payload = {
         "task": "research_current_iran_food_retail_prices",
         "as_of_date": (as_of_date or datetime.now(UTC).date()).isoformat(),
@@ -281,24 +269,6 @@ def build_food_price_research_request(
             "category": food.category,
             "aliases": list(food.aliases),
         },
-        "search_url": (
-            "https://api.torob.com/v4/base-product/search/?"
-            + urlencode(
-                {
-                    "page": 1,
-                    "sort": "popularity",
-                    "size": 3,
-                    "query": food_name_fa,
-                    "q": food_name_fa,
-                    "_landing_page": f"search_{food_name_fa}",
-                    "source": "next_desktop",
-                    "rank_offset": 0,
-                    "_bt__experiment": "sir23__a",
-                    "suid": search_session,
-                    "init_suid": search_session,
-                }
-            )
-        ),
         "requested_source_count": requested_source_count,
         "excluded_domains": normalized_excluded_domains,
     }
@@ -311,6 +281,7 @@ def build_food_price_research_request(
         provider_preferences=provider_preferences or ProviderRoutingPreferences(),
         temperature=temperature,
         max_output_tokens=max_output_tokens,
+        web_access="live",
     )
 
 

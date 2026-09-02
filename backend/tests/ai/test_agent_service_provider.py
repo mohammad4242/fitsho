@@ -108,7 +108,21 @@ def test_generate_structured_text_maps_contract_and_auth_header() -> None:
         "temperature": 0.0,
         "max_output_tokens": 512,
         "timeout_seconds": 7.0,
+        "web_access": "disabled",
     }
+
+
+def test_generate_structured_text_forwards_live_web_policy() -> None:
+    seen: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json=_output())
+
+    request = _request().model_copy(update={"web_access": "live"})
+    _run(_provider(handler).generate_structured_text(request))
+
+    assert seen["body"]["web_access"] == "live"
 
 
 def test_analyze_images_decodes_base64_and_sends_only_multipart_bytes() -> None:
@@ -145,6 +159,7 @@ def test_analyze_images_decodes_base64_and_sends_only_multipart_bytes() -> None:
     assert forwarded["schema_name"] == _request().schema_name
     assert forwarded["temperature"] == _request().temperature
     assert forwarded["max_output_tokens"] == _request().max_output_tokens
+    assert forwarded["web_access"] == "disabled"
     assert forwarded["image_labels"] == ["front view"]
     assert seen["headers"]["authorization"] == "Bearer agent-service-test-token"
 
@@ -179,6 +194,7 @@ def test_analyze_stored_images_sends_only_json_storage_references() -> None:
             "temperature": _request().temperature,
             "max_output_tokens": _request().max_output_tokens,
             "timeout_seconds": 7.0,
+            "web_access": "disabled",
         },
         "images": [
             {
