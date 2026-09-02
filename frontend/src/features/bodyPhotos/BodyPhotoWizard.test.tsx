@@ -19,7 +19,23 @@ const api = vi.hoisted(() => ({
   startBodyPhotoAnalysis: vi.fn(),
 }));
 
+const ghostEditor = vi.hoisted(() => ({
+  editedFile: new File(["edited"], "body-photo-edited.jpg", { type: "image/jpeg" }),
+}));
+
 vi.mock("./api", () => api);
+vi.mock("./GhostPhotoEditor", () => ({
+  GhostPhotoEditor: ({ onCancel, onConfirm }: {
+    onCancel: () => void;
+    onConfirm: (file: File) => void;
+  }) => (
+    <section aria-labelledby="mock-ghost-editor-title">
+      <h3 id="mock-ghost-editor-title">Align your photo</h3>
+      <button type="button" onClick={onCancel}>Cancel editing</button>
+      <button type="button" onClick={() => onConfirm(ghostEditor.editedFile)}>Use this photo</button>
+    </section>
+  ),
+}));
 vi.mock("./BodyAnalysisRequirementsStep", async () => {
   const { useEffect } = await import("react");
   function MockBodyAnalysisRequirementsStep({ onConfirmed }: { onConfirmed: () => void }) {
@@ -31,7 +47,7 @@ vi.mock("./BodyAnalysisRequirementsStep", async () => {
 
 import { BodyPhotoWizard } from "./BodyPhotoWizard";
 
-const file = new File(["user-cropped-headless-bytes"], "front.jpg", { type: "image/jpeg" });
+const file = new File(["user-photo-bytes"], "front.jpg", { type: "image/jpeg" });
 
 function processed(view: "front" | "side" | "back"): ProcessedBodyPhoto {
   return {
@@ -66,6 +82,11 @@ function renderWizard(processor?: BodyPhotoProcessor, entry = "/body-progress/ne
       <LocationDisplay />
     </MemoryRouter>,
   );
+}
+
+async function uploadPhoto(user: ReturnType<typeof userEvent.setup>, view: "front" | "side" | "back", photo = file) {
+  await user.upload(await screen.findByLabelText(new RegExp(`${view} photo upload`, "i")), photo);
+  await user.click(await screen.findByRole("button", { name: /use this photo/i }));
 }
 
 function LocationDisplay() {
@@ -107,7 +128,7 @@ it("requires operational consent before the confirm upload action is enabled", a
   const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("front")) };
   renderWizard(processor);
 
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
   expect(await screen.findByAltText(/standardized front preview/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeDisabled();
   expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
@@ -115,6 +136,21 @@ it("requires operational consent before the confirm upload action is enabled", a
 
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeEnabled();
+});
+
+it("opens the Ghost editor for uploads and processes only its confirmed output", async () => {
+  const user = userEvent.setup();
+  const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("front")) };
+  renderWizard(processor);
+
+  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+
+  expect(await screen.findByRole("heading", { name: /align your photo/i })).toBeInTheDocument();
+  expect(processor.process).not.toHaveBeenCalled();
+
+  await user.click(screen.getByRole("button", { name: /use this photo/i }));
+
+  await waitFor(() => expect(processor.process).toHaveBeenCalledWith(ghostEditor.editedFile, "front"));
 });
 
 it("returns to the existing upload control when the guided camera is unavailable", async () => {
@@ -135,7 +171,7 @@ it("explains how to recover when the phone origin is not trusted", async () => {
   );
   renderWizard(processor);
 
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   await user.click(screen.getByRole("button", { name: /confirm and upload front/i }));
 
@@ -150,7 +186,7 @@ it("replaces only the rejected view in an existing photo session", async () => {
   renderWizard(processor, "/body-progress/new?sessionId=session-2&view=side");
 
   expect(await screen.findByRole("heading", { name: /side photo/i })).toBeInTheDocument();
-  await user.upload(screen.getByLabelText(/side photo upload/i), file);
+  await uploadPhoto(user, "side");
   await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
 
   await waitFor(() => expect(api.uploadBodyPhoto).toHaveBeenCalledWith(
@@ -170,7 +206,7 @@ it("returns to the result after a successful replacement cannot start analysis",
   renderWizard(processor, "/body-progress/new?sessionId=session-2&view=side");
 
   await screen.findByRole("heading", { name: /side photo/i });
-  await user.upload(screen.getByLabelText(/side photo upload/i), file);
+  await uploadPhoto(user, "side");
   await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
 
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/body-progress/session-2"));
@@ -207,10 +243,10 @@ it("resumes an incomplete session at its first missing view and submits the same
 
   renderWizard(processor, "/body-progress/new?sessionId=session-2");
 
-  await user.upload(await screen.findByLabelText(/side photo upload/i), file);
+  await uploadPhoto(user, "side");
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
-  await user.upload(await screen.findByLabelText(/back photo upload/i), file);
+  await uploadPhoto(user, "back");
   await user.click(screen.getByRole("button", { name: /confirm and upload back/i }));
 
   expect(await screen.findByRole("heading", { name: /review standardized photos/i })).toBeVisible();
@@ -257,7 +293,7 @@ it("shows the selected photo immediately while anonymization is processing", asy
   };
   renderWizard(processor);
 
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
 
   expect(await screen.findByAltText(/selected front preview/i)).toHaveAttribute(
     "src",
@@ -273,19 +309,19 @@ it("shows fitted-clothing guidance on every capture step", async () => {
   renderWizard(processor);
 
   expect(screen.getAllByText(/athletic shorts and fitted, minimal athletic clothing/i)).not.toHaveLength(0);
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   await user.click(screen.getByRole("button", { name: /confirm and upload front/i }));
   await waitFor(() => expect(screen.getByLabelText(/side photo upload/i)).toBeInTheDocument());
   expect(screen.getByText(/athletic shorts and fitted, minimal athletic clothing/i)).toBeInTheDocument();
 });
 
-it("requires a phone-cropped headless photo and lists every retained body region", async () => {
+it("explains Ghost framing and lists every retained body region", async () => {
   await i18n.changeLanguage("fa");
   renderWizard();
 
-  expect(screen.getByText("لطفاً حتماً قبل از ارسال عکس، عکس را کراپ کرده و چهره را حذف کنید")).toBeVisible();
-  expect(screen.getByLabelText(/راهنمای کادر عکس بدون چهره/)).toHaveTextContent(
+  expect(screen.getByText("عکس را زیر راهنمای Ghost قرار بده")).toBeVisible();
+  expect(screen.getByLabelText(/راهنمای کادر عکس Ghost/)).toHaveTextContent(
     /شانه‌ها.*بازوها.*کمر و باسن.*زانوها.*مچ پا و کف پا/,
   );
   expect(screen.queryByRole("button", { name: /گرفتن عکس/ })).not.toBeInTheDocument();
@@ -297,15 +333,15 @@ it("processes three views, allows retake, and uploads only standardized files", 
   const processor: BodyPhotoProcessor = { process: vi.fn().mockImplementation((_, view) => processed(view)) };
   renderWizard(processor);
 
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
   await user.click(screen.getByRole("button", { name: /retake front/i }));
   expect(screen.queryByAltText(/standardized front preview/i)).not.toBeInTheDocument();
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
   await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
   await user.click(screen.getByRole("button", { name: /confirm and upload front/i }));
-  await user.upload(await screen.findByLabelText(/side photo upload/i), file);
+  await uploadPhoto(user, "side");
   await user.click(screen.getByRole("button", { name: /confirm and upload side/i }));
-  await user.upload(await screen.findByLabelText(/back photo upload/i), file);
+  await uploadPhoto(user, "back");
   await user.click(screen.getByRole("button", { name: /confirm and upload back/i }));
 
   await waitFor(() => expect(api.uploadBodyPhoto).toHaveBeenCalledTimes(3));
@@ -321,7 +357,7 @@ it("starts analysis immediately after a successful submission", async () => {
   renderWizard(processor);
 
   for (const view of ["front", "side", "back"] as const) {
-    await user.upload(await screen.findByLabelText(new RegExp(`${view} photo upload`, "i")), file);
+    await uploadPhoto(user, view);
     if (view === "front") {
       await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
     }
@@ -339,7 +375,7 @@ it("explains that photos were submitted when body analysis cannot start", async 
   renderWizard(processor);
 
   for (const view of ["front", "side", "back"] as const) {
-    await user.upload(await screen.findByLabelText(new RegExp(`${view} photo upload`, "i")), file);
+    await uploadPhoto(user, view);
     if (view === "front") {
       await user.click(screen.getByRole("checkbox", { name: /body-photo privacy and processing terms/i }));
     }
@@ -364,8 +400,8 @@ it("revokes standardized preview URLs when a photo is replaced and on unmount", 
   };
   const rendered = renderWizard(processor);
 
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
+  await uploadPhoto(user, "front");
   expect(revoke).toHaveBeenCalledWith("blob:preview-front");
 
   rendered.unmount();
@@ -376,7 +412,7 @@ it("shows only measured quality feedback for a standardized preview", async () =
   const user = userEvent.setup();
   renderWizard({ process: vi.fn().mockResolvedValue(processed("front")) });
 
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
 
   expect(screen.getByLabelText(/photo check/i)).toHaveTextContent(/lighting/i);
   expect(screen.getByLabelText(/photo check/i)).toHaveTextContent(/landmark visibility/i);
@@ -394,7 +430,7 @@ it.each([
 ] as const)("shows the actionable %s error", async (code, message) => {
   const user = userEvent.setup();
   renderWizard({ process: vi.fn().mockRejectedValue(new BodyPhotoProcessingError(code)) });
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
   expect(await screen.findByRole("alert")).toHaveTextContent(message);
 });
 
@@ -409,7 +445,7 @@ it("releases a late preview when processing resolves after the wizard unmounts",
   };
   const rendered = renderWizard(processor);
 
-  await user.upload(screen.getByLabelText(/front photo upload/i), file);
+  await uploadPhoto(user, "front");
   rendered.unmount();
   resolveProcessing?.({ ...processed("front"), previewUrl: "blob:late-preview" });
 

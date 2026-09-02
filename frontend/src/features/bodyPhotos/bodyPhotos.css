@@ -25,6 +25,22 @@
 .ghost-camera__countdown { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 2.75rem; font-weight: 850; }
 .ghost-camera__actions { display: flex; flex-wrap: wrap; gap: .65rem; }
 .ghost-camera__close { justify-self: start; }
+.ghost-photo-editor { display: grid; gap: .8rem; padding: .8rem; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface-subtle); }
+.ghost-photo-editor__heading { display: grid; gap: .35rem; }
+.ghost-photo-editor__heading h3, .ghost-photo-editor__heading p { margin: 0; }
+.ghost-photo-editor__stage { position: relative; overflow: hidden; width: min(100%, 25rem); margin-inline: auto; aspect-ratio: 2 / 3; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-md); background: var(--fitsho-canvas); isolation: isolate; touch-action: none; user-select: none; cursor: grab; }
+.ghost-photo-editor__stage:active { cursor: grabbing; }
+.ghost-photo-editor__image { position: absolute; inset: 50% auto auto 50%; z-index: 0; display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; transform-origin: center; }
+.ghost-photo-editor__privacy-note, .ghost-photo-editor__status { color: var(--fitsho-muted); font-size: .86rem; line-height: 1.6; }
+.ghost-photo-editor__privacy-note, .ghost-photo-editor__status { margin: 0; }
+.ghost-photo-editor__status { min-height: 1.5em; color: var(--fitsho-ink); font-weight: 750; }
+.ghost-photo-editor__controls { display: grid; gap: .7rem; }
+.ghost-photo-editor__button-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.ghost-photo-editor__button-row button { min-height: 2.65rem; }
+.ghost-photo-editor__range { display: grid; grid-template-columns: minmax(5rem, auto) 1fr; align-items: center; gap: .7rem; color: var(--fitsho-muted); font-size: .86rem; font-weight: 800; }
+.ghost-photo-editor__range input { width: 100%; accent-color: var(--fitsho-aqua); }
+.ghost-photo-editor__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }
+.ghost-photo-editor__actions > button { min-width: 8rem; }
 .ghost-overlay { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
 .ghost-overlay__privacy-cut { position: absolute; z-index: 2; inset-inline: 0; top: 18%; border-top: 2px solid var(--fitsho-aqua); color: white; text-align: center; text-shadow: 0 1px 3px rgb(0 0 0 / 85%); }
 .ghost-overlay__privacy-cut span { display: inline-block; margin-top: .35rem; padding: .2rem .45rem; border-radius: 999px; background: rgb(8 18 17 / 72%); font-size: .7rem; font-weight: 850; }
@@ -149,6 +165,7 @@
 @media (max-width: 640px) {
   .body-analysis-requirements__actions > button { flex: 1 1 100%; }
   .ghost-camera__actions > button { flex: 1 1 100%; }
+  .ghost-photo-editor__actions > button { flex: 1 1 100%; }
   .body-photo-source-actions { grid-template-columns: 1fr; }
   .body-photo-summary, .body-analysis-photos, .body-analysis-groups, .body-progress-comparison > ul { grid-template-columns: 1fr; }
   .body-photo-summary__item { grid-template-columns: 5rem 1fr; align-items: center; }

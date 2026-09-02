@@ -13,6 +13,7 @@ import {
 } from "./api";
 import { GhostCameraCapture, type CameraFallbackReason } from "./GhostCameraCapture";
 import { BodyAnalysisRequirementsStep } from "./BodyAnalysisRequirementsStep";
+import { GhostPhotoEditor } from "./GhostPhotoEditor";
 import {
   browserBodyPhotoProcessor,
   BodyPhotoProcessingError,
@@ -54,6 +55,7 @@ export function BodyPhotoWizard({
   const [state, setState] = useState<WizardState>("capture");
   const [requirementsConfirmed, setRequirementsConfirmed] = useState(false);
   const [captureMode, setCaptureMode] = useState<CaptureMode>("upload");
+  const [editorFile, setEditorFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -151,7 +153,15 @@ export function BodyPhotoWizard({
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (file !== undefined) void processFile(file);
+    if (file !== undefined) {
+      setError(null);
+      setEditorFile(file);
+    }
+  }
+
+  async function handleEditorConfirm(file: File) {
+    setEditorFile(null);
+    await processFile(file);
   }
 
   function openCamera() {
@@ -361,64 +371,75 @@ export function BodyPhotoWizard({
         <h2 id={`body-photo-${view}`}>{t("bodyPhotos.captureTitle", { view: t(`bodyPhotos.views.${view}`) })}</h2>
         <p>{instructions[view]}</p>
         <p className="body-photo-muted">{t("bodyPhotos.cameraGuidance")}</p>
-        {captureMode === "upload" && <HeadlessPhotoGuide />}
-        <div className="body-photo-source-actions">
-          {captureMode === "camera" ? (
-            <GhostCameraCapture
-              view={view}
-              onFileCaptured={handleCameraFile}
-              onFallback={handleCameraFallback}
-              onClose={() => setCaptureMode("upload")}
-            />
-          ) : (
-            <>
-              <button className="secondary-button" type="button" onClick={openCamera} disabled={busy || sessionLoading}>
-                {t("bodyPhotos.useCamera")}
-              </button>
-              <label className="body-photo-upload-control">
-                <span>{t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}</span>
-                <input
-                  aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
-                  accept="image/jpeg,image/png,image/webp"
-                  type="file"
-                  onChange={selectFile}
-                  disabled={busy || sessionLoading}
-                />
-              </label>
-            </>
-          )}
-        </div>
-        {selectedPreview?.view === view && (
-          <div className="body-photo-source-preview">
-            <img
-              src={selectedPreview.url}
-              alt={t("bodyPhotos.selectedPreviewAlt", { view: t(`bodyPhotos.views.${view}`) })}
-            />
-            <p>{t("bodyPhotos.selectedPreview")}</p>
-          </div>
-        )}
-        {current !== null && (
-          <div className="body-photo-preview">
-            <img src={current.previewUrl} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${view}`) })} />
-            <p>{t("bodyPhotos.anonymizedPreview")}</p>
-            <PhotoQualityFeedback photo={current} />
-            <button type="button" className="secondary-button" onClick={retake} disabled={busy}>
-              {t("bodyPhotos.retake", { view: t(`bodyPhotos.views.${view}`) })}
-            </button>
-          </div>
-        )}
-        <label className="body-photo-consent">
-          <input
-            type="checkbox"
-            checked={operationalConsent}
-            onChange={(event) => setOperationalConsent(event.target.checked)}
+        {editorFile !== null ? (
+          <GhostPhotoEditor
+            file={editorFile}
+            view={view}
+            onConfirm={handleEditorConfirm}
+            onCancel={() => setEditorFile(null)}
           />
-          <span>{t("bodyPhotos.processingConsentBefore")} <button type="button" className="body-photo-link-button" onClick={() => setTermsOpen(true)}>{t("bodyPhotos.processingTerms")}</button></span>
-        </label>
-        {error !== null && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-button" type="button" onClick={() => void confirmUpload()} disabled={current === null || !operationalConsent || busy || sessionLoading}>
-          {busy ? t("bodyPhotos.preparing") : t("bodyPhotos.confirmUpload", { view: t(`bodyPhotos.views.${view}`) })}
-        </button>
+        ) : (
+          <>
+            {captureMode === "upload" && <HeadlessPhotoGuide />}
+            <div className="body-photo-source-actions">
+              {captureMode === "camera" ? (
+                <GhostCameraCapture
+                  view={view}
+                  onFileCaptured={handleCameraFile}
+                  onFallback={handleCameraFallback}
+                  onClose={() => setCaptureMode("upload")}
+                />
+              ) : (
+                <>
+                  <button className="secondary-button" type="button" onClick={openCamera} disabled={busy || sessionLoading}>
+                    {t("bodyPhotos.useCamera")}
+                  </button>
+                  <label className="body-photo-upload-control">
+                    <span>{t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}</span>
+                    <input
+                      aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
+                      accept="image/jpeg,image/png,image/webp"
+                      type="file"
+                      onChange={selectFile}
+                      disabled={busy || sessionLoading}
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+            {selectedPreview?.view === view && (
+              <div className="body-photo-source-preview">
+                <img
+                  src={selectedPreview.url}
+                  alt={t("bodyPhotos.selectedPreviewAlt", { view: t(`bodyPhotos.views.${view}`) })}
+                />
+                <p>{t("bodyPhotos.selectedPreview")}</p>
+              </div>
+            )}
+            {current !== null && (
+              <div className="body-photo-preview">
+                <img src={current.previewUrl} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${view}`) })} />
+                <p>{t("bodyPhotos.anonymizedPreview")}</p>
+                <PhotoQualityFeedback photo={current} />
+                <button type="button" className="secondary-button" onClick={retake} disabled={busy}>
+                  {t("bodyPhotos.retake", { view: t(`bodyPhotos.views.${view}`) })}
+                </button>
+              </div>
+            )}
+            <label className="body-photo-consent">
+              <input
+                type="checkbox"
+                checked={operationalConsent}
+                onChange={(event) => setOperationalConsent(event.target.checked)}
+              />
+              <span>{t("bodyPhotos.processingConsentBefore")} <button type="button" className="body-photo-link-button" onClick={() => setTermsOpen(true)}>{t("bodyPhotos.processingTerms")}</button></span>
+            </label>
+            {error !== null && <p className="form-error" role="alert">{error}</p>}
+            <button className="primary-button" type="button" onClick={() => void confirmUpload()} disabled={current === null || !operationalConsent || busy || sessionLoading}>
+              {busy ? t("bodyPhotos.preparing") : t("bodyPhotos.confirmUpload", { view: t(`bodyPhotos.views.${view}`) })}
+            </button>
+          </>
+        )}
       </section>
       {termsOpen && <ConsentModal onClose={() => setTermsOpen(false)} />}
     </section>

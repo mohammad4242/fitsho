@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
+import { GHOST_PRIVACY_CUT_RATIO } from "./ghostPhotoEditor";
 import {
   createMediaPipeLivePoseGuide,
   type LivePoseGuidance,
@@ -26,7 +27,7 @@ type GhostCameraCaptureProps = {
   livePoseGuideFactory?: LivePoseGuideFactory;
 };
 
-export const GHOST_PRIVACY_CUT_RATIO = 0.18;
+export { GHOST_PRIVACY_CUT_RATIO } from "./ghostPhotoEditor";
 
 const cameraConstraints = {
   audio: false,
