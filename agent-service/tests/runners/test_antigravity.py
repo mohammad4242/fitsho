@@ -516,6 +516,35 @@ def test_malformed_or_schema_invalid_output_is_safe_error(
     assert "not json" not in str(error.value)
 
 
+def test_run_classifies_provider_error_written_only_to_cli_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log_root = tmp_path / "agy-log"
+    log_root.mkdir()
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        del command, kwargs
+        (log_root / "cli-current.log").write_text(
+            "calling model: FAILED_PRECONDITION (code 400): "
+            "User location is not supported for the API use.",
+            encoding="utf-8",
+        )
+        return ProcessResult(
+            1,
+            json.dumps({"status": "ERROR", "response": ""}),
+            "",
+        )
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setattr(antigravity, "run_process", fake_run_process)
+
+    with pytest.raises(RunnerError) as error:
+        run(AntigravityRunner(workspace=tmp_path, log_root=log_root).run(make_request()))
+
+    assert error.value.code == "location_unsupported"
+
+
 @pytest.mark.parametrize(
     ("status_text", "code"),
     [

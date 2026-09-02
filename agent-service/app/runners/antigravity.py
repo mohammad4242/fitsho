@@ -12,11 +12,11 @@ from typing import Any, cast
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
-from ..proxy import ProxyRuntime
 from ..profiles import (
     AgentModelProfile,
     antigravity_profiles_from_output,
 )
+from ..proxy import ProxyRuntime
 from ..schemas import (
     AgentName,
     AuthMode,
@@ -38,6 +38,7 @@ _RE2_DECIMAL_PATTERN = r"^[+-]?(0*[0-9]+(\.[0-9]*)?|\.[0-9]+)$"
 _AGY_CACHE_HOME = "/home/agent/.gemini/antigravity-cli/fitsho-cache"
 _AGY_PLAYWRIGHT_BROWSERS_PATH = f"{_AGY_CACHE_HOME}/playwright"
 _AGY_PLAYWRIGHT_DRIVER_PATH = f"{_AGY_CACHE_HOME}/playwright-driver"
+_AGY_LOG_ROOT = Path("/home/agent/.gemini/antigravity-cli/log")
 
 
 class AntigravityRunner(AgentRunner):
@@ -78,6 +79,7 @@ class AntigravityRunner(AgentRunner):
         supports_image_input: bool = False,
         shared_media_root: Path = Path("/shared-private-media"),
         proxy_runtime: ProxyRuntime | None = None,
+        log_root: Path = _AGY_LOG_ROOT,
     ) -> None:
         self.workspace = workspace
         self.executable = executable
@@ -85,6 +87,7 @@ class AntigravityRunner(AgentRunner):
         self.supports_image_input = supports_image_input
         self.shared_media_root = shared_media_root
         self.proxy_runtime = proxy_runtime or ProxyRuntime()
+        self.log_root = log_root
         self._profiles_cache: tuple[AgentModelProfile, ...] = ()
         self._profiles_cached_at = 0.0
         self._metadata = CliMetadataProbe(
@@ -212,6 +215,7 @@ class AntigravityRunner(AgentRunner):
             # permission prompt. The subprocess environment is separately
             # restricted to the safe allow-list above.
             command.extend(["--sandbox", "--dangerously-skip-permissions"])
+            log_snapshot = self._cli_log_snapshot()
             result = await run_process(
                 command,
                 workspace=workspace,
@@ -232,12 +236,13 @@ class AntigravityRunner(AgentRunner):
                 schema_path.unlink(missing_ok=True)
 
         elapsed = time.perf_counter() - started
+        cli_diagnostics = self._cli_log_diagnostics(log_snapshot)
         if result.returncode != 0:
-            raise self._classified_error(result.stdout, result.stderr)
+            raise self._classified_error(result.stdout, f"{result.stderr}\n{cli_diagnostics}")
 
         outer = self._parse_outer(result.stdout)
         if outer.get("status") == "ERROR":
-            raise self._classified_error(result.stdout, result.stderr)
+            raise self._classified_error(result.stdout, f"{result.stderr}\n{cli_diagnostics}")
         if outer.get("status") != "SUCCESS":
             raise RunnerError("invalid_output", "invalid runner output")
 
@@ -287,6 +292,39 @@ class AntigravityRunner(AgentRunner):
         environment["PLAYWRIGHT_BROWSERS_PATH"] = _AGY_PLAYWRIGHT_BROWSERS_PATH
         environment["PLAYWRIGHT_DRIVER_PATH"] = _AGY_PLAYWRIGHT_DRIVER_PATH
         return self.proxy_runtime.apply(environment)
+
+    def _cli_log_snapshot(self) -> dict[Path, tuple[int, int]]:
+        try:
+            return {
+                path: (path.stat().st_mtime_ns, path.stat().st_size)
+                for path in self.log_root.glob("*.log")
+                if path.is_file()
+            }
+        except OSError:
+            return {}
+
+    def _cli_log_diagnostics(self, snapshot: dict[Path, tuple[int, int]]) -> str:
+        changed_logs: list[tuple[int, Path]] = []
+        try:
+            for path in self.log_root.glob("*.log"):
+                try:
+                    stat = path.stat()
+                except OSError:
+                    continue
+                previous = snapshot.get(path)
+                current = (stat.st_mtime_ns, stat.st_size)
+                if previous is None or previous != current:
+                    changed_logs.append((stat.st_mtime_ns, path))
+        except OSError:
+            return ""
+
+        diagnostics: list[str] = []
+        for _, path in sorted(changed_logs, reverse=True)[:3]:
+            try:
+                diagnostics.append(path.read_bytes()[-65_536:].decode(errors="replace"))
+            except OSError:
+                continue
+        return "\n".join(diagnostics)
 
     def _image_paths(self, image_paths: tuple[Path, ...], workspace: Path) -> list[Path]:
         return resolve_image_paths(

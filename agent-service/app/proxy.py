@@ -52,7 +52,7 @@ def validate_proxy_url(value: str) -> str:
     try:
         parsed = urlsplit(candidate)
         hostname = parsed.hostname
-        parsed.port
+        _parsed_port = parsed.port
     except ValueError as error:
         raise ProxyConfigurationError("proxy URL is invalid") from error
     if parsed.scheme.lower() not in _PROXY_SCHEMES or not hostname:
@@ -70,7 +70,11 @@ def mask_proxy_url(value: str | None) -> str | None:
             return None
         host = f"[{hostname}]" if ":" in hostname and not hostname.startswith("[") else hostname
         port = f":{parsed.port}" if parsed.port is not None else ""
-        credentials = "****:****@" if parsed.username is not None or parsed.password is not None else ""
+        credentials = (
+            "****:****@"
+            if parsed.username is not None or parsed.password is not None
+            else ""
+        )
         return f"{parsed.scheme.lower()}://{credentials}{host}{port}"
     except (TypeError, ValueError):
         return None
