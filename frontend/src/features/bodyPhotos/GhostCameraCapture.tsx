@@ -40,6 +40,10 @@ const cameraConstraints = {
   },
 } as const;
 
+const GHOST_SCALE_MIN = 0.75;
+const GHOST_SCALE_MAX = 1.15;
+const GHOST_SCALE_STEP = 0.05;
+
 export function GhostCameraCapture({
   sex,
   view,
@@ -61,6 +65,7 @@ export function GhostCameraCapture({
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [ghostScale, setGhostScale] = useState(1);
   const [liveStatus, setLiveStatus] = useState<"loading" | "available" | "unavailable" | "disabled">("loading");
   const [guidance, setGuidance] = useState<LivePoseGuidance>({ status: "available", warnings: [] });
 
@@ -272,6 +277,13 @@ export function GhostCameraCapture({
     setFacingMode((current) => current === "user" ? "environment" : "user");
   }
 
+  function adjustGhostScale(delta: number) {
+    setGhostScale((current) => Math.min(
+      GHOST_SCALE_MAX,
+      Math.max(GHOST_SCALE_MIN, Math.round((current + delta) * 100) / 100),
+    ));
+  }
+
   function closeCamera() {
     setCountdown(null);
     stopCurrentStream();
@@ -318,11 +330,32 @@ export function GhostCameraCapture({
             alt={t("bodyPhotos.camera.capturedAlt", { view: t(`bodyPhotos.views.${view}`) })}
           />
         )}
-        <GhostOverlayGuide sex={sex} view={view} />
+        <GhostOverlayGuide sex={sex} scale={ghostScale} view={view} />
       </div>
       <canvas ref={canvasRef} className="ghost-camera__canvas" aria-hidden="true" />
       {capturedFile === null ? (
         <>
+          <div className="ghost-camera__scale-controls" role="group" aria-label={t("bodyPhotos.camera.ghostScaleControls")}>
+            <span>{t("bodyPhotos.camera.ghostScale", { percent: Math.round(ghostScale * 100) })}</span>
+            <div className="ghost-camera__scale-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => adjustGhostScale(-GHOST_SCALE_STEP)}
+                disabled={ghostScale <= GHOST_SCALE_MIN || confirming}
+              >
+                {t("bodyPhotos.camera.ghostSmaller")}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => adjustGhostScale(GHOST_SCALE_STEP)}
+                disabled={ghostScale >= GHOST_SCALE_MAX || confirming}
+              >
+                {t("bodyPhotos.camera.ghostLarger")}
+              </button>
+            </div>
+          </div>
           <p className="ghost-camera__privacy-note">{t("bodyPhotos.camera.privacyBody")}</p>
           {liveStatus === "unavailable" && <p className="body-photo-muted">{t("bodyPhotos.camera.liveUnavailable")}</p>}
           {liveStatus === "disabled" && <p className="body-photo-muted">{t("bodyPhotos.camera.liveDisabled")}</p>}

@@ -39,3 +39,11 @@ it.each([undefined, null, "other", "prefer_not_to_say"] as const)(
     );
   },
 );
+
+it("applies a uniform centered scale to the Ghost asset frame", () => {
+  const { container } = render(<GhostOverlayGuide sex="female" view="front" scale={0.95} />);
+  const frame = container.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
+
+  expect(frame).not.toBeNull();
+  expect(frame).toHaveStyle({ transform: "scale(0.95)" });
+});

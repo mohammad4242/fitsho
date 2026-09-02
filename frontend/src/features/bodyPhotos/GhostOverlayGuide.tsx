@@ -6,9 +6,11 @@ import type { BodyPhotoView } from "./types";
 
 export function GhostOverlayGuide({
   sex,
+  scale = 1,
   view,
 }: {
   sex?: Sex | null;
+  scale?: number;
   view: BodyPhotoView;
 }) {
   const { t } = useTranslation();
@@ -22,6 +24,7 @@ export function GhostOverlayGuide({
         className={`ghost-overlay__asset-frame ghost-overlay__asset-frame--${view}`}
         aria-label={t("bodyPhotos.camera.silhouette", { view: t(`bodyPhotos.views.${view}`) })}
         role="img"
+        style={{ transform: `scale(${scale})` }}
       >
         <img
           className="ghost-overlay__asset"

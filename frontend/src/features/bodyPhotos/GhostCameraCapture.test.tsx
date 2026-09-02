@@ -124,6 +124,32 @@ it("toggles to the environment camera and stops the previous stream", async () =
   rendered.unmount();
 });
 
+it("changes only the centered Ghost size in uniform five-percent steps", () => {
+  const rendered = renderCamera();
+  const video = screen.getByLabelText(/live camera preview/i);
+  const frame = rendered.container.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
+  const smaller = screen.getByRole("button", { name: /make ghost smaller/i });
+  const larger = screen.getByRole("button", { name: /make ghost larger/i });
+
+  expect(frame).not.toBeNull();
+  if (frame === null) throw new Error("Ghost frame was not rendered");
+  const initialVideoClass = video.className;
+
+  fireEvent.click(smaller);
+  expect(frame).toHaveStyle({ transform: "scale(0.95)" });
+  expect(video.className).toBe(initialVideoClass);
+
+  for (let click = 0; click < 4; click += 1) fireEvent.click(smaller);
+  expect(frame).toHaveStyle({ transform: "scale(0.75)" });
+  expect(smaller).toBeDisabled();
+
+  for (let click = 0; click < 8; click += 1) fireEvent.click(larger);
+  expect(frame).toHaveStyle({ transform: "scale(1.15)" });
+  expect(larger).toBeDisabled();
+
+  rendered.unmount();
+});
+
 it("captures a fixed privacy crop, mirrors the user camera, and returns a JPEG file", async () => {
   const drawImage = vi.fn();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
