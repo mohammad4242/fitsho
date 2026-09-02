@@ -11,7 +11,7 @@ import {
   type GhostPhotoRenderer,
 } from "./GhostPhotoEditor";
 import { GhostPhotoEditor } from "./GhostPhotoEditor";
-import type { BodyPhotoSide, BodyPhotoView } from "./types";
+import type { BodyPhotoView } from "./types";
 
 const sourceFile = new File(["source"], "side.png", { type: "image/png" });
 
