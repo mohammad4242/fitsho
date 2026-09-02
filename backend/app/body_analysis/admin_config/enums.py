@@ -24,6 +24,11 @@ class AIAgentName(StrEnum):
     CLAUDE = "claude"
 
 
+class AIAgentServiceProxySource(StrEnum):
+    DEPLOYMENT_DEFAULT = "deployment_default"
+    CUSTOM = "custom"
+
+
 class AIRoutingPolicy(StrEnum):
     DENY_PROVIDER_DATA_COLLECTION = "deny_provider_data_collection"
     ZERO_DATA_RETENTION = "zero_data_retention"

@@ -23,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.body_analysis.admin_config.enums import (
     AIAgentName,
+    AIAgentServiceProxySource,
     AIAuditAction,
     AIExecutionBackend,
     AIProviderName,
@@ -55,6 +56,42 @@ class AIProviderCredential(Base):
     key_last_four: Mapped[str] = mapped_column(String(4), nullable=False)
     updated_by_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class AIAgentServiceProxySetting(Base):
+    __tablename__ = "ai_agent_service_proxy_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_ai_agent_service_proxy_settings_singleton"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    source: Mapped[AIAgentServiceProxySource] = mapped_column(
+        Enum(
+            AIAgentServiceProxySource,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=enum_values,
+            name="ck_ai_agent_service_proxy_settings_source_values",
+        ),
+        default=AIAgentServiceProxySource.DEPLOYMENT_DEFAULT,
+        server_default=AIAgentServiceProxySource.DEPLOYMENT_DEFAULT.value,
+        nullable=False,
+    )
+    encrypted_proxy_url: Mapped[str | None] = mapped_column(String(2048))
+    masked_proxy_url: Mapped[str | None] = mapped_column(String(500))
+    last_applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_apply_error: Mapped[str | None] = mapped_column(String(500))
+    updated_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

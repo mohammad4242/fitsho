@@ -41,6 +41,7 @@ _RUNNER_STATUS: dict[str, tuple[ErrorCode, int]] = {
     "invalid_request": (ErrorCode.INVALID_REQUEST, 422),
     "invalid_output": (ErrorCode.INVALID_OUTPUT, 502),
     "model_not_found": (ErrorCode.MODEL_NOT_FOUND, 404),
+    "location_unsupported": (ErrorCode.LOCATION_UNSUPPORTED, 403),
     "provider_unavailable": (ErrorCode.PROVIDER_UNAVAILABLE, 503),
 }
 
@@ -419,6 +420,7 @@ class AgentService:
             ErrorCode.INVALID_REQUEST: "request could not be prepared",
             ErrorCode.INVALID_OUTPUT: "invalid runner output",
             ErrorCode.MODEL_NOT_FOUND: "model was not found",
+            ErrorCode.LOCATION_UNSUPPORTED: "this provider does not support the current location",
             ErrorCode.PROVIDER_UNAVAILABLE: "provider is unavailable",
         }[code]
 

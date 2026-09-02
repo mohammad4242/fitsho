@@ -16,6 +16,7 @@ from pydantic import (
 
 from app.body_analysis.admin_config.enums import (
     AIAgentName,
+    AIAgentServiceProxySource,
     AIExecutionBackend,
     AIProviderName,
     AIRoutingPolicy,
@@ -259,6 +260,75 @@ class AgentServiceTaskSmokeResponse(BaseModel):
     duration_seconds: float | None = Field(default=None, ge=0)
     error_code: str | None = None
     safe_error_message: str | None = None
+
+
+class AgentServiceProxyUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    source: AIAgentServiceProxySource = AIAgentServiceProxySource.DEPLOYMENT_DEFAULT
+    proxy_url: SecretStr | None = Field(default=None, max_length=500, repr=False)
+
+    @field_validator("proxy_url")
+    @classmethod
+    def validate_proxy_url(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        candidate = value.get_secret_value().strip()
+        if not candidate or any(character.isspace() for character in candidate):
+            raise ValueError("Proxy URL must be a non-empty URL")
+        try:
+            parsed = urlsplit(candidate)
+            hostname = parsed.hostname
+            port = parsed.port
+        except ValueError as error:
+            raise ValueError("Proxy URL is invalid") from error
+        if (
+            parsed.scheme.lower() not in {"http", "https", "socks5", "socks5h"}
+            or not hostname
+            or (port is not None and not 1 <= port <= 65_535)
+        ):
+            raise ValueError("Proxy URL must use a supported proxy scheme")
+        return SecretStr(candidate)
+
+    @model_validator(mode="after")
+    def validate_source_url_pair(self) -> "AgentServiceProxyUpdate":
+        if (
+            self.source is AIAgentServiceProxySource.DEPLOYMENT_DEFAULT
+            and self.proxy_url is not None
+        ):
+            raise ValueError("Deployment default cannot include a custom proxy URL")
+        if (
+            self.source is AIAgentServiceProxySource.CUSTOM
+            and self.enabled
+            and self.proxy_url is None
+        ):
+            raise ValueError("A custom proxy URL is required when proxy is enabled")
+        return self
+
+
+class AgentServiceProxyRuntimeStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    source: AIAgentServiceProxySource
+    configured: bool
+    default_configured: bool
+    masked_proxy_url: str | None = None
+
+
+class AgentServiceProxyDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    source: AIAgentServiceProxySource
+    configured: bool
+    default_configured: bool
+    masked_proxy_url: str | None = None
+    applied: bool
+    agent_service_available: bool
+    last_applied_at: datetime | None = None
+    last_apply_error: str | None = None
 
 
 AgentAuthStatus = Literal[

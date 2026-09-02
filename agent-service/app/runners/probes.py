@@ -10,6 +10,7 @@ from ..process import ProcessExecutionError, ProcessResult, ProcessTimeoutError,
 from ..schemas import AuthState
 
 AuthStatusParser = Callable[[ProcessResult], AuthState]
+EnvironmentProvider = Mapping[str, str] | Callable[[], Mapping[str, str]]
 
 _ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 _VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$")
@@ -19,7 +20,7 @@ _VERSION_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._()/-]{0,127}$")
 class CliMetadataProbe:
     executable: str
     workspace: Path
-    environment: Mapping[str, str]
+    environment: EnvironmentProvider
     auth_status_args: Sequence[str] | None = None
     auth_status_parser: AuthStatusParser | None = None
     _version_checked: bool = field(default=False, init=False, repr=False)
@@ -37,7 +38,7 @@ class CliMetadataProbe:
                     [self.executable, "--version"],
                     workspace=self.workspace,
                     timeout_seconds=2,
-                    env=self.environment,
+                    env=self._environment(),
                     inherit_environment=False,
                 )
             except (OSError, ProcessExecutionError, ProcessTimeoutError):
@@ -56,7 +57,7 @@ class CliMetadataProbe:
                 [self.executable, *self.auth_status_args],
                 workspace=self.workspace,
                 timeout_seconds=3,
-                env=self.environment,
+                env=self._environment(),
                 inherit_environment=False,
             )
         except (OSError, ProcessExecutionError, ProcessTimeoutError):
@@ -66,6 +67,10 @@ class CliMetadataProbe:
             return state if isinstance(state, AuthState) else AuthState.UNKNOWN
         except (TypeError, ValueError):
             return AuthState.UNKNOWN
+
+    def _environment(self) -> Mapping[str, str]:
+        environment = self.environment
+        return environment() if callable(environment) else environment
 
 
 def _safe_version(stdout: str, stderr: str) -> str | None:

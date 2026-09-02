@@ -1,7 +1,9 @@
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, model_validator
+
+from .proxy import ProxySource, validate_proxy_url
 
 NonBlankText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 ModelId = Annotated[
@@ -170,6 +172,35 @@ class TestOutput(BaseModel):
     duration_seconds: float = Field(ge=0)
 
 
+class ProxyRuntimeUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    source: ProxySource
+    proxy_url: SecretStr | None = Field(default=None, max_length=500, repr=False)
+
+    @model_validator(mode="after")
+    def validate_source_url(self) -> "ProxyRuntimeUpdate":
+        if self.source is ProxySource.CUSTOM:
+            if self.proxy_url is None and self.enabled:
+                raise ValueError("custom proxy URL is required")
+            if self.proxy_url is not None:
+                validate_proxy_url(self.proxy_url.get_secret_value())
+        elif self.proxy_url is not None:
+            raise ValueError("deployment default cannot include a custom URL")
+        return self
+
+
+class ProxyRuntimeStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    source: ProxySource
+    configured: bool
+    default_configured: bool
+    masked_proxy_url: str | None = Field(default=None, max_length=500)
+
+
 class ErrorCode(StrEnum):
     TIMEOUT = "timeout"
     UNAUTHORIZED = "unauthorized"
@@ -177,6 +208,7 @@ class ErrorCode(StrEnum):
     INVALID_REQUEST = "invalid_request"
     INVALID_OUTPUT = "invalid_output"
     MODEL_NOT_FOUND = "model_not_found"
+    LOCATION_UNSUPPORTED = "location_unsupported"
     PROVIDER_UNAVAILABLE = "provider_unavailable"
     AUTH_IN_PROGRESS = "auth_in_progress"
     AUTH_SESSION_NOT_FOUND = "auth_session_not_found"

@@ -13,6 +13,7 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
+from ..proxy import ProxyRuntime
 from ..profiles import claude_profiles
 from ..schemas import AgentName, AuthMode, AuthState, RunnerCapabilities, RunnerModelCapabilities
 from .base import AgentRunner, RunnerError, RunnerRequest, RunnerResult, resolve_image_paths
@@ -57,6 +58,7 @@ class ClaudeRunner(AgentRunner):
         configured_models: tuple[str, ...] = (),
         supports_image_input: bool = False,
         shared_media_root: Path = Path("/shared-private-media"),
+        proxy_runtime: ProxyRuntime | None = None,
     ) -> None:
         self.workspace = workspace
         self.executable = executable
@@ -65,10 +67,11 @@ class ClaudeRunner(AgentRunner):
         # invocation is smoke-tested with a subscription login.
         self.supports_image_input = supports_image_input
         self.shared_media_root = shared_media_root
+        self.proxy_runtime = proxy_runtime or ProxyRuntime()
         self._metadata = CliMetadataProbe(
             executable=self.executable,
             workspace=self.workspace,
-            environment=self._subprocess_environment(),
+            environment=self._subprocess_environment,
             auth_status_args=("auth", "status", "--json"),
             auth_status_parser=self._parse_auth_status,
         )
@@ -340,6 +343,14 @@ class ClaudeRunner(AgentRunner):
         ):
             return RunnerError("rate_limited", "runner rate limit reached")
         if re.search(
+            r"user location is not supported|location is not supported for the api",
+            text,
+        ):
+            return RunnerError(
+                "location_unsupported",
+                "this provider does not support the current location",
+            )
+        if re.search(
             r"unauthori[sz]ed|authentication failed|not authenticated|login required|"
             r"not logged in|permission denied|access denied|forbidden|invalid api key",
             text,
@@ -354,8 +365,8 @@ class ClaudeRunner(AgentRunner):
             return value
         return None
 
-    @classmethod
-    def _subprocess_environment(cls) -> dict[str, str]:
-        return {
-            key: value for key, value in os.environ.items() if key in cls._SAFE_ENVIRONMENT_KEYS
+    def _subprocess_environment(self) -> dict[str, str]:
+        environment = {
+            key: value for key, value in os.environ.items() if key in self._SAFE_ENVIRONMENT_KEYS
         }
+        return self.proxy_runtime.apply(environment)

@@ -85,6 +85,12 @@ class AuthManager:
                     # unavailable or malformed.
                     pass
 
+    async def update_environment(self, environment: Mapping[str, str]) -> None:
+        """Apply runtime environment changes to authentication started afterwards."""
+
+        async with self._lock:
+            self.environment = safe_auth_environment(environment)
+
     async def start(self, agent: AgentName, *, force_reauth: bool = False) -> AuthSessionView:
         if not isinstance(agent, AgentName):
             raise AuthManagerError(

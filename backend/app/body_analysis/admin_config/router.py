@@ -18,6 +18,8 @@ from app.body_analysis.admin_config.schemas import (
     AgentServiceAuthSessionResponse,
     AgentServiceAuthStartRequest,
     AgentServiceCapabilitiesResponse,
+    AgentServiceProxyDetail,
+    AgentServiceProxyUpdate,
     AgentServiceTaskSmokeRequest,
     AgentServiceTaskSmokeResponse,
     AgentServiceTestRequest,
@@ -38,10 +40,12 @@ from app.body_analysis.admin_config.service import (
     credential_status,
     get_agent_service_auth,
     get_agent_service_capabilities,
+    get_agent_service_proxy,
     get_credential,
     list_models,
     list_task_configs,
     refresh_model_catalog,
+    save_agent_service_proxy,
     save_task_config,
     start_agent_service_auth,
     submit_agent_service_auth_input,
@@ -250,6 +254,46 @@ async def read_agent_service_capabilities(
         ) from error
     except AIProviderError as error:
         raise _agent_provider_error(error) from None
+
+
+@router.get(
+    "/agent-service/proxy",
+    response_model=AgentServiceProxyDetail,
+)
+async def read_agent_service_proxy(
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> AgentServiceProxyDetail:
+    return await get_agent_service_proxy(
+        db,
+        client=_agent_client(request),
+        settings=settings,
+    )
+
+
+@router.put(
+    "/agent-service/proxy",
+    response_model=AgentServiceProxyDetail,
+    dependencies=[Depends(require_trusted_origin)],
+)
+async def update_agent_service_proxy(
+    payload: AgentServiceProxyUpdate,
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+    admin: AdminUser,
+) -> AgentServiceProxyDetail:
+    try:
+        return await save_agent_service_proxy(
+            db,
+            client=_agent_client(request),
+            settings=settings,
+            payload=payload,
+            actor=admin,
+        )
+    except (AIConfigError, CredentialEncryptionError) as error:
+        raise _unprocessable(error) from None
 
 
 @router.post(

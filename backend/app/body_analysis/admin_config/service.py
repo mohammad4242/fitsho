@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.body_analysis.admin_config.crypto import CredentialCipher
 from app.body_analysis.admin_config.enums import (
+    AIAgentServiceProxySource,
     AIAuditAction,
     AIExecutionBackend,
     AIProviderName,
@@ -19,6 +21,7 @@ from app.body_analysis.admin_config.enums import (
 )
 from app.body_analysis.admin_config.models import (
     AIAgentProfileVerification,
+    AIAgentServiceProxySetting,
     AIAuditEvent,
     AIModelCatalogEntry,
     AIProviderCredential,
@@ -30,6 +33,9 @@ from app.body_analysis.admin_config.schemas import (
     AgentServiceAuthSessionResponse,
     AgentServiceAuthStartRequest,
     AgentServiceCapabilitiesResponse,
+    AgentServiceProxyDetail,
+    AgentServiceProxyRuntimeStatus,
+    AgentServiceProxyUpdate,
     AgentServiceTestRequest,
     AgentServiceTestResponse,
     AITaskConfigDetail,
@@ -71,6 +77,9 @@ _AGENT_SAFE_MESSAGES: dict[ProviderErrorCode, str] = {
     ProviderErrorCode.UNAUTHORIZED: "The Agent Service credential was rejected.",
     ProviderErrorCode.RATE_LIMITED: "The Agent Service is busy. Please try again.",
     ProviderErrorCode.PROVIDER_UNAVAILABLE: "The Agent Service is temporarily unavailable.",
+    ProviderErrorCode.LOCATION_UNSUPPORTED: (
+        "The provider does not support the current network location."
+    ),
     ProviderErrorCode.INVALID_REQUEST: "The Agent Service rejected the request.",
     ProviderErrorCode.MALFORMED_RESPONSE: "The Agent Service returned a malformed response.",
 }
@@ -82,6 +91,7 @@ _AGENT_SERVICE_ERROR_CODES = {
     "invalid_output": ProviderErrorCode.INVALID_OUTPUT,
     "model_not_found": ProviderErrorCode.MODEL_NOT_FOUND,
     "provider_unavailable": ProviderErrorCode.PROVIDER_UNAVAILABLE,
+    "location_unsupported": ProviderErrorCode.LOCATION_UNSUPPORTED,
 }
 _AGENT_AUTH_ERRORS: dict[str, tuple[int, str]] = {
     "auth_in_progress": (409, "Authentication is already in progress."),
@@ -103,6 +113,26 @@ class _AgentServiceTestOutput(BaseModel):
     profile_id: str | None = Field(default=None, max_length=200)
     request_id: str = Field(min_length=1, max_length=300)
     duration_seconds: float = Field(ge=0)
+
+
+def _mask_proxy_url(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
+        if not hostname:
+            return None
+        host = f"[{hostname}]" if ":" in hostname and not hostname.startswith("[") else hostname
+        port = f":{parsed.port}" if parsed.port is not None else ""
+        credentials = (
+            "****:****@"
+            if parsed.username is not None or parsed.password is not None
+            else ""
+        )
+        return f"{parsed.scheme.lower()}://{credentials}{host}{port}"
+    except (TypeError, ValueError):
+        return None
 
 
 def credential_status(credential: AIProviderCredential | None) -> CredentialStatus:
@@ -474,6 +504,243 @@ def _agent_service_http_error(response: httpx.Response) -> AIProviderError:
         provider_status_code=response.status_code,
         provider_request_id=request_id,
     )
+
+
+def _proxy_setting(db: Session) -> AIAgentServiceProxySetting | None:
+    return db.scalar(select(AIAgentServiceProxySetting).where(AIAgentServiceProxySetting.id == 1))
+
+
+def _proxy_detail(
+    setting: AIAgentServiceProxySetting | None,
+    *,
+    runtime: AgentServiceProxyRuntimeStatus | None,
+    agent_service_available: bool,
+) -> AgentServiceProxyDetail:
+    enabled = setting.enabled if setting is not None else True
+    source = setting.source if setting is not None else AIAgentServiceProxySource.DEPLOYMENT_DEFAULT
+    if runtime is not None:
+        configured = runtime.configured
+        default_configured = runtime.default_configured
+        masked_proxy_url = runtime.masked_proxy_url
+        applied = (
+            runtime.enabled == enabled
+            and runtime.source == source
+            and (
+                source is not AIAgentServiceProxySource.CUSTOM
+                or runtime.masked_proxy_url == (setting.masked_proxy_url if setting else None)
+            )
+        )
+    else:
+        configured = (
+            bool(setting and setting.encrypted_proxy_url)
+            if source is AIAgentServiceProxySource.CUSTOM
+            else False
+        )
+        default_configured = False
+        masked_proxy_url = setting.masked_proxy_url if setting else None
+        applied = False
+    return AgentServiceProxyDetail(
+        enabled=enabled,
+        source=source,
+        configured=configured,
+        default_configured=default_configured,
+        masked_proxy_url=masked_proxy_url,
+        applied=applied,
+        agent_service_available=agent_service_available,
+        last_applied_at=setting.last_applied_at if setting else None,
+        last_apply_error=setting.last_apply_error if setting else None,
+    )
+
+
+async def get_agent_service_proxy(
+    db: Session,
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+) -> AgentServiceProxyDetail:
+    setting = _proxy_setting(db)
+    try:
+        payload = await _agent_service_json(
+            client,
+            settings=settings,
+            method="GET",
+            path="/v1/runtime/proxy",
+            timeout_seconds=max(5.0, settings.agent_service_connect_timeout_seconds),
+        )
+        runtime = AgentServiceProxyRuntimeStatus.model_validate(payload)
+    except (AIConfigError, AIProviderError):
+        return _proxy_detail(setting, runtime=None, agent_service_available=False)
+    return _proxy_detail(setting, runtime=runtime, agent_service_available=True)
+
+
+def _stored_proxy_url(
+    setting: AIAgentServiceProxySetting | None,
+    *,
+    settings: Settings,
+) -> str | None:
+    if setting is None or setting.encrypted_proxy_url is None:
+        return None
+    return CredentialCipher(settings.ai_credential_encryption_key).decrypt(
+        setting.encrypted_proxy_url
+    )
+
+
+def _proxy_apply_body(
+    setting: AIAgentServiceProxySetting,
+    *,
+    proxy_url: str | None,
+) -> dict[str, object]:
+    body: dict[str, object] = {
+        "enabled": setting.enabled,
+        "source": setting.source.value,
+    }
+    if setting.source is AIAgentServiceProxySource.CUSTOM and proxy_url is not None:
+        body["proxy_url"] = proxy_url
+    return body
+
+
+async def _apply_proxy_setting(
+    setting: AIAgentServiceProxySetting,
+    *,
+    proxy_url: str | None,
+    client: httpx.AsyncClient,
+    settings: Settings,
+) -> AgentServiceProxyRuntimeStatus:
+    payload = await _agent_service_json(
+        client,
+        settings=settings,
+        method="PUT",
+        path="/v1/runtime/proxy",
+        json_body=_proxy_apply_body(setting, proxy_url=proxy_url),
+        timeout_seconds=max(5.0, settings.agent_service_connect_timeout_seconds),
+    )
+    try:
+        runtime = AgentServiceProxyRuntimeStatus.model_validate(payload)
+    except ValidationError as error:
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+        ) from error
+    if runtime.enabled != setting.enabled or runtime.source != setting.source:
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+        )
+    if (
+        setting.source is AIAgentServiceProxySource.CUSTOM
+        and runtime.masked_proxy_url != setting.masked_proxy_url
+    ):
+        raise AIProviderError(
+            ProviderErrorCode.MALFORMED_RESPONSE,
+            _AGENT_SAFE_MESSAGES[ProviderErrorCode.MALFORMED_RESPONSE],
+        )
+    return runtime
+
+
+async def save_agent_service_proxy(
+    db: Session,
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+    payload: AgentServiceProxyUpdate,
+    actor: User,
+) -> AgentServiceProxyDetail:
+    setting = _proxy_setting(db)
+    supplied_custom_url = (
+        payload.proxy_url.get_secret_value() if payload.proxy_url is not None else None
+    )
+    custom_url = supplied_custom_url
+    if payload.source is AIAgentServiceProxySource.CUSTOM:
+        if custom_url is None:
+            custom_url = _stored_proxy_url(setting, settings=settings)
+        if payload.enabled and custom_url is None:
+            raise AIConfigError("A custom proxy URL is required when proxy is enabled")
+
+    if setting is None:
+        setting = AIAgentServiceProxySetting(
+            id=1,
+            enabled=True,
+            source=AIAgentServiceProxySource.DEPLOYMENT_DEFAULT,
+        )
+        db.add(setting)
+    previous_enabled = setting.enabled
+    previous_source = setting.source
+    previous_masked_proxy_url = setting.masked_proxy_url
+    setting.enabled = payload.enabled
+    setting.source = payload.source
+    if supplied_custom_url is not None:
+        setting.encrypted_proxy_url = CredentialCipher(
+            settings.ai_credential_encryption_key
+        ).encrypt(supplied_custom_url)
+        setting.masked_proxy_url = _mask_proxy_url(supplied_custom_url)
+    changed_fields: list[str] = []
+    if previous_enabled != setting.enabled:
+        changed_fields.append("enabled")
+    if previous_source != setting.source:
+        changed_fields.append("source")
+    if supplied_custom_url is not None and previous_masked_proxy_url != setting.masked_proxy_url:
+        changed_fields.append("proxy_url_replaced")
+    setting.updated_by_user_id = actor.id
+    setting.last_apply_error = None
+    db.add(
+        AIAuditEvent(
+            actor_user_id=actor.id,
+            action=AIAuditAction.CONFIG_UPDATED,
+            changed_fields=[f"agent_service_proxy.{field}" for field in changed_fields],
+        )
+    )
+    db.commit()
+    db.refresh(setting)
+
+    try:
+        runtime = await _apply_proxy_setting(
+            setting,
+            proxy_url=custom_url,
+            client=client,
+            settings=settings,
+        )
+    except (AIConfigError, AIProviderError) as error:
+        setting.last_apply_error = (
+            error.safe_message if isinstance(error, AIProviderError) else str(error)
+        )
+        db.commit()
+        db.refresh(setting)
+        return _proxy_detail(setting, runtime=None, agent_service_available=False)
+
+    setting.last_applied_at = datetime.now(UTC)
+    setting.last_apply_error = None
+    db.commit()
+    db.refresh(setting)
+    return _proxy_detail(setting, runtime=runtime, agent_service_available=True)
+
+
+async def sync_agent_service_proxy(
+    db: Session,
+    *,
+    client: httpx.AsyncClient,
+    settings: Settings,
+) -> bool:
+    setting = _proxy_setting(db)
+    if setting is None:
+        return True
+    try:
+        proxy_url = _stored_proxy_url(setting, settings=settings)
+        await _apply_proxy_setting(
+            setting,
+            proxy_url=proxy_url,
+            client=client,
+            settings=settings,
+        )
+    except (AIConfigError, AIProviderError) as error:
+        setting.last_apply_error = (
+            error.safe_message if isinstance(error, AIProviderError) else str(error)
+        )
+        db.commit()
+        return False
+    setting.last_applied_at = datetime.now(UTC)
+    setting.last_apply_error = None
+    db.commit()
+    return True
 
 
 async def get_agent_service_capabilities(

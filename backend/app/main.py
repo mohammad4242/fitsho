@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -9,11 +10,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from app.admin.router import router as admin_router
 from app.auth.providers import build_email_provider, build_sms_provider
 from app.auth.router import router as auth_router
+from app.body_analysis.admin_config.crypto import CredentialEncryptionError
 from app.body_analysis.admin_config.router import router as admin_ai_settings_router
+from app.body_analysis.admin_config.service import sync_agent_service_proxy
 from app.body_analysis.comparison_router import router as body_progress_comparison_router
 from app.body_analysis.history_router import router as body_progress_history_router
 from app.body_analysis.router import admin_router as body_analysis_admin_router
@@ -21,6 +25,7 @@ from app.body_analysis.router import review_router as body_analysis_review_route
 from app.body_analysis.router import router as body_analysis_router
 from app.body_photos.router import router as body_photo_router
 from app.config import Settings, get_settings
+from app.database.session import get_engine
 from app.exercises.router import router as exercises_router
 from app.nutrition.price_scheduler import scheduler_loop
 from app.nutrition.retention_scheduler import retention_scheduler_loop
@@ -29,6 +34,8 @@ from app.profile.router import router as profile_router
 from app.workout_cycles.router import router as workout_cycles_router
 from app.workout_reviews.router import router as workout_reviews_router
 from app.workouts.router import router as workout_plans_router
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -61,6 +68,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.food_price_http_client = food_price_client
             background_tasks: list[asyncio.Task[None]] = []
             if active_settings.app_env != "test":
+                try:
+                    with Session(get_engine(active_settings.database_url)) as db:
+                        await sync_agent_service_proxy(
+                            db,
+                            client=agent_client,
+                            settings=active_settings,
+                        )
+                except (CredentialEncryptionError, SQLAlchemyError) as error:
+                    logger.warning("Agent Service proxy startup sync failed: %s", error)
                 background_tasks.append(
                     asyncio.create_task(
                         scheduler_loop(

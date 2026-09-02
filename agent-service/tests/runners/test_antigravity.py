@@ -524,6 +524,10 @@ def test_malformed_or_schema_invalid_output_is_safe_error(
         ("authentication required", "unauthorized"),
         ("not logged into Antigravity", "unauthorized"),
         ("INVALID_ARGUMENT: schema is not supported", "invalid_request"),
+        (
+            "FAILED_PRECONDITION: User location is not supported for the API use.",
+            "location_unsupported",
+        ),
         ("temporary upstream outage", "provider_unavailable"),
         ("rate limit exceeded", "rate_limited"),
         ("You've hit your usage limit", "rate_limited"),
@@ -552,6 +556,7 @@ def test_error_status_is_classified_without_leaking_provider_text(
         "runner authorization failed",
         "runner rate limit reached",
         "request could not be prepared",
+        "this provider does not support the current location",
         "provider is unavailable",
     }
     assert status_text not in str(error.value)

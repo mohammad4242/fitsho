@@ -12,6 +12,7 @@ from typing import Any, cast
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
 from ..process import ProcessExecutionError, ProcessTimeoutError, run_process
+from ..proxy import ProxyRuntime
 from ..profiles import (
     AgentModelProfile,
     antigravity_profiles_from_output,
@@ -76,18 +77,20 @@ class AntigravityRunner(AgentRunner):
         configured_models: tuple[str, ...] = (),
         supports_image_input: bool = False,
         shared_media_root: Path = Path("/shared-private-media"),
+        proxy_runtime: ProxyRuntime | None = None,
     ) -> None:
         self.workspace = workspace
         self.executable = executable
         self.configured_models = configured_models
         self.supports_image_input = supports_image_input
         self.shared_media_root = shared_media_root
+        self.proxy_runtime = proxy_runtime or ProxyRuntime()
         self._profiles_cache: tuple[AgentModelProfile, ...] = ()
         self._profiles_cached_at = 0.0
         self._metadata = CliMetadataProbe(
             executable=self.executable,
             workspace=self.workspace,
-            environment=self._subprocess_environment(),
+            environment=self._subprocess_environment,
         )
 
     async def capabilities(self) -> RunnerCapabilities:
@@ -273,10 +276,9 @@ class AntigravityRunner(AgentRunner):
             raise RunnerError("invalid_request", "workspace is invalid")
         return workspace
 
-    @classmethod
-    def _subprocess_environment(cls) -> dict[str, str]:
+    def _subprocess_environment(self) -> dict[str, str]:
         environment = {
-            key: value for key, value in os.environ.items() if key in cls._SAFE_ENVIRONMENT_KEYS
+            key: value for key, value in os.environ.items() if key in self._SAFE_ENVIRONMENT_KEYS
         }
         # /tmp is mounted noexec and the compose volume can leave the default
         # cache root-owned. Keep browser and embedded-tool caches on the
@@ -284,7 +286,7 @@ class AntigravityRunner(AgentRunner):
         environment["XDG_CACHE_HOME"] = _AGY_CACHE_HOME
         environment["PLAYWRIGHT_BROWSERS_PATH"] = _AGY_PLAYWRIGHT_BROWSERS_PATH
         environment["PLAYWRIGHT_DRIVER_PATH"] = _AGY_PLAYWRIGHT_DRIVER_PATH
-        return environment
+        return self.proxy_runtime.apply(environment)
 
     def _image_paths(self, image_paths: tuple[Path, ...], workspace: Path) -> list[Path]:
         return resolve_image_paths(
@@ -346,6 +348,14 @@ class AntigravityRunner(AgentRunner):
             return RunnerError("model_not_found", "model was not found")
         if re.search(r"rate[ -]?limit|usage limit|too many requests|quota exceeded|\b429\b", text):
             return RunnerError("rate_limited", "runner rate limit reached")
+        if re.search(
+            r"user location is not supported|location is not supported for the api",
+            text,
+        ):
+            return RunnerError(
+                "location_unsupported",
+                "this provider does not support the current location",
+            )
         if re.search(
             r"unauthori[sz]ed|authentication failed|authentication required|"
             r"not authenticated|not logged in|login required|permission denied|"

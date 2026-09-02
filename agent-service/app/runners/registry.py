@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
 from ..config import Settings
+from ..proxy import ProxyRuntime
 from ..schemas import AgentName, AuthState, RunnerCapabilities
 from .antigravity import AntigravityRunner
 from .base import AgentRunner
@@ -22,13 +23,20 @@ class RunnerRegistry:
         self._auth_states = {runner.name: AuthState.UNKNOWN for runner in self._runners.values()}
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> "RunnerRegistry":
+    def from_settings(
+        cls,
+        settings: Settings,
+        *,
+        proxy_runtime: ProxyRuntime | None = None,
+    ) -> "RunnerRegistry":
+        runtime = proxy_runtime or ProxyRuntime()
         antigravity = AntigravityRunner(
             workspace=Path(settings.agent_workspace_root),
             executable=settings.agent_antigravity_executable,
             configured_models=settings.agent_antigravity_models,
             supports_image_input=settings.agent_antigravity_supports_image_input,
             shared_media_root=Path(settings.agent_shared_private_media_root),
+            proxy_runtime=runtime,
         )
         codex = CodexRunner(
             workspace=Path(settings.agent_workspace_root),
@@ -36,6 +44,7 @@ class RunnerRegistry:
             configured_models=settings.agent_codex_models,
             supports_image_input=settings.agent_codex_supports_image_input,
             shared_media_root=Path(settings.agent_shared_private_media_root),
+            proxy_runtime=runtime,
         )
         claude = ClaudeRunner(
             workspace=Path(settings.agent_workspace_root),
@@ -43,6 +52,7 @@ class RunnerRegistry:
             configured_models=settings.agent_claude_models,
             supports_image_input=settings.agent_claude_supports_image_input,
             shared_media_root=Path(settings.agent_shared_private_media_root),
+            proxy_runtime=runtime,
         )
 
         def antigravity_workspace_runner(workspace: Path) -> AgentRunner:
@@ -52,6 +62,7 @@ class RunnerRegistry:
                 configured_models=settings.agent_antigravity_models,
                 supports_image_input=settings.agent_antigravity_supports_image_input,
                 shared_media_root=Path(settings.agent_shared_private_media_root),
+                proxy_runtime=runtime,
             )
 
         def codex_workspace_runner(workspace: Path) -> AgentRunner:
@@ -61,6 +72,7 @@ class RunnerRegistry:
                 configured_models=settings.agent_codex_models,
                 supports_image_input=settings.agent_codex_supports_image_input,
                 shared_media_root=Path(settings.agent_shared_private_media_root),
+                proxy_runtime=runtime,
             )
 
         def claude_workspace_runner(workspace: Path) -> AgentRunner:
@@ -70,6 +82,7 @@ class RunnerRegistry:
                 configured_models=settings.agent_claude_models,
                 supports_image_input=settings.agent_claude_supports_image_input,
                 shared_media_root=Path(settings.agent_shared_private_media_root),
+                proxy_runtime=runtime,
             )
 
         return cls(

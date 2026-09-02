@@ -21,6 +21,7 @@ class ProviderErrorCode(StrEnum):
     INVALID_OUTPUT = "invalid_output"
     REFUSAL = "refusal"
     MODEL_NOT_FOUND = "model_not_found"
+    LOCATION_UNSUPPORTED = "location_unsupported"
 
 
 class AIProviderError(Exception):

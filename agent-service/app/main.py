@@ -25,6 +25,7 @@ from .config import Settings, get_settings
 from .errors import AgentServiceError, handle_service_error
 from .observability import emit_log
 from .private_media import PrivateMediaResolver
+from .proxy import ProxyConfigurationError, ProxyRuntime
 from .runners.registry import RunnerRegistry
 from .schemas import (
     AgentGenerationInput,
@@ -34,6 +35,8 @@ from .schemas import (
     ErrorCode,
     ErrorDetail,
     ErrorEnvelope,
+    ProxyRuntimeStatus as ProxyRuntimeStatusSchema,
+    ProxyRuntimeUpdate,
     StoredImageGenerationInput,
     TestOutput,
     TestRequest,
@@ -51,7 +54,11 @@ def create_app(
 ) -> FastAPI:
     effective_settings = settings or get_settings()
 
-    runner_registry = registry or RunnerRegistry.from_settings(effective_settings)
+    proxy_runtime = ProxyRuntime()
+    runner_registry = registry or RunnerRegistry.from_settings(
+        effective_settings,
+        proxy_runtime=proxy_runtime,
+    )
     effective_auth_manager = auth_manager or AuthManager(
         {
             AgentName.ANTIGRAVITY: AntigravityAuthAdapter(
@@ -63,6 +70,7 @@ def create_app(
         workspace=Path(effective_settings.agent_workspace_root),
         ttl_seconds=effective_settings.agent_auth_session_ttl_seconds,
         max_output_bytes=effective_settings.agent_auth_max_output_bytes,
+        environment=proxy_runtime.environment(),
         state_callback=runner_registry.set_auth_state,
     )
 
@@ -103,6 +111,7 @@ def create_app(
     )
     app.state.agent_service = agent_service
     app.state.auth_manager = effective_auth_manager
+    app.state.proxy_runtime = proxy_runtime
 
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -229,6 +238,32 @@ def create_app(
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/v1/runtime/proxy", response_model=ProxyRuntimeStatusSchema)
+    async def proxy_status(_: None = Depends(require_internal_auth)) -> ProxyRuntimeStatusSchema:
+        return ProxyRuntimeStatusSchema.model_validate(proxy_runtime.status().__dict__)
+
+    @app.put("/v1/runtime/proxy", response_model=ProxyRuntimeStatusSchema)
+    async def proxy_update(
+        payload: ProxyRuntimeUpdate,
+        _: None = Depends(require_internal_auth),
+    ) -> ProxyRuntimeStatusSchema:
+        try:
+            status = proxy_runtime.update(
+                enabled=payload.enabled,
+                source=payload.source,
+                proxy_url=(
+                    payload.proxy_url.get_secret_value() if payload.proxy_url is not None else None
+                ),
+            )
+        except ProxyConfigurationError as error:
+            raise AgentServiceError(
+                ErrorCode.INVALID_REQUEST,
+                "proxy configuration is invalid",
+                422,
+            ) from error
+        await effective_auth_manager.update_environment(proxy_runtime.environment())
+        return ProxyRuntimeStatusSchema.model_validate(status.__dict__)
 
     @app.get("/v1/capabilities", response_model=CapabilitiesResponse)
     async def capabilities(_: None = Depends(require_internal_auth)) -> CapabilitiesResponse:
