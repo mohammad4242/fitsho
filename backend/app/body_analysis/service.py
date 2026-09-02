@@ -522,6 +522,9 @@ class BodyAnalysisService:
                 .where(
                     BodyAnalysis.session_id == session_id,
                     BodyAnalysis.created_at >= latest_photo_change,
+                    # A provider change starts a new bounded recovery scope;
+                    # previous provider attempts remain immutable history.
+                    BodyAnalysis.provider == config.provider_name,
                 )
             )
             or 0
