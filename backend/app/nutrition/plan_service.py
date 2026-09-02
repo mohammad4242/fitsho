@@ -71,6 +71,7 @@ from app.nutrition.prepared_recipe import (
     PreparedRecipeRatio,
     PreparedRecipeYield,
 )
+from app.nutrition.price_mass_conversion import planner_price_irr_per_gram
 from app.nutrition.price_overrides import effective_prices
 from app.nutrition.program_adaptation import adapt_program
 from app.nutrition.program_catalogue import list_programs
@@ -661,9 +662,13 @@ def _planner_foods(
     manifest: list[dict[str, object]] = []
     for food in foods:
         reference = references.get(food.id)
-        if reference is None or reference.canonical_unit != "TOMAN_PER_KG":
+        if reference is None:
             continue
-        price_irr_per_gram = reference.reference_price_toman * Decimal("10") / Decimal("1000")
+        conversion = planner_price_irr_per_gram(
+            food_slug=food.slug,
+            reference_price_toman=reference.reference_price_toman,
+            canonical_unit=reference.canonical_unit,
+        )
         candidates.append(
             PlannerFood(
                 food_id=str(food.id),
@@ -675,7 +680,7 @@ def _planner_foods(
                     composition.nutrient_code: composition.value_per_100g
                     for composition in food.compositions
                 },
-                price_irr_per_gram=price_irr_per_gram,
+                price_irr_per_gram=conversion.price_irr_per_gram,
                 price_reference_id=reference.reference_id,
                 dietary_patterns=tuple(food.dietary_patterns),
             )
@@ -683,14 +688,20 @@ def _planner_foods(
         snapshots.append(
             {
                 "food_id": str(food.id),
+                "slug": food.slug,
                 "reference_id": reference.reference_id,
                 "reference_price_toman": str(reference.reference_price_toman),
                 "canonical_unit": reference.canonical_unit,
-                "price_irr_per_gram": str(price_irr_per_gram),
+                "price_irr_per_gram": str(conversion.price_irr_per_gram),
                 "sample_count": reference.sample_count,
                 "confidence": reference.confidence,
                 "accepted_at": reference.accepted_at.isoformat(),
                 "source": reference.source,
+                "price_mass_conversion_version": conversion.conversion_version,
+                "price_mass_conversion_method": conversion.conversion_method,
+                "grams_per_price_unit": str(conversion.grams_per_price_unit),
+                "price_mass_conversion_source": conversion.source_name,
+                "price_mass_conversion_source_reference": conversion.source_reference,
                 "freshness_policy_hours": DEFAULT_POLICY.maximum_price_age_hours,
             }
         )
