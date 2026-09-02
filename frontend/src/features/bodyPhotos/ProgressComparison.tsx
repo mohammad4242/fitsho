@@ -66,7 +66,6 @@ function V2Comparison({
                 delta={delta}
                 key={delta.measurement}
                 locale={locale}
-                maximum={measurementMaximum(exactMeasurements)}
               />
             ))}
           </ul>
@@ -91,7 +90,11 @@ function BiggestChange({
       : null;
 
   return (
-    <section className="body-progress-comparison__biggest-change" aria-labelledby="body-progress-biggest-change-title">
+    <section
+      aria-labelledby="body-progress-biggest-change-title"
+      className="body-progress-comparison__biggest-change"
+      data-state={transition?.state}
+    >
       <h3 id="body-progress-biggest-change-title">{t("bodyPhotos.comparison.biggestChangeTitle")}</h3>
       {transition !== null && messageKey !== null ? (
         <div className="body-progress-comparison__biggest-content" data-state={transition.state}>
@@ -108,17 +111,16 @@ function BiggestChange({
 function MeasurementDelta({
   delta,
   locale,
-  maximum,
 }: {
   delta: BodyProgressMeasurementDelta;
   locale: string;
-  maximum: number;
 }) {
   const { t } = useTranslation();
   const measurement = t(`bodyPhotos.comparison.measurements.${delta.measurement}`);
   const unit = t(`bodyPhotos.comparison.units.${delta.unit}`);
   const previous = delta.previous ?? 0;
   const current = delta.current ?? 0;
+  const maximum = Math.max(1, previous, current);
   const previousWidth = (previous / maximum) * 100;
   const currentWidth = (current / maximum) * 100;
 
@@ -164,13 +166,6 @@ function isExactMeasurement(delta: BodyProgressMeasurementDelta) {
   return delta.availability === "exact"
     && delta.previous !== null
     && delta.current !== null;
-}
-
-function measurementMaximum(measurements: BodyProgressMeasurementDelta[]) {
-  return Math.max(
-    1,
-    ...measurements.flatMap((delta) => [delta.previous ?? 0, delta.current ?? 0]),
-  );
 }
 
 function selectBiggestChange(

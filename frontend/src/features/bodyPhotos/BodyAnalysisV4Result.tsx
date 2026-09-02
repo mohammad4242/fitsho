@@ -34,6 +34,10 @@ export function BodyAnalysisV4Result({
     ))
     .slice(0, 3)
     .map((region) => areaLabel(region.area));
+  const importantWeaknesses = [
+    ...experience.regions.filter((region) => region.display_classification === "primary_priority"),
+    ...experience.regions.filter((region) => region.display_classification === "room_to_grow"),
+  ].slice(0, 4);
   const firstLook = translateExperienceMessage(t, experience.first_impression, areaLabel);
 
   return (
@@ -63,7 +67,7 @@ export function BodyAnalysisV4Result({
 
       <section className="body-analysis-v4__summary" aria-label={t("bodyAnalysis.summary.title")}>
         <SummaryCard
-          areas={experience.regions.filter((region) => region.display_classification === "primary_priority")}
+          areas={importantWeaknesses}
           areaLabel={areaLabel}
           emptyText={t("bodyAnalysis.summary.noWeaknesses")}
           title={t("bodyAnalysis.summary.weaknesses")}

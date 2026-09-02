@@ -1630,6 +1630,7 @@ const en = {
         notAssessable: "This area could not be assessed clearly enough from the available views.",
       },
       review: {
+        roleLabel: "{{role}} review",
         provisional: "This reading is provisional until both specialist reviews are complete.",
         pending: "Pending review — the reading is provisional.",
         approved: "Both specialist reviews are approved.",

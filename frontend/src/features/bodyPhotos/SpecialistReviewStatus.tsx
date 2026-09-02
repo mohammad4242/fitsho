@@ -5,7 +5,6 @@ import type { SpecialistReviewState } from "./types";
 export function SpecialistReviewStatus({ review }: { review: SpecialistReviewState }) {
   const { t } = useTranslation();
   const state = review.decision ?? "pending";
-  const approved = review.decision === "approved";
 
   return (
     <div
@@ -17,7 +16,9 @@ export function SpecialistReviewStatus({ review }: { review: SpecialistReviewSta
     >
       <span className="body-analysis-review__dot" aria-hidden="true" />
       <div>
-        <strong>{t(`bodyPhotos.results.reviewRoles.${review.role}`)}</strong>
+        <strong>{t("bodyAnalysis.review.roleLabel", {
+          role: t(`bodyPhotos.results.reviewRoles.${review.role}`),
+        })}</strong>
         <small>{t(`bodyPhotos.results.reviewStates.${state}`)}</small>
       </div>
     </div>

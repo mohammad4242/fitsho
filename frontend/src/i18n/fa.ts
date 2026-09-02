@@ -1583,8 +1583,8 @@ const fa = {
       indicators: {
         eyebrow: "نشانه‌های کاربردی",
         title: "تقارن و تناسب",
-        upperLowerBalance: { title: "تعادل بالاتنه و پایین‌تنه", message: "{{state}} در نماهای قابل‌مشاهده." },
-        visibleSymmetry: { title: "تقارن قابل‌مشاهده", message: "{{state}} در نماهای قابل‌مشاهده." },
+        upperLowerBalance: { title: "تناسب بالاتنه با پایین‌تنه", message: "{{state}} در نماهای قابل‌مشاهده." },
+        visibleSymmetry: { title: "تقارن اندام‌ها", message: "{{state}} در نماهای قابل‌مشاهده." },
         bodyShape: { title: "شکل کلی بدن", message: "ارزیابی کلی شکل بدن در نماهای موجود." },
         states: {
           upper_body_dominant: "بالاتنه رشد بیشتری نشان می‌دهد",
@@ -1599,8 +1599,8 @@ const fa = {
         },
       },
       map: {
-        eyebrow: "بدن به‌عنوان رابط",
-        title: "برای دیدن جزئیات یک ناحیه را انتخاب کن",
+        eyebrow: "نقشهٔ بدن",
+        title: "روی هر ناحیه بزن تا جزئیاتش رو ببینی",
         selectionHint: "برای دیدن یک ناحیه، روی خود بدن بزن.",
         viewSelector: "نمای نقشهٔ بدن",
         views: { front: "نمای روبه‌رو", back: "نمای پشت" },
@@ -1632,6 +1632,7 @@ const fa = {
         balanced: "{{area}} نسبت به بقیه بدنت متعادله؛ فعلاً مشکل واضحی اینجا دیده نمی‌شه.",
       },
       review: {
+        roleLabel: "نظر {{role}}",
         provisional: "این نتیجه تا تکمیل بررسی هر دو متخصص، موقتی است.",
         pending: "در انتظار بررسی — این نتیجه موقتی است.",
         approved: "بررسی هر دو متخصص تأیید شده است.",

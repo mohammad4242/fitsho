@@ -125,3 +125,30 @@ it("renders two concise summary cards and compact review states", () => {
   expect(screen.getByLabelText(/Doctor review pending/i)).toBeInTheDocument();
   expect(screen.queryByText(/confidence/i)).not.toBeInTheDocument();
 });
+
+it("renders review colors from the real specialist decisions", () => {
+  const reviewedAnalysis = {
+    ...analysis,
+    coach_review: { ...analysis.coach_review, decision: "approved" as const },
+    doctor_review: { ...analysis.doctor_review, decision: "changes_required" as const },
+  };
+  render(<BodyAnalysisV4Result analysis={reviewedAnalysis} experience={experience} />);
+
+  expect(screen.getByLabelText(/Coach review approved/i)).toHaveClass("body-analysis-review--approved");
+  expect(screen.getByLabelText(/Doctor review changes required/i)).toHaveClass("body-analysis-review--changes_required");
+  expect(document.querySelector(".body-analysis-review--approved .body-analysis-review__dot")).toBeInTheDocument();
+});
+
+it("leaves an unavailable display score neutral", () => {
+  const partialExperience = {
+    ...experience,
+    indicators: {
+      ...experience.indicators,
+      body_shape: { ...experience.indicators.body_shape, score_percent: null },
+    },
+  };
+  render(<BodyAnalysisV4Result analysis={analysis} experience={partialExperience} />);
+
+  expect(screen.getByText("—")).toBeInTheDocument();
+  expect(screen.getAllByRole("progressbar")[2]).not.toHaveAttribute("aria-valuenow");
+});
