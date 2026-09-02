@@ -1,4 +1,5 @@
 import asyncio
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -11,8 +12,12 @@ from app.body_analysis.admin_config.enums import (
 )
 from app.body_analysis.admin_config.models import AITaskConfig
 from app.body_analysis.admin_config.service import AIConfigError
+from app.body_analysis.providers.models import ProviderRoutingPreferences
 from app.config import Settings
-from app.nutrition.price_execution import resolve_price_update_execution
+from app.nutrition.price_execution import (
+    resolve_price_update_execution,
+    resolve_single_food_price_researcher,
+)
 
 
 def test_missing_or_disabled_food_price_task_uses_direct_providers(
@@ -85,6 +90,46 @@ def test_enabled_agent_food_price_task_selects_only_agent_researcher(
 
     assert selected.providers == ()
     assert selected.agent_researcher is not None
+
+
+def test_single_food_price_research_defaults_to_seven_minute_timeout(
+    db, test_settings: Settings, monkeypatch
+) -> None:
+    db.add(
+        AITaskConfig(
+            task_type=AITaskType.FOOD_PRICE_SEARCH,
+            provider=AIProviderName.OPENROUTER,
+            execution_backend=AIExecutionBackend.AGENT_SERVICE,
+            agent_name=AIAgentName.ANTIGRAVITY,
+            agent_model_id="gemini-price-model",
+            enabled=True,
+        )
+    )
+    db.commit()
+    captured: dict[str, object] = {}
+
+    def factory(_task, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            provider=object(),
+            primary_model_id="gemini-price-model",
+            fallback_model_ids=(),
+            routing_preferences=ProviderRoutingPreferences(),
+        )
+
+    monkeypatch.setattr("app.nutrition.price_execution.build_task_provider", factory)
+    client = httpx.AsyncClient()
+    try:
+        researcher = resolve_single_food_price_researcher(
+            db,
+            settings=test_settings,
+            agent_http_client=client,
+        )
+    finally:
+        asyncio.run(client.aclose())
+
+    assert researcher is not None
+    assert captured["timeout_seconds"] == 420.0
 
 
 def test_enabled_api_food_price_task_is_rejected_without_direct_fallback(

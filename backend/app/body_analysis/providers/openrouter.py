@@ -36,7 +36,7 @@ class OpenRouterProvider:
         *,
         api_key: SecretStr | str | None,
         base_url: str = "https://openrouter.ai/api/v1",
-        timeout_seconds: float = 30.0,
+        timeout_seconds: float = 420.0,
         app_url: str | None = None,
         app_name: str = "Fitsho",
         private_media_resolver: PrivateMediaResolver | None = None,

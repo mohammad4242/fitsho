@@ -136,6 +136,7 @@ def test_test_endpoint_uses_same_registry_and_contract(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert response.json()["ok"] is True
     assert runner.requests[0].schema_name == "agent_test"
+    assert runner.requests[0].timeout_seconds == 420
 
 
 def test_generate_rejects_invalid_response_schema_before_running(tmp_path: Path) -> None:

@@ -181,7 +181,7 @@ def config_detail(
             fallback_model_ids=[],
             temperature=0.0,
             max_output_tokens=4096,
-            timeout_seconds=45,
+            timeout_seconds=420,
             minimum_confidence=0.7,
             max_cost_per_request=None,
             routing_restrictions=[],
@@ -827,6 +827,7 @@ async def test_agent_service(
                 "model_id": payload.model_id,
                 **({"profile_id": payload.profile_id} if payload.profile_id else {}),
             },
+            timeout_seconds=420.0,
         )
     except AIConfigError:
         return AgentServiceTestResponse(

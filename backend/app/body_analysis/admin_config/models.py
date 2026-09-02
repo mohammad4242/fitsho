@@ -176,7 +176,7 @@ class AITaskConfig(Base):
         Integer, default=4096, server_default="4096", nullable=False
     )
     timeout_seconds: Mapped[int] = mapped_column(
-        Integer, default=45, server_default="45", nullable=False
+        Integer, default=420, server_default="420", nullable=False
     )
     minimum_confidence: Mapped[float] = mapped_column(
         default=0.7, server_default="0.7", nullable=False

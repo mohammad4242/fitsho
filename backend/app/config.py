@@ -74,18 +74,18 @@ class Settings(BaseSettings):
     owner_video_import_work_root: Path = Path("var/imports/owner-video")
     owner_video_codex_path: str = "codex"
     owner_video_codex_model: str | None = None
-    owner_video_codex_timeout_seconds: float = Field(default=180.0, gt=0, le=600)
+    owner_video_codex_timeout_seconds: float = Field(default=420.0, gt=0, le=600)
     owner_video_identification_confidence: float = Field(default=0.90, ge=0, le=1)
     owner_video_match_confidence: float = Field(default=0.92, ge=0, le=1)
     owner_video_presentation_confidence: float = Field(default=0.80, ge=0, le=1)
     opencode_zen_api_key: SecretStr | None = Field(default=None, repr=False)
     opencode_zen_base_url: str = "https://opencode.ai/zen/v1"
     opencode_zen_model: str = "gpt-5.6-terra"
-    opencode_zen_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+    opencode_zen_timeout_seconds: float = Field(default=420.0, gt=0, le=600)
     opencode_zen_proxy_url: str | None = Field(default=None, max_length=500, repr=False)
     ai_credential_encryption_key: SecretStr | None = Field(default=None, repr=False)
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openrouter_timeout_seconds: float = Field(default=45.0, gt=0, le=180)
+    openrouter_timeout_seconds: float = Field(default=420.0, gt=0, le=600)
     agent_service_base_url: str = "http://agent-service:9001"
     agent_service_token: SecretStr | None = Field(default=None, repr=False)
     agent_service_connect_timeout_seconds: float = Field(default=5.0, gt=0, le=60)

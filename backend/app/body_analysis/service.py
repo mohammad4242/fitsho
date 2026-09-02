@@ -124,7 +124,7 @@ class AnalysisExecutionConfig(BaseModel):
     schema_version: str = Field(pattern=r"^[0-9]+\.[0-9]+$", max_length=16)
     temperature: float = Field(default=0.0, ge=0, le=1)
     max_output_tokens: int = Field(default=4096, ge=1, le=65_536)
-    timeout_seconds: int = Field(default=45, ge=1, le=180)
+    timeout_seconds: int = Field(default=420, ge=1, le=600)
     retry_limit: int = Field(default=2, ge=0, le=5)
     minimum_confidence: float = Field(default=0.7, ge=0, le=1)
     max_cost_per_request: Decimal | None = Field(default=None, ge=0)

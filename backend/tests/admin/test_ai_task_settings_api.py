@@ -162,6 +162,7 @@ def test_admin_lists_food_price_search_as_disabled_agent_task(
     assert food_price["enabled"] is False
     assert food_price["agent_name"] is None
     assert food_price["agent_model_id"] is None
+    assert {item["timeout_seconds"] for item in response.json()} == {420}
     assert all(
         item["execution_backend"] == "api"
         for item in response.json()

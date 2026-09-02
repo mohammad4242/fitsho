@@ -56,7 +56,7 @@ def build_task_provider(
                 getattr(
                     task,
                     "timeout_seconds",
-                    getattr(settings, "openrouter_timeout_seconds", 45),
+                    getattr(settings, "openrouter_timeout_seconds", 420),
                 )
             ),
             app_url=getattr(settings, "frontend_origin", None),

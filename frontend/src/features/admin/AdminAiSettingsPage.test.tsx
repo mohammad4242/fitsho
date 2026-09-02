@@ -62,7 +62,7 @@ const bodyConfig: AdminAiTaskConfig = {
   fallback_model_ids: [],
   temperature: 0,
   max_output_tokens: 4096,
-  timeout_seconds: 45,
+  timeout_seconds: 420,
   minimum_confidence: 0.7,
   max_cost_per_request: null,
   routing_restrictions: [],

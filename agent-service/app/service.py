@@ -87,7 +87,7 @@ class AgentService:
             schema_name="agent_test",
             temperature=0,
             max_output_tokens=32,
-            timeout_seconds=30,
+            timeout_seconds=420,
             effort=(resolved.effort.value if resolved.effort is not None else None),
         )
         try:

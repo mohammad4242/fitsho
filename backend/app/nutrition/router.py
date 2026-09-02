@@ -451,7 +451,7 @@ async def research_single_food_price(
         db,
         settings=settings,
         agent_http_client=getattr(request.app.state, "agent_http_client", None),
-        timeout_seconds=300.0,
+        timeout_seconds=420.0,
     )
     if researcher is None:
         raise HTTPException(

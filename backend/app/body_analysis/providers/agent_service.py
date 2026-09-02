@@ -76,7 +76,7 @@ class AgentServiceProvider:
         token: SecretStr | str | None,
         agent_name: str,
         profile_id: str | None = None,
-        timeout_seconds: float = 30.0,
+        timeout_seconds: float = 420.0,
         max_image_bytes: int = 8 * 1024 * 1024,
         max_images: int = 5,
         max_total_image_bytes: int = 20 * 1024 * 1024,

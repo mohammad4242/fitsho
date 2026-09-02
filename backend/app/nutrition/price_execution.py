@@ -76,7 +76,7 @@ def resolve_single_food_price_researcher(
     *,
     settings: Settings,
     agent_http_client: httpx.AsyncClient | None,
-    timeout_seconds: float = 300.0,
+    timeout_seconds: float = 420.0,
 ) -> AgentFoodPriceResearcher | None:
     task = db.scalar(
         select(AITaskConfig).where(AITaskConfig.task_type == AITaskType.FOOD_PRICE_SEARCH)
