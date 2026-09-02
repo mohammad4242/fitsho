@@ -59,4 +59,7 @@ it("uses the owner-scoped analysis endpoints", async () => {
     ["/api/v1/body-photo-sessions/session-1/analysis", "POST"],
     ["/api/v1/body-photo-sessions/session-1/analysis/retry", "POST"],
   ]);
+  expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({
+    confirm_measurements_current: true,
+  });
 });

@@ -11,6 +11,8 @@
 }
 
 .body-photo-wizard { display: grid; gap: 1rem; }
+.body-analysis-requirements > form { display: grid; gap: 1rem; }
+.body-analysis-requirements__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }
 .body-photo-wizard__heading { display: grid; gap: .65rem; }
 .body-photo-wizard h1, .body-photo-wizard h2, .body-progress-page h1 { margin: 0; }
 .body-photo-wizard p, .body-progress-page p { margin: 0; line-height: 1.7; }
@@ -124,6 +126,7 @@
 .body-progress-comparison small { color: var(--muted); }
 
 @media (max-width: 640px) {
+  .body-analysis-requirements__actions > button { flex: 1 1 100%; }
   .body-photo-source-actions { grid-template-columns: 1fr; }
   .body-photo-summary, .body-analysis-photos, .body-analysis-groups, .body-progress-comparison > ul { grid-template-columns: 1fr; }
   .body-photo-summary__item { grid-template-columns: 5rem 1fr; align-items: center; }

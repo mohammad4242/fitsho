@@ -4,6 +4,7 @@ import {
   profileToFormValues,
   toProfileInput,
   toProfilePatch,
+  validateBodyAnalysisMeasurements,
   validateAll,
   validateStep,
 } from "./profileValidation";
@@ -146,6 +147,23 @@ describe("profile validation", () => {
       shoulder_circumference_cm: "circumferenceRange",
       hip_circumference_cm: "circumferencePrecision",
     });
+  });
+
+  it("requires all current measurements for Body Analysis without changing profile validation", () => {
+    expect(validateStep(validValues, 2, today)).toEqual({});
+    expect(validateBodyAnalysisMeasurements(validValues)).toEqual({
+      shoulder_circumference_cm: "required",
+      waist_circumference_cm: "required",
+      hip_circumference_cm: "required",
+    });
+    expect(
+      validateBodyAnalysisMeasurements({
+        ...validValues,
+        shoulder_circumference_cm: "112",
+        waist_circumference_cm: "82.5",
+        hip_circumference_cm: "99",
+      }),
+    ).toEqual({});
   });
 
   it("accepts only two through six training days", () => {

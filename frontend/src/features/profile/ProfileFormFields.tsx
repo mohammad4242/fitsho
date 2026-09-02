@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import type {
+  BodyAnalysisMeasurementErrors,
   ProfileValidationCode,
   ProfileValidationErrors,
 } from "./profileValidation";
@@ -19,6 +20,8 @@ import {
   type UserSelectablePriorityMuscle,
   type Equipment,
   type ProfileFormValue,
+  type MeasurementField,
+  type MeasurementFormValues,
   trainingLocations,
   type ProfileFormValues,
 } from "./types";
@@ -34,7 +37,7 @@ type FieldGroupProps = {
 };
 
 function describedBy(
-  field: keyof ProfileFormValues,
+  field: string,
   error: ProfileValidationCode | undefined,
   hint = false,
 ) {
@@ -47,7 +50,7 @@ function FieldError({
   field,
   error,
 }: {
-  field: keyof ProfileFormValues;
+  field: string;
   error: ProfileValidationCode | undefined;
 }) {
   const { t } = useTranslation();
@@ -148,79 +151,13 @@ export function BodyGoalFields({
     <fieldset className="profile-fieldset" disabled={disabled}>
       <legend>{t("onboarding.steps.bodyGoal")}</legend>
 
-      <div className="profile-field profile-field--paired">
-        <div>
-          <label htmlFor="profile-height">{t("onboarding.fields.height")}</label>
-          <input
-            id="profile-height"
-            name="height_cm"
-            type="number"
-            inputMode="numeric"
-            autoComplete="off"
-            min={120}
-            max={230}
-            step={1}
-            required
-            value={values.height_cm}
-            aria-invalid={errors.height_cm !== undefined}
-            aria-describedby={describedBy("height_cm", errors.height_cm)}
-            onChange={(event) => onChange("height_cm", event.target.value)}
-          />
-          <FieldError field="height_cm" error={errors.height_cm} />
-        </div>
-        <div>
-          <label htmlFor="profile-current-weight">{t("onboarding.fields.weight")}</label>
-          <input
-            id="profile-current-weight"
-            name="current_weight_kg"
-            type="number"
-            inputMode="decimal"
-            autoComplete="off"
-            min={35}
-            max={300}
-            step={0.01}
-            required
-            value={values.current_weight_kg}
-            aria-invalid={errors.current_weight_kg !== undefined}
-            aria-describedby={describedBy(
-              "current_weight_kg",
-              errors.current_weight_kg,
-            )}
-            onChange={(event) => onChange("current_weight_kg", event.target.value)}
-          />
-          <FieldError field="current_weight_kg" error={errors.current_weight_kg} />
-        </div>
-      </div>
-
-      {showCircumferences && <div className="profile-field profile-field--measurements">
-        {([
-          ["shoulder_circumference_cm", "shoulderCircumference"],
-          ["waist_circumference_cm", "waistCircumference"],
-          ["hip_circumference_cm", "hipCircumference"],
-        ] as const).map(([field, label]) => (
-          <div key={field}>
-            <label htmlFor={`profile-${field}`}>{t(`onboarding.fields.${label}`)}</label>
-            <input
-              id={`profile-${field}`}
-              name={field}
-              type="number"
-              inputMode="decimal"
-              autoComplete="off"
-              min={40}
-              max={250}
-              step={0.01}
-              value={values[field]}
-              aria-invalid={errors[field] !== undefined}
-              aria-describedby={describedBy(field, errors[field], true)}
-              onChange={(event) => onChange(field, event.target.value)}
-            />
-            <p className="profile-field__hint" id={`${field}-hint`}>
-              {t("onboarding.hints.circumference")}
-            </p>
-            <FieldError field={field} error={errors[field]} />
-          </div>
-        ))}
-      </div>}
+      <MeasurementFields
+        values={values}
+        errors={errors}
+        disabled={disabled}
+        onChange={(field, value) => onChange(field, value)}
+        showCircumferences={showCircumferences}
+      />
 
       <div className="profile-field">
         <label htmlFor="profile-fitness-goal">{t("onboarding.fields.fitnessGoal")}</label>
@@ -246,6 +183,112 @@ export function BodyGoalFields({
         <FieldError field="fitness_goal" error={errors.fitness_goal} />
       </div>
     </fieldset>
+  );
+}
+
+type MeasurementFieldsProps = {
+  values: MeasurementFormValues;
+  errors: BodyAnalysisMeasurementErrors;
+  disabled?: boolean;
+  onChange: (field: MeasurementField, value: string) => void;
+  showCircumferences?: boolean;
+  requiredCircumferences?: boolean;
+  idPrefix?: string;
+};
+
+export function MeasurementFields({
+  values,
+  errors,
+  disabled = false,
+  onChange,
+  showCircumferences = true,
+  requiredCircumferences = false,
+  idPrefix = "profile",
+}: MeasurementFieldsProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="profile-field profile-field--paired">
+        <div>
+          <label htmlFor={`${idPrefix}-height`}>{t("onboarding.fields.height")}</label>
+          <input
+            id={`${idPrefix}-height`}
+            name="height_cm"
+            type="number"
+            inputMode="numeric"
+            autoComplete="off"
+            min={120}
+            max={230}
+            step={1}
+            required
+            value={values.height_cm}
+            aria-invalid={errors.height_cm !== undefined}
+            aria-describedby={describedBy("height_cm", errors.height_cm)}
+            onChange={(event) => onChange("height_cm", event.target.value)}
+            disabled={disabled}
+          />
+          <FieldError field="height_cm" error={errors.height_cm} />
+        </div>
+        <div>
+          <label htmlFor={`${idPrefix}-current-weight`}>{t("onboarding.fields.weight")}</label>
+          <input
+            id={`${idPrefix}-current-weight`}
+            name="current_weight_kg"
+            type="number"
+            inputMode="decimal"
+            autoComplete="off"
+            min={35}
+            max={300}
+            step={0.01}
+            required
+            value={values.current_weight_kg}
+            aria-invalid={errors.current_weight_kg !== undefined}
+            aria-describedby={describedBy("current_weight_kg", errors.current_weight_kg)}
+            onChange={(event) => onChange("current_weight_kg", event.target.value)}
+            disabled={disabled}
+          />
+          <FieldError field="current_weight_kg" error={errors.current_weight_kg} />
+        </div>
+      </div>
+
+      {showCircumferences && (
+        <div className="profile-field profile-field--measurements">
+          {([
+            ["shoulder_circumference_cm", "shoulderCircumference"],
+            ["waist_circumference_cm", "waistCircumference"],
+            ["hip_circumference_cm", "hipCircumference"],
+          ] as const).map(([field, label]) => (
+            <div key={field}>
+              <label htmlFor={`${idPrefix}-${field}`}>
+                {requiredCircumferences
+                  ? t(`bodyPhotos.measurements.fields.${label}`)
+                  : t(`onboarding.fields.${label}`)}
+              </label>
+              <input
+                id={`${idPrefix}-${field}`}
+                name={field}
+                type="number"
+                inputMode="decimal"
+                autoComplete="off"
+                min={40}
+                max={250}
+                step={0.01}
+                required={requiredCircumferences}
+                value={values[field]}
+                aria-invalid={errors[field] !== undefined}
+                aria-describedby={describedBy(field, errors[field], true)}
+                onChange={(event) => onChange(field, event.target.value)}
+                disabled={disabled}
+              />
+              <p className="profile-field__hint" id={`${field}-hint`}>
+                {t("onboarding.hints.circumference")}
+              </p>
+              <FieldError field={field} error={errors[field]} />
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

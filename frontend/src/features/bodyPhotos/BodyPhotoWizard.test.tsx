@@ -20,6 +20,14 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("./api", () => api);
+vi.mock("./BodyAnalysisRequirementsStep", async () => {
+  const { useEffect } = await import("react");
+  function MockBodyAnalysisRequirementsStep({ onConfirmed }: { onConfirmed: () => void }) {
+    useEffect(() => onConfirmed(), [onConfirmed]);
+    return null;
+  }
+  return { BodyAnalysisRequirementsStep: MockBodyAnalysisRequirementsStep };
+});
 
 import { BodyPhotoWizard } from "./BodyPhotoWizard";
 
@@ -142,7 +150,7 @@ it("replaces only the rejected view in an existing photo session", async () => {
   ));
   expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
   expect(api.submitBodyPhotoSession).toHaveBeenCalledWith("session-2", true, false);
-  expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-2");
+  expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-2", true);
 });
 
 it("returns to the result after a successful replacement cannot start analysis", async () => {
@@ -203,7 +211,7 @@ it("resumes an incomplete session at its first missing view and submits the same
   await user.click(screen.getByRole("button", { name: /submit photos/i }));
 
   await waitFor(() => expect(api.submitBodyPhotoSession).toHaveBeenCalledWith("session-2", true, false));
-  expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-2");
+  expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-2", true);
   expect(api.createBodyPhotoSession).not.toHaveBeenCalled();
   expect(api.uploadBodyPhoto.mock.calls.map((call) => call[1])).toEqual(["side", "back"]);
 });
@@ -311,7 +319,7 @@ it("starts analysis immediately after a successful submission", async () => {
   }
 
   await user.click(await screen.findByRole("button", { name: /submit photos/i }));
-  await waitFor(() => expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-1"));
+  await waitFor(() => expect(api.startBodyPhotoAnalysis).toHaveBeenCalledWith("session-1", true));
 });
 
 it("explains that photos were submitted when body analysis cannot start", async () => {

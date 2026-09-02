@@ -5,6 +5,8 @@ import {
   type Equipment,
   type FitnessGoal,
   type HomeTrainingSetup,
+  type MeasurementField,
+  type MeasurementFormValues,
   type Profile,
   type ProfileFormValues,
   type ProfileInput,
@@ -34,6 +36,11 @@ export type ProfileValidationCode =
 
 export type ProfileValidationErrors = Partial<
   Record<keyof ProfileFormValues, ProfileValidationCode>
+>;
+
+export type BodyAnalysisMeasurementValues = MeasurementFormValues;
+export type BodyAnalysisMeasurementErrors = Partial<
+  Record<MeasurementField, ProfileValidationCode>
 >;
 
 function parseBirthDate(value: string): Date | null {
@@ -101,8 +108,11 @@ function validateStepOne(
   return errors;
 }
 
-function validateStepTwo(values: ProfileFormValues): ProfileValidationErrors {
-  const errors: ProfileValidationErrors = {};
+function validateMeasurementFields(
+  values: MeasurementFormValues,
+  requireCircumferences: boolean,
+): BodyAnalysisMeasurementErrors {
+  const errors: BodyAnalysisMeasurementErrors = {};
   const height = values.height_cm.trim();
   if (height === "") {
     errors.height_cm = "required";
@@ -117,6 +127,9 @@ function validateStepTwo(values: ProfileFormValues): ProfileValidationErrors {
   ] as const) {
     const value = values[field].trim();
     if (value === "") {
+      if (requireCircumferences) {
+        errors[field] = "required";
+      }
       continue;
     }
     const match = /^-?\d+(?:\.(\d+))?$/.exec(value);
@@ -142,10 +155,23 @@ function validateStepTwo(values: ProfileFormValues): ProfileValidationErrors {
       errors.current_weight_kg = "weightRange";
     }
   }
+  return errors;
+}
+
+function validateStepTwo(values: ProfileFormValues): ProfileValidationErrors {
+  const errors: ProfileValidationErrors = {
+    ...validateMeasurementFields(values, false),
+  };
   if (values.fitness_goal === "") {
     errors.fitness_goal = "required";
   }
   return errors;
+}
+
+export function validateBodyAnalysisMeasurements(
+  values: BodyAnalysisMeasurementValues,
+): BodyAnalysisMeasurementErrors {
+  return validateMeasurementFields(values, true);
 }
 
 function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {

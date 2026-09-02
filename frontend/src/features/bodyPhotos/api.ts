@@ -61,8 +61,14 @@ export function getBodyPhotoAnalysis(sessionId: string): Promise<BodyAnalysis | 
   return request<BodyAnalysis | null>(`${basePath}/${sessionId}/analysis`);
 }
 
-export function startBodyPhotoAnalysis(sessionId: string): Promise<BodyAnalysis> {
-  return request<BodyAnalysis>(`${basePath}/${sessionId}/analysis`, { method: "POST" });
+export function startBodyPhotoAnalysis(
+  sessionId: string,
+  confirmMeasurementsCurrent = true,
+): Promise<BodyAnalysis> {
+  return request<BodyAnalysis>(`${basePath}/${sessionId}/analysis`, {
+    method: "POST",
+    body: JSON.stringify({ confirm_measurements_current: confirmMeasurementsCurrent }),
+  });
 }
 
 export function retryBodyPhotoAnalysis(sessionId: string): Promise<BodyAnalysis> {

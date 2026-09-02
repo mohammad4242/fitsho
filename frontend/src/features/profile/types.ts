@@ -163,6 +163,15 @@ export type ProfileFormValues = {
   plan_duration_weeks: string;
 };
 
+export type MeasurementField =
+  | "height_cm"
+  | "current_weight_kg"
+  | "shoulder_circumference_cm"
+  | "waist_circumference_cm"
+  | "hip_circumference_cm";
+
+export type MeasurementFormValues = Pick<ProfileFormValues, MeasurementField>;
+
 export type ProfileFormValue =
   | string
   | TrainingCaution[]

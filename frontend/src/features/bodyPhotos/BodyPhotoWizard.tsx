@@ -11,6 +11,7 @@ import {
   submitBodyPhotoSession,
   uploadBodyPhoto,
 } from "./api";
+import { BodyAnalysisRequirementsStep } from "./BodyAnalysisRequirementsStep";
 import {
   browserBodyPhotoProcessor,
   BodyPhotoProcessingError,
@@ -49,6 +50,7 @@ export function BodyPhotoWizard({
   const [operationalConsent, setOperationalConsent] = useState(false);
   const [modelTrainingConsent, setModelTrainingConsent] = useState(false);
   const [state, setState] = useState<WizardState>("capture");
+  const [requirementsConfirmed, setRequirementsConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [termsOpen, setTermsOpen] = useState(false);
@@ -186,7 +188,7 @@ export function BodyPhotoWizard({
           true,
           uploaded.model_training_consent?.granted ?? false,
         );
-        await startBodyPhotoAnalysis(activeSession.id);
+        await startBodyPhotoAnalysis(activeSession.id, true);
         navigate(`/body-progress/${activeSession.id}`);
         return;
       }
@@ -241,7 +243,7 @@ export function BodyPhotoWizard({
       return;
     }
     try {
-      await startBodyPhotoAnalysis(session.id);
+      await startBodyPhotoAnalysis(session.id, true);
       setState("complete");
     } catch {
       setError(t("bodyPhotos.errors.analysisNotStarted"));
@@ -268,6 +270,15 @@ export function BodyPhotoWizard({
         <p role="status">{t("bodyPhotos.queuedBody")}</p>
         <button className="primary-button" type="button" onClick={() => navigate("/body-progress")}>{t("bodyPhotos.viewSessions")}</button>
       </section>
+    );
+  }
+
+  if (!requirementsConfirmed) {
+    return (
+      <BodyAnalysisRequirementsStep
+        onConfirmed={() => setRequirementsConfirmed(true)}
+        onCancel={() => navigate("/dashboard")}
+      />
     );
   }
 
