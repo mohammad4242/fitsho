@@ -3,7 +3,7 @@ export const GHOST_EDITOR_OUTPUT = {
   height: 1800,
 } as const;
 
-export const GHOST_PRIVACY_CUT_RATIO = 0.18;
+export const GHOST_PRIVACY_CUT_RATIO = 0.16;
 export const GHOST_EDITOR_OUTPUT_HEIGHT = Math.round(
   GHOST_EDITOR_OUTPUT.height * (1 - GHOST_PRIVACY_CUT_RATIO),
 );

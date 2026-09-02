@@ -180,8 +180,8 @@ it("captures a fixed privacy crop, mirrors the user camera, and returns a JPEG f
   const canvas = document.querySelector("canvas");
   expect(canvas).not.toBeNull();
   expect(canvas).toHaveProperty("width", 1280);
-  expect(canvas).toHaveProperty("height", 1574);
-  expect(drawImage).toHaveBeenCalledWith(video, 0, 346, 1280, 1574, 0, 0, 1280, 1574);
+  expect(canvas).toHaveProperty("height", 1613);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 307, 1280, 1613, 0, 0, 1280, 1613);
   expect(screen.getByRole("button", { name: /use this camera photo/i })).toBeInTheDocument();
 
   await act(async () => {

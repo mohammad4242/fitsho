@@ -64,14 +64,14 @@ describe("ghost photo transform", () => {
   it("builds a deterministic clean render plan with the privacy crop", () => {
     expect(createGhostPhotoRenderPlan(1600, 2400, GHOST_EDITOR_DEFAULT_TRANSFORM)).toEqual({
       canvasWidth: 1200,
-      canvasHeight: 1476,
+      canvasHeight: 1512,
       sourceWidth: 1600,
       sourceHeight: 2400,
       baseScale: 0.75,
-      privacyCutPixels: 324,
+      privacyCutPixels: 288,
       draw: {
         translateX: 600,
-        translateY: 576,
+        translateY: 612,
         rotationRadians: 0,
         scale: 0.75,
       },
@@ -112,7 +112,7 @@ describe("renderGhostPhoto", () => {
     expect(output.type).toBe("image/jpeg");
     expect(output.name).toMatch(/^body-photo-edited-.*\.jpg$/);
     expect(canvas.width).toBe(1200);
-    expect(canvas.height).toBe(1476);
+    expect(canvas.height).toBe(1512);
     expect(calls).toEqual(["fillRect", "save", "translate", "rotate", "scale", "drawImage", "restore"]);
   });
 });
