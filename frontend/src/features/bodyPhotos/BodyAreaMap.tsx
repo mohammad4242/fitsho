@@ -1,27 +1,37 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { bodyMapHitRegions } from "./bodyMapHitRegions";
 import {
   bodyMapArtwork,
   bodyMapRegions,
   type BodyMapSex,
   type BodyMapView,
-  type BodyMapRegionLayout,
 } from "./bodyMapRegions";
 import { translateExperienceInsight } from "./experienceText";
 import type { BodyAnalysisExperienceRegion } from "./types";
 
 export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAnalysisExperienceRegion[] }) {
   const { t } = useTranslation();
-  const artworkRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<BodyMapView>("front");
-  const [selectedArea, setSelectedArea] = useState<BodyAnalysisExperienceRegion["area"] | null>(
-    regions[0]?.area ?? null,
-  );
+  const [selectedArea, setSelectedArea] = useState<BodyAnalysisExperienceRegion["area"] | null>(null);
   const regionsByArea = useMemo(
     () => new Map(regions.map((region) => [region.area, region] as const)),
     [regions],
+  );
+  const layoutsByArea = useMemo(
+    () => new Map(bodyMapRegions.map((layout) => [layout.area, layout] as const)),
+    [],
+  );
+  const hitRegions = useMemo(
+    () => bodyMapHitRegions(sex, view).filter((hitRegion) => {
+      const layout = layoutsByArea.get(hitRegion.area);
+      return layout !== undefined
+        && layout.availableViews.includes(view)
+        && regionsByArea.has(hitRegion.area);
+    }),
+    [layoutsByArea, regionsByArea, sex, view],
   );
   const selectedRegion = selectedArea === null ? undefined : regionsByArea.get(selectedArea);
   const areaLabel = useCallback((area: string) => t(`bodyPhotos.results.areas.${area}`), [t]);
@@ -31,82 +41,15 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
     ),
     [t],
   );
-
-  useEffect(() => {
-    const svg = artworkRef.current?.querySelector("svg");
-    if (svg === null || svg === undefined) return;
-
-    const viewLabel = t(`bodyAnalysis.map.viewNames.${view}`);
-    const sexLabel = t(`bodyAnalysis.map.sex.${sex}`);
-    svg.setAttribute("role", "group");
-    svg.setAttribute("aria-label", t("bodyAnalysis.map.artworkAlt", { sex: sexLabel, view: viewLabel }));
-    const layoutsById = new Map<string, BodyMapRegionLayout>(
-      bodyMapRegions.map((layout) => [layout.svgRegionId, layout]),
-    );
-    const paths = svg.querySelectorAll<SVGPathElement>("path[data-region-id]");
-
-    paths.forEach((path) => {
-      const layout = layoutsById.get(path.dataset.regionId ?? "");
-      const region = layout === undefined ? undefined : regionsByArea.get(layout.area);
-      const available = layout !== undefined && region !== undefined && layout.availableViews.includes(view);
-      if (!available || layout === undefined || region === undefined) {
-        path.setAttribute("aria-hidden", "true");
-        path.setAttribute("tabindex", "-1");
-        path.removeAttribute("role");
-        path.style.display = "none";
-        return;
-      }
-
-      path.style.display = "";
-      path.removeAttribute("aria-hidden");
-      path.setAttribute("role", "button");
-      path.setAttribute("tabindex", "0");
-      path.setAttribute("aria-label", t("bodyAnalysis.map.svgRegion", {
-        area: areaLabel(region.area),
-        classification: classificationLabel(region.display_classification),
-      }));
-      path.setAttribute("aria-pressed", String(selectedArea === region.area));
-      path.dataset.classification = region.display_classification;
-      path.classList.toggle("is-selected", selectedArea === region.area);
-    });
-
-    function selectPath(path: SVGPathElement) {
-      const layout = layoutsById.get(path.dataset.regionId ?? "");
-      if (layout === undefined || !layout.availableViews.includes(view) || !regionsByArea.has(layout.area)) return;
-      setSelectedArea(layout.area);
-    }
-
-    function handleClick(event: Event) {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const path = target.closest<SVGPathElement>("path[data-region-id]");
-      if (path !== null) selectPath(path);
-    }
-
-    function handleKeyDown(event: Event) {
-      if (!(event instanceof globalThis.KeyboardEvent)) return;
-      const keyboardEvent = event;
-      if (keyboardEvent.key !== "Enter" && keyboardEvent.key !== " ") return;
-      const target = keyboardEvent.target;
-      if (!(target instanceof SVGPathElement)) return;
-      keyboardEvent.preventDefault();
-      selectPath(target);
-    }
-
-    svg.addEventListener("click", handleClick);
-    svg.addEventListener("keydown", handleKeyDown);
-    return () => {
-      svg.removeEventListener("click", handleClick);
-      svg.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [areaLabel, classificationLabel, regions, regionsByArea, selectedArea, sex, t, view]);
+  const viewLabel = t(`bodyAnalysis.map.viewNames.${view}`);
+  const sexLabel = t(`bodyAnalysis.map.sex.${sex}`);
+  const selectedInsight = selectedRegion === undefined
+    ? null
+    : translateExperienceInsight(t, selectedRegion, areaLabel) ?? t("bodyAnalysis.unavailable");
 
   function changeView(nextView: BodyMapView) {
     setView(nextView);
-    const nextRegion = bodyMapRegions.find((region) => (
-      region.availableViews.includes(nextView) && regionsByArea.has(region.area)
-    ));
-    if (nextRegion !== undefined) setSelectedArea(nextRegion.area);
+    setSelectedArea(null);
   }
 
   function handleViewKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
@@ -115,9 +58,18 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
     changeView(view === "front" ? "back" : "front");
   }
 
-  const selectedInsight = selectedRegion === undefined
-    ? null
-    : translateExperienceInsight(t, selectedRegion, areaLabel);
+  function selectArea(area: BodyAnalysisExperienceRegion["area"]) {
+    setSelectedArea(area);
+  }
+
+  function handleHitKeyDown(
+    event: ReactKeyboardEvent<SVGPathElement>,
+    area: BodyAnalysisExperienceRegion["area"],
+  ) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    selectArea(area);
+  }
 
   return (
     <section className="body-area-map" aria-labelledby="body-area-map-title">
@@ -152,49 +104,53 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
         id="body-area-map-artwork"
         role="tabpanel"
       >
-        <div
-          ref={artworkRef}
-          className="body-area-map__svg"
-          dangerouslySetInnerHTML={{ __html: bodyMapArtwork(sex, view) }}
-        />
+        <div className="body-area-map__image-layer">
+          <img
+            className="body-area-map__image"
+            src={bodyMapArtwork(sex, view)}
+            alt={t("bodyAnalysis.map.imageAlt", { sex: sexLabel, view: viewLabel })}
+          />
+          <svg
+            className="body-area-map__hit-map"
+            viewBox="0 0 853 1280"
+            role="group"
+            aria-label={t("bodyAnalysis.map.artworkAlt", { sex: sexLabel, view: viewLabel })}
+          >
+            {hitRegions.map((hitRegion) => {
+              const region = regionsByArea.get(hitRegion.area);
+              if (region === undefined) return null;
+              const selected = selectedArea === hitRegion.area;
+              return (
+                <path
+                  aria-label={t("bodyAnalysis.map.svgRegion", {
+                    area: areaLabel(region.area),
+                    classification: classificationLabel(region.display_classification),
+                  })}
+                  aria-pressed={selected}
+                  className={selected ? "is-selected" : undefined}
+                  data-area={hitRegion.area}
+                  data-classification={region.display_classification}
+                  data-region-id={hitRegion.id}
+                  d={hitRegion.d}
+                  id={hitRegion.id}
+                  key={hitRegion.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => selectArea(hitRegion.area)}
+                  onKeyDown={(event) => handleHitKeyDown(event, hitRegion.area)}
+                />
+              );
+            })}
+          </svg>
+        </div>
       </div>
-      {selectedRegion !== undefined && (
+      {selectedRegion !== undefined && selectedInsight !== null && (
         <div className="body-area-map__selection" aria-live="polite">
-          <div>
-            <p className="eyebrow eyebrow--accent">{t("bodyAnalysis.map.selectedEyebrow")}</p>
-            <h3>{areaLabel(selectedRegion.area)}</h3>
-          </div>
-          <p className="body-area-map__classification" data-classification={selectedRegion.display_classification}>
-            {classificationLabel(selectedRegion.display_classification)}
-          </p>
-          {selectedInsight !== null && <p>{selectedInsight}</p>}
-          <small>{t("bodyAnalysis.map.supportedViews", { views: selectedRegion.supporting_views.map((item) => t(`bodyPhotos.views.${item}`)).join(" · ") })}</small>
+          <p className="eyebrow eyebrow--accent">{t("bodyAnalysis.map.selectedEyebrow")}</p>
+          <h3>{areaLabel(selectedRegion.area)}</h3>
+          <p>{selectedInsight}</p>
         </div>
       )}
-      <ul className="body-area-map__regions" aria-label={t("bodyAnalysis.map.regionListLabel")}>
-        {regions.map((region, index) => {
-          const label = areaLabel(region.area);
-          const classification = classificationLabel(region.display_classification);
-          return (
-            <li key={region.area}>
-              <button
-                aria-label={`${label} — ${classification}`}
-                aria-pressed={selectedArea === region.area}
-                className={`body-area-map__region${selectedArea === region.area ? " is-selected" : ""}`}
-                data-classification={region.display_classification}
-                type="button"
-                onClick={() => setSelectedArea(region.area)}
-              >
-                <span className="body-area-map__region-index" aria-hidden="true">{index + 1}</span>
-                <span>
-                  <strong>{label}</strong>
-                  <small>{classification}</small>
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }

@@ -102,13 +102,13 @@ export type BodyAnalysisExperienceIndicator = {
   status: string;
   message_key: string;
   parameters: Record<string, unknown>;
+  score_percent: number | null;
 };
 
 export type BodyAnalysisExperienceIndicators = {
-  body_proportion: BodyAnalysisExperienceIndicator;
   upper_lower_balance: BodyAnalysisExperienceIndicator;
   visible_symmetry: BodyAnalysisExperienceIndicator;
-  current_development_focus: BodyAnalysisExperienceIndicator;
+  body_shape: BodyAnalysisExperienceIndicator;
 };
 
 export type BodyAnalysisExperienceRegion = {
@@ -121,7 +121,7 @@ export type BodyAnalysisExperienceRegion = {
 
 export type BodyAnalysisExperienceV4 = {
   schema_version: "4.0";
-  presentation_version: "body-analysis-experience-v1";
+  presentation_version: "body-analysis-experience-v2";
   assessment_status: VisualAssessmentStatus;
   input_snapshot: BodyAnalysisInputSnapshot;
   first_impression: BodyAnalysisExperienceMessage;

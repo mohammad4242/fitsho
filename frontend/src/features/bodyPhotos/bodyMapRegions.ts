@@ -1,9 +1,7 @@
-import maleFrontArtwork from "../../assets/body-map/male-front.svg?raw";
-import maleBackArtwork from "../../assets/body-map/male-back.svg?raw";
-import femaleFrontArtwork from "../../assets/body-map/female-front.svg?raw";
-import femaleBackArtwork from "../../assets/body-map/female-back.svg?raw";
-import neutralFrontArtwork from "../../assets/body-map/neutral-front.svg?raw";
-import neutralBackArtwork from "../../assets/body-map/neutral-back.svg?raw";
+import femaleBackArtwork from "../../assets/body1/female-back.jpg";
+import femaleFrontArtwork from "../../assets/body1/female-front.jpg";
+import maleBackArtwork from "../../assets/body1/male-back.jpg";
+import maleFrontArtwork from "../../assets/body1/male-front.jpg";
 
 import type { BodyAnalysisExperienceSex, BodyAnalysisExperienceRegion } from "./types";
 
@@ -77,7 +75,8 @@ export const bodyMapRegions: readonly BodyMapRegionLayout[] = [
 const artworkBySex: Record<BodyMapSex, Record<BodyMapView, string>> = {
   male: { front: maleFrontArtwork, back: maleBackArtwork },
   female: { front: femaleFrontArtwork, back: femaleBackArtwork },
-  neutral: { front: neutralFrontArtwork, back: neutralBackArtwork },
+  // Neutral profiles use the male artwork as the stable existing fallback.
+  neutral: { front: maleFrontArtwork, back: maleBackArtwork },
 };
 
 export function bodyMapSex(sex: BodyAnalysisExperienceSex): BodyMapSex {
