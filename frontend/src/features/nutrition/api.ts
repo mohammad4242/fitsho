@@ -101,6 +101,12 @@ export function getAdminFoodCatalogue(input: FoodCatalogueQuery = {}): Promise<A
   return getCatalogueAtPath<AdminFoodCatalogueResponse>("admin/food-catalogue", input);
 }
 
+export function deleteCatalogueFood(slug: string): Promise<void> {
+  return request(`${nutritionPath}/admin/foods/${slug}`, {
+    method: "DELETE",
+  });
+}
+
 function getCatalogueAtPath<T>(path: string, input: FoodCatalogueQuery): Promise<T> {
   const parameters = new URLSearchParams();
   if (input.query) parameters.set("q", input.query);

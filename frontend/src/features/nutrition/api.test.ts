@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   createNutritionEstimate,
   createWeeklyNutritionPlan,
+  deleteCatalogueFood,
   getCurrentNutritionEstimate,
   getLatestWeeklyNutritionPlan,
   getSafetyDecision,
@@ -91,4 +92,17 @@ it("uploads a catalogue food image as multipart form data", async () => {
   expect(requestInit.body).toBeInstanceOf(FormData);
   expect((requestInit.body as FormData).get("file")).toBe(file);
   expect(new Headers(requestInit.headers).has("Content-Type")).toBe(false);
+});
+
+it("deletes a catalogue food through the admin endpoint", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+  await deleteCatalogueFood("chicken-breast");
+
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/nutrition/admin/foods/chicken-breast",
+    expect.objectContaining({ method: "DELETE", credentials: "include" }),
+  );
+  const requestInit = vi.mocked(fetch).mock.calls[0]?.[1];
+  expect(requestInit?.body).toBeUndefined();
 });

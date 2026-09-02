@@ -35,6 +35,7 @@ export function FoodCataloguePage() {
   const [details, setDetails] = useState<FoodCatalogueItem | null>(null);
   const [priceFood, setPriceFood] = useState<{ item: AdminFoodCatalogueItem; autoResearch?: boolean } | null>(null);
   const [imageFood, setImageFood] = useState<AdminFoodCatalogueItem | null>(null);
+  const [deleteFood, setDeleteFood] = useState<AdminFoodCatalogueItem | null>(null);
   const [addingFood, setAddingFood] = useState(false);
 
   useEffect(() => {
@@ -63,6 +64,15 @@ export function FoodCataloguePage() {
     setAddingFood(false);
     setPriceFood(null);
     setImageFood(null);
+    setReload((value) => value + 1);
+  }
+
+  function deleted() {
+    setDeleteFood(null);
+    if (page > 1 && data?.items.length === 1) {
+      setPage((value) => value - 1);
+      return;
+    }
     setReload((value) => value + 1);
   }
 
@@ -105,6 +115,7 @@ export function FoodCataloguePage() {
               onImage={isAdminFood(food) ? () => setImageFood(food) : undefined}
               onPrice={isAdminFood(food) ? () => setPriceFood({ item: food, autoResearch: false }) : undefined}
               onResearchPrice={isAdminFood(food) ? () => setPriceFood({ item: food, autoResearch: true }) : undefined}
+              onDelete={isAdminFood(food) ? () => setDeleteFood(food) : undefined}
             />
           ))}
         </section>
@@ -123,12 +134,13 @@ export function FoodCataloguePage() {
         />
       )}
       {imageFood && <FoodImageDialog food={imageFood} language={language} onClose={() => setImageFood(null)} onSaved={saved} />}
+      {deleteFood && <DeleteFoodDialog food={deleteFood} language={language} onClose={() => setDeleteFood(null)} onDeleted={deleted} />}
       {addingFood && <AddFoodDialog language={language} onClose={() => setAddingFood(false)} onSaved={saved} />}
     </main>
   );
 }
 
-function FoodCard({ food, language, onDetails, onImage, onPrice, onResearchPrice }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onImage?: () => void; onPrice?: () => void; onResearchPrice?: () => void }) {
+function FoodCard({ food, language, onDetails, onImage, onPrice, onResearchPrice, onDelete }: { food: FoodCatalogueItem; language: "fa" | "en"; onDetails: () => void; onImage?: () => void; onPrice?: () => void; onResearchPrice?: () => void; onDelete?: () => void }) {
   const fa = language === "fa";
   const l = (persian: string, english: string) => fa ? persian : english;
   const portion = defaultPortion(food);
@@ -143,10 +155,45 @@ function FoodCard({ food, language, onDetails, onImage, onPrice, onResearchPrice
         <button type="button" onClick={onDetails}>{l("جزئیات بیشتر", "More details")}</button>
         {onImage && <button type="button" onClick={onImage} aria-label={l(`${food.image_url ? "جایگزینی" : "بارگذاری"} تصویر ${food.name_fa}`, `${food.image_url ? "Replace" : "Upload"} image for ${food.name_en}`)}>{l(food.image_url ? "جایگزینی تصویر" : "بارگذاری تصویر", food.image_url ? "Replace image" : "Upload image")}</button>}
         {onPrice && <button type="button" onClick={onPrice} aria-label={l(`ویرایش قیمت ${food.name_fa}`, `Edit price for ${food.name_en}`)}>{l("ویرایش قیمت", "Edit price")}</button>}
-        {onResearchPrice && <button type="button" onClick={onResearchPrice} aria-label={l(`استعلام قیمت ${food.name_fa}`, `Inquire price for ${food.name_en}`)}>{l("استعلام قیمت", "Inquire price")}</button>}
+        {onResearchPrice && <button className="food-card-research" type="button" onClick={onResearchPrice} aria-label={l(`استعلام قیمت ${food.name_fa}`, `Inquire price for ${food.name_en}`)}>{l("استعلام قیمت", "Inquire price")}</button>}
+        {onDelete && <button className="food-card-delete" type="button" onClick={onDelete} aria-label={l(`حذف ${food.name_fa}`, `Delete ${food.name_en}`)}>{l("حذف", "Delete")}</button>}
       </footer>
     </div>
   </article>;
+}
+
+function DeleteFoodDialog({ food, language, onClose, onDeleted }: { food: AdminFoodCatalogueItem; language: "fa" | "en"; onClose: () => void; onDeleted: () => void }) {
+  const fa = language === "fa";
+  const l = (persian: string, english: string) => fa ? persian : english;
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(false);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (deleting) return;
+    setDeleting(true);
+    setError(false);
+    void api.deleteCatalogueFood(food.slug)
+      .then(onDeleted)
+      .catch(() => setError(true))
+      .finally(() => setDeleting(false));
+  }
+
+  return (
+    <DialogFrame label={l("حذف ماده غذایی؟", "Delete food?")} onClose={onClose}>
+      <p className="eyebrow eyebrow--accent">{l("اقدام مدیر", "Admin action")}</p>
+      <h2>{l("حذف ماده غذایی؟", "Delete food?")}</h2>
+      <p>{l(`«${food.name_fa}» از کاتالوگ فعال حذف شود؟`, `Remove “${food.name_en}” from the active catalogue?`)}</p>
+      <p>{l("این ماده دیگر در کاتالوگ و برنامه‌های غذایی جدید استفاده نمی‌شود، اما اطلاعات و سوابق تاریخی آن حذف نخواهند شد.", "It will no longer be available for new nutrition plans. Historical records will be preserved.")}</p>
+      <form className="food-delete-dialog" onSubmit={submit}>
+        {error && <p className="food-delete-dialog__error" role="alert">{l("حذف ماده غذایی انجام نشد.", "Food deletion failed.")}</p>}
+        <footer className="food-dialog__actions">
+          <button disabled={deleting} type="button" onClick={onClose}>{l("انصراف", "Cancel")}</button>
+          <button className="food-dialog-delete" disabled={deleting} type="submit">{deleting ? l("در حال حذف…", "Deleting…") : l("حذف ماده غذایی", "Delete food")}</button>
+        </footer>
+      </form>
+    </DialogFrame>
+  );
 }
 
 function FoodImage({ food, language }: { food: FoodCatalogueItem; language: "fa" | "en" }) {

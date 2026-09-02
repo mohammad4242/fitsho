@@ -110,6 +110,7 @@ beforeEach(async () => {
   await i18n.changeLanguage("fa");
   vi.mocked(api.getFoodCatalogue).mockResolvedValue(response);
   vi.mocked(api.getAdminFoodCatalogue).mockResolvedValue({ ...response, items: [{ ...response.items[0], price: { status: "not_found" } }] });
+  vi.mocked(api.deleteCatalogueFood).mockResolvedValue(undefined);
   vi.mocked(api.uploadCatalogueFoodImage).mockResolvedValue({ image_url: "/media/food-catalogue/replacement.png" });
 });
 
@@ -180,7 +181,126 @@ it("shows price and price controls only to an admin", async () => {
   expect(screen.getByRole("button", { name: "افزودن ماده غذایی" })).toBeVisible();
   expect(screen.getByRole("button", { name: "ویرایش قیمت سینه مرغ" })).toBeVisible();
   expect(screen.getByRole("button", { name: "جایگزینی تصویر سینه مرغ" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "حذف سینه مرغ" })).toBeVisible();
   expect(screen.getByText("یافت نشد")).toBeVisible();
+});
+
+it("never shows the delete action to a member", async () => {
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  await screen.findByRole("heading", { name: "کاتالوگ مواد غذایی" });
+
+  expect(screen.queryByRole("button", { name: "حذف سینه مرغ" })).not.toBeInTheDocument();
+});
+
+it("opens a confirmation dialog with the food name and preservation warning", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "حذف سینه مرغ" }));
+
+  expect(screen.getByRole("dialog", { name: "حذف ماده غذایی؟" })).toBeVisible();
+  expect(screen.getByText("«سینه مرغ» از کاتالوگ فعال حذف شود؟")).toBeVisible();
+  expect(screen.getByText(/سوابق تاریخی آن حذف نخواهند شد/)).toBeVisible();
+});
+
+it("closes the delete confirmation without calling the API when cancelled", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "حذف سینه مرغ" }));
+  await user.click(screen.getByRole("button", { name: "انصراف" }));
+
+  expect(api.deleteCatalogueFood).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog", { name: "حذف ماده غذایی؟" })).not.toBeInTheDocument();
+});
+
+it("deletes the food after confirmation and refetches the catalogue", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  const adminItem = { ...response.items[0], price: { status: "not_found" as const } };
+  const adminResponse: api.AdminFoodCatalogueResponse = { ...response, items: [adminItem] };
+  vi.mocked(api.getAdminFoodCatalogue)
+    .mockResolvedValueOnce(adminResponse)
+    .mockResolvedValueOnce({ ...adminResponse, items: [], total: 0 });
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "حذف سینه مرغ" }));
+  await user.click(screen.getByRole("button", { name: "حذف ماده غذایی" }));
+
+  await waitFor(() => expect(api.deleteCatalogueFood).toHaveBeenCalledWith("chicken-breast"));
+  await waitFor(() => expect(api.getAdminFoodCatalogue).toHaveBeenCalledTimes(2));
+  expect(screen.queryByRole("heading", { name: "سینه مرغ" })).not.toBeInTheDocument();
+});
+
+it("keeps the dialog and food visible when deletion fails", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  vi.mocked(api.deleteCatalogueFood).mockRejectedValueOnce(new Error("delete failed"));
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "حذف سینه مرغ" }));
+  await user.click(screen.getByRole("button", { name: "حذف ماده غذایی" }));
+
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("حذف ماده غذایی انجام نشد."));
+  expect(screen.getByRole("dialog", { name: "حذف ماده غذایی؟" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "سینه مرغ" })).toBeVisible();
+});
+
+it("disables the confirmation action while deletion is pending", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  let resolveDelete: (() => void) | undefined;
+  vi.mocked(api.deleteCatalogueFood).mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      resolveDelete = resolve;
+    }),
+  );
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "حذف سینه مرغ" }));
+  await user.click(screen.getByRole("button", { name: "حذف ماده غذایی" }));
+  await waitFor(() => expect(api.deleteCatalogueFood).toHaveBeenCalledTimes(1));
+
+  const confirmButton = screen.getByRole("button", { name: "در حال حذف…" });
+  expect(confirmButton).toBeDisabled();
+  expect(api.deleteCatalogueFood).toHaveBeenCalledTimes(1);
+
+  resolveDelete?.();
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "حذف ماده غذایی؟" })).not.toBeInTheDocument());
+});
+
+it("moves back one page when the deleted food was the only item on a later page", async () => {
+  const user = userEvent.setup();
+  auth.isAdmin = true;
+  const adminItem = { ...response.items[0], price: { status: "not_found" as const } };
+  const pageOne: api.AdminFoodCatalogueResponse = { ...response, page: 1, page_size: 1, total: 3, items: [adminItem] };
+  const pageTwo: api.AdminFoodCatalogueResponse = { ...pageOne, page: 2 };
+  const pageThree: api.AdminFoodCatalogueResponse = { ...pageOne, page: 3 };
+  vi.mocked(api.getAdminFoodCatalogue)
+    .mockReset()
+    .mockResolvedValueOnce(pageOne)
+    .mockResolvedValueOnce(pageTwo)
+    .mockResolvedValueOnce(pageThree)
+    .mockResolvedValueOnce({ ...pageTwo, total: 2 });
+  render(<MemoryRouter><FoodCataloguePage /></MemoryRouter>);
+
+  await screen.findByRole("heading", { name: "سینه مرغ" });
+  await user.click(screen.getByRole("button", { name: "بعدی" }));
+  await waitFor(() => expect(api.getAdminFoodCatalogue).toHaveBeenCalledTimes(2));
+  await user.click(screen.getByRole("button", { name: "بعدی" }));
+  await waitFor(() => expect(api.getAdminFoodCatalogue).toHaveBeenCalledTimes(3));
+  await user.click(screen.getByRole("button", { name: "حذف سینه مرغ" }));
+  await user.click(screen.getByRole("button", { name: "حذف ماده غذایی" }));
+
+  await waitFor(() => expect(api.getAdminFoodCatalogue).toHaveBeenLastCalledWith({
+    query: "",
+    category: "",
+    page: 2,
+    pageSize: 24,
+  }));
 });
 
 it("shows a stable fallback for missing and broken food images", async () => {
