@@ -29,7 +29,7 @@
 - Consumes: `BodyAnalysisService.queue`, `BodyAnalysisService.retry`, and `AnalysisExecutionConfig`.
 - Produces: a failing regression proving three failed revisions under `openrouter` do not block a retry under `agent_service:codex` for unchanged photos.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add this test after the existing bounded-retry test:
 
@@ -60,7 +60,7 @@ def test_provider_change_reopens_retry_budget_for_same_stored_photos(db: Session
     assert retried.raw_result == failed.raw_result
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run from `backend/`:
 
@@ -70,7 +70,7 @@ uv run pytest tests/body_analysis/test_execution_and_reviews.py::test_provider_c
 
 Expected: FAIL with `BodyAnalysisStateError: analysis retry limit reached`, because the current query counts the three old-provider revisions together.
 
-- [ ] **Step 3: Commit the red test**
+- [x] **Step 3: Commit the red test**
 
 ```bash
 git add backend/tests/body_analysis/test_execution_and_reviews.py
@@ -88,7 +88,7 @@ git push origin main
 - Consumes: `session_id` and `AnalysisExecutionConfig.provider_name` in `_assert_retry_available`.
 - Produces: the same retry-limit error for repeated attempts under one provider and a new revision when the current provider changes.
 
-- [ ] **Step 1: Implement the minimal query change**
+- [x] **Step 1: Implement the minimal query change**
 
 Keep the latest-photo boundary and existing `retry_limit + 1` arithmetic. Add the durable provider scope to the count:
 
@@ -102,7 +102,7 @@ Keep the latest-photo boundary and existing `retry_limit + 1` arithmetic. Add th
 
 Add a short comment explaining that provider changes create a fresh bounded recovery scope while prior rows remain immutable history. Do not remove the limit or alter photo storage.
 
-- [ ] **Step 2: Run retry and snapshot tests**
+- [x] **Step 2: Run retry and snapshot tests**
 
 ```bash
 uv run pytest \
@@ -113,7 +113,7 @@ uv run pytest \
 
 Expected: all focused body-analysis, API authorization, stored-reference, stale-recovery, same-provider-limit, and photo-snapshot tests pass.
 
-- [ ] **Step 3: Commit the implementation**
+- [x] **Step 3: Commit the implementation**
 
 ```bash
 git add backend/app/body_analysis/service.py
@@ -131,7 +131,7 @@ git push origin main
 - Consumes: the existing `retryBodyPhotoAnalysis(sessionId)` action and queued-state polling.
 - Produces: no frontend code change; evidence that the visible retry action calls the owner endpoint and that the backend still sends stored image references.
 
-- [ ] **Step 1: Run focused frontend checks**
+- [x] **Step 1: Run focused frontend checks**
 
 ```bash
 cd frontend
@@ -142,7 +142,7 @@ npm run build
 
 Expected: retry UI, API method, lint, and production build pass without a frontend diff.
 
-- [ ] **Step 2: Rebuild the live backend without touching database volumes**
+- [x] **Step 2: Rebuild the live backend without touching database volumes**
 
 ```bash
 docker compose up -d --build backend
@@ -151,10 +151,10 @@ docker compose ps
 
 Confirm the backend is running and the existing Agent Service remains healthy.
 
-- [ ] **Step 3: Verify current task routing and the affected session**
+- [x] **Step 3: Verify current task routing and the affected session**
 
 Use read-only PostgreSQL queries and redacted service logs to confirm the task is enabled on `agent_service:codex`, the affected session still has three old Antigravity failures, and no old row was deleted. Do not claim the user's new attempt succeeded until the user clicks Retry and the database plus Agent Service logs show the new Codex revision and stored-image request.
 
-- [ ] **Step 4: Commit only if verification adds a required test change**
+- [x] **Step 4: Commit only if verification adds a required test change**
 
 No frontend commit is expected. If no additional source change is required, finish with the two focused commits above and the live verification evidence.
