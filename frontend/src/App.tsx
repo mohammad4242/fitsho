@@ -21,7 +21,6 @@ const AdminAiSettingsPage = lazy(() => import("./features/admin/AdminAiSettingsP
 const AdminExerciseEditPage = lazy(() => import("./features/admin/AdminExerciseEditPage").then(({ AdminExerciseEditPage }) => ({ default: AdminExerciseEditPage })));
 const AdminExerciseNewPage = lazy(() => import("./features/admin/AdminExerciseNewPage").then(({ AdminExerciseNewPage }) => ({ default: AdminExerciseNewPage })));
 const AdminNutritionMonitoringPage = lazy(() => import("./features/admin/AdminNutritionMonitoringPage").then(({ AdminNutritionMonitoringPage }) => ({ default: AdminNutritionMonitoringPage })));
-const AdminMealCataloguePage = lazy(() => import("./features/admin/AdminMealCataloguePage").then(({ AdminMealCataloguePage }) => ({ default: AdminMealCataloguePage })));
 const AdminMealCatalogueEditorPage = lazy(() => import("./features/admin/AdminMealCatalogueEditorPage").then(({ AdminMealCatalogueEditorPage }) => ({ default: AdminMealCatalogueEditorPage })));
 const AdminNutritionProgramEditorPage = lazy(() => import("./features/admin/AdminNutritionProgramEditorPage").then(({ AdminNutritionProgramEditorPage }) => ({ default: AdminNutritionProgramEditorPage })));
 const AdminNutritionProgramsPage = lazy(() => import("./features/admin/AdminNutritionProgramsPage").then(({ AdminNutritionProgramsPage }) => ({ default: AdminNutritionProgramsPage })));
@@ -84,7 +83,7 @@ export function AppRoutes() {
           <Route path="/admin/exercises/:exerciseId/edit" element={deferred(<AdminExerciseEditPage />)} />
           <Route path="/admin/nutrition-supplements" element={deferred(<AdminSupplementsPage />)} />
           <Route path="/admin/nutrition-monitoring" element={deferred(<AdminNutritionMonitoringPage />)} />
-          <Route path="/admin/nutrition-meals" element={deferred(<AdminMealCataloguePage />)} />
+          <Route path="/admin/nutrition-meals" element={<Navigate to="/meal-catalogue" replace />} />
           <Route path="/admin/nutrition-meals/new" element={deferred(<AdminMealCatalogueEditorPage />)} />
           <Route path="/admin/nutrition-meals/:mealId/edit" element={deferred(<AdminMealCatalogueEditorPage />)} />
           <Route path="/admin/nutrition-programs" element={deferred(<AdminNutritionProgramsPage />)} />
@@ -100,13 +99,17 @@ export function AppRoutes() {
             <Route path="/exercises/:slug" element={deferred(<ExerciseDetailPage />)} />
           </Route>
         </Route>
+        <Route element={<MealCatalogueRoute />}>
+          <Route element={<CompletedAppShellRoute />}>
+            <Route path="/meal-catalogue" element={deferred(<MealCataloguePage />)} />
+          </Route>
+        </Route>
         <Route element={<CompletedProfileRoute />}>
           <Route element={<CompletedAppShellRoute />}>
             <Route path="/dashboard" element={deferred(<DashboardPage />)} />
             <Route path="/more" element={deferred(<MorePage />)} />
             <Route path="/profile" element={deferred(<ProfilePage />)} />
             <Route path="/nutrition-profile" element={<NutritionProfileRoute />} />
-            <Route path="/meal-catalogue" element={deferred(<MealCataloguePage />)} />
             <Route element={<NutritionCapabilityRoute />}>
               <Route path="/nutrition-estimate" element={deferred(<NutritionEstimatePage />)} />
               <Route path="/nutrition-tracking" element={deferred(<NutritionTrackingPage />)} />
@@ -137,6 +140,11 @@ function CompletedAppShellRoute() {
 }
 
 function ExerciseLibraryRoute() {
+  const { user } = useAuth();
+  return user?.is_admin === true ? <Outlet /> : <CompletedProfileRoute />;
+}
+
+function MealCatalogueRoute() {
   const { user } = useAuth();
   return user?.is_admin === true ? <Outlet /> : <CompletedProfileRoute />;
 }

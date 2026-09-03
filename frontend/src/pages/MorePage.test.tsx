@@ -118,7 +118,7 @@ it("shows the meal catalogue for training-only members", () => {
   expect(within(productGroup).queryByRole("link", { name: /کاتالوگ مواد غذایی/ })).not.toBeInTheDocument();
 });
 
-it("shows both member meal catalogue in product and admin management in workspaces for administrators", () => {
+it("shows single meal catalogue in product and no duplicate in workspaces for administrators", () => {
   auth.isAdmin = true;
   profileState.productMode = "both";
 
@@ -131,8 +131,6 @@ it("shows both member meal catalogue in product and admin management in workspac
   );
 
   const workspacesGroup = screen.getByRole("region", { name: "فضاهای تخصصی" });
-  expect(within(workspacesGroup).getByRole("link", { name: /کاتالوگ وعده‌های غذایی/ })).toHaveAttribute(
-    "href",
-    "/admin/nutrition-meals",
-  );
+  expect(within(workspacesGroup).queryByRole("link", { name: /کاتالوگ وعده‌های غذایی/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "/admin/nutrition-meals" })).not.toBeInTheDocument();
 });

@@ -155,6 +155,12 @@ export function uploadAdminMealImage(
   });
 }
 
+export function deleteAdminMeal(mealId: string): Promise<void> {
+  return request<void>(`${adminMealCataloguePath}/${mealId}`, {
+    method: "DELETE",
+  });
+}
+
 export function getAdminFoodCatalogue(
   input: FoodCatalogueQuery = {},
 ): Promise<AdminFoodCatalogueResponse> {

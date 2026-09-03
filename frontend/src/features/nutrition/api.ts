@@ -108,12 +108,36 @@ export type MealCatalogueCategory =
   | "snack"
   | "dinner";
 
+export type MealIngredientRole =
+  | "primary_protein"
+  | "primary_carb"
+  | "primary_fat"
+  | "vegetable_volume"
+  | "flavor_profile"
+  | "micronutrient_source";
+
+export type MealCatalogueIngredient = {
+  food_id: string;
+  food_slug: string;
+  food_name_fa: string;
+  food_name_en: string;
+  reference_grams: number;
+  min_grams: number;
+  max_grams: number;
+  is_required: boolean;
+  functional_role: MealIngredientRole | string | null;
+};
+
 export type MealCatalogueItem = {
   id: string;
+  code: string;
   name_fa: string;
   name_en: string;
   image_url: string | null;
   category: MealCatalogueCategory;
+  verification_status: "draft" | "verified" | "retired" | string;
+  calculation_mode?: "simple" | "prepared_recipe" | string;
+  items: MealCatalogueIngredient[];
 };
 
 export type MealCatalogueResponse = {
@@ -123,8 +147,12 @@ export type MealCatalogueResponse = {
 
 export function getMealCatalogue(
   category?: MealCatalogueCategory,
+  statusFilter?: "published" | "draft" | "all",
 ): Promise<MealCatalogueResponse> {
-  const query = category ? `?category=${encodeURIComponent(category)}` : "";
+  const params = new URLSearchParams();
+  if (category) params.set("category", category);
+  if (statusFilter) params.set("status_filter", statusFilter);
+  const query = params.toString() ? `?${params.toString()}` : "";
   return request<MealCatalogueResponse>(`${nutritionPath}/meal-catalogue${query}`);
 }
 
