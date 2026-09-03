@@ -6,10 +6,9 @@ import {
   ghostPercentage,
   ghostPhotoTransformStyle,
   ghostPrivacyLineGeometry,
-  type GhostPhotoTransform,
 } from "./ghostPhotoEditor";
 import type { Sex } from "../profile/types";
-import type { BodyPhotoSide, BodyPhotoView } from "./types";
+import type { BodyPhotoSide, BodyPhotoView, GhostTransform } from "./types";
 
 export function GhostOverlayGuide({
   sex,
@@ -18,7 +17,7 @@ export function GhostOverlayGuide({
   view,
 }: {
   sex?: Sex | null;
-  transform?: GhostPhotoTransform;
+  transform?: GhostTransform;
   sideProfile?: BodyPhotoSide;
   view: BodyPhotoView;
 }) {
