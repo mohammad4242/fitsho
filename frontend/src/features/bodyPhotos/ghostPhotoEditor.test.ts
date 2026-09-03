@@ -74,12 +74,9 @@ describe("ghost photo transform", () => {
   });
 
   it("moves the privacy line with the Ghost translation", () => {
-    const line = ghostPrivacyLineGeometry("front", {
-      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
-      translateY: 0.12,
-    });
+    const line = ghostPrivacyLineGeometry("front", 1);
 
-    expect(line.anchor.y).toBeCloseTo(0.28, 6);
+    expect(line.anchor.y).toBeCloseTo(0.16, 6);
     expect(line.start.x).toBeCloseTo(0, 6);
     expect(line.end.x).toBeCloseTo(1, 6);
     expect(line.start.y).toBeCloseTo(line.anchor.y, 6);
@@ -87,51 +84,38 @@ describe("ghost photo transform", () => {
   });
 
   it("moves the privacy line horizontally with the Ghost", () => {
-    const line = ghostPrivacyLineGeometry("front", {
-      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
-      translateX: 0.12,
-    });
+    const line = ghostPrivacyLineGeometry("front", 1);
 
-    expect(line.anchor.x).toBeCloseTo(0.62, 6);
-    expect(line.start.x).toBeCloseTo(0.12, 6);
-    expect(line.end.x).toBeCloseTo(1.12, 6);
+    expect(line.anchor.x).toBeCloseTo(0.5, 6);
+    expect(line.start.x).toBeCloseTo(0, 6);
+    expect(line.end.x).toBeCloseTo(1, 6);
   });
 
   it("mirrors the privacy line with a left side Ghost", () => {
-    const line = ghostPrivacyLineGeometry("side", {
-      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
-      scale: 0.8,
-      translateX: 0.12,
-    }, true);
+    const line = ghostPrivacyLineGeometry("side", 0.8, true);
 
     expect(line.anchor.x).toBeCloseTo(0.38, 6);
-    expect(line.start.x).toBeCloseTo(-0.02, 6);
-    expect(line.end.x).toBeCloseTo(0.78, 6);
+    expect(line.start.x).toBeCloseTo(0.1, 6);
+    expect(line.end.x).toBeCloseTo(0.9, 6);
   });
 
-  it("recomputes the privacy anchor when the Ghost is scaled", () => {
-    const line = ghostPrivacyLineGeometry("front", {
-      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
-      scale: 0.8,
-    });
+  it("recomputes the privacy anchor when only the fixed Ghost is scaled", () => {
+    const line = ghostPrivacyLineGeometry("front", 0.8);
 
     expect(line.anchor.y).toBeCloseTo(0.228, 6);
   });
 
-  it("uses rotation while calculating the transformed privacy anchor", () => {
-    const line = ghostPrivacyLineGeometry("front", {
-      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
-      rotation: 90,
-    });
+  it("does not move the fixed Ghost line when the photo is rotated", () => {
+    const line = ghostPrivacyLineGeometry("front", 1);
 
-    expect(line.anchor.x).toBeCloseTo(0.84, 6);
-    expect(line.anchor.y).toBeCloseTo(0.5, 6);
+    expect(line.anchor.x).toBeCloseTo(0.5, 6);
+    expect(line.anchor.y).toBeCloseTo(0.16, 6);
   });
 
   it("maps the visible line through responsive contain geometry to source pixels", () => {
     const sourceY = privacyCropSourceYForView(
       "front",
-      GHOST_EDITOR_DEFAULT_TRANSFORM,
+      1,
       { width: 320, height: 480 },
       { width: 900, height: 1200 },
     );
@@ -142,29 +126,24 @@ describe("ghost photo transform", () => {
   it("keeps the same crop mapping when the preview uses a different size", () => {
     expect(privacyCropSourceYForView(
       "front",
-      GHOST_EDITOR_DEFAULT_TRANSFORM,
+      1,
       { width: 390, height: 585 },
       { width: 1200, height: 1800 },
     )).toBeCloseTo(288, 6);
   });
 
   it("uses the transformed visible line for the encoded crop", () => {
-    const transform = {
-      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
-      scale: 0.8,
-      translateY: 0.12,
-    };
-    const line = ghostPrivacyLineGeometry("front", transform);
+    const line = ghostPrivacyLineGeometry("front", 0.8);
     const sourceY = privacyCropSourceYForView(
       "front",
-      transform,
+      0.8,
       GHOST_EDITOR_OUTPUT,
       { width: 1600, height: 2400 },
     );
 
-    expect(line.anchor.y * GHOST_EDITOR_OUTPUT.height).toBeCloseTo(626.4, 6);
-    expect(sourceY).toBeCloseTo(835.2, 6);
-    expect(Math.round(sourceY)).toBe(835);
+    expect(line.anchor.y * GHOST_EDITOR_OUTPUT.height).toBeCloseTo(410.4, 6);
+    expect(sourceY).toBeCloseTo(547.2, 6);
+    expect(Math.round(sourceY)).toBe(547);
   });
 
   it.each(["front", "side", "back"] as const)(
@@ -174,7 +153,7 @@ describe("ghost photo transform", () => {
 
       expect(privacyCropSourceYForView(
         view,
-        GHOST_EDITOR_DEFAULT_TRANSFORM,
+        1,
         GHOST_EDITOR_OUTPUT,
         { width: 1600, height: 2400 },
       )).toBeCloseTo(expectedSourceY, 6);
@@ -192,14 +171,10 @@ describe("ghost photo transform", () => {
       privacyCutPixels: 288,
       privacyLineDisplayY: 288,
       draw: {
-        sourceX: 0,
-        sourceY: 384,
-        sourceWidth: 1600,
-        sourceHeight: 2016,
-        destinationX: 0,
-        destinationY: 0,
-        destinationWidth: 1200,
-        destinationHeight: 1512,
+        translateX: 600,
+        translateY: 612,
+        rotationRadians: 0,
+        scale: 0.75,
       },
     });
   });
@@ -215,7 +190,7 @@ describe("ghost photo transform", () => {
       sourceCropY: 192,
       privacyCutPixels: 144,
       privacyLineDisplayY: 144,
-      draw: { sourceY: 192, sourceHeight: 2208 },
+      draw: { translateX: 600, translateY: 828, rotationRadians: 0, scale: 0.75 },
     });
   });
 });
@@ -229,7 +204,12 @@ describe("renderGhostPhoto", () => {
       getContext: () => ({
         fillStyle: "",
         fillRect: () => calls.push("fillRect"),
+        save: () => calls.push("save"),
+        translate: (...args: unknown[]) => calls.push(`translate:${args.join(",")}`),
+        rotate: (...args: unknown[]) => calls.push(`rotate:${args.join(",")}`),
+        scale: (...args: unknown[]) => calls.push(`scale:${args.join(",")}`),
         drawImage: (...args: unknown[]) => calls.push(`drawImage:${args.slice(1).join(",")}`),
+        restore: () => calls.push("restore"),
       }),
     };
     const runtime: GhostPhotoCanvasRuntime = {
@@ -250,7 +230,15 @@ describe("renderGhostPhoto", () => {
     expect(output.name).toMatch(/^body-photo-edited-.*\.jpg$/);
     expect(canvas.width).toBe(1200);
     expect(canvas.height).toBe(1512);
-    expect(calls).toEqual(["fillRect", "drawImage:0,384,1600,2016,0,0,1200,1512"]);
+    expect(calls).toEqual([
+      "fillRect",
+      "save",
+      "translate:600,612",
+      "rotate:0",
+      "scale:0.75,0.75",
+      "drawImage:-800,-1200",
+      "restore",
+    ]);
   });
 
   it("renders the higher back crop into a taller clean JPEG", async () => {

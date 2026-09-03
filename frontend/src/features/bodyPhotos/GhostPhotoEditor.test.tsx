@@ -5,6 +5,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import i18n from "../../i18n";
 import {
   GHOST_EDITOR_DEFAULT_TRANSFORM,
+  ghostGuideTransformStyle,
   ghostPhotoTransformStyle,
 } from "./ghostPhotoEditor";
 import {
@@ -18,7 +19,7 @@ const sourceFile = new File(["source"], "side.png", { type: "image/png" });
 const renderPhoto: GhostPhotoRenderer = vi.fn(async () => (
   new File(["clean"], "body-photo-edited.jpg", { type: "image/jpeg" })
 ));
-const staticPhotoPreviewTransform = "translate(-50%, -50%)";
+const staticGhostScale = 1;
 
 function renderEditor(view: BodyPhotoView = "front") {
   return render(
@@ -45,28 +46,32 @@ it.each(["front", "side", "back"] as const)("renders the %s Ghost guide over the
   expect(screen.getByRole("heading", { name: /align your photo/i })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: new RegExp(`loose ${view} body-position silhouette`, "i") })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: /photo being aligned/i }).style.transform).toBe(
-    staticPhotoPreviewTransform,
+    ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM),
   );
 });
 
-it("supports keyboard-accessible zoom, rotation, and reset controls", () => {
+it("supports keyboard-accessible photo zoom, rotation, and reset controls without moving Ghost", () => {
   renderEditor();
+  const image = screen.getByRole("img", { name: /photo being aligned/i });
   const ghost = screen.getByRole("img", { name: /loose front body-position silhouette/i });
 
   fireEvent.click(screen.getByRole("button", { name: /zoom in/i }));
-  expect(ghost).toHaveStyle({
+  expect(image).toHaveStyle({
     transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 1.1 }),
   });
+  expect(ghost).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
 
   fireEvent.click(screen.getByRole("button", { name: /rotate right/i }));
-  expect(ghost).toHaveStyle({
+  expect(image).toHaveStyle({
     transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 1.1, rotation: 1 }),
   });
+  expect(ghost).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
 
   fireEvent.click(screen.getByRole("button", { name: /reset framing/i }));
-  expect(ghost).toHaveStyle({
+  expect(image).toHaveStyle({
     transform: ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM),
   });
+  expect(ghost).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
 });
 
 it("changes only the Ghost size while keeping the photo framing fixed", () => {
@@ -78,7 +83,7 @@ it("changes only the Ghost size while keeping the photo framing fixed", () => {
   fireEvent.click(screen.getByRole("button", { name: /make ghost smaller/i }));
 
   expect(ghost).toHaveStyle({
-    transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 0.95 }),
+    transform: ghostGuideTransformStyle(0.95),
   });
   expect(image.style.transform).toBe(initialImageTransform);
 });
@@ -96,12 +101,13 @@ it("shows the left side Ghost without changing photo framing", () => {
   );
 
   expect(container.querySelector(".ghost-overlay__asset-frame")).toHaveStyle({
-    transform: `scaleX(-1) ${ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM)}`,
+    transform: ghostGuideTransformStyle(1, true),
   });
 });
 
 it("allows a quarter-turn through the rotation slider", () => {
   renderEditor();
+  const image = screen.getByRole("img", { name: /photo being aligned/i });
   const ghost = screen.getByRole("img", { name: /loose front body-position silhouette/i });
   const rotationSlider = screen.getByRole("slider", { name: /rotation/i });
 
@@ -110,14 +116,16 @@ it("allows a quarter-turn through the rotation slider", () => {
 
   fireEvent.change(rotationSlider, { target: { value: "90" } });
 
-  expect(ghost).toHaveStyle({
+  expect(image).toHaveStyle({
     transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, rotation: 90 }),
   });
+  expect(ghost).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
 });
 
-it("moves the image with a pointer drag and reports the soft framing status", () => {
+it("moves the photo with a pointer drag while keeping Ghost fixed", () => {
   renderEditor();
   const stage = screen.getByRole("application", { name: /photo framing editor/i });
+  const image = screen.getByRole("img", { name: /photo being aligned/i });
   const frame = stage.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
   expect(frame).not.toBeNull();
   if (frame === null) throw new Error("Ghost frame was not rendered");
@@ -130,19 +138,21 @@ it("moves the image with a pointer drag and reports the soft framing status", ()
   fireEvent.pointerMove(stage, { pointerId: 1, clientX: 180, clientY: 160 });
   fireEvent.pointerUp(stage, { pointerId: 1, clientX: 180, clientY: 160 });
 
-  expect(frame).toHaveStyle({
+  expect(image).toHaveStyle({
     transform: ghostPhotoTransformStyle({
       ...GHOST_EDITOR_DEFAULT_TRANSFORM,
       translateX: 80 / 300,
       translateY: 60 / 450,
     }),
   });
-  expect(screen.getByRole("status")).toHaveTextContent(/move the Ghost guide closer/i);
+  expect(frame).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
+  expect(screen.getByRole("status")).toHaveTextContent(/move the photo closer/i);
 });
 
-it("uses two active pointers to pinch-zoom and rotate the photo", () => {
-  renderEditor();
+it.each(["front", "side", "back"] as const)("uses two active pointers to pinch-zoom and rotate the %s photo", (view) => {
+  renderEditor(view);
   const stage = screen.getByRole("application", { name: /photo framing editor/i });
+  const image = screen.getByRole("img", { name: /photo being aligned/i });
   const frame = stage.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
   expect(frame).not.toBeNull();
   if (frame === null) throw new Error("Ghost frame was not rendered");
@@ -156,9 +166,10 @@ it("uses two active pointers to pinch-zoom and rotate the photo", () => {
   fireEvent.pointerMove(stage, { pointerId: 1, clientX: 95, clientY: 95 });
   fireEvent.pointerMove(stage, { pointerId: 2, clientX: 205, clientY: 105 });
 
-  expect(frame.style.transform).toContain("translate(0%, 0%)");
-  expect(frame.style.transform).toContain("rotate(5.194deg)");
-  expect(frame.style.transform).toContain("scale(1.105)");
+  expect(image.style.transform).toContain("translate(0%, 0%)");
+  expect(image.style.transform).toContain("rotate(5.194deg)");
+  expect(image.style.transform).toContain("scale(1.105)");
+  expect(frame).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
 });
 
 it("returns the clean rendered file only after confirmation", async () => {
@@ -179,6 +190,7 @@ it("returns the clean rendered file only after confirmation", async () => {
     sourceFile,
     GHOST_EDITOR_DEFAULT_TRANSFORM,
     "front",
+    staticGhostScale,
   ));
   expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ type: "image/jpeg" }));
 });
@@ -200,6 +212,21 @@ it("passes the back view to the clean renderer", async () => {
     sourceFile,
     GHOST_EDITOR_DEFAULT_TRANSFORM,
     "back",
+    staticGhostScale,
+  ));
+});
+
+it("passes the independent Ghost size to the crop renderer", async () => {
+  renderEditor();
+
+  fireEvent.click(screen.getByRole("button", { name: /make ghost smaller/i }));
+  await fireEvent.click(screen.getByRole("button", { name: /use this photo/i }));
+
+  await waitFor(() => expect(renderPhoto).toHaveBeenCalledWith(
+    sourceFile,
+    GHOST_EDITOR_DEFAULT_TRANSFORM,
+    "front",
+    0.95,
   ));
 });
 
