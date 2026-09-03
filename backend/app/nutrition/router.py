@@ -114,6 +114,7 @@ from app.nutrition.meal_catalogue import (
 from app.nutrition.meal_catalogue import (
     create_catalogue_meal as create_meal,
 )
+from app.nutrition.meal_catalogue_view import member_meal_catalogue
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueMeal,
@@ -192,6 +193,7 @@ from app.nutrition.schemas import (
     FreeMealTrackingInput,
     MealFeedbackInput,
     MealLockInput,
+    MemberCatalogueMealPageResponse,
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
@@ -559,6 +561,19 @@ async def research_single_food_price(
         if candidate_price is not None
         else "قیمتی در فروشگاه‌های آنلاین برای این ماده غذایی یافت نشد.",
     )
+
+
+@router.get(
+    "/meal-catalogue",
+    response_model=MemberCatalogueMealPageResponse,
+)
+def read_member_meal_catalogue(
+    db: DatabaseSession,
+    user: CurrentUser,
+    category: MealCategory | None = None,
+) -> MemberCatalogueMealPageResponse:
+    del user
+    return member_meal_catalogue(db, category=category)
 
 
 @router.get(

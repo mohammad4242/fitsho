@@ -644,6 +644,19 @@ class CatalogueMealPageResponse(BaseModel):
     categories: list[MealCategory]
 
 
+class MemberCatalogueMealResponse(BaseModel):
+    id: UUID
+    name_fa: str
+    name_en: str
+    image_url: str | None
+    category: MealCategory
+
+
+class MemberCatalogueMealPageResponse(BaseModel):
+    items: list[MemberCatalogueMealResponse]
+    categories: list[MealCategory]
+
+
 class CatalogueMealImageResponse(BaseModel):
     image_url: str
 

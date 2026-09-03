@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
@@ -489,7 +490,20 @@ def test_admin_switches_modes_and_creates_immutable_recipe_revisions(
 
     assert updated.status_code == 200, updated.json()
     assert updated.json()["prepared_recipe"]["version"] == 2
-    assert db.scalar(select(func.count()).select_from(NutritionPreparedRecipeRevision)) == 2
+    from app.nutrition.models import NutritionPreparedRecipe
+
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(NutritionPreparedRecipeRevision)
+            .join(
+                NutritionPreparedRecipe,
+                NutritionPreparedRecipeRevision.recipe_id == NutritionPreparedRecipe.id,
+            )
+            .where(NutritionPreparedRecipe.meal_id == UUID(body["id"]))
+        )
+        == 2
+    )
 
     simple_payload = {
         key: value
@@ -504,7 +518,18 @@ def test_admin_switches_modes_and_creates_immutable_recipe_revisions(
     assert switched_back.status_code == 200, switched_back.json()
     assert switched_back.json()["calculation_mode"] == "simple"
     assert switched_back.json()["prepared_recipe"] is None
-    assert db.scalar(select(func.count()).select_from(NutritionPreparedRecipeRevision)) == 2
+    assert (
+        db.scalar(
+            select(func.count())
+            .select_from(NutritionPreparedRecipeRevision)
+            .join(
+                NutritionPreparedRecipe,
+                NutritionPreparedRecipeRevision.recipe_id == NutritionPreparedRecipe.id,
+            )
+            .where(NutritionPreparedRecipe.meal_id == UUID(body["id"]))
+        )
+        == 2
+    )
 
 
 def test_recipe_data_gap_is_visible_and_prevents_verification(
@@ -560,3 +585,139 @@ def test_recipe_data_gap_is_visible_and_prevents_verification(
 
     assert rejected.status_code == 422
     assert "data gaps" in rejected.json()["detail"]
+
+
+def _register_member(
+    client: TestClient,
+    db: Session,
+    email: str = "meal-member@example.com",
+    is_admin: bool = False,
+) -> User:
+    response = client.post(
+        "/api/v1/auth/register",
+        headers=ORIGIN,
+        json={"email": email, "password": "long password"},
+    )
+    assert response.status_code == 201
+    user = db.scalar(select(User).where(User.email == email))
+    assert user is not None
+    user.is_admin = is_admin
+    db.commit()
+    return user
+
+
+def test_member_meal_catalogue_requires_authentication(client: TestClient) -> None:
+    response = client.get("/api/v1/nutrition/meal-catalogue")
+    assert response.status_code == 401
+
+
+def test_member_meal_catalogue_normal_member_access(client: TestClient, db: Session) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.meal_catalogue import seed_meal_catalogue
+    from app.profile.enums import ProductMode
+    from app.profile.models import UserProfile
+
+    seed_base_iranian_food_catalogue(db)
+    _add_required_imported_foods(db)
+    seed_meal_catalogue(db)
+
+    user = _register_member(client, db, email="training-only@example.com")
+    db.add(UserProfile(user_id=user.id, product_mode=ProductMode.TRAINING))
+    db.commit()
+
+    response = client.get("/api/v1/nutrition/meal-catalogue")
+    assert response.status_code == 200
+    data = response.json()
+    assert "items" in data
+    assert "categories" in data
+    assert len(data["items"]) > 0
+    assert "breakfast" in data["categories"]
+
+
+def test_member_meal_catalogue_category_filtering(client: TestClient, db: Session) -> None:
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.meal_catalogue import seed_meal_catalogue
+
+    seed_base_iranian_food_catalogue(db)
+    _add_required_imported_foods(db)
+    seed_meal_catalogue(db)
+    _register_member(client, db, email="category-filter@example.com")
+
+    response = client.get("/api/v1/nutrition/meal-catalogue?category=breakfast")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) > 0
+    assert all(item["category"] == "breakfast" for item in data["items"])
+
+
+def test_draft_meal_excluded_from_member_and_safe_response_schema(
+    client: TestClient, db: Session
+) -> None:
+    from app.nutrition.enums import FoodVerificationStatus, MealCategory
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.meal_catalogue import seed_meal_catalogue
+    from app.nutrition.models import NutritionCatalogueMeal
+
+    seed_base_iranian_food_catalogue(db)
+    _add_required_imported_foods(db)
+    seed_meal_catalogue(db)
+
+    draft_meal = NutritionCatalogueMeal(
+        code="DRAFT01",
+        name_fa="وعده پیش‌نویس اختصاصی",
+        name_en="Draft Only Meal",
+        category=MealCategory.BREAKFAST,
+        verification_status=FoodVerificationStatus.DRAFT,
+    )
+    db.add(draft_meal)
+    db.commit()
+
+    _register_member(client, db, email="member-safe@example.com")
+    member_resp = client.get("/api/v1/nutrition/meal-catalogue?category=breakfast")
+    assert member_resp.status_code == 200
+    member_data = member_resp.json()
+    member_item_ids = {item["id"] for item in member_data["items"]}
+
+    # Draft meal must NOT be returned to normal members
+    assert str(draft_meal.id) not in member_item_ids
+
+    # Verify member response item schema contains only safe public fields
+    forbidden_fields = {
+        "code",
+        "verification_status",
+        "calculation_mode",
+        "items",
+        "min_grams",
+        "max_grams",
+        "is_required",
+        "functional_role",
+        "prepared_recipe",
+        "totals",
+        "price",
+        "prices",
+        "estimated_cost_irr_per_100g",
+        "price_reference_ids",
+    }
+    for item in member_data["items"]:
+        assert set(item.keys()) == {"id", "name_fa", "name_en", "image_url", "category"}
+        for field in forbidden_fields:
+            assert field not in item
+
+    # Verify admin can still view and manage the draft meal
+    admin_client = TestClient(client.app, cookies=None)
+    _register_admin(admin_client, db)
+    admin_resp = admin_client.get("/api/v1/nutrition/admin/meals?category=breakfast")
+    assert admin_resp.status_code == 200
+    admin_data = admin_resp.json()
+    admin_item_ids = {item["id"] for item in admin_data["items"]}
+    assert str(draft_meal.id) in admin_item_ids
+
+
+def test_admin_meals_still_denies_normal_member(client: TestClient, db: Session) -> None:
+    _register_member(client, db, email="non-admin@example.com")
+    resp_get = client.get("/api/v1/nutrition/admin/meals")
+    assert resp_get.status_code == 403
+
+    resp_post = client.post("/api/v1/nutrition/admin/meals", headers=ORIGIN, json={})
+    assert resp_post.status_code == 403
+
