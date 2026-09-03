@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from app.nutrition.preference_snapshot import PreferenceSnapshot
 from app.nutrition.program_selection import ProgramCandidate
 
 if TYPE_CHECKING:
@@ -77,6 +78,7 @@ def evaluate_candidate(
     *,
     weekly_budget_irr: Decimal,
     stable_variant_key: tuple[str, ...] = ("base",),
+    preference_snapshot: PreferenceSnapshot | None = None,
 ) -> CandidateEvaluation:
     effective_variant_key = _effective_variant_key(result, stable_variant_key)
     quality = (
@@ -86,6 +88,7 @@ def evaluate_candidate(
             preferred_style=proposal.preferred_style,
             stable_program_code=proposal.program.code,
             stable_variant_key=effective_variant_key,
+            preference_snapshot=preference_snapshot,
         )
         if _is_success(result)
         else None
@@ -152,6 +155,7 @@ def _candidate_quality(
     *,
     weekly_budget_irr: Decimal,
     stable_variant_key: tuple[str, ...],
+    preference_snapshot: PreferenceSnapshot | None = None,
 ) -> CandidateQuality:
     return _quality_for_result(
         result,
@@ -159,6 +163,7 @@ def _candidate_quality(
         preferred_style=proposal.preferred_style,
         stable_program_code=proposal.program.code,
         stable_variant_key=stable_variant_key,
+        preference_snapshot=preference_snapshot,
     )
 
 
@@ -167,6 +172,7 @@ def quality_for_result(
     *,
     weekly_budget_irr: Decimal,
     stable_variant_key: tuple[str, ...] = ("base",),
+    preference_snapshot: PreferenceSnapshot | None = None,
 ) -> CandidateQuality:
     """Score a fully validated result for comparing variants of one program."""
 
@@ -176,6 +182,7 @@ def quality_for_result(
         preferred_style=True,
         stable_program_code="",
         stable_variant_key=stable_variant_key,
+        preference_snapshot=preference_snapshot,
     )
 
 
@@ -186,6 +193,7 @@ def _quality_for_result(
     preferred_style: bool,
     stable_program_code: str,
     stable_variant_key: tuple[str, ...],
+    preference_snapshot: PreferenceSnapshot | None,
 ) -> CandidateQuality:
     comparisons = result.nutrient_comparisons or {}
     core_deviations = tuple(
@@ -195,11 +203,11 @@ def _quality_for_result(
         core_nutrition_max_deviation=max(core_deviations, default=ONE),
         core_nutrition_total_deviation=sum(core_deviations, ZERO),
         micronutrient_gap_penalty=_micronutrient_gap_penalty(comparisons),
-        diet_quality_penalty=ZERO,
+        diet_quality_penalty=_diet_quality_penalty(comparisons),
         sports_nutrition_distribution_penalty=ZERO,
         budget_utilization_penalty=_budget_utilization(result.weekly_cost_irr, weekly_budget_irr),
-        preference_and_feedback_penalty=ZERO,
-        repetition_penalty=ZERO,
+        preference_and_feedback_penalty=_preference_penalty(result, preference_snapshot),
+        repetition_penalty=_repetition_penalty(result),
         warning_burden=len(result.warning_codes),
         repair_burden=(
             len(result.repair_actions)
@@ -252,11 +260,67 @@ def _micronutrient_gap_penalty(comparisons: dict[str, NutrientComparison]) -> De
             continue
         gap = max(comparison.preferred - comparison.planned, ZERO) / comparison.preferred
         if comparison.data_confidence != "high":
-            gap += Decimal("0.10")
+            gap += Decimal("0.25")
         gaps.append(gap)
     if not gaps:
         return ZERO
     return max(gaps) + min(sum(gaps, ZERO), ONE)
+
+
+def _diet_quality_penalty(comparisons: dict[str, NutrientComparison]) -> Decimal:
+    penalty = ZERO
+    for code, comparison in comparisons.items():
+        if comparison.preferred is None or comparison.preferred <= ZERO:
+            continue
+        if code == "fibre":
+            penalty += max(comparison.preferred - comparison.planned, ZERO) / comparison.preferred
+        elif code in {"free_sugar", "added_sugar", "saturated_fat", "trans_fat", "sodium"}:
+            penalty += max(comparison.planned - comparison.preferred, ZERO) / comparison.preferred
+    return penalty
+
+
+def _preference_penalty(
+    result: PlannerResult,
+    snapshot: PreferenceSnapshot | None,
+) -> Decimal:
+    if snapshot is None:
+        return ZERO
+    counts: dict[str, int] = {}
+    for day in result.days:
+        for meal in day.meals:
+            if meal.template_id is not None:
+                counts[meal.template_id] = counts.get(meal.template_id, 0) + 1
+    penalty = ZERO
+    for meal_id, count in counts.items():
+        if meal_id in snapshot.disliked_meal_ids:
+            penalty += Decimal("2") * count
+        if meal_id in snapshot.liked_meal_ids:
+            penalty -= Decimal("0.5") * count
+        if meal_id in snapshot.prefer_more_often_meal_ids:
+            penalty -= Decimal("1") * count
+    if snapshot.data_sufficient:
+        adherence = dict(snapshot.historical_meal_adherence)
+        penalty += sum(
+            (
+                (ONE - adherence[meal_id]) * Decimal("0.5") * count
+                for meal_id, count in counts.items()
+                if meal_id in adherence
+            ),
+            ZERO,
+        )
+    return penalty
+
+
+def _repetition_penalty(result: PlannerResult) -> Decimal:
+    counts: dict[str, int] = {}
+    for day in result.days:
+        for meal in day.meals:
+            if meal.template_id is not None:
+                counts[meal.template_id] = counts.get(meal.template_id, 0) + 1
+    return sum(
+        (Decimal(count - 1) ** 2 for count in counts.values() if count > 1),
+        ZERO,
+    )
 
 
 def _budget_utilization(cost: Decimal, budget: Decimal) -> Decimal:

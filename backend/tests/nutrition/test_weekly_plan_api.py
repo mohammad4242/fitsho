@@ -477,6 +477,9 @@ def test_generation_evaluates_every_program_and_persists_only_the_best_result(
     assert trace["first_valid_program_code"] == "TEST-A"
     assert trace["selected_program_code"] == "TEST-B"
     assert trace["selected_differs_from_first_valid"] is True
+    assert len(trace["candidates"]) == 3
+    assert "preference_and_feedback_penalty" in trace["selected_quality"]
+    assert "repetition_penalty" in trace["selected_quality"]
 
 
 def test_generation_aggregates_all_candidate_failures_without_persisting_a_plan(

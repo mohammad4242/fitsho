@@ -75,8 +75,10 @@ from app.nutrition.planner_policy import (
     DEFAULT_POLICY,
     PLANNER_POLICY_VERSION,
     PLANNER_VERSION,
+    PREFERENCE_QUALITY_POLICY_VERSION,
     TEMPLATE_SUBSTITUTION_POLICY_VERSION,
 )
+from app.nutrition.preference_snapshot import load_preference_snapshot
 from app.nutrition.prepared_recipe import (
     PreparedRecipeDefinition,
     PreparedRecipeIngredient,
@@ -251,19 +253,12 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     food_items = db.scalars(
         select(NutritionFoodItem).where(NutritionFoodItem.user_id == user_id)
     ).all()
+    preference_snapshot = load_preference_snapshot(db, user_id, food_items)
     exclusions = tuple(
         item.normalized_name for item in food_items if item.kind in _HARD_EXCLUSION_KINDS
     )
-    liked_food_ids = tuple(
-        str(item.catalogue_food_id)
-        for item in food_items
-        if item.kind is FoodItemKind.FAVOURITE and item.catalogue_food_id is not None
-    )
-    disliked_food_ids = tuple(
-        str(item.catalogue_food_id)
-        for item in food_items
-        if item.kind is FoodItemKind.DISLIKED and item.catalogue_food_id is not None
-    )
+    liked_food_ids = preference_snapshot.liked_food_ids
+    disliked_food_ids = preference_snapshot.disliked_food_ids
     foods, price_snapshot, food_manifest = _planner_foods(db)
     meal_templates, meal_manifest = _planner_meal_templates(db)
     programs = list_programs(db)
@@ -313,6 +308,16 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "hard_exclusions": list(exclusions),
         "liked_food_ids": list(liked_food_ids),
         "disliked_food_ids": list(disliked_food_ids),
+        "liked_meal_ids": list(preference_snapshot.liked_meal_ids),
+        "disliked_meal_ids": list(preference_snapshot.disliked_meal_ids),
+        "prefer_more_often_meal_ids": list(preference_snapshot.prefer_more_often_meal_ids),
+        "excluded_meal_ids": list(preference_snapshot.excluded_meal_ids),
+        "historical_meal_adherence": [
+            [meal_id, str(score)]
+            for meal_id, score in preference_snapshot.historical_meal_adherence
+        ],
+        "preference_data_sufficient": preference_snapshot.data_sufficient,
+        "preference_quality_policy_version": PREFERENCE_QUALITY_POLICY_VERSION,
         "dietary_pattern": profile.dietary_pattern.value,
         "maximum_meal_repetition_per_week": profile.maximum_meal_repetition_per_week,
         "meal_distribution_policy_version": "meal-distribution-v1",
@@ -338,6 +343,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         disliked_food_ids=disliked_food_ids,
         dietary_pattern=profile.dietary_pattern.value,
         maximum_meal_repetition_per_week=profile.maximum_meal_repetition_per_week,
+        preference_snapshot=preference_snapshot,
     )
     optimization_cache: dict[tuple[object, ...], PlannedFood] = {}
     evaluations: list[CandidateEvaluation] = []
@@ -364,6 +370,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
                     proposal,
                     candidate_result,
                     weekly_budget_irr=Decimal(weekly_budget),
+                    preference_snapshot=preference_snapshot,
                 )
             )
         selection = select_best_candidate(tuple(evaluations))

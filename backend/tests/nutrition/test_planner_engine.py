@@ -72,6 +72,83 @@ def _input(**changes: object):
     return PlannerInput(**values)  # type: ignore[arg-type]
 
 
+def test_do_not_suggest_again_excludes_a_meal_template() -> None:
+    from app.nutrition.planner_engine import (
+        PlannerMealIngredient,
+        PlannerMealTemplate,
+        _eligible_templates,
+    )
+    from app.nutrition.preference_snapshot import PreferenceSnapshot
+
+    excluded_id = str(UUID(int=901))
+    allowed_id = str(UUID(int=902))
+    templates = tuple(
+        PlannerMealTemplate(
+            meal_id=meal_id,
+            name_fa=meal_id,
+            name_en=meal_id,
+            category="main",
+            items=(
+                PlannerMealIngredient(
+                    food_id="food",
+                    reference_grams=Decimal("100"),
+                    min_grams=Decimal("50"),
+                    max_grams=Decimal("200"),
+                    is_required=True,
+                    functional_role="main_protein",
+                ),
+            ),
+        )
+        for meal_id in (excluded_id, allowed_id)
+    )
+    inputs = _input(
+        preference_snapshot=PreferenceSnapshot(excluded_meal_ids=(excluded_id,))
+    )
+
+    eligible = _eligible_templates(
+        inputs,
+        (_food("food", ("main_protein",), kcal="200"),),
+        templates,
+    )
+
+    assert [candidate.template.meal_id for candidate in eligible] == [allowed_id]
+
+
+def test_preference_exclusion_reports_infeasibility_when_it_removes_all_meals() -> None:
+    from app.nutrition.planner_engine import PlannerMealIngredient, PlannerMealTemplate, plan_week
+    from app.nutrition.preference_snapshot import PreferenceSnapshot
+
+    excluded_id = str(UUID(int=903))
+    template = PlannerMealTemplate(
+        meal_id=excluded_id,
+        name_fa="excluded",
+        name_en="excluded",
+        category="main",
+        items=(
+            PlannerMealIngredient(
+                food_id="food",
+                reference_grams=Decimal("100"),
+                min_grams=Decimal("50"),
+                max_grams=Decimal("200"),
+                is_required=True,
+                functional_role="main_protein",
+            ),
+        ),
+    )
+
+    result = plan_week(
+        _input(
+            main_meals_per_day=2,
+            snacks_per_day=0,
+            preference_snapshot=PreferenceSnapshot(excluded_meal_ids=(excluded_id,)),
+        ),
+        (_food("food", ("main_protein",), kcal="200"),),
+        (template,),
+    )
+
+    assert result.reason_codes == ("PREFERENCE_EXCLUSION_NO_FEASIBLE_PLAN",)
+
+
 def test_prepared_recipe_optimizer_changes_raw_inputs_but_returns_cooked_dish() -> None:
     from app.nutrition.planner_engine import PlannerPreparedRecipe, optimize_prepared_recipe
     from app.nutrition.prepared_recipe import (

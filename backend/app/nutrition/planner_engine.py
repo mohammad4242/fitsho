@@ -14,6 +14,7 @@ from app.nutrition.portion_solver import (
     PortionVariable,
     solve_portions,
 )
+from app.nutrition.preference_snapshot import PreferenceSnapshot
 from app.nutrition.prepared_recipe import (
     PreparedRecipeCalculation,
     PreparedRecipeDefinition,
@@ -125,6 +126,7 @@ class PlannerInput:
     dietary_pattern: str
     maximum_meal_repetition_per_week: int
     template_schedule: tuple[tuple[tuple[str, str | None, str], ...], ...] | None = None
+    preference_snapshot: PreferenceSnapshot | None = None
 
 
 @dataclass(frozen=True)
@@ -256,6 +258,13 @@ def plan_week(
         policy,
     )
     if not main_templates or (inputs.snacks_per_day and not snack_templates):
+        if inputs.preference_snapshot is not None and inputs.preference_snapshot.excluded_meal_ids:
+            excluded = set(inputs.preference_snapshot.excluded_meal_ids)
+            if any(template.meal_id in excluded for template in meal_templates):
+                return _failure(
+                    GenerationOutcome.INFEASIBLE,
+                    "PREFERENCE_EXCLUSION_NO_FEASIBLE_PLAN",
+                )
         return _failure(GenerationOutcome.LIVE_PRICE_UNAVAILABLE, "INSUFFICIENT_PRICE_COVERAGE")
 
     weekly_budget_cap = _weekly_budget_cap(inputs, policy)
@@ -282,12 +291,22 @@ def plan_week(
                 optimization_cache=optimization_cache,
             )
     except NoCompatibleTemplateSubstituteError as error:
+        if inputs.preference_snapshot is not None and inputs.preference_snapshot.excluded_meal_ids:
+            if error.requested_template_id in set(inputs.preference_snapshot.excluded_meal_ids):
+                return _failure(
+                    GenerationOutcome.INFEASIBLE,
+                    "PREFERENCE_EXCLUSION_NO_FEASIBLE_PLAN",
+                )
         return PlannerResult(
             outcome=GenerationOutcome.INFEASIBLE,
             reason_codes=("NO_COMPATIBLE_TEMPLATE_SUBSTITUTE",),
             substitution_diagnostics=error.diagnostics,
         )
-    except ScheduledTemplateUnavailableError:
+    except ScheduledTemplateUnavailableError as error:
+        if inputs.preference_snapshot is not None and error.meal_id in set(
+            inputs.preference_snapshot.excluded_meal_ids
+        ):
+            return _failure(GenerationOutcome.INFEASIBLE, "PREFERENCE_EXCLUSION_NO_FEASIBLE_PLAN")
         return _failure(GenerationOutcome.INFEASIBLE, "SCHEDULED_TEMPLATE_UNAVAILABLE")
 
     foods_by_id = {food.food_id: food for food in eligible}
@@ -316,6 +335,7 @@ def plan_week(
                 variant.result,
                 weekly_budget_irr=Decimal(inputs.weekly_budget_irr),
                 stable_variant_key=variant.stable_variant_key,
+                preference_snapshot=inputs.preference_snapshot,
             ).sort_key(),
         ).result
     return min(evaluated, key=_failure_variant_key).result
@@ -563,6 +583,11 @@ def _eligible_templates(
     eligible: list[EligibleMealTemplate] = []
     for template in sorted(templates, key=lambda item: (item.category, item.meal_id)):
         if template.verification_status != "verified":
+            continue
+        if (
+            inputs.preference_snapshot is not None
+            and template.meal_id in inputs.preference_snapshot.excluded_meal_ids
+        ):
             continue
         items: list[tuple[PlannerMealIngredient, PlannerFood]] = []
         missing_required = False
