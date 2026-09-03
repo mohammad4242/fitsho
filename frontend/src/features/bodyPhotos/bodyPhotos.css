@@ -688,15 +688,31 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 .body-area-map--interactive .body-area-map__figure::after { display: none; }
 .body-area-map--interactive .body-area-map__image-layer { position: relative; width: 100%; overflow: hidden; aspect-ratio: 853 / 1280; border-radius: var(--fitsho-radius-lg); background: var(--fitsho-canvas); isolation: isolate; }
 .body-area-map--interactive .body-area-map__image,
+.body-area-map--interactive .body-area-map__visual-mask,
 .body-area-map--interactive .body-area-map__hit-map { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .body-area-map--interactive .body-area-map__image { z-index: 0; object-fit: contain; }
-.body-area-map--interactive .body-area-map__hit-map { z-index: 1; overflow: visible; }
+.body-area-map--interactive .body-area-map__visual-mask {
+  z-index: 1;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: .78;
+  filter: sepia(1) saturate(4.6) hue-rotate(126deg) brightness(1.04);
+  mix-blend-mode: color;
+  -webkit-mask-position: 0 0;
+  mask-position: 0 0;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  transition: opacity .18s ease;
+}
+.body-area-map--interactive .body-area-map__hit-map { z-index: 2; overflow: visible; pointer-events: none; }
 .body-area-map--interactive .body-area-map__figure .body-area-map__hit-map { width: 100%; height: 100%; }
-.body-area-map--interactive .body-area-map__hit-map path { cursor: pointer; fill: transparent; stroke: transparent; stroke-width: 8; pointer-events: all; vector-effect: non-scaling-stroke; }
-.body-area-map--interactive .body-area-map__hit-map path:hover,
-.body-area-map--interactive .body-area-map__hit-map path:focus-visible { fill: color-mix(in srgb, var(--fitsho-aqua) 16%, transparent); stroke: var(--fitsho-aqua); }
-.body-area-map--interactive .body-area-map__hit-map path:focus { outline: none; }
-.body-area-map--interactive .body-area-map__hit-map path.is-selected { fill: color-mix(in srgb, var(--fitsho-aqua) 38%, transparent); stroke: var(--fitsho-aqua); stroke-width: 14; filter: drop-shadow(0 0 .55rem color-mix(in srgb, var(--fitsho-aqua) 90%, transparent)); transform-box: fill-box; transform-origin: center; transform: scale(1.025); }
+.body-area-map--interactive .body-area-map__hit-region { cursor: pointer; fill: transparent; stroke: transparent; stroke-width: 8; pointer-events: all; vector-effect: non-scaling-stroke; }
+.body-area-map--interactive .body-area-map__hit-region:hover,
+.body-area-map--interactive .body-area-map__hit-region:focus-visible,
+.body-area-map--interactive .body-area-map__hit-region[aria-pressed="true"] { fill: transparent; stroke: transparent; }
+.body-area-map--interactive .body-area-map__hit-region:focus { outline: none; }
 .body-area-map--interactive .body-area-map__selection { display: grid; gap: .3rem; padding: .8rem .9rem; border-inline-start: .25rem solid var(--fitsho-aqua); border-radius: var(--fitsho-radius-md); background: color-mix(in srgb, var(--fitsho-aqua) 7%, var(--fitsho-surface)); }
 .body-area-map--interactive .body-area-map__selection h3,
 .body-area-map--interactive .body-area-map__selection p { margin: 0; }
@@ -809,6 +825,7 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .body-area-map--interactive .body-area-map__visual-mask { transition: none; }
   .body-before-after__photo--after,
   .body-before-after__divider { transition: none; }
 }

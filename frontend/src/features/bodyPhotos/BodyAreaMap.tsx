@@ -9,8 +9,11 @@ import {
   type BodyMapSex,
   type BodyMapView,
 } from "./bodyMapRegions";
+import { bodyMapVisualMask } from "./bodyMapVisualMasks";
 import { translateExperienceInsight } from "./experienceText";
 import type { BodyAnalysisExperienceRegion } from "./types";
+
+const BODY_MAP_VIEWBOX = "0 0 853 1280";
 
 export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAnalysisExperienceRegion[] }) {
   const { t } = useTranslation();
@@ -34,6 +37,9 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
     [layoutsByArea, regionsByArea, sex, view],
   );
   const selectedRegion = selectedArea === null ? undefined : regionsByArea.get(selectedArea);
+  const selectedVisualMask = selectedArea === null
+    ? undefined
+    : bodyMapVisualMask(sex, view, selectedArea);
   const areaLabel = useCallback((area: string) => t(`bodyPhotos.results.areas.${area}`), [t]);
   const classificationLabel = useCallback(
     (classification: BodyAnalysisExperienceRegion["display_classification"]) => (
@@ -110,9 +116,24 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
             src={bodyMapArtwork(sex, view)}
             alt={t("bodyAnalysis.map.imageAlt", { sex: sexLabel, view: viewLabel })}
           />
+          {selectedVisualMask !== undefined && (
+            <img
+              aria-hidden="true"
+              className="body-area-map__visual-mask"
+              data-area={selectedArea ?? undefined}
+              data-mask-file={selectedVisualMask.file}
+              src={bodyMapArtwork(sex, view)}
+              alt=""
+              style={{
+                maskImage: `url(${selectedVisualMask.url})`,
+                WebkitMaskImage: `url(${selectedVisualMask.url})`,
+              }}
+            />
+          )}
           <svg
             className="body-area-map__hit-map"
-            viewBox="0 0 853 1280"
+            preserveAspectRatio="none"
+            viewBox={BODY_MAP_VIEWBOX}
             role="group"
             aria-label={t("bodyAnalysis.map.artworkAlt", { sex: sexLabel, view: viewLabel })}
           >
@@ -127,7 +148,7 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
                     classification: classificationLabel(region.display_classification),
                   })}
                   aria-pressed={selected}
-                  className={selected ? "is-selected" : undefined}
+                  className="body-area-map__hit-region"
                   data-area={hitRegion.area}
                   data-classification={region.display_classification}
                   data-region-id={hitRegion.id}
