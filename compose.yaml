@@ -82,6 +82,7 @@ services:
     ports:
       - "8001:8000"
     volumes:
+      - ./backend/app:/app/app
       - ./backend/var/media:/var/lib/fitsho/media
       - ./backend/var/private/body-photos:/var/lib/fitsho/private/body-photos
       - ./backend/var/private/food-photos:/var/lib/fitsho/private/food-photos

@@ -221,18 +221,21 @@ export function MealCataloguePage() {
                         />
                         <div>
                           <p className="eyebrow">
-                            {meal.code} · {t(`mealCatalogue.categories.${meal.category}`)}
+                            {meal.code ? `${meal.code} · ` : ""}
+                            {meal.category ? t(`mealCatalogue.categories.${meal.category}`) : ""}
                           </p>
                           <h2>{name}</h2>
                         </div>
                       </div>
-                      <span className={`admin-meal-status admin-meal-status--${meal.verification_status}`}>
-                        {t(`mealCatalogue.status.${meal.verification_status}`)}
-                      </span>
+                      {meal.verification_status && (
+                        <span className={`admin-meal-status admin-meal-status--${meal.verification_status}`}>
+                          {t(`mealCatalogue.status.${meal.verification_status}`)}
+                        </span>
+                      )}
                     </summary>
                     <div className="admin-meal-card__details">
                       <ul className="admin-meal-ingredients">
-                        {meal.items.map((item) => (
+                        {(meal.items ?? []).map((item) => (
                           <li key={item.food_id}>
                             <div>
                               <strong>{english ? item.food_name_en : item.food_name_fa}</strong>
