@@ -637,7 +637,43 @@ def test_macro_floor_failure_is_target_infeasible_after_full_validation() -> Non
     )
 
     assert result.outcome is GenerationOutcome.TARGET_INFEASIBLE
-    assert "MACRONUTRIENT_FLOOR_NOT_MET" in result.reason_codes
+    assert "PROTEIN_TARGET_UNREACHABLE_WITH_PORTION_BOUNDS" in result.reason_codes
+
+
+def test_portion_solver_repairs_protein_floor_after_scale_then_clamp() -> None:
+    from app.nutrition.planner_engine import GenerationOutcome, plan_week
+
+    result = plan_week(
+        _input(
+            daily_targets={
+                "goal_calories": Decimal("2000"),
+                "protein": Decimal("160"),
+                "carbohydrate": Decimal("220"),
+                "total_fat": Decimal("60"),
+                "fibre": Decimal("25"),
+            },
+            micronutrient_targets={},
+            micronutrient_upper_limits={},
+            daily_minimums={
+                "protein": Decimal("160"),
+                "carbohydrate": Decimal("80"),
+                "total_fat": Decimal("10"),
+            },
+            daily_maximums={"carbohydrate": Decimal("500"), "total_fat": Decimal("200")},
+        ),
+        _catalogue(),
+        _meal_templates(),
+    )
+
+    assert result.outcome is GenerationOutcome.SUCCESS
+    assert result.portion_adjustment_actions
+    assert result.nutrient_comparisons["protein"].planned >= Decimal("160")
+    assert all(
+        food.min_grams <= food.grams <= food.max_grams
+        for day in result.days
+        for meal in day.meals
+        for food in meal.foods
+    )
 
 
 def test_missing_supported_nutrient_data_is_reported_not_treated_as_zero() -> None:

@@ -771,6 +771,19 @@ def _persist_successful_plan(
         repair_snapshot=[
             *(
                 {
+                    "action_type": "portion_adjustment",
+                    "day_index": action.day_index,
+                    "role": action.role,
+                    "slot_index": action.slot_index,
+                    "food_id": action.food_id,
+                    "before_grams": str(action.before_grams),
+                    "after_grams": str(action.after_grams),
+                    "reason_code": action.reason_code,
+                }
+                for action in result.portion_adjustment_actions
+            ),
+            *(
+                {
                     "nutrient_code": action.nutrient_code,
                     "food_slug": action.food_slug,
                     "grams_added": str(action.grams_added),

@@ -3,8 +3,8 @@ from decimal import Decimal
 
 PLANNER_POLICY_VERSION = "weekly-planner-v1"
 MEAL_DISTRIBUTION_POLICY_VERSION = "meal-distribution-v1"
-PORTION_POLICY_VERSION = "portion-bounds-v1"
-PLANNER_VERSION = "deterministic-candidate-search-template-substitution-budget-v1"
+PORTION_POLICY_VERSION = "bounded-portion-solver-v1"
+PLANNER_VERSION = "nutrition-planner-portion-solver-v2"
 CANDIDATE_SELECTION_POLICY_VERSION = "best-admitted-all-active-programs-v1"
 TEMPLATE_SUBSTITUTION_POLICY_VERSION = "safe-template-substitution-beam-v1"
 BUDGET_OPTIMIZER_POLICY_VERSION = "deterministic-budget-optimizer-v1"
@@ -38,6 +38,9 @@ class PlannerPolicy:
     maximum_budget_repair_iterations: int = 12
     maximum_budget_feasibility_variants: int = 24
     maximum_budget_alternatives_per_slot: int = 6
+    portion_adjustment_increment_g: Decimal = Decimal("5")
+    maximum_portion_solver_iterations: int = 40
+    maximum_combined_repair_passes: int = 2
 
 
 DEFAULT_POLICY = PlannerPolicy()

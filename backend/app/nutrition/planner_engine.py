@@ -9,6 +9,11 @@ from app.nutrition.budget_optimizer import BudgetRepairAction, optimize_weekly_b
 from app.nutrition.candidate_selection import quality_for_result
 from app.nutrition.exceptions import ScheduledTemplateUnavailableError
 from app.nutrition.planner_policy import DEFAULT_POLICY, PlannerPolicy
+from app.nutrition.portion_solver import (
+    PortionAdjustmentAction,
+    PortionVariable,
+    solve_portions,
+)
 from app.nutrition.prepared_recipe import (
     PreparedRecipeCalculation,
     PreparedRecipeDefinition,
@@ -194,6 +199,7 @@ class PlannerResult:
     substitution_diagnostics: tuple[dict[str, str], ...] = ()
     budget_repair_actions: tuple[BudgetRepairAction, ...] = ()
     budget_diagnostics: dict[str, str] | None = None
+    portion_adjustment_actions: tuple[PortionAdjustmentAction, ...] = ()
 
     def __post_init__(self) -> None:
         if self.nutrient_comparisons is None:
@@ -326,28 +332,6 @@ def _evaluate_built_days(
     optimization_cache: dict[tuple[object, ...], PlannedFood],
 ) -> PlannerResult:
     days, repairs = _repair_micronutrients(days, inputs, foods_by_id, policy)
-    weekly_totals = _sum_nutrients(day.nutrients for day in days)
-    daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
-    data_completeness = _nutrient_data_completeness(days, inputs)
-    comparisons = _comparisons(inputs, daily_average, data_completeness, policy)
-    if _upper_limit_exceeded(inputs, daily_average):
-        return PlannerResult(
-            outcome=GenerationOutcome.INFEASIBLE,
-            reason_codes=("NUTRIENT_UPPER_LIMIT_EXCEEDED",),
-            nutrient_comparisons=comparisons,
-            repair_actions=repairs,
-            substitution_actions=substitution_actions,
-        )
-
-    validation = _validate_nutritional_feasibility(inputs, daily_average, policy)
-    if validation:
-        return PlannerResult(
-            outcome=GenerationOutcome.TARGET_INFEASIBLE,
-            reason_codes=validation,
-            nutrient_comparisons=comparisons,
-            repair_actions=repairs,
-            substitution_actions=substitution_actions,
-        )
 
     def build_budget_meal(
         candidate: EligibleMealTemplate,
@@ -365,28 +349,64 @@ def _evaluate_built_days(
             optimization_cache=optimization_cache,
         )
 
-    budget_result = optimize_weekly_budget(
-        days=days,
-        inputs=inputs,
-        eligible_templates=eligible_templates,
-        policy=policy,
-        meal_builder=build_budget_meal,
-    )
-    days = budget_result.days
+    portion_actions: list[PortionAdjustmentAction] = []
+    portion_reasons: tuple[str, ...] = ()
+    budget_result = None
+    validation: tuple[str, ...] = ()
+    upper_limit_exceeded = False
+    for _ in range(policy.maximum_combined_repair_passes):
+        days, actions, portion_reasons = _repair_portions(days, inputs, foods_by_id, policy)
+        portion_actions.extend(actions)
+        budget_result = optimize_weekly_budget(
+            days=days,
+            inputs=inputs,
+            eligible_templates=eligible_templates,
+            policy=policy,
+            meal_builder=build_budget_meal,
+        )
+        days = budget_result.days
+        days, actions, post_portion_reasons = _repair_portions(days, inputs, foods_by_id, policy)
+        portion_actions.extend(actions)
+        portion_reasons = tuple(dict.fromkeys((*portion_reasons, *post_portion_reasons)))
+        weekly_totals = _sum_nutrients(day.nutrients for day in days)
+        daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
+        validation = _validate_nutritional_feasibility(inputs, daily_average, policy)
+        upper_limit_exceeded = _upper_limit_exceeded(inputs, daily_average)
+        allowance = Decimal(inputs.weekly_budget_irr)
+        budget_cap = allowance * (
+            Decimal("1")
+            if inputs.budget_mode == "strict"
+            else Decimal("1") + policy.flexible_budget_overage_cap
+        )
+        budget_valid = (
+            budget_result.failure_code is None and budget_result.final_cost_irr <= budget_cap
+        )
+        if not validation and not upper_limit_exceeded and budget_valid:
+            break
+
+    assert budget_result is not None
     weekly_totals = _sum_nutrients(day.nutrients for day in days)
     daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
     data_completeness = _nutrient_data_completeness(days, inputs)
     comparisons = _comparisons(inputs, daily_average, data_completeness, policy)
-    post_repair_validation = _validate_nutritional_feasibility(inputs, daily_average, policy)
-    if _upper_limit_exceeded(inputs, daily_average) or post_repair_validation:
+    if upper_limit_exceeded or validation:
         return PlannerResult(
-            outcome=GenerationOutcome.TARGET_INFEASIBLE,
-            reason_codes=post_repair_validation or ("NUTRIENT_UPPER_LIMIT_EXCEEDED",),
+            outcome=(
+                GenerationOutcome.INFEASIBLE
+                if upper_limit_exceeded
+                else GenerationOutcome.TARGET_INFEASIBLE
+            ),
+            reason_codes=(
+                ("NUTRIENT_UPPER_LIMIT_EXCEEDED",)
+                if upper_limit_exceeded
+                else portion_reasons or validation
+            ),
             nutrient_comparisons=comparisons,
             repair_actions=repairs,
             substitution_actions=substitution_actions,
             budget_repair_actions=budget_result.repair_actions,
             budget_diagnostics=budget_result.diagnostics,
+            portion_adjustment_actions=tuple(portion_actions),
         )
     cost = budget_result.final_cost_irr
     if budget_result.failure_code is not None:
@@ -400,6 +420,7 @@ def _evaluate_built_days(
             substitution_actions=substitution_actions,
             budget_repair_actions=budget_result.repair_actions,
             budget_diagnostics=budget_result.diagnostics,
+            portion_adjustment_actions=tuple(portion_actions),
         )
     allowance = Decimal(inputs.weekly_budget_irr)
     if inputs.budget_mode == "strict" and cost > allowance:
@@ -413,6 +434,7 @@ def _evaluate_built_days(
             substitution_actions=substitution_actions,
             budget_repair_actions=budget_result.repair_actions,
             budget_diagnostics=budget_result.diagnostics,
+            portion_adjustment_actions=tuple(portion_actions),
         )
     if inputs.budget_mode == "flexible" and cost > allowance * (
         Decimal("1") + policy.flexible_budget_overage_cap
@@ -427,6 +449,7 @@ def _evaluate_built_days(
             substitution_actions=substitution_actions,
             budget_repair_actions=budget_result.repair_actions,
             budget_diagnostics=budget_result.diagnostics,
+            portion_adjustment_actions=tuple(portion_actions),
         )
     budget_status = "flexible_overage" if cost > allowance else "within_budget"
     warning_codes = _warning_codes(
@@ -448,6 +471,7 @@ def _evaluate_built_days(
         substitution_actions=substitution_actions,
         budget_repair_actions=budget_result.repair_actions,
         budget_diagnostics=budget_result.diagnostics,
+        portion_adjustment_actions=tuple(portion_actions),
     )
 
 
@@ -1457,6 +1481,100 @@ def _repair_micronutrients(
         if len(actions) >= policy.maximum_repair_iterations:
             break
     return tuple(mutable_days), tuple(actions)
+
+
+def _repair_portions(
+    days: tuple[PlannedDay, ...],
+    inputs: PlannerInput,
+    foods_by_id: dict[str, PlannerFood],
+    policy: PlannerPolicy,
+) -> tuple[tuple[PlannedDay, ...], tuple[PortionAdjustmentAction, ...], tuple[str, ...]]:
+    target_values = {
+        TARGET_NUTRIENT_CODES.get(code, code): value
+        for code, value in inputs.daily_targets.items()
+        if TARGET_NUTRIENT_CODES.get(code, code)
+        in {"energy_kcal", "protein_g", "carbohydrate_g", "total_fat_g", "fibre_g"}
+    }
+    minimum_values = {
+        TARGET_NUTRIENT_CODES.get(code, code): value
+        for code, value in inputs.daily_minimums.items()
+    }
+    maximum_values = {
+        TARGET_NUTRIENT_CODES.get(code, code): value
+        for code, value in inputs.daily_maximums.items()
+    }
+    upper_limits = dict(inputs.micronutrient_upper_limits)
+    repaired_days = list(days)
+    actions: list[PortionAdjustmentAction] = []
+    reasons: list[str] = []
+
+    for day_index, day in enumerate(days):
+        variables: list[PortionVariable] = []
+        locations: dict[str, tuple[int, int, PlannerFood]] = {}
+        for meal_index, meal in enumerate(day.meals):
+            for food_index, planned in enumerate(meal.foods):
+                if planned.food_id is None:
+                    continue
+                source = foods_by_id.get(planned.food_id)
+                if source is None:
+                    continue
+                key = f"{day_index}:{meal.role}:{meal.slot_index}:{food_index}:{planned.food_id}"
+                variables.append(
+                    PortionVariable(
+                        key=key,
+                        day_index=day_index,
+                        role=meal.role,
+                        slot_index=meal.slot_index,
+                        food_id=planned.food_id,
+                        grams=planned.grams,
+                        reference_grams=planned.grams,
+                        min_grams=planned.min_grams,
+                        max_grams=planned.max_grams,
+                        nutrients_per_gram=tuple(
+                            sorted(
+                                (code, value / HUNDRED)
+                                for code, value in source.nutrients_per_100g.items()
+                            )
+                        ),
+                        cost_per_gram=source.price_irr_per_gram,
+                    )
+                )
+                locations[key] = (meal_index, food_index, source)
+        if not variables:
+            continue
+        solver_result = solve_portions(
+            variables=tuple(variables),
+            initial_totals=dict(day.nutrients),
+            targets=target_values,
+            minimums=minimum_values,
+            maximums=maximum_values,
+            upper_limits=upper_limits,
+            increment_g=policy.portion_adjustment_increment_g,
+            maximum_iterations=policy.maximum_portion_solver_iterations,
+            target_tolerance_ratio=policy.calorie_tolerance_ratio,
+        )
+        replacements = dict(solver_result.grams_by_key)
+        meals = list(day.meals)
+        for key, grams in replacements.items():
+            meal_index, food_index, source = locations[key]
+            planned = meals[meal_index].foods[food_index]
+            if grams == planned.grams:
+                continue
+            resized = _resize_planned_food(planned, source, grams)
+            meal_foods = list(meals[meal_index].foods)
+            meal_foods[food_index] = resized
+            meals[meal_index] = _meal(
+                meals[meal_index].role,
+                meals[meal_index].slot_index,
+                tuple(meal_foods),
+                template_id=meals[meal_index].template_id,
+                template_category=meals[meal_index].template_category,
+            )
+        repaired_days[day_index] = _day(day.day_index, tuple(meals))
+        actions.extend(solver_result.actions)
+        reasons.extend(solver_result.reason_codes)
+
+    return tuple(repaired_days), tuple(actions), tuple(dict.fromkeys(sorted(reasons)))
 
 
 def _resize_planned_food(planned: PlannedFood, source: PlannerFood, grams: Decimal) -> PlannedFood:
