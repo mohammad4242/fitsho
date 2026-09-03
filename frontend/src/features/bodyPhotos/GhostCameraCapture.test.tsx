@@ -169,7 +169,7 @@ it("shows the left side Ghost in guided camera mode", () => {
   unmount();
 });
 
-it("captures a fixed privacy crop, mirrors the user camera, and returns a JPEG file", async () => {
+it("captures the transformed privacy crop, mirrors the user camera, and returns a JPEG file", async () => {
   const drawImage = vi.fn();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
     save: vi.fn(),
@@ -186,6 +186,7 @@ it("captures a fixed privacy crop, mirrors the user camera, and returns a JPEG f
   await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1));
   const video = prepareVideo();
   await waitFor(() => expect(screen.getByRole("button", { name: /start five-second timer/i })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: /make ghost smaller/i }));
   vi.useFakeTimers();
 
   fireEvent.click(screen.getByRole("button", { name: /start five-second timer/i }));
@@ -199,8 +200,8 @@ it("captures a fixed privacy crop, mirrors the user camera, and returns a JPEG f
   const canvas = document.querySelector("canvas");
   expect(canvas).not.toBeNull();
   expect(canvas).toHaveProperty("width", 1280);
-  expect(canvas).toHaveProperty("height", 1613);
-  expect(drawImage).toHaveBeenCalledWith(video, 0, 307, 1280, 1613, 0, 0, 1280, 1613);
+  expect(canvas).toHaveProperty("height", 1580);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 340, 1280, 1580, 0, 0, 1280, 1580);
   expect(screen.getByRole("button", { name: /use this camera photo/i })).toBeInTheDocument();
 
   await act(async () => {

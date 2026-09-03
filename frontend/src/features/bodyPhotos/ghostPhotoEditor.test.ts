@@ -80,8 +80,21 @@ describe("ghost photo transform", () => {
     });
 
     expect(line.anchor.y).toBeCloseTo(0.28, 6);
+    expect(line.start.x).toBeCloseTo(0, 6);
+    expect(line.end.x).toBeCloseTo(1, 6);
     expect(line.start.y).toBeCloseTo(line.anchor.y, 6);
     expect(line.end.y).toBeCloseTo(line.anchor.y, 6);
+  });
+
+  it("moves the privacy line horizontally with the Ghost", () => {
+    const line = ghostPrivacyLineGeometry("front", {
+      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
+      translateX: 0.12,
+    });
+
+    expect(line.anchor.x).toBeCloseTo(0.62, 6);
+    expect(line.start.x).toBeCloseTo(0.12, 6);
+    expect(line.end.x).toBeCloseTo(1.12, 6);
   });
 
   it("recomputes the privacy anchor when the Ghost is scaled", () => {

@@ -1212,7 +1212,7 @@ const fa = {
         imageAlt: "عکس در حال تنظیم برای نمای {{view}}",
         privacyNote: "Ghost فقط راهنماست. ناحیه بالای حریم خصوصی پیش از پردازش حذف می‌شود.",
         framingOkay: "قرارگیری تقریبی مناسب است.",
-        framingApproximate: "اگر می‌توانی عکس را کمی به راهنمای Ghost نزدیک‌تر کن.",
+        framingApproximate: "اگر می‌توانی راهنمای Ghost را کمی به عکس نزدیک‌تر کن.",
         controlsLabel: "کنترل‌های تنظیم کادر عکس",
         zoomOut: "کوچک‌نمایی",
         zoomIn: "بزرگ‌نمایی",

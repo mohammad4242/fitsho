@@ -1210,7 +1210,7 @@ const en = {
         imageAlt: "Photo being aligned for {{view}}",
         privacyNote: "The Ghost is only a guide. The top privacy region is removed before processing.",
         framingOkay: "Approximate framing is okay.",
-        framingApproximate: "Move the photo closer to the Ghost guide if you can.",
+        framingApproximate: "Move the Ghost guide closer to the photo if you can.",
         controlsLabel: "Photo framing controls",
         zoomOut: "Zoom out",
         zoomIn: "Zoom in",

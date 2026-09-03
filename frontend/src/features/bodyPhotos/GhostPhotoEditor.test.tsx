@@ -137,7 +137,7 @@ it("moves the image with a pointer drag and reports the soft framing status", ()
       translateY: 60 / 450,
     }),
   });
-  expect(screen.getByRole("status")).toHaveTextContent(/move the photo closer/i);
+  expect(screen.getByRole("status")).toHaveTextContent(/move the Ghost guide closer/i);
 });
 
 it("uses two active pointers to pinch-zoom and rotate the photo", () => {

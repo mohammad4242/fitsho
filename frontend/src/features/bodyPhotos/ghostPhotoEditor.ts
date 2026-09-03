@@ -158,10 +158,11 @@ export function ghostPrivacyLineGeometry(
   );
   // The privacy boundary is a horizontal raster crop. Its row follows the
   // transformed neck anchor so the visible line and the encoded crop agree.
+  const halfLineLength = safeTransform.scale / 2;
   return {
     anchor,
-    start: { x: 0, y: anchor.y },
-    end: { x: 1, y: anchor.y },
+    start: { x: anchor.x - halfLineLength, y: anchor.y },
+    end: { x: anchor.x + halfLineLength, y: anchor.y },
   };
 }
 

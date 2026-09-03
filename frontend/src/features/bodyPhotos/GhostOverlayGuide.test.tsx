@@ -71,6 +71,21 @@ it("renders the privacy line from the transformed Ghost neck anchor", () => {
   expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({ top: "28%" });
 });
 
+it("moves the visible privacy line horizontally with the Ghost", () => {
+  const { container } = render(
+    <GhostOverlayGuide
+      sex="female"
+      view="front"
+      transform={{ ...GHOST_EDITOR_DEFAULT_TRANSFORM, translateX: 0.12 }}
+    />,
+  );
+
+  expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
+    left: "12%",
+    width: "100%",
+  });
+});
+
 it("keeps the privacy line attached when the Ghost is scaled", () => {
   const { container } = render(
     <GhostOverlayGuide
@@ -80,7 +95,11 @@ it("keeps the privacy line attached when the Ghost is scaled", () => {
     />,
   );
 
-  expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({ top: "22.8%" });
+  expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
+    top: "22.8%",
+    left: "10%",
+    width: "80%",
+  });
 });
 
 it("mirrors only the side Ghost for a left profile", () => {
