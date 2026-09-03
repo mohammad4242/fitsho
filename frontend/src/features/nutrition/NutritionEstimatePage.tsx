@@ -126,17 +126,16 @@ function PlanArea({
 }) {
   const l = (fa: string, en: string) => language === "en" ? en : fa;
   if (plan !== null) return <WeeklyNutritionPlan language={language} plan={plan} />;
-  const message = outcome === null ? null : generationMessage(outcome.outcome, language);
+  const generation = outcome === null
+    ? null
+    : generationMessage(outcome.outcome, outcome.reason_codes, language);
   return (
     <section className="weekly-plan-empty" aria-label={l("ساخت برنامه تغذیه هفتگی", "Build weekly nutrition plan")}>
-      {message && <p className="weekly-plan-empty__message" role="status">{message}</p>}
-      {outcome?.reason_codes.includes("INSUFFICIENT_PRICE_COVERAGE") && (
-        <small>
-          {l(
-            "قیمت معتبر برای مواد کافی در دسترس نیست؛ هیچ قیمت زنده‌ای ساخته یا حدس زده نشد.",
-            "Reliable prices are unavailable for enough foods; no live price was fabricated or guessed.",
-          )}
-        </small>
+      {generation !== null && <p className="weekly-plan-empty__message" role="status">{generation.message}</p>}
+      {generation !== null && generation.reasons.length > 0 && (
+        <ul>
+          {generation.reasons.map((reason) => <li key={reason}>{reason}</li>)}
+        </ul>
       )}
       <button className="primary-button" disabled={generating} onClick={onGenerate} type="button">
         {generating ? l("در حال ساخت برنامه…", "Building plan…") : l("ساخت برنامه تغذیه هفتگی", "Build weekly nutrition plan")}
@@ -204,8 +203,96 @@ function DoctorSupervision({ language, plan }: { language: "fa" | "en"; plan: We
   );
 }
 
-function generationMessage(outcome: WeeklyPlanGeneration["outcome"], language: "fa" | "en") {
-  const values: Record<WeeklyPlanGeneration["outcome"], [string, string]> = {
+type LocalizedGenerationMessage = readonly [string, string];
+
+const generationReasonMessages: Record<string, LocalizedGenerationMessage> = {
+  STRICT_BUDGET_EXCEEDED: [
+    "هزینه برنامه‌ای که با شرایط فعلی ساخته شد از بودجه غذایی تعیین‌شده بیشتر است. بودجه را افزایش بده یا حالت بودجه را از سخت‌گیرانه به انعطاف‌پذیر تغییر بده.",
+    "The generated plan exceeds your current strict food budget. Increase the budget or switch to flexible budget mode.",
+  ],
+  FLEXIBLE_BUDGET_CAP_EXCEEDED: [
+    "حتی با محدوده انعطاف‌پذیر بودجه، هزینه برنامه از سقف مجاز بیشتر شده است. بودجه غذایی را کمی افزایش بده.",
+    "Even the flexible budget limit is not enough for the current plan. Increase your food budget.",
+  ],
+  NUTRIENT_UPPER_LIMIT_EXCEEDED: [
+    "برنامه ساخته‌شده از سقف ایمن یکی از ریزمغذی‌ها عبور کرده است، بنابراین فیتشو آن را قبول نکرد.",
+    "The generated plan exceeds the safe upper limit for at least one micronutrient, so it was rejected.",
+  ],
+  INSUFFICIENT_PRICE_COVERAGE: [
+    "برای تعداد کافی از مواد غذایی، قیمت معتبر در دسترس نیست و بدون قیمت قابل اعتماد امکان ساخت برنامه وجود ندارد.",
+    "Reliable prices are unavailable for enough foods to build the plan.",
+  ],
+  GOAL_RESELECTION_REQUIRED: [
+    "هدف فعلی با شرایط تمرینی ثبت‌شده قابل برنامه‌ریزی نیست. هدف یا اطلاعات تمرینت را بررسی کن.",
+    "The current goal is not compatible with the recorded training conditions. Review your goal or exercise information.",
+  ],
+  STRUCTURED_EXERCISE_REQUIRED: [
+    "اطلاعات تمرین برای محاسبه و ساخت برنامه تغذیه کامل نیست.",
+    "Exercise information is required before the nutrition plan can be generated.",
+  ],
+  NUTRITION_PROFILE_REQUIRED: [
+    "اطلاعات پروفایل تغذیه کامل نیست. ابتدا پروفایل تغذیه را تکمیل کن.",
+    "Your nutrition profile is incomplete. Complete it before generating a plan.",
+  ],
+  NUTRITION_PRODUCT_MODE_REQUIRED: [
+    "مسیر تغذیه برای این پروفایل فعال نیست.",
+    "Nutrition mode is not enabled for this profile.",
+  ],
+  PROTEIN_MINIMUM_EXCEEDS_CALORIE_BUDGET: [
+    "حداقل پروتئین موردنیاز با کالری هدف فعلی قابل جمع نیست.",
+    "The minimum protein requirement cannot fit within the current calorie target.",
+  ],
+  CARBOHYDRATE_MINIMUM_EXCEEDS_CALORIE_BUDGET: [
+    "حداقل کربوهیدرات موردنیاز با کالری هدف فعلی قابل جمع نیست.",
+    "The minimum carbohydrate requirement cannot fit within the current calorie target.",
+  ],
+  FAT_MINIMUM_EXCEEDS_CALORIE_BUDGET: [
+    "حداقل چربی موردنیاز با کالری هدف فعلی قابل جمع نیست.",
+    "The minimum fat requirement cannot fit within the current calorie target.",
+  ],
+  PHYSICIAN_MANUAL_PLAN_REQUIRED: [
+    "با توجه به شرایط ثبت‌شده، ساخت خودکار برنامه مناسب نیست و برنامه باید توسط پزشک تنظیم یا بررسی شود.",
+    "Based on the recorded conditions, an automatic plan is not appropriate and physician involvement is required.",
+  ],
+  UNSUPPORTED_OR_HARD_BLOCKED: [
+    "با شرایط فعلی، ساخت خودکار برنامه تغذیه مجاز نیست.",
+    "Automatic nutrition planning is unavailable under the current safety conditions.",
+  ],
+  REQUEST_FAILED: [
+    "درخواست ساخت برنامه انجام نشد. اتصال یا سرویس را بررسی کن و دوباره تلاش کن.",
+    "The plan request failed. Check the connection or service and try again.",
+  ],
+};
+
+const unknownGenerationReason: LocalizedGenerationMessage = [
+  "ساخت برنامه با یکی از محدودیت‌های فعلی کامل نشد.",
+  "The plan could not be generated because of one of the current constraints.",
+];
+
+function generationMessage(
+  outcome: WeeklyPlanGeneration["outcome"],
+  reasonCodes: string[],
+  language: "fa" | "en",
+) {
+  const languageIndex = language === "en" ? 1 : 0;
+  const reasons = [...new Set(reasonCodes.filter((code) => code.trim() !== ""))]
+    .map((code) => generationReasonMessages[code]?.[languageIndex] ?? unknownGenerationReason[languageIndex])
+    .filter((message, index, allMessages) => allMessages.indexOf(message) === index);
+
+  if (reasons.length === 0) {
+    return { message: generationOutcomeMessage(outcome, language), reasons: [] };
+  }
+  if (reasons.length === 1) return { message: reasons[0], reasons: [] };
+  return {
+    message: language === "en"
+      ? "Several constraints prevented the plan from being generated:"
+      : "چند محدودیت همزمان مانع ساخت برنامه شدند:",
+    reasons,
+  };
+}
+
+function generationOutcomeMessage(outcome: WeeklyPlanGeneration["outcome"], language: "fa" | "en") {
+  const values: Record<WeeklyPlanGeneration["outcome"], LocalizedGenerationMessage> = {
     success: ["برنامه ساخته شد.", "Plan generated."],
     failed: ["ساخت برنامه انجام نشد. اطلاعات پروفایل را بررسی کن.", "Plan generation failed. Review your profile."],
     safety_blocked: ["ساخت خودکار این برنامه به‌دلیل وضعیت ایمنی مجاز نیست.", "Automatic planning is unavailable because of the current safety status."],

@@ -7,7 +7,7 @@ import i18n from "../../i18n";
 import * as nutritionApi from "./api";
 import { NutritionEstimatePage } from "./NutritionEstimatePage";
 import { WeeklyNutritionPlan } from "./WeeklyNutritionPlan";
-import type { NutritionEstimate, WeeklyPlan } from "./types";
+import type { NutritionEstimate, WeeklyPlan, WeeklyPlanGeneration } from "./types";
 
 vi.mock("./api");
 vi.mock("../../shared/AuthenticatedHeader", () => ({ AuthenticatedHeader: () => null }));
@@ -169,6 +169,26 @@ function preparedRecipePlan(status: "estimated" | "verified"): WeeklyPlan {
   };
 }
 
+function generationResult(
+  outcome: WeeklyPlanGeneration["outcome"],
+  reason_codes: string[],
+): WeeklyPlanGeneration {
+  return {
+    generation_id: "generation-failure",
+    outcome,
+    reason_codes,
+    warning_codes: [],
+    plan: null,
+  };
+}
+
+async function generatePlan(result: WeeklyPlanGeneration) {
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue(result);
+  const user = userEvent.setup();
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  await user.click(await screen.findByRole("button", { name: /ساخت برنامه تغذیه هفتگی|Build weekly nutrition plan/ }));
+}
+
 it("shows the safe per-100g summary and only تخمینی for an estimated recipe", async () => {
   await i18n.changeLanguage("fa");
 
@@ -276,6 +296,89 @@ it("uses one compact weekly nutrition plan action", async () => {
   expect(screen.queryByText("گام بعد")).not.toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "برنامه هفتگی شخصی‌ات را بساز" })).not.toBeInTheDocument();
   expect(screen.queryByText(/فیتشو هدف‌های علمی/)).not.toBeInTheDocument();
+});
+
+it("explains a strict budget failure from its reason code", async () => {
+  await i18n.changeLanguage("fa");
+  await generatePlan(generationResult("infeasible", ["STRICT_BUDGET_EXCEEDED"]));
+
+  expect(await screen.findByText("هزینه برنامه‌ای که با شرایط فعلی ساخته شد از بودجه غذایی تعیین‌شده بیشتر است. بودجه را افزایش بده یا حالت بودجه را از سخت‌گیرانه به انعطاف‌پذیر تغییر بده.")).toBeInTheDocument();
+});
+
+it("explains a flexible budget cap failure from its reason code", async () => {
+  await i18n.changeLanguage("fa");
+  await generatePlan(generationResult("infeasible", ["FLEXIBLE_BUDGET_CAP_EXCEEDED"]));
+
+  expect(await screen.findByText("حتی با محدوده انعطاف‌پذیر بودجه، هزینه برنامه از سقف مجاز بیشتر شده است. بودجه غذایی را کمی افزایش بده.")).toBeInTheDocument();
+});
+
+it("explains a micronutrient upper-limit failure without naming a nutrient", async () => {
+  await i18n.changeLanguage("fa");
+  await generatePlan(generationResult("infeasible", ["NUTRIENT_UPPER_LIMIT_EXCEEDED"]));
+
+  const message = await screen.findByText("برنامه ساخته‌شده از سقف ایمن یکی از ریزمغذی‌ها عبور کرده است، بنابراین فیتشو آن را قبول نکرد.");
+  expect(message).toBeInTheDocument();
+  expect(message).not.toHaveTextContent(/سدیم|آهن|ویتامین/);
+});
+
+it("shows one price coverage message without the legacy duplicate", async () => {
+  await i18n.changeLanguage("fa");
+  await generatePlan(generationResult("live_price_unavailable", ["INSUFFICIENT_PRICE_COVERAGE"]));
+
+  const message = "برای تعداد کافی از مواد غذایی، قیمت معتبر در دسترس نیست و بدون قیمت قابل اعتماد امکان ساخت برنامه وجود ندارد.";
+  expect(await screen.findByText(message)).toBeInTheDocument();
+  expect(screen.getAllByText(message)).toHaveLength(1);
+  expect(screen.queryByText(/هیچ قیمت زنده‌ای ساخته یا حدس زده نشد/)).not.toBeInTheDocument();
+});
+
+it("shows all distinct macro constraints when target generation has multiple reasons", async () => {
+  await i18n.changeLanguage("fa");
+  await generatePlan(generationResult("target_infeasible", [
+    "PROTEIN_MINIMUM_EXCEEDS_CALORIE_BUDGET",
+    "CARBOHYDRATE_MINIMUM_EXCEEDS_CALORIE_BUDGET",
+    "FAT_MINIMUM_EXCEEDS_CALORIE_BUDGET",
+    "PROTEIN_MINIMUM_EXCEEDS_CALORIE_BUDGET",
+  ]));
+
+  expect(await screen.findByText("چند محدودیت همزمان مانع ساخت برنامه شدند:")).toBeInTheDocument();
+  expect(screen.getAllByRole("listitem")).toHaveLength(3);
+  expect(screen.getByText("حداقل پروتئین موردنیاز با کالری هدف فعلی قابل جمع نیست.")).toBeInTheDocument();
+  expect(screen.getByText("حداقل کربوهیدرات موردنیاز با کالری هدف فعلی قابل جمع نیست.")).toBeInTheDocument();
+  expect(screen.getByText("حداقل چربی موردنیاز با کالری هدف فعلی قابل جمع نیست.")).toBeInTheDocument();
+});
+
+it("explains a request failure separately from an infeasible plan", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockRejectedValueOnce(new Error("network failure"));
+  const user = userEvent.setup();
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  await user.click(await screen.findByRole("button", { name: /ساخت برنامه تغذیه هفتگی|Build weekly nutrition plan/ }));
+
+  expect(await screen.findByText("درخواست ساخت برنامه انجام نشد. اتصال یا سرویس را بررسی کن و دوباره تلاش کن.")).toBeInTheDocument();
+  expect(screen.queryByText("با محدودیت‌های فعلی برنامه ایمن و شدنی پیدا نشد.")).not.toBeInTheDocument();
+});
+
+it("uses a safe fallback for an unknown reason code", async () => {
+  await i18n.changeLanguage("fa");
+  const unknownCode = "SOME_INTERNAL_ERROR_CODE";
+  await generatePlan(generationResult("failed", [unknownCode]));
+
+  expect(await screen.findByText("ساخت برنامه با یکی از محدودیت‌های فعلی کامل نشد.")).toBeInTheDocument();
+  expect(screen.queryByText(unknownCode)).not.toBeInTheDocument();
+});
+
+it("keeps the outcome fallback when no reason code is returned", async () => {
+  await i18n.changeLanguage("fa");
+  await generatePlan(generationResult("infeasible", []));
+
+  expect(await screen.findByText("با محدودیت‌های فعلی برنامه ایمن و شدنی پیدا نشد.")).toBeInTheDocument();
+});
+
+it("shows reason-code copy in English", async () => {
+  await i18n.changeLanguage("en");
+  await generatePlan(generationResult("infeasible", ["STRICT_BUDGET_EXCEEDED"]));
+
+  expect(await screen.findByText("The generated plan exceeds your current strict food budget. Increase the budget or switch to flexible budget mode.")).toBeInTheDocument();
 });
 
 it("keeps real tracked context while presenting the calculated calorie goal", async () => {
