@@ -31,6 +31,21 @@ def test_converts_egg_unit_price_using_its_pricing_mass_equivalent() -> None:
     assert conversion.conversion_version == "price-mass-equivalent-v1"
 
 
+def test_converts_pineapple_unit_price_using_its_pricing_mass_equivalent() -> None:
+    from app.nutrition.price_mass_conversion import planner_price_irr_per_gram
+
+    conversion = planner_price_irr_per_gram(
+        food_slug="pineapple",
+        reference_price_toman=Decimal("307000"),
+        canonical_unit="TOMAN_PER_UNIT",
+    )
+
+    assert conversion.price_irr_per_gram == Decimal("307000") * Decimal("10") / Decimal("905")
+    assert conversion.grams_per_price_unit == Decimal("905")
+    assert conversion.source_name == "USDA FoodData Central SR Legacy"
+    assert conversion.source_reference == "USDA FDC SR Legacy food 169124, portion fruit"
+
+
 @pytest.mark.parametrize(
     ("slug", "price", "unit", "grams"),
     [

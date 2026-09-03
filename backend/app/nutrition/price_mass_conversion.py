@@ -77,6 +77,14 @@ PRICE_MASS_BASES: Final[dict[str, PriceMassBasis]] = {
         source_name=PRICE_MASS_CONVERSION_SOURCE_NAME,
         source_reference=PRICE_MASS_CONVERSION_SOURCE_REFERENCE,
     ),
+    "pineapple": PriceMassBasis(
+        slug="pineapple",
+        canonical_unit="TOMAN_PER_UNIT",
+        grams_per_price_unit=Decimal("905"),
+        method=NON_KG_CONVERSION_METHOD,
+        source_name="USDA FoodData Central SR Legacy",
+        source_reference="USDA FDC SR Legacy food 169124, portion fruit",
+    ),
     "sangak-bread": PriceMassBasis(
         slug="sangak-bread",
         canonical_unit="TOMAN_PER_UNIT",
