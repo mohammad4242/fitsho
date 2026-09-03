@@ -142,15 +142,15 @@ it("changes only the centered Ghost size in uniform five-percent steps", () => {
   const initialVideoClass = video.className;
 
   fireEvent.click(smaller);
-  expect(frame).toHaveStyle({ transform: "scale(0.95)" });
+  expect(frame).toHaveStyle({ transform: "translate(0%, 0%) rotate(0deg) scale(0.95)" });
   expect(video.className).toBe(initialVideoClass);
 
   for (let click = 0; click < 4; click += 1) fireEvent.click(smaller);
-  expect(frame).toHaveStyle({ transform: "scale(0.75)" });
+  expect(frame).toHaveStyle({ transform: "translate(0%, 0%) rotate(0deg) scale(0.75)" });
   expect(smaller).toBeDisabled();
 
   for (let click = 0; click < 8; click += 1) fireEvent.click(larger);
-  expect(frame).toHaveStyle({ transform: "scale(1.15)" });
+  expect(frame).toHaveStyle({ transform: "translate(0%, 0%) rotate(0deg) scale(1.15)" });
   expect(larger).toBeDisabled();
 
   rendered.unmount();
@@ -164,7 +164,7 @@ it("shows the left side Ghost in guided camera mode", () => {
   );
 
   expect(container.querySelector(".ghost-overlay__asset-frame")).toHaveStyle({
-    transform: "scaleX(-1) scale(1)",
+    transform: "scaleX(-1) translate(0%, 0%) rotate(0deg) scale(1)",
   });
   unmount();
 });

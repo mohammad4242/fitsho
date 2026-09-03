@@ -1,32 +1,40 @@
 import { useTranslation } from "react-i18next";
 
 import { ghostOverlayAssets, resolveGhostOverlayVariant } from "./ghostOverlayAssets";
-import { ghostPrivacyCutRatioForView } from "./ghostPhotoEditor";
+import {
+  GHOST_EDITOR_DEFAULT_TRANSFORM,
+  ghostPercentage,
+  ghostPhotoTransformStyle,
+  ghostPrivacyLineGeometry,
+  type GhostPhotoTransform,
+} from "./ghostPhotoEditor";
 import type { Sex } from "../profile/types";
 import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 export function GhostOverlayGuide({
   sex,
-  scale = 1,
+  transform = GHOST_EDITOR_DEFAULT_TRANSFORM,
   sideProfile = "right",
   view,
 }: {
   sex?: Sex | null;
-  scale?: number;
+  transform?: GhostPhotoTransform;
   sideProfile?: BodyPhotoSide;
   view: BodyPhotoView;
 }) {
   const { t } = useTranslation();
   const variant = resolveGhostOverlayVariant(sex);
-  const ghostTransform = view === "side" && sideProfile === "left"
-    ? `scaleX(-1) scale(${scale})`
-    : `scale(${scale})`;
+  const privacyLine = ghostPrivacyLineGeometry(view, transform);
   return (
     <div className="ghost-overlay" aria-label={t("bodyPhotos.camera.overlayLabel")}>
       <div
         className="ghost-overlay__privacy-cut"
         aria-label={t("bodyPhotos.camera.privacyCut")}
-        style={{ top: `${ghostPrivacyCutRatioForView(view) * 100}%` }}
+        style={{
+          top: ghostPercentage(privacyLine.anchor.y),
+          left: ghostPercentage(privacyLine.start.x),
+          width: ghostPercentage(privacyLine.end.x - privacyLine.start.x),
+        }}
       >
         <span>{t("bodyPhotos.camera.privacyCut")}</span>
       </div>
@@ -34,7 +42,12 @@ export function GhostOverlayGuide({
         className={`ghost-overlay__asset-frame ghost-overlay__asset-frame--${view}`}
         aria-label={t("bodyPhotos.camera.silhouette", { view: t(`bodyPhotos.views.${view}`) })}
         role="img"
-        style={{ transform: ghostTransform }}
+        style={{
+          transform: ghostPhotoTransformStyle(
+            transform,
+            view === "side" && sideProfile === "left",
+          ),
+        }}
       >
         <img
           className="ghost-overlay__asset"

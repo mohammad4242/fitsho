@@ -4,19 +4,19 @@ import { useTranslation } from "react-i18next";
 import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { GhostScaleControls } from "./GhostScaleControls";
+import { GHOST_SCALE_MAX, GHOST_SCALE_MIN } from "./ghostScale";
 import {
   clampGhostPhotoTransform,
   GHOST_EDITOR_DEFAULT_TRANSFORM,
-  ghostPhotoTransformStyle,
+  GHOST_EDITOR_OUTPUT,
   isGhostFramingWithinTolerance,
   renderGhostPhoto,
-  type GhostPhotoTransform,
 } from "./ghostPhotoEditor";
-import type { BodyPhotoSide, BodyPhotoView } from "./types";
+import type { BodyPhotoSide, BodyPhotoView, GhostTransform } from "./types";
 
 export type GhostPhotoRenderer = (
   file: File,
-  transform: GhostPhotoTransform,
+  transform: GhostTransform,
   view: BodyPhotoView,
 ) => Promise<File>;
 
@@ -36,6 +36,8 @@ type DragState = {
   startY: number;
   originX: number;
   originY: number;
+  stageWidth: number;
+  stageHeight: number;
 };
 
 type GhostPhotoPoint = {
@@ -47,7 +49,9 @@ type PinchGesture = {
   initialCenter: GhostPhotoPoint;
   initialDistance: number;
   initialAngle: number;
-  initialTransform: GhostPhotoTransform;
+  initialTransform: GhostTransform;
+  stageWidth: number;
+  stageHeight: number;
 };
 
 const zoomStep = 0.1;
@@ -67,8 +71,7 @@ export function GhostPhotoEditor({
   const dragRef = useRef<DragState | null>(null);
   const pointersRef = useRef(new Map<number, GhostPhotoPoint>());
   const pinchRef = useRef<PinchGesture | null>(null);
-  const [transform, setTransform] = useState<GhostPhotoTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
-  const [ghostScale, setGhostScale] = useState(1);
+  const [transform, setTransform] = useState<GhostTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,26 +81,29 @@ export function GhostPhotoEditor({
     return () => URL.revokeObjectURL(nextPreviewUrl);
   }, [file]);
 
-  function updateTransform(update: (current: GhostPhotoTransform) => GhostPhotoTransform) {
+  function updateTransform(update: (current: GhostTransform) => GhostTransform) {
     setTransform((current) => clampGhostPhotoTransform(update(current)));
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (confirming) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    const stageSize = getStageSize(event.currentTarget);
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const points = firstTwoPointerPoints(pointersRef.current);
     if (pointersRef.current.size >= 2 && points !== null) {
       dragRef.current = null;
-      pinchRef.current = createPinchGesture(points[0], points[1], transform);
+      pinchRef.current = createPinchGesture(points[0], points[1], transform, stageSize);
       return;
     }
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originX: transform.offsetX,
-      originY: transform.offsetY,
+      originX: transform.translateX,
+      originY: transform.translateY,
+      stageWidth: stageSize.width,
+      stageHeight: stageSize.height,
     };
   }
 
@@ -116,8 +122,8 @@ export function GhostPhotoEditor({
     if (drag === null || drag.pointerId !== event.pointerId) return;
     updateTransform((current) => ({
       ...current,
-      offsetX: drag.originX + event.clientX - drag.startX,
-      offsetY: drag.originY + event.clientY - drag.startY,
+      translateX: drag.originX + (event.clientX - drag.startX) / drag.stageWidth,
+      translateY: drag.originY + (event.clientY - drag.startY) / drag.stageHeight,
     }));
   }
 
@@ -128,12 +134,15 @@ export function GhostPhotoEditor({
     const remaining = Array.from(pointersRef.current.entries())[0];
     if (remaining !== undefined) {
       const [pointerId, point] = remaining;
+      const stageSize = getStageSize(event.currentTarget);
       dragRef.current = {
         pointerId,
         startX: point.x,
         startY: point.y,
-        originX: transform.offsetX,
-        originY: transform.offsetY,
+        originX: transform.translateX,
+        originY: transform.translateY,
+        stageWidth: stageSize.width,
+        stageHeight: stageSize.height,
       };
     }
     event.currentTarget.releasePointerCapture?.(event.pointerId);
@@ -173,10 +182,10 @@ export function GhostPhotoEditor({
             src={previewUrl}
             alt={t("bodyPhotos.editor.imageAlt", { view: t(`bodyPhotos.views.${view}`) })}
             draggable={false}
-            style={{ transform: ghostPhotoTransformStyle(transform) }}
+            style={{ transform: "translate(-50%, -50%)" }}
           />
         )}
-        <GhostOverlayGuide sex={sex} scale={ghostScale} sideProfile={sideProfile} view={view} />
+        <GhostOverlayGuide sex={sex} transform={transform} sideProfile={sideProfile} view={view} />
       </div>
       <p className="ghost-photo-editor__privacy-note">{t("bodyPhotos.editor.privacyNote")}</p>
       <p className="ghost-photo-editor__status" role="status">
@@ -185,7 +194,11 @@ export function GhostPhotoEditor({
           : t("bodyPhotos.editor.framingApproximate")}
       </p>
       <div className="ghost-photo-editor__controls" aria-label={t("bodyPhotos.editor.controlsLabel")}>
-        <GhostScaleControls disabled={confirming} onScaleChange={setGhostScale} scale={ghostScale} />
+        <GhostScaleControls
+          disabled={confirming}
+          onScaleChange={(scale) => updateTransform((current) => ({ ...current, scale }))}
+          scale={transform.scale}
+        />
         <div className="ghost-photo-editor__button-row">
           <button
             className="secondary-button"
@@ -224,8 +237,8 @@ export function GhostPhotoEditor({
           <span>{t("bodyPhotos.editor.zoomLabel")}</span>
           <input
             type="range"
-            min="0.75"
-            max="2.5"
+            min={String(GHOST_SCALE_MIN)}
+            max={String(GHOST_SCALE_MAX)}
             step="0.05"
             value={transform.scale}
             aria-label={t("bodyPhotos.editor.zoomLabel")}
@@ -279,13 +292,16 @@ function firstTwoPointerPoints(
 function createPinchGesture(
   first: GhostPhotoPoint,
   second: GhostPhotoPoint,
-  transform: GhostPhotoTransform,
+  transform: GhostTransform,
+  stageSize: StageSize,
 ): PinchGesture {
   return {
     initialCenter: midpoint(first, second),
     initialDistance: distance(first, second),
     initialAngle: angle(first, second),
     initialTransform: transform,
+    stageWidth: stageSize.width,
+    stageHeight: stageSize.height,
   };
 }
 
@@ -293,16 +309,31 @@ function applyPinchGesture(
   gesture: PinchGesture,
   first: GhostPhotoPoint,
   second: GhostPhotoPoint,
-): GhostPhotoTransform {
+): GhostTransform {
   const currentCenter = midpoint(first, second);
   const initialDistance = gesture.initialDistance;
   const scaleRatio = initialDistance === 0 ? 1 : distance(first, second) / initialDistance;
   const rotationDelta = shortestAngleDelta(angle(first, second) - gesture.initialAngle);
   return {
-    offsetX: gesture.initialTransform.offsetX + currentCenter.x - gesture.initialCenter.x,
-    offsetY: gesture.initialTransform.offsetY + currentCenter.y - gesture.initialCenter.y,
+    translateX: gesture.initialTransform.translateX
+      + (currentCenter.x - gesture.initialCenter.x) / gesture.stageWidth,
+    translateY: gesture.initialTransform.translateY
+      + (currentCenter.y - gesture.initialCenter.y) / gesture.stageHeight,
     scale: gesture.initialTransform.scale * scaleRatio,
     rotation: gesture.initialTransform.rotation + (rotationDelta * 180) / Math.PI,
+  };
+}
+
+type StageSize = {
+  width: number;
+  height: number;
+};
+
+function getStageSize(element: HTMLElement): StageSize {
+  const rect = element.getBoundingClientRect();
+  return {
+    width: rect.width > 0 ? rect.width : GHOST_EDITOR_OUTPUT.width,
+    height: rect.height > 0 ? rect.height : GHOST_EDITOR_OUTPUT.height,
   };
 }
 

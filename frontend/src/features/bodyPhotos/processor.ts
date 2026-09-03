@@ -138,7 +138,9 @@ const limits = {
   maximumBrightnessScore: 0.94,
   minimumSharpnessScore: 0.025,
   minimumLandmarkVisibility: 0.55,
-  frameMargin: 0.005,
+  // Landmark coordinates on the image edge are still usable. Out-of-frame
+  // rejection is reserved for coordinates beyond the actual image bounds.
+  frameMargin: 0,
   targetWidth: 1200,
   outputQuality: 0.9,
   neutralGray: [160, 163, 161] as const,
@@ -147,7 +149,7 @@ const limits = {
 const bodySeedConfidenceThreshold = 0.35;
 const bodyProtectionMinConfidence = 0.20;
 const bodyProtectionMaxConfidence = 0.70;
-const backgroundFeatherRatio = 0.06;
+const backgroundFeatherRatio = 0.0675;
 
 const landmarkGroups = {
   shoulders: [11, 12],
@@ -215,7 +217,7 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
             sharpnessScore: quality.sharpnessScore,
             minimumLandmarkVisibility: pose.minimumVisibility,
           },
-          visibleLandmarks: ["shoulders", "arms", "hips", "knees", "ankles", "feet"],
+          visibleLandmarks: pose.visibleLandmarks,
         },
       };
     } finally {
@@ -253,6 +255,7 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
 type ValidatedPose = {
   viewAssessment: "matched" | "ambiguous";
   minimumVisibility: number;
+  visibleLandmarks: BodyPhotoValidation["visibleLandmarks"];
 };
 
 function validateLandmarks(
@@ -261,13 +264,7 @@ function validateLandmarks(
 ): ValidatedPose {
   const landmarks = selectPrimaryPose(detection.poses);
   const required = requiredLandmarksForView(landmarks, expectedView);
-  const frameLandmarks = expectedView === "front"
-    ? [
-      ...required,
-      ...landmarkGroups.wrists.map((index) => landmarks[index]!),
-    ]
-    : required;
-  if (frameLandmarks.some((landmark) => !insideFrame(landmark))) {
+  if (required.some((landmark) => !insideFrame(landmark))) {
     throw new BodyPhotoProcessingError("body_out_of_frame");
   }
 
@@ -283,6 +280,7 @@ function validateLandmarks(
       expectedView === "side" && projection === "side" ? "matched" : "ambiguous"
     ),
     minimumVisibility: clampScore(Math.min(...required.map((landmark) => landmark.visibility))),
+    visibleLandmarks: visibleLandmarksForPose(landmarks),
   };
 }
 
@@ -293,7 +291,6 @@ function requiredLandmarksForView(
   if (view === "side") {
     return [
       mostVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible"),
-      mostVisible(landmarks, landmarkGroups.elbows, "arms_not_visible"),
       mostVisible(landmarks, landmarkGroups.hips, "torso_not_visible"),
       mostVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible"),
       mostVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible"),
@@ -309,8 +306,6 @@ function requiredLandmarksForView(
     requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
     return [
       ...landmarkGroups.shoulders.map((index) => landmarks[index]!),
-      mostVisible(landmarks, [13, 15], "arms_not_visible"),
-      mostVisible(landmarks, [14, 16], "arms_not_visible"),
       ...landmarkGroups.hips.map((index) => landmarks[index]!),
       ...landmarkGroups.knees.map((index) => landmarks[index]!),
       ...landmarkGroups.ankles.map((index) => landmarks[index]!),
@@ -319,14 +314,12 @@ function requiredLandmarksForView(
   }
 
   requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
-  requireVisible(landmarks, landmarkGroups.elbows, "arms_not_visible");
   requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
   requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
   requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
   requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
   return [
     ...landmarkGroups.shoulders,
-    ...landmarkGroups.elbows,
     ...landmarkGroups.hips,
     ...landmarkGroups.knees,
     ...landmarkGroups.ankles,
@@ -411,7 +404,6 @@ function isCrediblePose(landmarks: NormalizedBodyLandmark[]): boolean {
   const visibleLowerGroups = [landmarkGroups.knees, landmarkGroups.ankles, landmarkGroups.feet]
     .filter(visible).length;
   return visible(landmarkGroups.shoulders)
-    && visible(landmarkGroups.elbows)
     && visible(landmarkGroups.hips)
     && visibleLowerGroups >= 2;
 }
@@ -468,6 +460,22 @@ function insideFrame(landmark: NormalizedBodyLandmark): boolean {
     && landmark.x <= 1 - limits.frameMargin
     && landmark.y >= limits.frameMargin
     && landmark.y <= 1 - limits.frameMargin;
+}
+
+function visibleLandmarksForPose(
+  landmarks: NormalizedBodyLandmark[],
+): BodyPhotoValidation["visibleLandmarks"] {
+  const groups = [
+    ["shoulders", landmarkGroups.shoulders],
+    ["arms", [...landmarkGroups.elbows, ...landmarkGroups.wrists]],
+    ["hips", landmarkGroups.hips],
+    ["knees", landmarkGroups.knees],
+    ["ankles", landmarkGroups.ankles],
+    ["feet", landmarkGroups.feet],
+  ] as const;
+  return groups
+    .filter(([, indices]) => maximumVisibility(landmarks, indices) >= limits.minimumLandmarkVisibility)
+    .map(([name]) => name);
 }
 
 function projectedView(landmarks: NormalizedBodyLandmark[]): "side" | "non_side" | "ambiguous" {

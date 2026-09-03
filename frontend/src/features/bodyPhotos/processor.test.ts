@@ -8,6 +8,7 @@ import {
   type BodyLandmarkDetector,
   type BodyPhotoRuntime,
   type BodyPhotoSegmenter,
+  type BodySegmentationMask,
   type DecodedBodyPhoto,
   type NormalizedBodyLandmark,
 } from "./processor";
@@ -49,6 +50,7 @@ function setup(options: {
   brightness?: number;
   sharpness?: number;
   orientationNormalized?: boolean;
+  mask?: BodySegmentationMask;
 } = {}) {
   const detected = landmarks(options.viewShape);
   options.mutate?.(detected);
@@ -58,9 +60,9 @@ function setup(options: {
   const detector: BodyLandmarkDetector = { detect: vi.fn().mockResolvedValue(detection) };
   const segmenter: BodyPhotoSegmenter = {
     segment: vi.fn().mockResolvedValue({
-      width: 2,
-      height: 2,
-      confidence: new Float32Array([0, 1, 1, 0]),
+      width: options.mask?.width ?? 2,
+      height: options.mask?.height ?? 2,
+      confidence: options.mask?.confidence ?? new Float32Array([0, 1, 1, 0]),
     }),
   };
   const decoded: DecodedBodyPhoto = {
@@ -149,7 +151,7 @@ describe("BrowserBodyPhotoProcessor", () => {
     });
   });
 
-  it("rejects a side view when neither elbow is visible", async () => {
+  it("accepts a side view when neither elbow is visible", async () => {
     const { processor } = setup({
       viewShape: "side",
       mutate: (value) => {
@@ -158,8 +160,8 @@ describe("BrowserBodyPhotoProcessor", () => {
       },
     });
 
-    await expect(processor.process(inputFile(), "side")).rejects.toMatchObject({
-      code: "arms_not_visible",
+    await expect(processor.process(inputFile(), "side")).resolves.toMatchObject({
+      validation: { expectedView: "side" },
     });
   });
 
@@ -176,7 +178,7 @@ describe("BrowserBodyPhotoProcessor", () => {
     });
   });
 
-  it("rejects a back view when one arm has neither a visible elbow nor wrist", async () => {
+  it("accepts a back view when one arm is obscured but the body landmarks remain visible", async () => {
     const { processor } = setup({
       mutate: (value) => {
         value[13]!.visibility = 0.1;
@@ -184,8 +186,8 @@ describe("BrowserBodyPhotoProcessor", () => {
       },
     });
 
-    await expect(processor.process(inputFile(), "back")).rejects.toMatchObject({
-      code: "arms_not_visible",
+    await expect(processor.process(inputFile(), "back")).resolves.toMatchObject({
+      validation: { expectedView: "back" },
     });
   });
 
@@ -212,10 +214,46 @@ describe("BrowserBodyPhotoProcessor", () => {
   });
 
   it("rejects a material body landmark outside the frame", async () => {
-    const { processor } = setup({ mutate: (value) => { value[16]!.x = 1.02; } });
+    const { processor } = setup({ mutate: (value) => { value[24]!.x = 1.02; } });
 
     await expect(processor.process(inputFile(), "front")).rejects.toMatchObject({
       code: "body_out_of_frame",
+    });
+  });
+
+  it("accepts an essential landmark close to the image edge when it remains inside", async () => {
+    const { processor } = setup({ mutate: (value) => { value[24]!.x = 0.003; } });
+
+    await expect(processor.process(inputFile(), "front")).resolves.toMatchObject({
+      validation: { expectedView: "front" },
+    });
+  });
+
+  it("accepts a wide abdomen when the pose and framing landmarks are valid", async () => {
+    const wideBodyMask = {
+      width: 4,
+      height: 4,
+      confidence: new Float32Array(16).fill(1),
+    };
+    const { processor } = setup({ mask: wideBodyMask });
+
+    await expect(processor.process(inputFile(), "front")).resolves.toMatchObject({
+      validation: { expectedView: "front" },
+    });
+  });
+
+  it("accepts small shoulder and hip alignment differences", async () => {
+    const { processor } = setup({
+      mutate: (value) => {
+        value[11]!.x += 0.015;
+        value[12]!.x += 0.015;
+        value[23]!.x -= 0.01;
+        value[24]!.x -= 0.01;
+      },
+    });
+
+    await expect(processor.process(inputFile(), "front")).resolves.toMatchObject({
+      validation: { expectedView: "front" },
     });
   });
 
@@ -340,9 +378,10 @@ describe("compositeBodyOnNeutralBackground", () => {
     );
 
     const nearBody = pixelAt(result, size, 53, 50);
-    const mediumDistance = pixelAt(result, size, 58, 50);
+    const transitionDistance = pixelAt(result, size, 58, 50);
+    const mediumDistance = pixelAt(result, size, 60, 50);
 
-    expect(nearBody[0]).toBeLessThan(mediumDistance[0]);
+    expect(nearBody[0]).toBeLessThan(transitionDistance[0]);
     expect(mediumDistance).toEqual([160, 163, 161, 255]);
   });
 

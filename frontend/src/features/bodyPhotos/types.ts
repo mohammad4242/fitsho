@@ -1,5 +1,12 @@
 export type BodyPhotoView = "front" | "side" | "back";
 export type BodyPhotoSide = "right" | "left";
+
+export type GhostTransform = {
+  scale: number;
+  translateX: number;
+  translateY: number;
+  rotation: number;
+};
 export type BodyPhotoPurpose = "initial_plan" | "cycle_completion" | "progress_check";
 export type BodyPhotoSessionState =
   | "draft"

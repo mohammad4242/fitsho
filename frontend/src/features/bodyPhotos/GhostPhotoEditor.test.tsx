@@ -18,6 +18,7 @@ const sourceFile = new File(["source"], "side.png", { type: "image/png" });
 const renderPhoto: GhostPhotoRenderer = vi.fn(async () => (
   new File(["clean"], "body-photo-edited.jpg", { type: "image/jpeg" })
 ));
+const staticPhotoPreviewTransform = "translate(-50%, -50%)";
 
 function renderEditor(view: BodyPhotoView = "front") {
   return render(
@@ -44,22 +45,28 @@ it.each(["front", "side", "back"] as const)("renders the %s Ghost guide over the
   expect(screen.getByRole("heading", { name: /align your photo/i })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: new RegExp(`loose ${view} body-position silhouette`, "i") })).toBeInTheDocument();
   expect(screen.getByRole("img", { name: /photo being aligned/i }).style.transform).toBe(
-    ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM),
+    staticPhotoPreviewTransform,
   );
 });
 
 it("supports keyboard-accessible zoom, rotation, and reset controls", () => {
   renderEditor();
-  const image = screen.getByRole("img", { name: /photo being aligned/i });
+  const ghost = screen.getByRole("img", { name: /loose front body-position silhouette/i });
 
   fireEvent.click(screen.getByRole("button", { name: /zoom in/i }));
-  expect(image.style.transform).toContain("scale(1.1)");
+  expect(ghost).toHaveStyle({
+    transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 1.1 }),
+  });
 
   fireEvent.click(screen.getByRole("button", { name: /rotate right/i }));
-  expect(image.style.transform).toContain("rotate(1deg)");
+  expect(ghost).toHaveStyle({
+    transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 1.1, rotation: 1 }),
+  });
 
   fireEvent.click(screen.getByRole("button", { name: /reset framing/i }));
-  expect(image.style.transform).toBe(ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM));
+  expect(ghost).toHaveStyle({
+    transform: ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM),
+  });
 });
 
 it("changes only the Ghost size while keeping the photo framing fixed", () => {
@@ -70,7 +77,9 @@ it("changes only the Ghost size while keeping the photo framing fixed", () => {
 
   fireEvent.click(screen.getByRole("button", { name: /make ghost smaller/i }));
 
-  expect(ghost).toHaveStyle({ transform: "scale(0.95)" });
+  expect(ghost).toHaveStyle({
+    transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 0.95 }),
+  });
   expect(image.style.transform).toBe(initialImageTransform);
 });
 
@@ -87,13 +96,13 @@ it("shows the left side Ghost without changing photo framing", () => {
   );
 
   expect(container.querySelector(".ghost-overlay__asset-frame")).toHaveStyle({
-    transform: "scaleX(-1) scale(1)",
+    transform: `scaleX(-1) ${ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM)}`,
   });
 });
 
 it("allows a quarter-turn through the rotation slider", () => {
   renderEditor();
-  const image = screen.getByRole("img", { name: /photo being aligned/i });
+  const ghost = screen.getByRole("img", { name: /loose front body-position silhouette/i });
   const rotationSlider = screen.getByRole("slider", { name: /rotation/i });
 
   expect(rotationSlider).toHaveAttribute("min", "-180");
@@ -101,35 +110,55 @@ it("allows a quarter-turn through the rotation slider", () => {
 
   fireEvent.change(rotationSlider, { target: { value: "90" } });
 
-  expect(image.style.transform).toContain("rotate(90deg)");
+  expect(ghost).toHaveStyle({
+    transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, rotation: 90 }),
+  });
 });
 
 it("moves the image with a pointer drag and reports the soft framing status", () => {
   renderEditor();
   const stage = screen.getByRole("application", { name: /photo framing editor/i });
-  const image = screen.getByRole("img", { name: /photo being aligned/i });
+  const frame = stage.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
+  expect(frame).not.toBeNull();
+  if (frame === null) throw new Error("Ghost frame was not rendered");
+  vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+    width: 300,
+    height: 450,
+  } as DOMRect);
 
   fireEvent.pointerDown(stage, { pointerId: 1, clientX: 100, clientY: 100 });
   fireEvent.pointerMove(stage, { pointerId: 1, clientX: 180, clientY: 160 });
   fireEvent.pointerUp(stage, { pointerId: 1, clientX: 180, clientY: 160 });
 
-  expect(image.style.transform).toContain("translate(80px, 60px)");
-  expect(screen.getByRole("status")).toHaveTextContent(/approximate framing is okay/i);
+  expect(frame).toHaveStyle({
+    transform: ghostPhotoTransformStyle({
+      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
+      translateX: 80 / 300,
+      translateY: 60 / 450,
+    }),
+  });
+  expect(screen.getByRole("status")).toHaveTextContent(/move the photo closer/i);
 });
 
 it("uses two active pointers to pinch-zoom and rotate the photo", () => {
   renderEditor();
   const stage = screen.getByRole("application", { name: /photo framing editor/i });
-  const image = screen.getByRole("img", { name: /photo being aligned/i });
+  const frame = stage.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
+  expect(frame).not.toBeNull();
+  if (frame === null) throw new Error("Ghost frame was not rendered");
+  vi.spyOn(stage, "getBoundingClientRect").mockReturnValue({
+    width: 300,
+    height: 450,
+  } as DOMRect);
 
   fireEvent.pointerDown(stage, { pointerId: 1, clientX: 100, clientY: 100 });
   fireEvent.pointerDown(stage, { pointerId: 2, clientX: 200, clientY: 100 });
   fireEvent.pointerMove(stage, { pointerId: 1, clientX: 95, clientY: 95 });
   fireEvent.pointerMove(stage, { pointerId: 2, clientX: 205, clientY: 105 });
 
-  expect(image.style.transform).toContain("translate(0px, 0px)");
-  expect(image.style.transform).toContain("rotate(5.194deg)");
-  expect(image.style.transform).toContain("scale(1.105)");
+  expect(frame.style.transform).toContain("translate(0%, 0%)");
+  expect(frame.style.transform).toContain("rotate(5.194deg)");
+  expect(frame.style.transform).toContain("scale(1.105)");
 });
 
 it("returns the clean rendered file only after confirmation", async () => {

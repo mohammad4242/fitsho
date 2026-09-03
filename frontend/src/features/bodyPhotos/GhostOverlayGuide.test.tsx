@@ -4,6 +4,7 @@ import { beforeEach, expect, it } from "vitest";
 import i18n from "../../i18n";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { resolveGhostOverlayVariant } from "./ghostOverlayAssets";
+import { GHOST_EDITOR_DEFAULT_TRANSFORM, ghostPhotoTransformStyle } from "./ghostPhotoEditor";
 
 beforeEach(async () => {
   await i18n.changeLanguage("en");
@@ -41,11 +42,12 @@ it.each([undefined, null, "other", "prefer_not_to_say"] as const)(
 );
 
 it("applies a uniform centered scale to the Ghost asset frame", () => {
-  const { container } = render(<GhostOverlayGuide sex="female" view="front" scale={0.95} />);
+  const transform = { ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 0.95 };
+  const { container } = render(<GhostOverlayGuide sex="female" view="front" transform={transform} />);
   const frame = container.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
 
   expect(frame).not.toBeNull();
-  expect(frame).toHaveStyle({ transform: "scale(0.95)" });
+  expect(frame).toHaveStyle({ transform: ghostPhotoTransformStyle(transform) });
 });
 
 it("places the back privacy line above the unchanged front line", () => {
@@ -57,11 +59,42 @@ it("places the back privacy line above the unchanged front line", () => {
   expect(front.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "16%" });
 });
 
+it("renders the privacy line from the transformed Ghost neck anchor", () => {
+  const { container } = render(
+    <GhostOverlayGuide
+      sex="female"
+      view="front"
+      transform={{ ...GHOST_EDITOR_DEFAULT_TRANSFORM, translateY: 0.12 }}
+    />,
+  );
+
+  expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({ top: "28%" });
+});
+
+it("keeps the privacy line attached when the Ghost is scaled", () => {
+  const { container } = render(
+    <GhostOverlayGuide
+      sex="female"
+      view="front"
+      transform={{ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 0.8 }}
+    />,
+  );
+
+  expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({ top: "22.8%" });
+});
+
 it("mirrors only the side Ghost for a left profile", () => {
   const { container } = render(
-    <GhostOverlayGuide sex="female" view="side" sideProfile="left" scale={0.95} />,
+    <GhostOverlayGuide
+      sex="female"
+      view="side"
+      sideProfile="left"
+      transform={{ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 0.95 }}
+    />,
   );
   const frame = container.querySelector<HTMLElement>(".ghost-overlay__asset-frame");
 
-  expect(frame).toHaveStyle({ transform: "scaleX(-1) scale(0.95)" });
+  expect(frame).toHaveStyle({
+    transform: `scaleX(-1) ${ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 0.95 })}`,
+  });
 });

@@ -69,12 +69,12 @@ describe("MediaPipeLivePoseGuide", () => {
     });
   });
 
-  it("allows a shoulder at the back privacy boundary", () => {
+  it("does not turn the privacy line into a live pose gate", () => {
     const landmarks = pose();
     landmarks[11]!.y = 0.1;
     landmarks[12]!.y = 0.1;
     const guide = new MediaPipeLivePoseGuide(
-      "back",
+      "front",
       { detectForVideo: vi.fn().mockReturnValue({ landmarks: [landmarks] }) },
     );
 

@@ -1,4 +1,3 @@
-import { ghostPrivacyCutRatioForView } from "./ghostPhotoEditor";
 import { mediaPipePoseAssets } from "./mediaPipePoseDetector";
 import type { BodyPhotoView } from "./types";
 import type { NormalizedBodyLandmark } from "./processor";
@@ -147,7 +146,6 @@ function evaluateGuidance(
   video: HTMLVideoElement,
 ): LivePoseWarning[] {
   const warnings: LivePoseWarning[] = [];
-  const privacyCutRatio = ghostPrivacyCutRatioForView(view);
   if (poses.length === 0) warnings.push("person_missing");
   if (poses.length > 1) warnings.push("multiple_people");
 
@@ -163,7 +161,7 @@ function evaluateGuidance(
       const bottom = Math.max(...points.map((point) => point.y));
       const left = Math.min(...points.map((point) => point.x));
       const right = Math.max(...points.map((point) => point.x));
-      if (top <= privacyCutRatio || bottom >= 0.995 || left <= 0.02 || right >= 0.98) {
+      if (bottom >= 0.995 || left <= 0.02 || right >= 0.98) {
         warnings.push("body_out_of_frame");
       }
       const bodySpan = bottom - top;

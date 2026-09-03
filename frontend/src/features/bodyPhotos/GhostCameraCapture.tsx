@@ -4,13 +4,16 @@ import { useTranslation } from "react-i18next";
 import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { GhostScaleControls } from "./GhostScaleControls";
-import { ghostPrivacyCutRatioForView } from "./ghostPhotoEditor";
+import {
+  GHOST_EDITOR_DEFAULT_TRANSFORM,
+  privacyCropSourceYForView,
+} from "./ghostPhotoEditor";
 import {
   createMediaPipeLivePoseGuide,
   type LivePoseGuidance,
   type LivePoseGuideFactory,
 } from "./livePoseGuide";
-import type { BodyPhotoSide, BodyPhotoView } from "./types";
+import type { BodyPhotoSide, BodyPhotoView, GhostTransform } from "./types";
 
 export type CameraFallbackReason =
   | "unsupported"
@@ -54,6 +57,7 @@ export function GhostCameraCapture({
   const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   const streamRef = useRef<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
@@ -64,7 +68,7 @@ export function GhostCameraCapture({
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [ghostScale, setGhostScale] = useState(1);
+  const [ghostTransform, setGhostTransform] = useState<GhostTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
   const [liveStatus, setLiveStatus] = useState<"loading" | "available" | "unavailable" | "disabled">("loading");
   const [guidance, setGuidance] = useState<LivePoseGuidance>({ status: "available", warnings: [] });
 
@@ -82,7 +86,13 @@ export function GhostCameraCapture({
       onFallback("camera_error");
       return;
     }
-    const sourceY = Math.round(video.videoHeight * ghostPrivacyCutRatioForView(view));
+    const displaySize = getCameraDisplaySize(stageRef.current, video.videoWidth, video.videoHeight);
+    const sourceY = Math.round(privacyCropSourceYForView(
+      view,
+      ghostTransform,
+      displaySize,
+      { width: video.videoWidth, height: video.videoHeight },
+    ));
     const outputHeight = video.videoHeight - sourceY;
     canvas.width = video.videoWidth;
     canvas.height = outputHeight;
@@ -123,7 +133,7 @@ export function GhostCameraCapture({
       setStreamReady(false);
       stopCurrentStream();
     }, "image/jpeg", 0.92);
-  }, [facingMode, onFallback, streamReady, view]);
+  }, [facingMode, ghostTransform, onFallback, streamReady, view]);
 
   useEffect(() => {
     const capability = detectCameraCapability();
@@ -305,7 +315,7 @@ export function GhostCameraCapture({
         <h3 id="ghost-camera-title">{t("bodyPhotos.camera.title", { view: t(`bodyPhotos.views.${view}`) })}</h3>
         <p>{t("bodyPhotos.camera.body")}</p>
       </div>
-      <div className="ghost-camera__stage">
+      <div ref={stageRef} className="ghost-camera__stage">
         {capturedPreviewUrl === null ? (
           <video
             ref={videoRef}
@@ -322,12 +332,16 @@ export function GhostCameraCapture({
             alt={t("bodyPhotos.camera.capturedAlt", { view: t(`bodyPhotos.views.${view}`) })}
           />
         )}
-        <GhostOverlayGuide sex={sex} scale={ghostScale} sideProfile={sideProfile} view={view} />
+        <GhostOverlayGuide sex={sex} transform={ghostTransform} sideProfile={sideProfile} view={view} />
       </div>
       <canvas ref={canvasRef} className="ghost-camera__canvas" aria-hidden="true" />
       {capturedFile === null ? (
         <>
-          <GhostScaleControls disabled={confirming} onScaleChange={setGhostScale} scale={ghostScale} />
+          <GhostScaleControls
+            disabled={confirming}
+            onScaleChange={(scale) => setGhostTransform((current) => ({ ...current, scale }))}
+            scale={ghostTransform.scale}
+          />
           <p className="ghost-camera__privacy-note">{t("bodyPhotos.camera.privacyBody")}</p>
           {liveStatus === "unavailable" && <p className="body-photo-muted">{t("bodyPhotos.camera.liveUnavailable")}</p>}
           {liveStatus === "disabled" && <p className="body-photo-muted">{t("bodyPhotos.camera.liveDisabled")}</p>}
@@ -413,3 +427,15 @@ function isSlowDevice(): boolean {
 }
 
 const defaultLivePoseGuideFactory: LivePoseGuideFactory = (view) => createMediaPipeLivePoseGuide(view);
+
+function getCameraDisplaySize(
+  stage: HTMLDivElement | null,
+  fallbackWidth: number,
+  fallbackHeight: number,
+): { width: number; height: number } {
+  const rect = stage?.getBoundingClientRect();
+  return {
+    width: rect !== undefined && rect.width > 0 ? rect.width : fallbackWidth,
+    height: rect !== undefined && rect.height > 0 ? rect.height : fallbackHeight,
+  };
+}
