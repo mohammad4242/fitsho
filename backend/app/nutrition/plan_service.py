@@ -552,6 +552,7 @@ def _selection_trace(selection: CandidateSelection) -> dict[str, object]:
         "template_substitution_policy_version": TEMPLATE_SUBSTITUTION_POLICY_VERSION,
         "budget_optimizer_policy_version": BUDGET_OPTIMIZER_POLICY_VERSION,
         "proposed_candidate_count": len(selection.evaluations),
+        "active_candidate_count": len(selection.evaluations),
         "evaluated_candidate_count": len(selection.evaluations),
         "successful_candidate_count": len(successful),
         "first_valid_program_code": first_valid.program_code if first_valid else None,
@@ -559,6 +560,14 @@ def _selection_trace(selection: CandidateSelection) -> dict[str, object]:
         "selected_differs_from_first_valid": differs,
         "first_valid_quality": _quality_snapshot(first_valid.quality if first_valid else None),
         "selected_quality": _quality_snapshot(selected.quality if selected else None),
+        "selected_quality_not_worse_than_first_valid": (
+            selected.quality.sort_key() <= first_valid.quality.sort_key()
+            if selected is not None
+            and selected.quality is not None
+            and first_valid is not None
+            and first_valid.quality is not None
+            else None
+        ),
         "failure_reason_counts": failure_reason_counts(selection.evaluations),
         "candidates": [
             {
