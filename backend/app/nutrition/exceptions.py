@@ -35,6 +35,8 @@ class NutritionEstimateBlockedError(Exception):
 
 
 class GoalReselectionRequiredDomainError(Exception):
+    """Raised only when a safe target cannot honor the explicit goal contract."""
+
     pass
 
 

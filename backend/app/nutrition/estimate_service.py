@@ -45,12 +45,14 @@ from app.nutrition.schemas import (
 )
 from app.nutrition.scientific import (
     FORMULA_VERSION,
+    GOAL_CONTRACT_VERSION,
     POLICY_VERSION,
     GoalReselectionRequiredError,
     ScientificInputs,
     ScientificResult,
     StructuredExercise,
     TargetInfeasibleError,
+    assess_training_stimulus_alignment,
     calculate_targets,
 )
 from app.nutrition.service import current_safety_decision
@@ -323,6 +325,7 @@ def _estimate_context(db: Session, user_id: UUID) -> EstimateContext:
         fitness_goal=profile.fitness_goal.value,
         structured_exercise=scientific_exercise,
     )
+    training_alignment = assess_training_stimulus_alignment(inputs)
     snapshot: dict[str, object] = {
         "product_mode": profile.product_mode.value,
         "birth_date": profile.birth_date.isoformat(),
@@ -340,6 +343,9 @@ def _estimate_context(db: Session, user_id: UUID) -> EstimateContext:
         "safety_outcome": safety.outcome.value,
         "medical_policy_version": safety.medical_condition_policy_version,
         "nutrition_policy_version": POLICY_VERSION,
+        "goal_contract_version": GOAL_CONTRACT_VERSION,
+        "training_alignment_warning_codes": list(training_alignment.warning_codes),
+        "training_alignment_explanation_codes": list(training_alignment.explanation_codes),
         "formula_version": FORMULA_VERSION,
     }
     signature = sha256(
@@ -510,7 +516,15 @@ def _target_rows(estimate_id: UUID, result: ScientificResult) -> list[NutritionE
             source_ids=_source_ids(metric),
             applicable_population=AUTOMATIC_POPULATION,
             rounding_rule="10 kcal display; 1 g nutrients; 10 mg sodium",
-            explanation_codes=[f"{metric.value.upper()}_ESTIMATE", *result.confidence_reasons],
+            explanation_codes=list(
+                dict.fromkeys(
+                    [
+                        f"{metric.value.upper()}_ESTIMATE",
+                        *result.explanation_codes,
+                        *result.confidence_reasons,
+                    ]
+                )
+            ),
         )
         for metric, band in bands.items()
     ]

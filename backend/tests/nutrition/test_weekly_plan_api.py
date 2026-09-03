@@ -41,7 +41,12 @@ def _birth_date() -> str:
 
 
 def _register_and_estimate(
-    client: TestClient, email: str, *, meals: int = 2, snacks: int = 1
+    client: TestClient,
+    email: str,
+    *,
+    meals: int = 2,
+    snacks: int = 1,
+    goal: str = "maintain_weight",
 ) -> None:
     assert (
         client.post(
@@ -67,7 +72,7 @@ def _register_and_estimate(
                 "sex": "female",
                 "height_cm": 165,
                 "current_weight_kg": 62.5,
-                "fitness_goal": "maintain_weight",
+                "fitness_goal": goal,
             },
         ).status_code
         == 200
@@ -356,6 +361,29 @@ def test_generation_returns_visible_seven_day_draft_and_creates_review(
     revision = client.get(f"/api/v1/nutrition/plans/{body['plan']['id']}")
     assert revision.status_code == 200
     assert revision.json()["id"] == body["plan"]["id"]
+
+
+def test_generation_continues_with_alignment_warning_for_muscle_goal_without_training(
+    client: TestClient, db: Session
+) -> None:
+    _register_and_estimate(
+        client,
+        "weekly-plan-goal-warning@example.com",
+        goal="build_muscle",
+    )
+    _seed_foods_and_prices(db)
+
+    response = client.post("/api/v1/nutrition/plans", headers=ORIGIN)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["outcome"] == "success", body
+    assert "TRAINING_STIMULUS_MISMATCH" in body["warning_codes"]
+    assert "TARGETS_GENERATED_WITH_GOAL_COACHING_WARNING" in body["warning_codes"]
+    assert "TRAINING_STIMULUS_MISMATCH" in body["plan"]["explanation_codes"]
+    profile = client.get("/api/v1/profile/shared", headers=ORIGIN)
+    assert profile.status_code == 200
+    assert profile.json()["fitness_goal"] == "build_muscle"
 
 
 def test_generation_evaluates_every_program_and_persists_only_the_best_result(

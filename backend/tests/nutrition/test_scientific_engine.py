@@ -115,13 +115,27 @@ def test_who_targets_are_derived_from_goal_calories() -> None:
     assert targets.sodium.maximum == Decimal("2300")
 
 
-def test_no_training_rejects_muscle_building_goal() -> None:
+def test_no_training_muscle_building_goal_gets_target_with_coaching_warning() -> None:
     scientific = scientific_module()
 
-    with pytest.raises(scientific.GoalReselectionRequiredError):
-        scientific.calculate_targets(
-            make_inputs(fitness_goal="build_muscle", structured_exercise=None)
-        )
+    result = scientific.calculate_targets(
+        make_inputs(fitness_goal="build_muscle", structured_exercise=None)
+    )
+
+    assert result.goal_calories.preferred is not None
+    assert "TRAINING_STIMULUS_MISMATCH" in result.training_alignment.warning_codes
+    assert "TARGETS_GENERATED_WITH_GOAL_COACHING_WARNING" in result.explanation_codes
+
+
+def test_improve_fitness_uses_supported_conservative_nutrition_target() -> None:
+    scientific = scientific_module()
+
+    result = scientific.calculate_targets(make_inputs(fitness_goal="improve_fitness"))
+
+    assert result.goal_calories.preferred == result.tdee.preferred
+    assert result.goal_calories.minimum == result.tdee.minimum
+    assert result.goal_calories.maximum == result.tdee.maximum
+    assert result.explanation_codes == ("GENERAL_FITNESS_NUTRITION_TARGET",)
 
 
 def test_strength_goal_accepts_resistance_training_with_maintenance_energy() -> None:
@@ -139,6 +153,7 @@ def test_strength_goal_accepts_resistance_training_with_maintenance_energy() -> 
     )
 
     assert result.goal_calories.preferred == result.tdee.preferred
+    assert result.training_alignment.warning_codes == ()
 
 
 def test_macro_energy_conflict_is_structured_as_target_infeasible() -> None:

@@ -128,6 +128,19 @@ _WEEKDAY_INDEX = {
     Weekday.SATURDAY: 5,
     Weekday.SUNDAY: 6,
 }
+_GOAL_WARNING_CODES = frozenset(
+    {
+        "TARGETS_GENERATED_WITH_GOAL_COACHING_WARNING",
+        "TRAINING_STIMULUS_MISMATCH",
+    }
+)
+_GOAL_EXPLANATION_CODES = frozenset(
+    {
+        "GENERAL_FITNESS_NUTRITION_TARGET",
+        "TARGETS_GENERATED_WITH_GOAL_COACHING_WARNING",
+        "TRAINING_STIMULUS_MISMATCH",
+    }
+)
 
 
 class WeeklyPlanNotFoundError(Exception):
@@ -136,6 +149,18 @@ class WeeklyPlanNotFoundError(Exception):
 
 class ActiveWeeklyPlanNotFoundError(Exception):
     pass
+
+
+def _estimate_goal_contract_codes(
+    estimate: NutritionEstimate,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    codes = {
+        code
+        for target in estimate.targets
+        for code in target.explanation_codes
+        if code in _GOAL_EXPLANATION_CODES
+    }
+    return tuple(sorted(codes & _GOAL_WARNING_CODES)), tuple(sorted(codes))
 
 
 def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResponse:
@@ -369,7 +394,16 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         **base_input_snapshot,
         "nutrition_program_id": str(selected_program) if selected_program else None,
         "nutrition_program_code": selected_program_code,
+        "goal_contract_version": estimate.input_snapshot.get("goal_contract_version"),
+        "training_alignment_warning_codes": estimate.input_snapshot.get(
+            "training_alignment_warning_codes", []
+        ),
     }
+    goal_warning_codes, _ = _estimate_goal_contract_codes(estimate)
+    result = replace(
+        result,
+        warning_codes=tuple(sorted(set(result.warning_codes).union(goal_warning_codes))),
+    )
     outcome = NutritionPlanGenerationOutcome(result.outcome.value)
     generation = _persist_generation(
         db,
@@ -760,7 +794,11 @@ def _persist_successful_plan(
             ),
         ],
         warning_codes=list(result.warning_codes),
-        explanation_codes=["DETERMINISTIC_PLAN", "PHYSICIAN_REVIEW_REQUIRED"],
+        explanation_codes=[
+            "DETERMINISTIC_PLAN",
+            "PHYSICIAN_REVIEW_REQUIRED",
+            *_estimate_goal_contract_codes(estimate)[1],
+        ],
         weekly_cost_irr=int(result.weekly_cost_irr),
         weekly_budget_irr=profile.individual_monthly_food_budget_irr * 12 // 52,
         budget_status=NutritionPlanBudgetStatus(result.budget_status),

@@ -5,6 +5,7 @@ from typing import Literal
 
 POLICY_VERSION = "nutrition-science-v1"
 FORMULA_VERSION = "mifflin-net-met-v1"
+GOAL_CONTRACT_VERSION = "nutrition-goal-contract-v1"
 
 MetabolicBasis = Literal["female_coefficient", "male_coefficient"]
 DailyActivity = Literal["sedentary", "light", "moderate", "very_active"]
@@ -49,6 +50,12 @@ class TargetBand:
     preferred: Decimal | None = None
     preferred_maximum: Decimal | None = None
     maximum: Decimal | None = None
+
+
+@dataclass(frozen=True)
+class TrainingAlignment:
+    warning_codes: tuple[str, ...] = ()
+    explanation_codes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -103,6 +110,8 @@ class ScientificResult:
     formula_version: str
     confidence: Confidence
     confidence_reasons: tuple[str, ...]
+    training_alignment: TrainingAlignment
+    explanation_codes: tuple[str, ...]
     protein_calculation_weight_kg: Decimal
     bmr: TargetBand
     non_exercise_energy: TargetBand
@@ -171,7 +180,8 @@ def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
     daily_exercise = _daily_exercise_energy(inputs.weight_kg, inputs.structured_exercise)
     exercise = _point_band(daily_exercise, "kcal/day")
     tdee = _map_band(non_exercise, lambda value: value + daily_exercise)
-    goal_calories = _goal_calorie_band(inputs, bmr, tdee)
+    goal_calories = calculate_safe_nutrition_target(inputs, bmr, tdee)
+    training_alignment = assess_training_stimulus_alignment(inputs)
     calculation_weight = _protein_calculation_weight(inputs.height_cm, inputs.weight_kg)
     protein = TargetBand(
         unit="g/day",
@@ -188,6 +198,8 @@ def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
         formula_version=FORMULA_VERSION,
         confidence=confidence,
         confidence_reasons=reasons,
+        training_alignment=training_alignment,
+        explanation_codes=training_alignment.explanation_codes,
         protein_calculation_weight_kg=calculation_weight,
         bmr=bmr,
         non_exercise_energy=non_exercise,
@@ -249,22 +261,9 @@ def _daily_exercise_energy(weight_kg: Decimal, exercise: StructuredExercise | No
     return weekly / Decimal("7")
 
 
-def _goal_calorie_band(inputs: ScientificInputs, bmr: TargetBand, tdee: TargetBand) -> TargetBand:
-    exercise_type = (
-        inputs.structured_exercise.exercise_type if inputs.structured_exercise is not None else None
-    )
-    if inputs.fitness_goal in {
-        "build_muscle",
-        "body_recomposition",
-        "strength",
-    } and exercise_type not in {
-        "resistance",
-        "mixed",
-    }:
-        raise GoalReselectionRequiredError
-    if inputs.fitness_goal == "improve_fitness":
-        raise GoalReselectionRequiredError
-
+def calculate_safe_nutrition_target(
+    inputs: ScientificInputs, bmr: TargetBand, tdee: TargetBand
+) -> TargetBand:
     if inputs.fitness_goal in {"lose_weight", "fat_loss"}:
         factors = (Decimal("0.80"), Decimal("0.85"), Decimal("0.90"))
     elif inputs.fitness_goal == "gain_weight":
@@ -288,6 +287,28 @@ def _goal_calorie_band(inputs: ScientificInputs, bmr: TargetBand, tdee: TargetBa
         preferred=max(bmr.preferred, tdee.preferred * factors[1]),
         maximum=max(bmr.maximum, tdee.maximum * factors[2]),
     )
+
+
+def assess_training_stimulus_alignment(inputs: ScientificInputs) -> TrainingAlignment:
+    if inputs.fitness_goal == "improve_fitness":
+        return TrainingAlignment(explanation_codes=("GENERAL_FITNESS_NUTRITION_TARGET",))
+
+    exercise_type = (
+        inputs.structured_exercise.exercise_type if inputs.structured_exercise is not None else None
+    )
+    physique_goal = inputs.fitness_goal in {"build_muscle", "body_recomposition", "strength"}
+    if physique_goal and exercise_type not in {"resistance", "mixed"}:
+        return TrainingAlignment(
+            warning_codes=(
+                "TARGETS_GENERATED_WITH_GOAL_COACHING_WARNING",
+                "TRAINING_STIMULUS_MISMATCH",
+            ),
+            explanation_codes=(
+                "TARGETS_GENERATED_WITH_GOAL_COACHING_WARNING",
+                "TRAINING_STIMULUS_MISMATCH",
+            ),
+        )
+    return TrainingAlignment()
 
 
 def _protein_calculation_weight(height_cm: Decimal, actual_weight: Decimal) -> Decimal:

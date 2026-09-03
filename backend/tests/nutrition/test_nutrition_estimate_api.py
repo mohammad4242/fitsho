@@ -228,7 +228,9 @@ def test_combined_mode_reuses_training_profile_for_exercise(client: TestClient) 
     assert estimate.json()["targets"]["protein"]["preferred"] > 100
 
 
-def test_no_training_muscle_goal_returns_reselection_error(client: TestClient) -> None:
+def test_no_training_muscle_goal_creates_estimate_with_alignment_warning(
+    client: TestClient,
+) -> None:
     create_nutrition_member(
         client,
         "estimate-invalid-goal@example.com",
@@ -245,8 +247,39 @@ def test_no_training_muscle_goal_returns_reselection_error(client: TestClient) -
 
     response = client.post("/api/v1/nutrition/estimates", headers=ORIGIN)
 
-    assert response.status_code == 409
-    assert response.json()["detail"]["code"] == "GOAL_RESELECTION_REQUIRED"
+    assert response.status_code == 201
+    assert (
+        "TRAINING_STIMULUS_MISMATCH"
+        in response.json()["targets"]["goal_calories"]["explanation_codes"]
+    )
+    assert (
+        "TARGETS_GENERATED_WITH_GOAL_COACHING_WARNING"
+        in response.json()["targets"]["goal_calories"]["explanation_codes"]
+    )
+    profile = client.get("/api/v1/profile/shared", headers=ORIGIN)
+    assert profile.status_code == 200
+    assert profile.json()["fitness_goal"] == "build_muscle"
+
+
+def test_improve_fitness_creates_a_supported_estimate(client: TestClient) -> None:
+    create_nutrition_member(client, "estimate-improve-fitness@example.com", goal="improve_fitness")
+    assert (
+        client.put(
+            "/api/v1/nutrition/structured-exercise",
+            headers=ORIGIN,
+            json={"trains": False},
+        ).status_code
+        == 200
+    )
+
+    response = client.post("/api/v1/nutrition/estimates", headers=ORIGIN)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["targets"]["goal_calories"]["preferred"] == body["targets"]["tdee"]["preferred"]
+    assert (
+        "GENERAL_FITNESS_NUTRITION_TARGET" in body["targets"]["goal_calories"]["explanation_codes"]
+    )
 
 
 def test_manual_medical_state_blocks_ordinary_estimate(client: TestClient) -> None:
