@@ -18,6 +18,8 @@ from app.nutrition.models import (
     NutritionPreparedRecipeIngredient,
     NutritionPreparedRecipeRatio,
     NutritionPreparedRecipeRevision,
+    NutritionProgramSlot,
+    NutritionWeeklyPlanMeal,
 )
 from app.nutrition.prepared_recipe import (
     CALCULATION_VERSION,
@@ -40,13 +42,20 @@ from app.nutrition.schemas import (
     PreparedRecipeResponse,
     PreparedRecipeWrite,
     PreparedRecipeYieldResponse,
+    SharedCatalogueMealResponse,
 )
 
 CATEGORY_ORDER = tuple(MealCategory)
 
 
+class MealReferencedError(Exception):
+    pass
+
+
 def list_catalogue_meals(
-    db: Session, category: MealCategory | None = None
+    db: Session,
+    category: MealCategory | None = None,
+    verification_status: FoodVerificationStatus | None = None,
 ) -> list[NutritionCatalogueMeal]:
     query = (
         select(NutritionCatalogueMeal)
@@ -70,6 +79,8 @@ def list_catalogue_meals(
     )
     if category is not None:
         query = query.where(NutritionCatalogueMeal.category == category)
+    if verification_status is not None:
+        query = query.where(NutritionCatalogueMeal.verification_status == verification_status)
     return list(db.scalars(query).unique())
 
 
@@ -116,6 +127,41 @@ def update_catalogue_meal(
     meal.items.clear()
     db.flush()
     return _save_catalogue_meal(db, meal, payload)
+
+
+def delete_catalogue_meal(db: Session, meal_id: UUID) -> str | None:
+    meal = db.scalar(
+        select(NutritionCatalogueMeal).where(NutritionCatalogueMeal.id == meal_id).with_for_update()
+    )
+    if meal is None:
+        return None
+
+    program_slot_refs = (
+        db.scalar(
+            select(func.count())
+            .select_from(NutritionProgramSlot)
+            .where(NutritionProgramSlot.meal_id == meal_id)
+        )
+        or 0
+    )
+    weekly_plan_refs = (
+        db.scalar(
+            select(func.count())
+            .select_from(NutritionWeeklyPlanMeal)
+            .where(NutritionWeeklyPlanMeal.catalogue_meal_id == meal_id)
+        )
+        or 0
+    )
+    if program_slot_refs > 0 or weekly_plan_refs > 0:
+        raise MealReferencedError(
+            "Meal is referenced by existing nutrition programs or weekly plans "
+            "and cannot be deleted."
+        )
+
+    image_path = meal.image_path
+    db.delete(meal)
+    db.commit()
+    return image_path
 
 
 def _save_catalogue_meal(
@@ -313,6 +359,33 @@ def preview_prepared_recipe(
             float(calculation.cost_irr_per_100g) if all_prices_available else None
         ),
         price_reference_ids=(list(calculation.price_reference_ids) if all_prices_available else []),
+    )
+
+
+def meal_summary_response(meal: NutritionCatalogueMeal) -> SharedCatalogueMealResponse:
+    return SharedCatalogueMealResponse(
+        id=meal.id,
+        code=meal.code,
+        name_fa=meal.name_fa,
+        name_en=meal.name_en,
+        image_url=meal.image_path,
+        category=meal.category,
+        verification_status=meal.verification_status.value,
+        calculation_mode=meal.calculation_mode,
+        items=[
+            CatalogueMealItemResponse(
+                food_id=item.food_id,
+                food_slug=item.food.slug,
+                food_name_fa=item.food.name_fa,
+                food_name_en=item.food.name_en,
+                reference_grams=float(item.reference_grams),
+                min_grams=float(item.min_grams),
+                max_grams=float(item.max_grams),
+                is_required=item.is_required,
+                functional_role=item.functional_role,
+            )
+            for item in meal.items
+        ],
     )
 
 

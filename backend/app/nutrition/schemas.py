@@ -625,7 +625,7 @@ class PreparedRecipeResponse(BaseModel):
     preview: PreparedRecipePreviewResponse
 
 
-class CatalogueMealResponse(BaseModel):
+class SharedCatalogueMealResponse(BaseModel):
     id: UUID
     code: str
     name_fa: str
@@ -633,27 +633,22 @@ class CatalogueMealResponse(BaseModel):
     image_url: str | None
     category: MealCategory
     verification_status: Literal["draft", "verified", "retired"]
-    calculation_mode: MealCalculationMode
+    calculation_mode: MealCalculationMode = MealCalculationMode.SIMPLE
     items: list[CatalogueMealItemResponse]
+
+
+class SharedCatalogueMealPageResponse(BaseModel):
+    items: list[SharedCatalogueMealResponse]
+    categories: list[MealCategory]
+
+
+class CatalogueMealResponse(SharedCatalogueMealResponse):
     prepared_recipe: PreparedRecipeResponse | None
     totals: dict[str, float | None]
 
 
 class CatalogueMealPageResponse(BaseModel):
     items: list[CatalogueMealResponse]
-    categories: list[MealCategory]
-
-
-class MemberCatalogueMealResponse(BaseModel):
-    id: UUID
-    name_fa: str
-    name_en: str
-    image_url: str | None
-    category: MealCategory
-
-
-class MemberCatalogueMealPageResponse(BaseModel):
-    items: list[MemberCatalogueMealResponse]
     categories: list[MealCategory]
 
 

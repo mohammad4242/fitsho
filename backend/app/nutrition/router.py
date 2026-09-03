@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import (
@@ -105,16 +105,18 @@ from app.nutrition.food_photo_service import (
 )
 from app.nutrition.meal_catalogue import (
     CATEGORY_ORDER,
+    MealReferencedError,
+    delete_catalogue_meal,
     get_catalogue_meal,
     list_catalogue_meals,
     meal_response,
+    meal_summary_response,
     preview_prepared_recipe,
     update_catalogue_meal,
 )
 from app.nutrition.meal_catalogue import (
     create_catalogue_meal as create_meal,
 )
-from app.nutrition.meal_catalogue_view import member_meal_catalogue
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueMeal,
@@ -193,7 +195,6 @@ from app.nutrition.schemas import (
     FreeMealTrackingInput,
     MealFeedbackInput,
     MealLockInput,
-    MemberCatalogueMealPageResponse,
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
@@ -220,6 +221,7 @@ from app.nutrition.schemas import (
     SafetyDecisionResponse,
     SafetyEvaluationResponse,
     SafetyProfileInput,
+    SharedCatalogueMealPageResponse,
     SingleFoodPriceResearchQuoteResponse,
     SingleFoodPriceResearchResponse,
     StructuredExerciseInput,
@@ -565,15 +567,30 @@ async def research_single_food_price(
 
 @router.get(
     "/meal-catalogue",
-    response_model=MemberCatalogueMealPageResponse,
+    response_model=SharedCatalogueMealPageResponse,
 )
-def read_member_meal_catalogue(
+def read_shared_meal_catalogue(
     db: DatabaseSession,
     user: CurrentUser,
     category: MealCategory | None = None,
-) -> MemberCatalogueMealPageResponse:
-    del user
-    return member_meal_catalogue(db, category=category)
+    status_filter: Literal["published", "draft", "all"] = "published",
+) -> SharedCatalogueMealPageResponse:
+    target_status: FoodVerificationStatus | None = FoodVerificationStatus.VERIFIED
+    if user.is_admin:
+        if status_filter == "draft":
+            target_status = FoodVerificationStatus.DRAFT
+        elif status_filter == "all":
+            target_status = None
+        else:
+            target_status = FoodVerificationStatus.VERIFIED
+    else:
+        target_status = FoodVerificationStatus.VERIFIED
+
+    meals = list_catalogue_meals(db, category=category, verification_status=target_status)
+    return SharedCatalogueMealPageResponse(
+        items=[meal_summary_response(meal) for meal in meals],
+        categories=list(CATEGORY_ORDER),
+    )
 
 
 @router.get(
@@ -703,6 +720,32 @@ def upload_catalogue_meal_image(
         raise
     discard_managed_media_path(previous_path, settings, "meal-catalogue")
     return CatalogueMealImageResponse(image_url=stored.public_path)
+
+
+@router.delete(
+    "/admin/meals/{meal_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def remove_catalogue_meal(
+    meal_id: UUID,
+    db: DatabaseSession,
+    admin: AdminUser,
+    settings: AppSettings,
+) -> None:
+    del admin
+    meal = db.get(NutritionCatalogueMeal, meal_id)
+    if meal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meal not found")
+    try:
+        image_path = delete_catalogue_meal(db, meal_id)
+    except MealReferencedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "meal_referenced", "message": str(exc)},
+        ) from exc
+    if image_path:
+        discard_managed_media_path(image_path, settings, "meal-catalogue")
 
 
 @router.get(

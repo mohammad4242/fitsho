@@ -681,16 +681,19 @@ def test_draft_meal_excluded_from_member_and_safe_response_schema(
     # Draft meal must NOT be returned to normal members
     assert str(draft_meal.id) not in member_item_ids
 
-    # Verify member response item schema contains only safe public fields
-    forbidden_fields = {
+    # Verify rich shared card fields are present
+    expected_fields = {
+        "id",
         "code",
+        "name_fa",
+        "name_en",
+        "image_url",
+        "category",
         "verification_status",
         "calculation_mode",
         "items",
-        "min_grams",
-        "max_grams",
-        "is_required",
-        "functional_role",
+    }
+    forbidden_fields = {
         "prepared_recipe",
         "totals",
         "price",
@@ -699,13 +702,26 @@ def test_draft_meal_excluded_from_member_and_safe_response_schema(
         "price_reference_ids",
     }
     for item in member_data["items"]:
-        assert set(item.keys()) == {"id", "name_fa", "name_en", "image_url", "category"}
+        assert expected_fields.issubset(set(item.keys()))
         for field in forbidden_fields:
             assert field not in item
+        for ingredient in item["items"]:
+            assert "food_id" in ingredient
+            assert "food_name_fa" in ingredient
+            assert "min_grams" in ingredient
+            assert "max_grams" in ingredient
+            assert "is_required" in ingredient
 
-    # Verify admin can still view and manage the draft meal
+    # Verify admin can view draft meals via status filter and admin route
     admin_client = TestClient(client.app, cookies=None)
     _register_admin(admin_client, db)
+    admin_shared_resp = admin_client.get(
+        "/api/v1/nutrition/meal-catalogue?category=breakfast&status_filter=draft"
+    )
+    assert admin_shared_resp.status_code == 200
+    admin_shared_ids = {item["id"] for item in admin_shared_resp.json()["items"]}
+    assert str(draft_meal.id) in admin_shared_ids
+
     admin_resp = admin_client.get("/api/v1/nutrition/admin/meals?category=breakfast")
     assert admin_resp.status_code == 200
     admin_data = admin_resp.json()
@@ -721,3 +737,116 @@ def test_admin_meals_still_denies_normal_member(client: TestClient, db: Session)
     resp_post = client.post("/api/v1/nutrition/admin/meals", headers=ORIGIN, json={})
     assert resp_post.status_code == 403
 
+
+def test_safe_delete_catalogue_meal_lifecycle_and_foreign_key_protection(
+    client: TestClient, db: Session
+) -> None:
+    from uuid import uuid4
+
+    from app.nutrition.enums import (
+        FoodVerificationStatus,
+        MealCategory,
+        NutritionDietStyle,
+    )
+    from app.nutrition.food_catalogue import seed_base_iranian_food_catalogue
+    from app.nutrition.meal_catalogue import seed_meal_catalogue
+    from app.nutrition.models import (
+        NutritionCatalogueMeal,
+        NutritionProgram,
+        NutritionProgramDay,
+        NutritionProgramSlot,
+    )
+
+    seed_base_iranian_food_catalogue(db)
+    _add_required_imported_foods(db)
+    seed_meal_catalogue(db)
+
+    unused_meal = NutritionCatalogueMeal(
+        code="DEL01",
+        name_fa="وعده قابل حذف",
+        name_en="Deletable Meal",
+        category=MealCategory.BREAKFAST,
+        verification_status=FoodVerificationStatus.DRAFT,
+    )
+    db.add(unused_meal)
+    db.commit()
+
+    # 1. Unauthenticated delete -> 401
+    unauth_resp = client.delete(f"/api/v1/nutrition/admin/meals/{unused_meal.id}", headers=ORIGIN)
+    assert unauth_resp.status_code == 401
+
+    # 2. Normal member delete -> 403
+    _register_member(client, db, email="delete-normal@example.com")
+    member_resp = client.delete(f"/api/v1/nutrition/admin/meals/{unused_meal.id}", headers=ORIGIN)
+    assert member_resp.status_code == 403
+
+    # 3. Admin delete non-existent meal -> 404
+    admin_client = TestClient(client.app, cookies=None)
+    _register_admin(admin_client, db)
+    non_existent = uuid4()
+    not_found_resp = admin_client.delete(
+        f"/api/v1/nutrition/admin/meals/{non_existent}", headers=ORIGIN
+    )
+    assert not_found_resp.status_code == 404
+
+    # 4. Meal referenced by NutritionProgramSlot -> 409 Conflict, no deletion
+    program_meal = NutritionCatalogueMeal(
+        code="PROG01",
+        name_fa="وعده متصل به برنامه",
+        name_en="Program Bound Meal",
+        category=MealCategory.LUNCH,
+        verification_status=FoodVerificationStatus.VERIFIED,
+    )
+    db.add(program_meal)
+    db.flush()
+
+    program = NutritionProgram(
+        code=f"PR{uuid4().hex[:4]}",
+        slug=f"prog-{uuid4().hex[:8]}",
+        name_fa="برنامه تستی",
+        name_en="Test Program",
+        description_fa="توضیحات برنامه",
+        description_en="Program description",
+        diet_style=NutritionDietStyle.BALANCED_IRANIAN,
+        is_active=True,
+    )
+    db.add(program)
+    db.flush()
+    day = NutritionProgramDay(program_id=program.id, day_number=1)
+    db.add(day)
+    db.flush()
+    slot = NutritionProgramSlot(
+        program_day_id=day.id, category=MealCategory.LUNCH, meal_id=program_meal.id
+    )
+    db.add(slot)
+    db.commit()
+
+    conflict_program_resp = admin_client.delete(
+        f"/api/v1/nutrition/admin/meals/{program_meal.id}", headers=ORIGIN
+    )
+    assert conflict_program_resp.status_code == 409
+    assert conflict_program_resp.json()["detail"]["code"] == "meal_referenced"
+    # Verify meal and slot still exist
+    assert db.get(NutritionCatalogueMeal, program_meal.id) is not None
+    assert db.get(NutritionProgramSlot, slot.id) is not None
+
+    # 5. Weekly plan reference check -> MealReferencedError prevents deletion
+    from unittest.mock import patch
+
+    import pytest
+
+    from app.nutrition.meal_catalogue import MealReferencedError, delete_catalogue_meal
+
+    with patch.object(db, "scalar") as mock_scalar:
+        mock_scalar.side_effect = [program_meal, 0, 1]
+        with pytest.raises(
+            MealReferencedError, match="referenced by existing nutrition programs or weekly plans"
+        ):
+            delete_catalogue_meal(db, program_meal.id)
+
+    # 6. Unreferenced meal -> successfully deleted (204)
+    del_resp = admin_client.delete(
+        f"/api/v1/nutrition/admin/meals/{unused_meal.id}", headers=ORIGIN
+    )
+    assert del_resp.status_code == 204
+    assert db.get(NutritionCatalogueMeal, unused_meal.id) is None
