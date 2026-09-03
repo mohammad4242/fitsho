@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 
+from app.nutrition.budget_optimizer import BudgetRepairAction, optimize_weekly_budget
 from app.nutrition.candidate_selection import quality_for_result
 from app.nutrition.exceptions import ScheduledTemplateUnavailableError
 from app.nutrition.planner_policy import DEFAULT_POLICY, PlannerPolicy
@@ -191,10 +192,14 @@ class PlannerResult:
     warning_codes: tuple[str, ...] = ()
     substitution_actions: tuple[SubstitutionAction, ...] = ()
     substitution_diagnostics: tuple[dict[str, str], ...] = ()
+    budget_repair_actions: tuple[BudgetRepairAction, ...] = ()
+    budget_diagnostics: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         if self.nutrient_comparisons is None:
             object.__setattr__(self, "nutrient_comparisons", {})
+        if self.budget_diagnostics is None:
+            object.__setattr__(self, "budget_diagnostics", {})
 
 
 @dataclass(frozen=True)
@@ -344,18 +349,58 @@ def _evaluate_built_days(
             substitution_actions=substitution_actions,
         )
 
-    days = _repair_prepared_recipe_budget(
-        days,
-        inputs,
-        eligible_templates,
-        policy,
-        optimization_cache=optimization_cache,
+    def build_budget_meal(
+        candidate: EligibleMealTemplate,
+        role: str,
+        slot_index: int,
+        target_kcal: Decimal,
+        maximum_cost_irr: Decimal,
+    ) -> PlannedMeal:
+        return _meal_from_template(
+            role,
+            slot_index,
+            candidate,
+            target_kcal,
+            maximum_recipe_cost_irr=maximum_cost_irr,
+            optimization_cache=optimization_cache,
+        )
+
+    budget_result = optimize_weekly_budget(
+        days=days,
+        inputs=inputs,
+        eligible_templates=eligible_templates,
+        policy=policy,
+        meal_builder=build_budget_meal,
     )
+    days = budget_result.days
     weekly_totals = _sum_nutrients(day.nutrients for day in days)
     daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
     data_completeness = _nutrient_data_completeness(days, inputs)
     comparisons = _comparisons(inputs, daily_average, data_completeness, policy)
-    cost = sum((day.cost_irr for day in days), ZERO).quantize(Decimal("1"))
+    post_repair_validation = _validate_nutritional_feasibility(inputs, daily_average, policy)
+    if _upper_limit_exceeded(inputs, daily_average) or post_repair_validation:
+        return PlannerResult(
+            outcome=GenerationOutcome.TARGET_INFEASIBLE,
+            reason_codes=post_repair_validation or ("NUTRIENT_UPPER_LIMIT_EXCEEDED",),
+            nutrient_comparisons=comparisons,
+            repair_actions=repairs,
+            substitution_actions=substitution_actions,
+            budget_repair_actions=budget_result.repair_actions,
+            budget_diagnostics=budget_result.diagnostics,
+        )
+    cost = budget_result.final_cost_irr
+    if budget_result.failure_code is not None:
+        return PlannerResult(
+            outcome=GenerationOutcome.INFEASIBLE,
+            reason_codes=(budget_result.failure_code,),
+            weekly_cost_irr=cost,
+            budget_status="over_budget",
+            nutrient_comparisons=comparisons,
+            repair_actions=repairs,
+            substitution_actions=substitution_actions,
+            budget_repair_actions=budget_result.repair_actions,
+            budget_diagnostics=budget_result.diagnostics,
+        )
     allowance = Decimal(inputs.weekly_budget_irr)
     if inputs.budget_mode == "strict" and cost > allowance:
         return PlannerResult(
@@ -366,6 +411,8 @@ def _evaluate_built_days(
             nutrient_comparisons=comparisons,
             repair_actions=repairs,
             substitution_actions=substitution_actions,
+            budget_repair_actions=budget_result.repair_actions,
+            budget_diagnostics=budget_result.diagnostics,
         )
     if inputs.budget_mode == "flexible" and cost > allowance * (
         Decimal("1") + policy.flexible_budget_overage_cap
@@ -378,6 +425,8 @@ def _evaluate_built_days(
             nutrient_comparisons=comparisons,
             repair_actions=repairs,
             substitution_actions=substitution_actions,
+            budget_repair_actions=budget_result.repair_actions,
+            budget_diagnostics=budget_result.diagnostics,
         )
     budget_status = "flexible_overage" if cost > allowance else "within_budget"
     warning_codes = _warning_codes(
@@ -397,6 +446,8 @@ def _evaluate_built_days(
         repair_actions=repairs,
         warning_codes=warning_codes,
         substitution_actions=substitution_actions,
+        budget_repair_actions=budget_result.repair_actions,
+        budget_diagnostics=budget_result.diagnostics,
     )
 
 
@@ -1287,76 +1338,6 @@ def _day(day_index: int, meals: tuple[PlannedMeal, ...]) -> PlannedDay:
         cost_irr=sum((meal.cost_irr for meal in meals), ZERO),
         nutrients=tuple(sorted(nutrients.items())),
     )
-
-
-def _repair_prepared_recipe_budget(
-    days: tuple[PlannedDay, ...],
-    inputs: PlannerInput,
-    templates: tuple[EligibleMealTemplate, ...],
-    policy: PlannerPolicy,
-    *,
-    optimization_cache: dict[tuple[object, ...], PlannedFood],
-) -> tuple[PlannedDay, ...]:
-    budget_cap = _weekly_budget_cap(inputs, policy)
-    mutable_days = list(days)
-    templates_by_id = {candidate.template.meal_id: candidate for candidate in templates}
-    locations = sorted(
-        (
-            (food.cost_irr, day_index, meal_index, food_index)
-            for day_index, day in enumerate(days)
-            for meal_index, meal in enumerate(day.meals)
-            for food_index, food in enumerate(meal.foods)
-            if food.item_kind == "prepared_recipe"
-        ),
-        reverse=True,
-    )
-    for _, day_index, meal_index, food_index in locations:
-        weekly_cost = sum((day.cost_irr for day in mutable_days), ZERO)
-        overage = weekly_cost - budget_cap
-        if overage <= ZERO:
-            break
-        day = mutable_days[day_index]
-        meal = day.meals[meal_index]
-        current = meal.foods[food_index]
-        candidate = templates_by_id.get(meal.template_id or "")
-        if candidate is None or candidate.template.prepared_recipe is None:
-            continue
-        nutrients = dict(current.nutrients)
-        for fraction in (Decimal("1"), Decimal("0.75"), Decimal("0.5"), Decimal("0.25")):
-            maximum_cost = max(current.cost_irr - overage * fraction, ZERO)
-            replacement = _cached_optimize_prepared_recipe(
-                candidate.template.prepared_recipe,
-                dict(candidate.prepared_recipe_foods),
-                target_kcal=nutrients.get("energy_kcal", ZERO),
-                target_protein=nutrients.get("protein_g", ZERO),
-                maximum_cost_irr=maximum_cost,
-                optimization_cache=optimization_cache,
-            )
-            if replacement.cost_irr >= current.cost_irr:
-                continue
-            repaired_foods = list(meal.foods)
-            repaired_foods[food_index] = replacement
-            repaired_meal = _meal(
-                meal.role,
-                meal.slot_index,
-                tuple(repaired_foods),
-                template_id=meal.template_id,
-                template_category=meal.template_category,
-            )
-            repaired_meals = list(day.meals)
-            repaired_meals[meal_index] = repaired_meal
-            candidate_days = list(mutable_days)
-            candidate_days[day_index] = _day(day.day_index, tuple(repaired_meals))
-            candidate_totals = _sum_nutrients(item.nutrients for item in candidate_days)
-            candidate_average = {
-                code: value / Decimal("7") for code, value in candidate_totals.items()
-            }
-            invalid_nutrition = _validate_nutritional_feasibility(inputs, candidate_average, policy)
-            if _upper_limit_exceeded(inputs, candidate_average) or invalid_nutrition:
-                continue
-            mutable_days = candidate_days
-            break
-    return tuple(mutable_days)
 
 
 def _cached_optimize_prepared_recipe(

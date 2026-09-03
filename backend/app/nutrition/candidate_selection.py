@@ -201,7 +201,7 @@ def _quality_for_result(
         preference_and_feedback_penalty=ZERO,
         repetition_penalty=ZERO,
         warning_burden=len(result.warning_codes),
-        repair_burden=len(result.repair_actions),
+        repair_burden=len(result.repair_actions) + len(result.budget_repair_actions),
         substitution_burden=len(result.substitution_actions),
         preferred_program_style_penalty=0 if preferred_style else 1,
         stable_program_code=stable_program_code,

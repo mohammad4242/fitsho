@@ -4,9 +4,10 @@ from decimal import Decimal
 PLANNER_POLICY_VERSION = "weekly-planner-v1"
 MEAL_DISTRIBUTION_POLICY_VERSION = "meal-distribution-v1"
 PORTION_POLICY_VERSION = "portion-bounds-v1"
-PLANNER_VERSION = "deterministic-candidate-search-template-substitution-v1"
+PLANNER_VERSION = "deterministic-candidate-search-template-substitution-budget-v1"
 CANDIDATE_SELECTION_POLICY_VERSION = "best-admitted-all-active-programs-v1"
 TEMPLATE_SUBSTITUTION_POLICY_VERSION = "safe-template-substitution-beam-v1"
+BUDGET_OPTIMIZER_POLICY_VERSION = "deterministic-budget-optimizer-v1"
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,9 @@ class PlannerPolicy:
     maximum_substitutes_per_slot: int = 2
     maximum_partial_variants_per_program: int = 8
     maximum_full_variants_per_program: int = 2
+    maximum_budget_repair_iterations: int = 12
+    maximum_budget_feasibility_variants: int = 24
+    maximum_budget_alternatives_per_slot: int = 6
 
 
 DEFAULT_POLICY = PlannerPolicy()

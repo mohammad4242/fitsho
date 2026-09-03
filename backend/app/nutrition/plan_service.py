@@ -70,6 +70,7 @@ from app.nutrition.planner_engine import (
     plan_week,
 )
 from app.nutrition.planner_policy import (
+    BUDGET_OPTIMIZER_POLICY_VERSION,
     CANDIDATE_SELECTION_POLICY_VERSION,
     DEFAULT_POLICY,
     PLANNER_POLICY_VERSION,
@@ -291,6 +292,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "maximum_meal_repetition_per_week": profile.maximum_meal_repetition_per_week,
         "meal_distribution_policy_version": "meal-distribution-v1",
         "template_substitution_policy_version": TEMPLATE_SUBSTITUTION_POLICY_VERSION,
+        "budget_optimizer_policy_version": BUDGET_OPTIMIZER_POLICY_VERSION,
         "budget_formula_version": "annualized-monthly-times-12-divided-52-v1",
         "meal_catalogue_template_ids": [item.meal_id for item in meal_templates],
         "nutrition_program_id": None,
@@ -507,6 +509,7 @@ def _selection_trace(selection: CandidateSelection) -> dict[str, object]:
         "schema_version": "nutrition-selection-trace-v1",
         "strategy": CANDIDATE_SELECTION_POLICY_VERSION,
         "template_substitution_policy_version": TEMPLATE_SUBSTITUTION_POLICY_VERSION,
+        "budget_optimizer_policy_version": BUDGET_OPTIMIZER_POLICY_VERSION,
         "proposed_candidate_count": len(selection.evaluations),
         "evaluated_candidate_count": len(selection.evaluations),
         "successful_candidate_count": len(successful),
@@ -539,6 +542,20 @@ def _selection_trace(selection: CandidateSelection) -> dict[str, object]:
                     for action in evaluation.result.substitution_actions[:32]
                 ],
                 "substitution_diagnostics": list(evaluation.result.substitution_diagnostics[:32]),
+                "budget_repair_actions": [
+                    {
+                        "day_index": action.day_index,
+                        "role": action.role,
+                        "slot_index": action.slot_index,
+                        "action_type": action.action_type,
+                        "before_cost_irr": str(action.before_cost_irr),
+                        "after_cost_irr": str(action.after_cost_irr),
+                        "saved_irr": str(action.saved_irr),
+                        "reason_code": action.reason_code,
+                    }
+                    for action in evaluation.result.budget_repair_actions[:32]
+                ],
+                "budget_diagnostics": evaluation.result.budget_diagnostics,
                 "quality": _quality_snapshot(evaluation.quality),
             }
             for evaluation in selection.evaluations
@@ -718,14 +735,29 @@ def _persist_successful_plan(
         input_snapshot=input_snapshot,
         price_snapshot=price_snapshot,
         repair_snapshot=[
-            {
-                "nutrient_code": action.nutrient_code,
-                "food_slug": action.food_slug,
-                "grams_added": str(action.grams_added),
-                "day_index": action.day_index,
-                "reason_code": action.reason_code,
-            }
-            for action in result.repair_actions
+            *(
+                {
+                    "nutrient_code": action.nutrient_code,
+                    "food_slug": action.food_slug,
+                    "grams_added": str(action.grams_added),
+                    "day_index": action.day_index,
+                    "reason_code": action.reason_code,
+                }
+                for action in result.repair_actions
+            ),
+            *(
+                {
+                    "action_type": action.action_type,
+                    "role": action.role,
+                    "slot_index": action.slot_index,
+                    "before_cost_irr": str(action.before_cost_irr),
+                    "after_cost_irr": str(action.after_cost_irr),
+                    "saved_irr": str(action.saved_irr),
+                    "day_index": action.day_index,
+                    "reason_code": action.reason_code,
+                }
+                for action in result.budget_repair_actions
+            ),
         ],
         warning_codes=list(result.warning_codes),
         explanation_codes=["DETERMINISTIC_PLAN", "PHYSICIAN_REVIEW_REQUIRED"],

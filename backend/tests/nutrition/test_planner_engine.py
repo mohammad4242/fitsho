@@ -553,7 +553,7 @@ def test_strict_budget_is_hard_and_flexible_budget_has_a_versioned_cap() -> None
     )
 
     assert strict.outcome is GenerationOutcome.INFEASIBLE
-    assert "STRICT_BUDGET_EXCEEDED" in strict.reason_codes
+    assert strict.reason_codes == ("INSUFFICIENT_LOW_COST_TEMPLATE_COVERAGE",)
     assert flexible.outcome is GenerationOutcome.SUCCESS
     assert flexible.budget_status in {"within_budget", "flexible_overage"}
 
