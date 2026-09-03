@@ -125,6 +125,47 @@ it("renders rich meal cards with details disclosure for non-admin members", asyn
   expect(screen.queryByText("حذف وعده")).not.toBeInTheDocument();
 });
 
+it("renders concise Persian labels for catalogue ingredient roles", async () => {
+  vi.mocked(api.getMealCatalogue).mockResolvedValueOnce({
+    ...mockData,
+    items: [
+      {
+        ...mockData.items[0],
+        items: [
+          { ...mockData.items[0].items[0], functional_role: "protein" },
+          { ...mockData.items[0].items[0], food_id: "food-2", functional_role: "carbohydrate" },
+          { ...mockData.items[0].items[0], food_id: "food-3", functional_role: "fat" },
+          { ...mockData.items[0].items[0], food_id: "food-4", functional_role: "fibre" },
+          {
+            ...mockData.items[0].items[0],
+            food_id: "food-5",
+            functional_role: "micronutrient_source",
+          },
+        ],
+      },
+    ],
+  });
+
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <MealCataloguePage />
+    </MemoryRouter>,
+  );
+
+  await screen.findByRole("heading", { level: 2, name: "املت گوجه‌فرنگی با نان" });
+  const card = document.querySelector(".admin-meal-card") as HTMLElement;
+  expect(card).toBeInTheDocument();
+  await user.click(within(card).getByText("املت گوجه‌فرنگی با نان"));
+
+  expect(within(card).getByText("پروتئین")).toBeInTheDocument();
+  expect(within(card).getByText("کربوهیدرات")).toBeInTheDocument();
+  expect(within(card).getByText("چربی")).toBeInTheDocument();
+  expect(within(card).getByText("فیبر")).toBeInTheDocument();
+  expect(within(card).getByText("ریزمغذی‌ها")).toBeInTheDocument();
+  expect(within(card).queryByText("mealCatalogue.roles.carbohydrate")).not.toBeInTheDocument();
+});
+
 it("filters by category when a category chip is selected", async () => {
   vi.mocked(api.getMealCatalogue).mockResolvedValue(mockData);
 
