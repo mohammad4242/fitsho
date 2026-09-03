@@ -13,7 +13,9 @@ import { bodyMapVisualMask } from "./bodyMapVisualMasks";
 import { translateExperienceInsight } from "./experienceText";
 import type { BodyAnalysisExperienceRegion } from "./types";
 
+const BODY_MAP_HEIGHT = 1280;
 const BODY_MAP_VIEWBOX = "0 0 853 1280";
+const BODY_MAP_WIDTH = 853;
 
 export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAnalysisExperienceRegion[] }) {
   const { t } = useTranslation();
@@ -40,6 +42,9 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
   const selectedVisualMask = selectedArea === null
     ? undefined
     : bodyMapVisualMask(sex, view, selectedArea);
+  const selectedVisualMaskId = selectedArea === null
+    ? undefined
+    : `body-area-map-visual-mask-${sex}-${view}-${selectedArea}`;
   const areaLabel = useCallback((area: string) => t(`bodyPhotos.results.areas.${area}`), [t]);
   const classificationLabel = useCallback(
     (classification: BodyAnalysisExperienceRegion["display_classification"]) => (
@@ -116,19 +121,37 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
             src={bodyMapArtwork(sex, view)}
             alt={t("bodyAnalysis.map.imageAlt", { sex: sexLabel, view: viewLabel })}
           />
-          {selectedVisualMask !== undefined && (
-            <img
+          {selectedVisualMask !== undefined && selectedVisualMaskId !== undefined && (
+            <svg
               aria-hidden="true"
               className="body-area-map__visual-mask"
               data-area={selectedArea ?? undefined}
               data-mask-file={selectedVisualMask.file}
-              src={bodyMapArtwork(sex, view)}
-              alt=""
-              style={{
-                maskImage: `url(${selectedVisualMask.url})`,
-                WebkitMaskImage: `url(${selectedVisualMask.url})`,
-              }}
-            />
+              preserveAspectRatio="none"
+              viewBox={BODY_MAP_VIEWBOX}
+            >
+              <defs>
+                <clipPath clipPathUnits="userSpaceOnUse" id={selectedVisualMaskId}>
+                  {selectedVisualMask.paths.map((path, index) => (
+                    <path
+                      d={path.d}
+                      key={`${selectedVisualMask.file}-${index}`}
+                      transform={path.transform}
+                    />
+                  ))}
+                </clipPath>
+              </defs>
+              <image
+                className="body-area-map__visual-artwork"
+                clipPath={`url(#${selectedVisualMaskId})`}
+                href={bodyMapArtwork(sex, view)}
+                height={BODY_MAP_HEIGHT}
+                preserveAspectRatio="none"
+                width={BODY_MAP_WIDTH}
+                x="0"
+                y="0"
+              />
+            </svg>
           )}
           <svg
             className="body-area-map__hit-map"
