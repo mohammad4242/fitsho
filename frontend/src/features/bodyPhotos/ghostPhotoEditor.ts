@@ -8,9 +8,6 @@ export const GHOST_EDITOR_OUTPUT = {
 
 export const GHOST_PRIVACY_CUT_RATIO = 0.16;
 export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.08;
-export const GHOST_EDITOR_OUTPUT_HEIGHT = Math.round(
-  GHOST_EDITOR_OUTPUT.height * (1 - GHOST_PRIVACY_CUT_RATIO),
-);
 export const GHOST_EDITOR_TOLERANCE = 0.15;
 
 const minimumScale = GHOST_SCALE_MIN;
@@ -35,10 +32,6 @@ export function ghostPrivacyCutRatioForView(view: BodyPhotoView): number {
 
 export function ghostPercentage(value: number): string {
   return `${formatNumber(value * 100)}%`;
-}
-
-export function ghostEditorOutputHeightForView(view: BodyPhotoView): number {
-  return Math.round(GHOST_EDITOR_OUTPUT.height * (1 - ghostPrivacyCutRatioForView(view)));
 }
 
 export type GhostPhotoRenderPlan = {

@@ -155,6 +155,20 @@ describe("ghost photo transform", () => {
     expect(Math.round(sourceY)).toBe(835);
   });
 
+  it.each(["front", "side", "back"] as const)(
+    "maps the visible %s privacy line to the source crop",
+    (view) => {
+      const expectedSourceY = view === "back" ? 192 : 384;
+
+      expect(privacyCropSourceYForView(
+        view,
+        GHOST_EDITOR_DEFAULT_TRANSFORM,
+        GHOST_EDITOR_OUTPUT,
+        { width: 1600, height: 2400 },
+      )).toBeCloseTo(expectedSourceY, 6);
+    },
+  );
+
   it("builds a deterministic clean render plan with the privacy crop", () => {
     expect(createGhostPhotoRenderPlan(1600, 2400, GHOST_EDITOR_DEFAULT_TRANSFORM)).toEqual({
       canvasWidth: 1200,
