@@ -6,6 +6,7 @@ import {
   deleteCatalogueFood,
   getCurrentNutritionEstimate,
   getLatestWeeklyNutritionPlan,
+  getMealCatalogue,
   getSafetyDecision,
   getStructuredExercise,
   saveNutritionProfile,
@@ -105,4 +106,30 @@ it("deletes a catalogue food through the admin endpoint", async () => {
   );
   const requestInit = vi.mocked(fetch).mock.calls[0]?.[1];
   expect(requestInit?.body).toBeUndefined();
+});
+
+it("fetches the member meal catalogue without category filter", async () => {
+  const fakeResponse = { items: [], categories: ["breakfast", "lunch"] };
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(fakeResponse));
+
+  const result = await getMealCatalogue();
+
+  expect(result).toEqual(fakeResponse);
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/nutrition/meal-catalogue",
+    expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("fetches the member meal catalogue with category query parameter", async () => {
+  const fakeResponse = { items: [], categories: ["breakfast", "lunch"] };
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(fakeResponse));
+
+  const result = await getMealCatalogue("breakfast");
+
+  expect(result).toEqual(fakeResponse);
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/nutrition/meal-catalogue?category=breakfast",
+    expect.objectContaining({ credentials: "include" }),
+  );
 });

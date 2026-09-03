@@ -74,6 +74,7 @@ export function MorePage() {
             {hasTraining && <MoreLink to="/exercises" icon="dumbbell" title={l("کتابخانه حرکات", "Exercise library")} subtitle={l("حرکت‌ها، اجرا و نکات ایمنی", "Exercises, execution, and safety notes")} />}
             {hasTraining && <MoreLink to="/body-progress" icon="body" title="Body Analysis" subtitle={l("جلسه‌ها و تحلیل‌های ثبت‌شده", "Saved sessions and analyses")} />}
             {hasNutrition && <MoreLink to="/food-catalogue" icon="nutrition" title={l("کاتالوگ مواد غذایی", "Food catalogue")} subtitle={l("مرجع سریع ارزش غذایی", "Fast nutrition reference")} />}
+            <MoreLink to="/meal-catalogue" icon="nutrition" title={l("کاتالوگ وعده‌های غذایی", "Meal catalogue")} subtitle={l("وعده‌هایی که فیتشو در حال حاضر پشتیبانی می‌کند", "Meals currently supported by Fitsho")} />
             {hasNutrition && <MoreLink to="/nutrition-tracking" icon="target" title={l("ثبت تغذیه", "Nutrition tracking")} subtitle={l("پیگیری ساده وضعیت روز", "Simple daily check-in")} />}
           </MoreGroup>
 

@@ -1763,6 +1763,25 @@ const en = {
       catalogEyebrow: "Exercise Library",
       catalogTitle: "Find the right movement",
     },
+    mealCatalogue: {
+      eyebrow: "Fitsho catalogue",
+      title: "Meal catalogue",
+      intro: "Meals currently supported by the Fitsho nutrition system.",
+      categoryFilter: "Meal category",
+      allCategories: "All",
+      categories: {
+        breakfast: "Breakfast",
+        lunch: "Lunch",
+        post_workout: "Post-workout",
+        snack: "Snack",
+        dinner: "Dinner",
+      },
+      loading: "Loading meals…",
+      loadError: "The meal catalogue could not be loaded.",
+      retry: "Try again",
+      empty: "No meals found in this category.",
+      imageFallback: "Placeholder image for {{name}}",
+    },
   },
 };
 

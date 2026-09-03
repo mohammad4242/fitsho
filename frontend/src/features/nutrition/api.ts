@@ -101,6 +101,33 @@ export function getAdminFoodCatalogue(input: FoodCatalogueQuery = {}): Promise<A
   return getCatalogueAtPath<AdminFoodCatalogueResponse>("admin/food-catalogue", input);
 }
 
+export type MealCatalogueCategory =
+  | "breakfast"
+  | "lunch"
+  | "post_workout"
+  | "snack"
+  | "dinner";
+
+export type MealCatalogueItem = {
+  id: string;
+  name_fa: string;
+  name_en: string;
+  image_url: string | null;
+  category: MealCatalogueCategory;
+};
+
+export type MealCatalogueResponse = {
+  items: MealCatalogueItem[];
+  categories: MealCatalogueCategory[];
+};
+
+export function getMealCatalogue(
+  category?: MealCatalogueCategory,
+): Promise<MealCatalogueResponse> {
+  const query = category ? `?category=${encodeURIComponent(category)}` : "";
+  return request<MealCatalogueResponse>(`${nutritionPath}/meal-catalogue${query}`);
+}
+
 export function deleteCatalogueFood(slug: string): Promise<void> {
   return request(`${nutritionPath}/admin/foods/${slug}`, {
     method: "DELETE",

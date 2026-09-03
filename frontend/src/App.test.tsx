@@ -46,6 +46,7 @@ const profile = vi.hoisted(() => ({
       created_at: string;
       updated_at: string;
     },
+    productMode: undefined as "both" | "training" | "nutrition" | undefined,
     status: "idle" as "idle" | "loading" | "missing" | "mode_selected" | "ready" | "error",
     retryProfile: vi.fn(),
     createProfile: vi.fn(),
@@ -74,6 +75,13 @@ const workoutReviewApi = vi.hoisted(() => ({
 const physicianApi = vi.hoisted(() => ({
   verifyPhysicianAccess: vi.fn(),
   listPhysicianReviews: vi.fn(),
+  getMealCatalogue: vi.fn(async () => ({
+    items: [],
+    categories: ["breakfast", "lunch", "post_workout", "snack", "dinner"],
+  })),
+  getLatestWeeklyNutritionPlan: vi.fn(async () => null),
+  getCurrentNutritionEstimate: vi.fn(async () => null),
+  getDailyTracking: vi.fn(async () => null),
 }));
 
 vi.mock("./features/auth/AuthContext", () => ({
@@ -149,6 +157,7 @@ beforeEach(() => {
   auth.value.logout.mockReset();
   profile.value.status = "idle";
   profile.value.profile = null;
+  profile.value.productMode = undefined;
   profile.value.retryProfile.mockReset();
   exerciseApi.getExerciseCategories.mockReset();
   exerciseApi.getExercises.mockReset();
@@ -575,3 +584,53 @@ function renderRoute(path: string) {
     </MemoryRouter>,
   );
 }
+
+it("lets a normal authenticated completed member open the meal catalogue route", async () => {
+  setReadyMember();
+  renderRoute("/meal-catalogue");
+
+  expect(
+    await screen.findByRole("heading", { name: "کاتالوگ وعده‌های غذایی" }),
+  ).toBeInTheDocument();
+});
+
+it("allows access to meal catalogue for training-only members without nutrition mode", async () => {
+  setReadyMember();
+  profile.value.productMode = "training";
+  renderRoute("/meal-catalogue");
+
+  expect(
+    await screen.findByRole("heading", { name: "کاتالوگ وعده‌های غذایی" }),
+  ).toBeInTheDocument();
+});
+
+it("redirects non-admin away from admin nutrition meals route", async () => {
+  setReadyMember();
+  renderRoute("/admin/nutrition-meals");
+
+  expect(
+    await screen.findByRole("heading", { name: "سلام، Mohammad" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("ترکیب‌های کنترل‌شده تغذیه")).not.toBeInTheDocument();
+});
+
+it("lets an admin open the admin nutrition meals route", async () => {
+  auth.value.user = { ...member, is_admin: true };
+  profile.value.status = "missing";
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        items: [],
+        categories: ["breakfast", "lunch", "post_workout", "snack", "dinner"],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    ),
+  );
+
+  renderRoute("/admin/nutrition-meals");
+
+  expect(
+    await screen.findByText("ترکیب‌های کنترل‌شده تغذیه"),
+  ).toBeInTheDocument();
+  fetchMock.mockRestore();
+});

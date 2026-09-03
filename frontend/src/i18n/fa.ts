@@ -1765,6 +1765,25 @@ const fa = {
       catalogEyebrow: "کتابخانه حرکات",
       catalogTitle: "حرکت مناسب را پیدا کن",
     },
+    mealCatalogue: {
+      eyebrow: "کاتالوگ فیتشو",
+      title: "کاتالوگ وعده‌های غذایی",
+      intro: "وعده‌هایی که فیتشو در حال حاضر در سیستم تغذیه پشتیبانی می‌کند.",
+      categoryFilter: "دسته‌بندی وعده‌ها",
+      allCategories: "همه",
+      categories: {
+        breakfast: "صبحانه",
+        lunch: "ناهار",
+        post_workout: "پس از تمرین",
+        snack: "میان‌وعده",
+        dinner: "شام",
+      },
+      loading: "در حال دریافت وعده‌ها…",
+      loadError: "کاتالوگ وعده‌ها دریافت نشد.",
+      retry: "تلاش دوباره",
+      empty: "در این دسته وعده‌ای یافت نشد.",
+      imageFallback: "تصویر پیش‌فرض {{name}}",
+    },
   },
 };
 

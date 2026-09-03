@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import "../i18n";
 
 const logout = vi.fn(async () => undefined);
 const auth = vi.hoisted(() => ({ isAdmin: false }));
+const profileState = vi.hoisted(() => ({ productMode: "both" as "both" | "training" | "nutrition" }));
 
 vi.mock("../features/auth/AuthContext", () => ({
   useAuth: () => ({
@@ -18,7 +19,7 @@ vi.mock("../features/auth/AuthContext", () => ({
 vi.mock("../features/profile/ProfileContext", () => ({
   useProfile: () => ({
     profile: { display_name: "محمد" },
-    productMode: "both",
+    productMode: profileState.productMode,
     status: "ready",
   }),
 }));
@@ -86,4 +87,52 @@ it("does not show a separate exercise administration workspace", () => {
 
   expect(screen.queryByRole("link", { name: /مدیریت حرکات/ })).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: /کتابخانه حرکات/ })).toHaveAttribute("href", "/exercises");
+});
+
+it("shows the meal catalogue in the product group for non-admin members", () => {
+  auth.isAdmin = false;
+  profileState.productMode = "both";
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  const productGroup = screen.getByRole("region", { name: "محصول" });
+  expect(within(productGroup).getByRole("link", { name: /کاتالوگ وعده‌های غذایی/ })).toHaveAttribute(
+    "href",
+    "/meal-catalogue",
+  );
+  expect(screen.queryByRole("link", { name: /فضاهای تخصصی/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "/admin/nutrition-meals" })).not.toBeInTheDocument();
+});
+
+it("shows the meal catalogue for training-only members", () => {
+  auth.isAdmin = false;
+  profileState.productMode = "training";
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  const productGroup = screen.getByRole("region", { name: "محصول" });
+  expect(within(productGroup).getByRole("link", { name: /کاتالوگ وعده‌های غذایی/ })).toHaveAttribute(
+    "href",
+    "/meal-catalogue",
+  );
+  expect(within(productGroup).queryByRole("link", { name: /کاتالوگ مواد غذایی/ })).not.toBeInTheDocument();
+});
+
+it("shows both member meal catalogue in product and admin management in workspaces for administrators", () => {
+  auth.isAdmin = true;
+  profileState.productMode = "both";
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  const productGroup = screen.getByRole("region", { name: "محصول" });
+  expect(within(productGroup).getByRole("link", { name: /کاتالوگ وعده‌های غذایی/ })).toHaveAttribute(
+    "href",
+    "/meal-catalogue",
+  );
+
+  const workspacesGroup = screen.getByRole("region", { name: "فضاهای تخصصی" });
+  expect(within(workspacesGroup).getByRole("link", { name: /کاتالوگ وعده‌های غذایی/ })).toHaveAttribute(
+    "href",
+    "/admin/nutrition-meals",
+  );
 });
