@@ -1,4 +1,9 @@
-import { GHOST_SCALE_MAX, GHOST_SCALE_MIN } from "./ghostScale";
+import {
+  GHOST_SCALE_MAX,
+  GHOST_SCALE_MIN,
+  PHOTO_SCALE_MAX,
+  PHOTO_SCALE_MIN,
+} from "./ghostScale";
 import type { BodyPhotoView, GhostTransform } from "./types";
 
 export const GHOST_EDITOR_OUTPUT = {
@@ -10,8 +15,8 @@ export const GHOST_PRIVACY_CUT_RATIO = 0.16;
 export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.08;
 export const GHOST_EDITOR_TOLERANCE = 0.15;
 
-const minimumScale = GHOST_SCALE_MIN;
-const maximumScale = GHOST_SCALE_MAX;
+const minimumPhotoScale = PHOTO_SCALE_MIN;
+const maximumPhotoScale = PHOTO_SCALE_MAX;
 const minimumRotation = -180;
 const maximumRotation = 180;
 const minimumTranslation = -0.5;
@@ -44,14 +49,10 @@ export type GhostPhotoRenderPlan = {
   privacyCutPixels: number;
   privacyLineDisplayY: number;
   draw: {
-    sourceX: number;
-    sourceY: number;
-    sourceWidth: number;
-    sourceHeight: number;
-    destinationX: number;
-    destinationY: number;
-    destinationWidth: number;
-    destinationHeight: number;
+    translateX: number;
+    translateY: number;
+    rotationRadians: number;
+    scale: number;
   };
 };
 
@@ -86,17 +87,12 @@ export type DecodedGhostPhoto = {
 export type GhostPhotoCanvasContext = {
   fillStyle: string | CanvasGradient | CanvasPattern;
   fillRect: (x: number, y: number, width: number, height: number) => void;
-  drawImage: (
-    image: CanvasImageSource,
-    sourceX: number,
-    sourceY: number,
-    sourceWidth: number,
-    sourceHeight: number,
-    destinationX: number,
-    destinationY: number,
-    destinationWidth: number,
-    destinationHeight: number,
-  ) => void;
+  save: () => void;
+  translate: (x: number, y: number) => void;
+  rotate: (angle: number) => void;
+  scale: (x: number, y: number) => void;
+  drawImage: (image: CanvasImageSource, x: number, y: number) => void;
+  restore: () => void;
 };
 
 export type GhostPhotoCanvas = {
@@ -117,7 +113,7 @@ export function clampGhostPhotoTransform(
   return {
     translateX: clamp(transform.translateX, minimumTranslation, maximumTranslation),
     translateY: clamp(transform.translateY, minimumTranslation, maximumTranslation),
-    scale: clamp(transform.scale, minimumScale, maximumScale),
+    scale: clamp(transform.scale, minimumPhotoScale, maximumPhotoScale),
     rotation: clamp(transform.rotation, minimumRotation, maximumRotation),
   };
 }
@@ -128,7 +124,13 @@ export function ghostPhotoTransformStyle(
 ): string {
   const safeTransform = clampGhostPhotoTransform(transform);
   const mirror = mirrored ? "scaleX(-1) " : "";
-  return `${mirror}translate(${formatNumber(safeTransform.translateX * 100)}%, ${formatNumber(safeTransform.translateY * 100)}%) rotate(${formatNumber(safeTransform.rotation)}deg) scale(${formatNumber(safeTransform.scale)})`;
+  return `${mirror}translate(-50%, -50%) translate(${formatNumber(safeTransform.translateX * 100)}%, ${formatNumber(safeTransform.translateY * 100)}%) rotate(${formatNumber(safeTransform.rotation)}deg) scale(${formatNumber(safeTransform.scale)})`;
+}
+
+export function ghostGuideTransformStyle(scale: number, mirrored = false): string {
+  const safeScale = clamp(scale, GHOST_SCALE_MIN, GHOST_SCALE_MAX);
+  const mirror = mirrored ? "scaleX(-1) " : "";
+  return `${mirror}scale(${formatNumber(safeScale)})`;
 }
 
 export function isGhostFramingWithinTolerance(
@@ -142,17 +144,17 @@ export function isGhostFramingWithinTolerance(
 
 export function ghostPrivacyLineGeometry(
   view: BodyPhotoView,
-  transform: GhostPhotoTransform,
+  ghostScale = 1,
   mirrored = false,
 ): GhostPrivacyLineGeometry {
-  const safeTransform = clampGhostPhotoTransform(transform);
-  const transformedAnchor = transformGhostPoint(
+  const safeScale = clamp(ghostScale, GHOST_SCALE_MIN, GHOST_SCALE_MAX);
+  const transformedAnchor = transformGhostGuidePoint(
     { x: 0.5, y: ghostPrivacyCutRatioForView(view) },
-    safeTransform,
+    safeScale,
   );
   // The privacy boundary is a horizontal raster crop. Its row follows the
-  // transformed neck anchor so the visible line and the encoded crop agree.
-  const halfLineLength = safeTransform.scale / 2;
+  // centered Ghost neck anchor so the visible line and encoded crop agree.
+  const halfLineLength = safeScale / 2;
   const transformedStart = {
     x: transformedAnchor.x - halfLineLength,
     y: transformedAnchor.y,
@@ -195,11 +197,11 @@ export function containImageRect(
 
 export function privacyCropSourceYForView(
   view: BodyPhotoView,
-  transform: GhostPhotoTransform,
+  ghostScale: number,
   displaySize: GhostDisplaySize,
   sourceSize: GhostDisplaySize,
 ): number {
-  const line = ghostPrivacyLineGeometry(view, transform);
+  const line = ghostPrivacyLineGeometry(view, ghostScale);
   const imageRect = containImageRect(displaySize, sourceSize);
   const displayY = line.anchor.y * displaySize.height;
   return clamp(
@@ -214,6 +216,7 @@ export function createGhostPhotoRenderPlan(
   sourceHeight: number,
   transform: GhostPhotoTransform,
   view: BodyPhotoView = "front",
+  ghostScale = 1,
 ): GhostPhotoRenderPlan {
   if (sourceWidth <= 0 || sourceHeight <= 0) {
     throw new Error("Ghost photo source dimensions must be positive");
@@ -222,24 +225,20 @@ export function createGhostPhotoRenderPlan(
     GHOST_EDITOR_OUTPUT.width / sourceWidth,
     GHOST_EDITOR_OUTPUT.height / sourceHeight,
   );
+  const safeTransform = clampGhostPhotoTransform(transform);
   const privacyLineDisplayY = Math.round(
-    ghostPrivacyLineGeometry(view, transform).anchor.y * GHOST_EDITOR_OUTPUT.height,
+    ghostPrivacyLineGeometry(view, ghostScale).anchor.y * GHOST_EDITOR_OUTPUT.height,
   );
   const sourceCropY = Math.round(privacyCropSourceYForView(
     view,
-    transform,
+    ghostScale,
     GHOST_EDITOR_OUTPUT,
     { width: sourceWidth, height: sourceHeight },
   ));
-  const sourceCropHeight = Math.max(1, sourceHeight - sourceCropY);
-  const destinationWidth = sourceWidth * baseScale;
-  const destinationHeight = sourceCropHeight * baseScale;
-  const privacyCutPixels = Math.round(
-    sourceCropY * baseScale,
-  );
+  const privacyCutPixels = privacyLineDisplayY;
   return {
     canvasWidth: GHOST_EDITOR_OUTPUT.width,
-    canvasHeight: Math.max(1, Math.round(destinationHeight)),
+    canvasHeight: Math.max(1, GHOST_EDITOR_OUTPUT.height - privacyCutPixels),
     sourceWidth,
     sourceHeight,
     baseScale,
@@ -247,28 +246,45 @@ export function createGhostPhotoRenderPlan(
     privacyCutPixels,
     privacyLineDisplayY,
     draw: {
-      sourceX: 0,
-      sourceY: sourceCropY,
-      sourceWidth,
-      sourceHeight: sourceCropHeight,
-      destinationX: (GHOST_EDITOR_OUTPUT.width - destinationWidth) / 2,
-      destinationY: 0,
-      destinationWidth,
-      destinationHeight,
+      translateX: GHOST_EDITOR_OUTPUT.width / 2
+        + safeTransform.translateX * GHOST_EDITOR_OUTPUT.width,
+      translateY: GHOST_EDITOR_OUTPUT.height / 2
+        - privacyCutPixels
+        + safeTransform.translateY * GHOST_EDITOR_OUTPUT.height,
+      rotationRadians: safeTransform.rotation * Math.PI / 180,
+      scale: baseScale * safeTransform.scale,
     },
   };
 }
+
+export function renderGhostPhoto(
+  file: File,
+  transform: GhostPhotoTransform,
+  view?: BodyPhotoView,
+  ghostScale?: number,
+  runtime?: GhostPhotoCanvasRuntime,
+): Promise<File>;
+
+export function renderGhostPhoto(
+  file: File,
+  transform: GhostPhotoTransform,
+  view: BodyPhotoView,
+  runtime: GhostPhotoCanvasRuntime,
+): Promise<File>;
 
 export async function renderGhostPhoto(
   file: File,
   transform: GhostPhotoTransform,
   view: BodyPhotoView = "front",
+  ghostScaleOrRuntime: number | GhostPhotoCanvasRuntime = 1,
   runtime: GhostPhotoCanvasRuntime = browserGhostPhotoCanvasRuntime,
 ): Promise<File> {
-  const image = await runtime.decode(file);
+  const ghostScale = typeof ghostScaleOrRuntime === "number" ? ghostScaleOrRuntime : 1;
+  const canvasRuntime = typeof ghostScaleOrRuntime === "number" ? runtime : ghostScaleOrRuntime;
+  const image = await canvasRuntime.decode(file);
   try {
-    const plan = createGhostPhotoRenderPlan(image.width, image.height, transform, view);
-    const canvas = runtime.createCanvas(plan.canvasWidth, plan.canvasHeight);
+    const plan = createGhostPhotoRenderPlan(image.width, image.height, transform, view, ghostScale);
+    const canvas = canvasRuntime.createCanvas(plan.canvasWidth, plan.canvasHeight);
     canvas.width = plan.canvasWidth;
     canvas.height = plan.canvasHeight;
     const context = canvas.getContext("2d");
@@ -276,19 +292,14 @@ export async function renderGhostPhoto(
 
     context.fillStyle = "rgb(160, 163, 161)";
     context.fillRect(0, 0, plan.canvasWidth, plan.canvasHeight);
-    context.drawImage(
-      image.source,
-      plan.draw.sourceX,
-      plan.draw.sourceY,
-      plan.draw.sourceWidth,
-      plan.draw.sourceHeight,
-      plan.draw.destinationX,
-      plan.draw.destinationY,
-      plan.draw.destinationWidth,
-      plan.draw.destinationHeight,
-    );
+    context.save();
+    context.translate(plan.draw.translateX, plan.draw.translateY);
+    context.rotate(plan.draw.rotationRadians);
+    context.scale(plan.draw.scale, plan.draw.scale);
+    context.drawImage(image.source, -plan.sourceWidth / 2, -plan.sourceHeight / 2);
+    context.restore();
 
-    const blob = await runtime.toJpeg(canvas, 0.9);
+    const blob = await canvasRuntime.toJpeg(canvas, 0.9);
     if (blob.size === 0 || blob.type !== "image/jpeg") {
       throw new Error("Ghost photo output is unavailable");
     }
@@ -305,15 +316,12 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : 0));
 }
 
-function transformGhostPoint(point: GhostPoint, transform: GhostPhotoTransform): GhostPoint {
-  const radians = transform.rotation * Math.PI / 180;
-  const cosine = Math.cos(radians);
-  const sine = Math.sin(radians);
-  const relativeX = (point.x - 0.5) * transform.scale;
-  const relativeY = (point.y - 0.5) * transform.scale;
+function transformGhostGuidePoint(point: GhostPoint, scale: number): GhostPoint {
+  const relativeX = (point.x - 0.5) * scale;
+  const relativeY = (point.y - 0.5) * scale;
   return {
-    x: 0.5 + relativeX * cosine - relativeY * sine + transform.translateX,
-    y: 0.5 + relativeX * sine + relativeY * cosine + transform.translateY,
+    x: 0.5 + relativeX,
+    y: 0.5 + relativeY,
   };
 }
 

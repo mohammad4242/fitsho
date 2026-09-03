@@ -55,19 +55,19 @@ it("supports keyboard-accessible photo zoom, rotation, and reset controls withou
   const image = screen.getByRole("img", { name: /photo being aligned/i });
   const ghost = screen.getByRole("img", { name: /loose front body-position silhouette/i });
 
-  fireEvent.click(screen.getByRole("button", { name: /zoom in/i }));
+  fireEvent.click(screen.getByRole("button", { name: /zoom photo in/i }));
   expect(image).toHaveStyle({
     transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 1.1 }),
   });
   expect(ghost).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
 
-  fireEvent.click(screen.getByRole("button", { name: /rotate right/i }));
+  fireEvent.click(screen.getByRole("button", { name: /rotate photo right/i }));
   expect(image).toHaveStyle({
     transform: ghostPhotoTransformStyle({ ...GHOST_EDITOR_DEFAULT_TRANSFORM, scale: 1.1, rotation: 1 }),
   });
   expect(ghost).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
 
-  fireEvent.click(screen.getByRole("button", { name: /reset framing/i }));
+  fireEvent.click(screen.getByRole("button", { name: /reset photo framing/i }));
   expect(image).toHaveStyle({
     transform: ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM),
   });
@@ -109,7 +109,7 @@ it("allows a quarter-turn through the rotation slider", () => {
   renderEditor();
   const image = screen.getByRole("img", { name: /photo being aligned/i });
   const ghost = screen.getByRole("img", { name: /loose front body-position silhouette/i });
-  const rotationSlider = screen.getByRole("slider", { name: /rotation/i });
+  const rotationSlider = screen.getByRole("slider", { name: /photo rotation/i });
 
   expect(rotationSlider).toHaveAttribute("min", "-180");
   expect(rotationSlider).toHaveAttribute("max", "180");
@@ -146,7 +146,7 @@ it("moves the photo with a pointer drag while keeping Ghost fixed", () => {
     }),
   });
   expect(frame).toHaveStyle({ transform: ghostGuideTransformStyle(staticGhostScale) });
-  expect(screen.getByRole("status")).toHaveTextContent(/move the photo closer/i);
+  expect(screen.getByRole("status")).toHaveTextContent(/move your photo closer/i);
 });
 
 it.each(["front", "side", "back"] as const)("uses two active pointers to pinch-zoom and rotate the %s photo", (view) => {

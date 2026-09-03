@@ -146,11 +146,11 @@ it("changes only the centered Ghost size in uniform five-percent steps", () => {
   expect(video.className).toBe(initialVideoClass);
 
   for (let click = 0; click < 4; click += 1) fireEvent.click(smaller);
-  expect(frame).toHaveStyle({ transform: "translate(0%, 0%) rotate(0deg) scale(0.75)" });
+  expect(frame).toHaveStyle({ transform: "scale(0.75)" });
   expect(smaller).toBeDisabled();
 
   for (let click = 0; click < 8; click += 1) fireEvent.click(larger);
-  expect(frame).toHaveStyle({ transform: "translate(0%, 0%) rotate(0deg) scale(1.15)" });
+  expect(frame).toHaveStyle({ transform: "scale(1.15)" });
   expect(larger).toBeDisabled();
 
   rendered.unmount();

@@ -4,11 +4,16 @@ import { useTranslation } from "react-i18next";
 import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { GhostScaleControls } from "./GhostScaleControls";
-import { GHOST_SCALE_MAX, GHOST_SCALE_MIN } from "./ghostScale";
+import {
+  PHOTO_SCALE_MAX,
+  PHOTO_SCALE_MIN,
+  PHOTO_SCALE_STEP,
+} from "./ghostScale";
 import {
   clampGhostPhotoTransform,
   GHOST_EDITOR_DEFAULT_TRANSFORM,
   GHOST_EDITOR_OUTPUT,
+  ghostPhotoTransformStyle,
   isGhostFramingWithinTolerance,
   renderGhostPhoto,
 } from "./ghostPhotoEditor";
@@ -18,7 +23,15 @@ export type GhostPhotoRenderer = (
   file: File,
   transform: GhostTransform,
   view: BodyPhotoView,
+  ghostScale: number,
 ) => Promise<File>;
+
+const defaultGhostPhotoRenderer: GhostPhotoRenderer = (
+  file,
+  transform,
+  view,
+  ghostScale,
+) => renderGhostPhoto(file, transform, view, ghostScale);
 
 type GhostPhotoEditorProps = {
   file: File;
@@ -54,7 +67,6 @@ type PinchGesture = {
   stageHeight: number;
 };
 
-const zoomStep = 0.1;
 const rotationStep = 1;
 
 export function GhostPhotoEditor({
@@ -64,14 +76,15 @@ export function GhostPhotoEditor({
   view,
   onConfirm,
   onCancel,
-  renderPhoto = renderGhostPhoto,
+  renderPhoto = defaultGhostPhotoRenderer,
 }: GhostPhotoEditorProps) {
   const { t } = useTranslation();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const pointersRef = useRef(new Map<number, GhostPhotoPoint>());
   const pinchRef = useRef<PinchGesture | null>(null);
-  const [transform, setTransform] = useState<GhostTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
+  const [photoTransform, setPhotoTransform] = useState<GhostTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
+  const [ghostScale, setGhostScale] = useState(1);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,8 +94,8 @@ export function GhostPhotoEditor({
     return () => URL.revokeObjectURL(nextPreviewUrl);
   }, [file]);
 
-  function updateTransform(update: (current: GhostTransform) => GhostTransform) {
-    setTransform((current) => clampGhostPhotoTransform(update(current)));
+  function updatePhotoTransform(update: (current: GhostTransform) => GhostTransform) {
+    setPhotoTransform((current) => clampGhostPhotoTransform(update(current)));
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -93,15 +106,15 @@ export function GhostPhotoEditor({
     const points = firstTwoPointerPoints(pointersRef.current);
     if (pointersRef.current.size >= 2 && points !== null) {
       dragRef.current = null;
-      pinchRef.current = createPinchGesture(points[0], points[1], transform, stageSize);
+      pinchRef.current = createPinchGesture(points[0], points[1], photoTransform, stageSize);
       return;
     }
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originX: transform.translateX,
-      originY: transform.translateY,
+      originX: photoTransform.translateX,
+      originY: photoTransform.translateY,
       stageWidth: stageSize.width,
       stageHeight: stageSize.height,
     };
@@ -115,12 +128,12 @@ export function GhostPhotoEditor({
     const points = firstTwoPointerPoints(pointers);
     if (pinch !== null && points !== null) {
       event.preventDefault();
-      setTransform(clampGhostPhotoTransform(applyPinchGesture(pinch, points[0], points[1])));
+      setPhotoTransform(clampGhostPhotoTransform(applyPinchGesture(pinch, points[0], points[1])));
       return;
     }
     const drag = dragRef.current;
     if (drag === null || drag.pointerId !== event.pointerId) return;
-    updateTransform((current) => ({
+    updatePhotoTransform((current) => ({
       ...current,
       translateX: drag.originX + (event.clientX - drag.startX) / drag.stageWidth,
       translateY: drag.originY + (event.clientY - drag.startY) / drag.stageHeight,
@@ -139,8 +152,8 @@ export function GhostPhotoEditor({
         pointerId,
         startX: point.x,
         startY: point.y,
-        originX: transform.translateX,
-        originY: transform.translateY,
+        originX: photoTransform.translateX,
+        originY: photoTransform.translateY,
         stageWidth: stageSize.width,
         stageHeight: stageSize.height,
       };
@@ -152,13 +165,13 @@ export function GhostPhotoEditor({
     if (confirming) return;
     setConfirming(true);
     setError(null);
-    void renderPhoto(file, transform, view)
+    void renderPhoto(file, photoTransform, view, ghostScale)
       .then((editedFile) => onConfirm(editedFile))
       .catch(() => setError(t("bodyPhotos.editor.renderError")))
       .finally(() => setConfirming(false));
   }
 
-  const framingIsWithinTolerance = isGhostFramingWithinTolerance(transform);
+  const framingIsWithinTolerance = isGhostFramingWithinTolerance(photoTransform);
 
   return (
     <section className="ghost-photo-editor" aria-labelledby="ghost-photo-editor-title">
@@ -182,10 +195,10 @@ export function GhostPhotoEditor({
             src={previewUrl}
             alt={t("bodyPhotos.editor.imageAlt", { view: t(`bodyPhotos.views.${view}`) })}
             draggable={false}
-            style={{ transform: "translate(-50%, -50%)" }}
+            style={{ transform: ghostPhotoTransformStyle(photoTransform) }}
           />
         )}
-        <GhostOverlayGuide sex={sex} transform={transform} sideProfile={sideProfile} view={view} />
+        <GhostOverlayGuide sex={sex} ghostScale={ghostScale} sideProfile={sideProfile} view={view} />
       </div>
       <p className="ghost-photo-editor__privacy-note">{t("bodyPhotos.editor.privacyNote")}</p>
       <p className="ghost-photo-editor__status" role="status">
@@ -196,14 +209,14 @@ export function GhostPhotoEditor({
       <div className="ghost-photo-editor__controls" aria-label={t("bodyPhotos.editor.controlsLabel")}>
         <GhostScaleControls
           disabled={confirming}
-          onScaleChange={(scale) => updateTransform((current) => ({ ...current, scale }))}
-          scale={transform.scale}
+          onScaleChange={setGhostScale}
+          scale={ghostScale}
         />
         <div className="ghost-photo-editor__button-row">
           <button
             className="secondary-button"
             type="button"
-            onClick={() => updateTransform((current) => ({ ...current, scale: current.scale - zoomStep }))}
+            onClick={() => updatePhotoTransform((current) => ({ ...current, scale: current.scale - PHOTO_SCALE_STEP }))}
             disabled={confirming}
           >
             {t("bodyPhotos.editor.zoomOut")}
@@ -211,7 +224,7 @@ export function GhostPhotoEditor({
           <button
             className="secondary-button"
             type="button"
-            onClick={() => updateTransform((current) => ({ ...current, scale: current.scale + zoomStep }))}
+            onClick={() => updatePhotoTransform((current) => ({ ...current, scale: current.scale + PHOTO_SCALE_STEP }))}
             disabled={confirming}
           >
             {t("bodyPhotos.editor.zoomIn")}
@@ -219,7 +232,7 @@ export function GhostPhotoEditor({
           <button
             className="secondary-button"
             type="button"
-            onClick={() => updateTransform((current) => ({ ...current, rotation: current.rotation - rotationStep }))}
+            onClick={() => updatePhotoTransform((current) => ({ ...current, rotation: current.rotation - rotationStep }))}
             disabled={confirming}
           >
             {t("bodyPhotos.editor.rotateLeft")}
@@ -227,7 +240,7 @@ export function GhostPhotoEditor({
           <button
             className="secondary-button"
             type="button"
-            onClick={() => updateTransform((current) => ({ ...current, rotation: current.rotation + rotationStep }))}
+            onClick={() => updatePhotoTransform((current) => ({ ...current, rotation: current.rotation + rotationStep }))}
             disabled={confirming}
           >
             {t("bodyPhotos.editor.rotateRight")}
@@ -237,12 +250,12 @@ export function GhostPhotoEditor({
           <span>{t("bodyPhotos.editor.zoomLabel")}</span>
           <input
             type="range"
-            min={String(GHOST_SCALE_MIN)}
-            max={String(GHOST_SCALE_MAX)}
+            min={String(PHOTO_SCALE_MIN)}
+            max={String(PHOTO_SCALE_MAX)}
             step="0.05"
-            value={transform.scale}
+            value={photoTransform.scale}
             aria-label={t("bodyPhotos.editor.zoomLabel")}
-            onChange={(event) => updateTransform((current) => ({ ...current, scale: Number(event.target.value) }))}
+            onChange={(event) => updatePhotoTransform((current) => ({ ...current, scale: Number(event.target.value) }))}
             disabled={confirming}
           />
         </label>
@@ -253,16 +266,16 @@ export function GhostPhotoEditor({
             min="-180"
             max="180"
             step="1"
-            value={transform.rotation}
+            value={photoTransform.rotation}
             aria-label={t("bodyPhotos.editor.rotationLabel")}
-            onChange={(event) => updateTransform((current) => ({ ...current, rotation: Number(event.target.value) }))}
+            onChange={(event) => updatePhotoTransform((current) => ({ ...current, rotation: Number(event.target.value) }))}
             disabled={confirming}
           />
         </label>
         <button
           className="body-photo-link-button"
           type="button"
-          onClick={() => setTransform(GHOST_EDITOR_DEFAULT_TRANSFORM)}
+          onClick={() => setPhotoTransform(GHOST_EDITOR_DEFAULT_TRANSFORM)}
           disabled={confirming}
         >
           {t("bodyPhotos.editor.reset")}

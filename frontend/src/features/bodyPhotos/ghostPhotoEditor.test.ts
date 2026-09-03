@@ -20,6 +20,7 @@ const createGhostPhotoRenderPlanForView = createGhostPhotoRenderPlan as (
   sourceHeight: number,
   transform: GhostPhotoTransform,
   view: BodyPhotoView,
+  ghostScale?: number,
 ) => GhostPhotoRenderPlan;
 
 describe("ghost photo transform", () => {
@@ -31,7 +32,7 @@ describe("ghost photo transform", () => {
       rotation: 0,
     });
     expect(ghostPhotoTransformStyle(GHOST_EDITOR_DEFAULT_TRANSFORM)).toBe(
-      "translate(0%, 0%) rotate(0deg) scale(1)",
+      "translate(-50%, -50%) translate(0%, 0%) rotate(0deg) scale(1)",
     );
   });
 
@@ -44,7 +45,7 @@ describe("ghost photo transform", () => {
     })).toEqual({
       translateX: 0.5,
       translateY: -0.5,
-      scale: 1.15,
+      scale: 2.5,
       rotation: -180,
     });
   });
@@ -94,7 +95,7 @@ describe("ghost photo transform", () => {
   it("mirrors the privacy line with a left side Ghost", () => {
     const line = ghostPrivacyLineGeometry("side", 0.8, true);
 
-    expect(line.anchor.x).toBeCloseTo(0.38, 6);
+    expect(line.anchor.x).toBeCloseTo(0.5, 6);
     expect(line.start.x).toBeCloseTo(0.1, 6);
     expect(line.end.x).toBeCloseTo(0.9, 6);
   });
@@ -190,7 +191,54 @@ describe("ghost photo transform", () => {
       sourceCropY: 192,
       privacyCutPixels: 144,
       privacyLineDisplayY: 144,
-      draw: { translateX: 600, translateY: 828, rotationRadians: 0, scale: 0.75 },
+      draw: { translateX: 600, translateY: 756, rotationRadians: 0, scale: 0.75 },
+    });
+  });
+
+  it("keeps the photo transform separate from the Ghost crop scale", () => {
+    const photoTransform = {
+      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
+      scale: 2,
+      translateX: 0.1,
+      translateY: -0.05,
+      rotation: 90,
+    };
+
+    const smallGhostPlan = createGhostPhotoRenderPlanForView(
+      1600,
+      2400,
+      photoTransform,
+      "front",
+      0.8,
+    );
+    const defaultGhostPlan = createGhostPhotoRenderPlanForView(
+      1600,
+      2400,
+      photoTransform,
+      "front",
+      1,
+    );
+
+    expect(smallGhostPlan).toMatchObject({
+      canvasHeight: 1390,
+      privacyCutPixels: 410,
+      sourceCropY: 547,
+      draw: {
+        translateX: 720,
+        translateY: 400,
+        rotationRadians: Math.PI / 2,
+        scale: 1.5,
+      },
+    });
+    expect(defaultGhostPlan).toMatchObject({
+      canvasHeight: 1512,
+      privacyCutPixels: 288,
+      draw: {
+        translateX: 720,
+        translateY: 522,
+        rotationRadians: Math.PI / 2,
+        scale: 1.5,
+      },
     });
   });
 });

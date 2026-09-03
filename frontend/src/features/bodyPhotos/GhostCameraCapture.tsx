@@ -4,16 +4,13 @@ import { useTranslation } from "react-i18next";
 import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { GhostScaleControls } from "./GhostScaleControls";
-import {
-  GHOST_EDITOR_DEFAULT_TRANSFORM,
-  privacyCropSourceYForView,
-} from "./ghostPhotoEditor";
+import { privacyCropSourceYForView } from "./ghostPhotoEditor";
 import {
   createMediaPipeLivePoseGuide,
   type LivePoseGuidance,
   type LivePoseGuideFactory,
 } from "./livePoseGuide";
-import type { BodyPhotoSide, BodyPhotoView, GhostTransform } from "./types";
+import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 export type CameraFallbackReason =
   | "unsupported"
@@ -68,7 +65,7 @@ export function GhostCameraCapture({
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [ghostTransform, setGhostTransform] = useState<GhostTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
+  const [ghostScale, setGhostScale] = useState(1);
   const [liveStatus, setLiveStatus] = useState<"loading" | "available" | "unavailable" | "disabled">("loading");
   const [guidance, setGuidance] = useState<LivePoseGuidance>({ status: "available", warnings: [] });
 
@@ -89,7 +86,7 @@ export function GhostCameraCapture({
     const displaySize = getCameraDisplaySize(stageRef.current, video.videoWidth, video.videoHeight);
     const sourceY = Math.round(privacyCropSourceYForView(
       view,
-      ghostTransform,
+      ghostScale,
       displaySize,
       { width: video.videoWidth, height: video.videoHeight },
     ));
@@ -133,7 +130,7 @@ export function GhostCameraCapture({
       setStreamReady(false);
       stopCurrentStream();
     }, "image/jpeg", 0.92);
-  }, [facingMode, ghostTransform, onFallback, streamReady, view]);
+  }, [facingMode, ghostScale, onFallback, streamReady, view]);
 
   useEffect(() => {
     const capability = detectCameraCapability();
@@ -332,15 +329,15 @@ export function GhostCameraCapture({
             alt={t("bodyPhotos.camera.capturedAlt", { view: t(`bodyPhotos.views.${view}`) })}
           />
         )}
-        <GhostOverlayGuide sex={sex} transform={ghostTransform} sideProfile={sideProfile} view={view} />
+        <GhostOverlayGuide sex={sex} ghostScale={ghostScale} sideProfile={sideProfile} view={view} />
       </div>
       <canvas ref={canvasRef} className="ghost-camera__canvas" aria-hidden="true" />
       {capturedFile === null ? (
         <>
           <GhostScaleControls
             disabled={confirming}
-            onScaleChange={(scale) => setGhostTransform((current) => ({ ...current, scale }))}
-            scale={ghostTransform.scale}
+            onScaleChange={setGhostScale}
+            scale={ghostScale}
           />
           <p className="ghost-camera__privacy-note">{t("bodyPhotos.camera.privacyBody")}</p>
           {liveStatus === "unavailable" && <p className="body-photo-muted">{t("bodyPhotos.camera.liveUnavailable")}</p>}

@@ -2,29 +2,28 @@ import { useTranslation } from "react-i18next";
 
 import { ghostOverlayAssets, resolveGhostOverlayVariant } from "./ghostOverlayAssets";
 import {
-  GHOST_EDITOR_DEFAULT_TRANSFORM,
   ghostPercentage,
-  ghostPhotoTransformStyle,
+  ghostGuideTransformStyle,
   ghostPrivacyLineGeometry,
 } from "./ghostPhotoEditor";
 import type { Sex } from "../profile/types";
-import type { BodyPhotoSide, BodyPhotoView, GhostTransform } from "./types";
+import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 export function GhostOverlayGuide({
   sex,
-  transform = GHOST_EDITOR_DEFAULT_TRANSFORM,
+  ghostScale = 1,
   sideProfile = "right",
   view,
 }: {
   sex?: Sex | null;
-  transform?: GhostTransform;
+  ghostScale?: number;
   sideProfile?: BodyPhotoSide;
   view: BodyPhotoView;
 }) {
   const { t } = useTranslation();
   const variant = resolveGhostOverlayVariant(sex);
   const mirrored = view === "side" && sideProfile === "left";
-  const privacyLine = ghostPrivacyLineGeometry(view, transform, mirrored);
+  const privacyLine = ghostPrivacyLineGeometry(view, ghostScale, mirrored);
   return (
     <div className="ghost-overlay" aria-label={t("bodyPhotos.camera.overlayLabel")}>
       <div
@@ -43,10 +42,7 @@ export function GhostOverlayGuide({
         aria-label={t("bodyPhotos.camera.silhouette", { view: t(`bodyPhotos.views.${view}`) })}
         role="img"
         style={{
-          transform: ghostPhotoTransformStyle(
-            transform,
-            mirrored,
-          ),
+          transform: ghostGuideTransformStyle(ghostScale, mirrored),
         }}
       >
         <img
