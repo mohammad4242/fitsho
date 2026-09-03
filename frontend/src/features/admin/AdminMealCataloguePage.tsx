@@ -74,37 +74,41 @@ export function AdminMealCataloguePage() {
           <section className="admin-template-list admin-meal-list" role="tabpanel">
             {page.items.map((meal) => (
               <article className="admin-template-card admin-meal-card" key={meal.id}>
-                <header>
-                  <div className="admin-meal-card__identity">
-                    <MealThumbnail
-                      alt={english ? meal.name_en : meal.name_fa}
-                      className="admin-meal-card__image"
-                      fallbackLabel={t("admin.meals.imageFallback", { name: english ? meal.name_en : meal.name_fa })}
-                      imageUrl={meal.image_url}
-                    />
-                    <div>
-                    <p className="eyebrow">{meal.code} · {t(`admin.meals.categories.${meal.category}`)}</p>
-                    <h2>{english ? meal.name_en : meal.name_fa}</h2>
+                <details className="admin-meal-card__disclosure">
+                  <summary className="admin-meal-card__summary">
+                    <div className="admin-meal-card__identity">
+                      <MealThumbnail
+                        alt={english ? meal.name_en : meal.name_fa}
+                        className="admin-meal-card__image"
+                        fallbackLabel={t("admin.meals.imageFallback", { name: english ? meal.name_en : meal.name_fa })}
+                        imageUrl={meal.image_url}
+                      />
+                      <div>
+                        <p className="eyebrow">{meal.code} · {t(`admin.meals.categories.${meal.category}`)}</p>
+                        <h2>{english ? meal.name_en : meal.name_fa}</h2>
+                      </div>
                     </div>
+                    <span className={`admin-meal-status admin-meal-status--${meal.verification_status}`}>
+                      {t(`admin.meals.status.${meal.verification_status}`)}
+                    </span>
+                  </summary>
+                  <div className="admin-meal-card__details">
+                    <ul className="admin-meal-ingredients">
+                      {meal.items.map((item) => (
+                        <li key={item.food_id}>
+                          <div><strong>{english ? item.food_name_en : item.food_name_fa}</strong><small>{item.functional_role ? t(`admin.meals.roles.${item.functional_role}`) : t("admin.meals.roles.none")}</small></div>
+                          <span>{t("admin.meals.bounds", { min: number.format(item.min_grams), max: number.format(item.max_grams) })}</span>
+                          <span>{item.is_required ? t("admin.meals.required") : t("admin.meals.optional")}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <footer>
+                      <Link aria-label={t("admin.meals.editAria", { name: english ? meal.name_en : meal.name_fa })} to={`/admin/nutrition-meals/${meal.id}/edit`}>{t("admin.meals.edit")}</Link>
+                      <button aria-label={t("admin.meals.imageActionAria", { action: t(meal.image_url ? "admin.meals.replaceImage" : "admin.meals.uploadImage"), name: english ? meal.name_en : meal.name_fa })} type="button" onClick={() => setImageMeal(meal)}>{t(meal.image_url ? "admin.meals.replaceImage" : "admin.meals.uploadImage")}</button>
+                      <span>{t("admin.meals.referenceNote")}</span>
+                    </footer>
                   </div>
-                  <span className={`admin-meal-status admin-meal-status--${meal.verification_status}`}>
-                    {t(`admin.meals.status.${meal.verification_status}`)}
-                  </span>
-                </header>
-                <ul className="admin-meal-ingredients">
-                  {meal.items.map((item) => (
-                    <li key={item.food_id}>
-                      <div><strong>{english ? item.food_name_en : item.food_name_fa}</strong><small>{item.functional_role ? t(`admin.meals.roles.${item.functional_role}`) : t("admin.meals.roles.none")}</small></div>
-                      <span>{t("admin.meals.bounds", { min: number.format(item.min_grams), max: number.format(item.max_grams) })}</span>
-                      <span>{item.is_required ? t("admin.meals.required") : t("admin.meals.optional")}</span>
-                    </li>
-                  ))}
-                </ul>
-                <footer>
-                  <Link aria-label={t("admin.meals.editAria", { name: english ? meal.name_en : meal.name_fa })} to={`/admin/nutrition-meals/${meal.id}/edit`}>{t("admin.meals.edit")}</Link>
-                  <button aria-label={t("admin.meals.imageActionAria", { action: t(meal.image_url ? "admin.meals.replaceImage" : "admin.meals.uploadImage"), name: english ? meal.name_en : meal.name_fa })} type="button" onClick={() => setImageMeal(meal)}>{t(meal.image_url ? "admin.meals.replaceImage" : "admin.meals.uploadImage")}</button>
-                  <span>{t("admin.meals.referenceNote")}</span>
-                </footer>
+                </details>
               </article>
             ))}
           </section>

@@ -47,9 +47,18 @@ it("shows all five categories and meals linked for editing", async () => {
   expect(screen.getByText(/BF02/)).toBeInTheDocument();
   expect(screen.getAllByRole("tab")).toHaveLength(5);
   expect(screen.getByRole("tab", { name: "صبحانه" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("img", { name: "تصویر پیش‌فرض تخم‌مرغ نیمرو با نان و گوجه خردشده" })).toBeInTheDocument();
+  const mealDetails = screen.getByText("تخم‌مرغ نیمرو با نان و گوجه خردشده").closest("details");
+  expect(mealDetails).toBeInTheDocument();
+  expect(mealDetails).not.toHaveAttribute("open");
+  expect(screen.getByText("۵۰ تا ۲۰۰ گرم")).not.toBeVisible();
+  expect(screen.getByRole("link", { name: "ویرایش وعده: تخم‌مرغ نیمرو با نان و گوجه خردشده" })).not.toBeVisible();
+
+  await user.click(screen.getByText("تخم‌مرغ نیمرو با نان و گوجه خردشده"));
+
+  expect(mealDetails).toHaveAttribute("open");
   expect(screen.getByText("۵۰ تا ۲۰۰ گرم")).toBeInTheDocument();
   expect(screen.getByText("الزامی")).toBeInTheDocument();
-  expect(screen.getByRole("img", { name: "تصویر پیش‌فرض تخم‌مرغ نیمرو با نان و گوجه خردشده" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "ویرایش وعده: تخم‌مرغ نیمرو با نان و گوجه خردشده" })).toHaveAttribute(
     "href", "/admin/nutrition-meals/meal-1/edit",
   );
@@ -79,6 +88,7 @@ it("shows meal thumbnails and replaces an uploaded image", async () => {
   expect(await screen.findByRole("img", { name: "املت" })).toHaveAttribute(
     "src", "/media/meal-catalogue/omelette.png",
   );
+  await user.click(screen.getByText("املت"));
   await user.click(screen.getByRole("button", { name: "جایگزینی تصویر املت" }));
   const file = new File(["image"], "replacement.png", { type: "image/png" });
   await user.upload(screen.getByLabelText("تصویر وعده"), file);
