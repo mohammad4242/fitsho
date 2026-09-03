@@ -63,7 +63,13 @@ it("starts unselected, switches artwork, and selects an overlay region by pointe
     "aria-pressed",
     "true",
   );
-  expect(chestRegion).toHaveClass("is-selected");
+  expect(chestRegion).toHaveClass("body-area-map__hit-region");
+  expect(chestRegion).not.toHaveClass("is-selected");
+  const visualMask = document.querySelector(".body-area-map__visual-mask");
+  expect(visualMask).toHaveAttribute("aria-hidden", "true");
+  expect(visualMask).toHaveAttribute("data-area", "chest");
+  expect(visualMask).toHaveAttribute("data-mask-file", "male-front/chest.svg");
+  expect(visualMask).toHaveAttribute("src", expect.stringContaining("male-front.jpg"));
   expect(screen.getByRole("heading", { name: "Chest" })).toBeInTheDocument();
   expect(screen.getByText(/chest is balanced/i)).toBeInTheDocument();
 
@@ -95,5 +101,32 @@ it("supports Space-key selection and shows the direct balanced insight", async (
 
   expect(chest).toHaveAttribute("data-classification", "balanced");
   expect(chest).toHaveAttribute("aria-pressed", "true");
+  expect(chest).not.toHaveClass("is-selected");
   expect(screen.getByText(/chest is balanced/i)).toBeInTheDocument();
+});
+
+it.each([
+  ["male", "front", "chest", "Chest — Balanced in these views", "male-front/chest.svg"],
+  ["male", "back", "back", "Back — Not assessable", "male-back/back.svg"],
+  ["female", "front", "chest", "Chest — Balanced in these views", "female-front/chest.svg"],
+  ["female", "back", "back", "Back — Not assessable", "female-back/back.svg"],
+] as const)("uses a precise visual mask for the %s %s artwork", async (sex, view, area, label, maskFile) => {
+  const user = userEvent.setup();
+  render(<BodyAreaMap sex={sex} regions={regions} />);
+
+  if (view === "back") {
+    await user.click(screen.getByRole("tab", { name: "Back view" }));
+  }
+
+  const hitRegion = screen.getByRole("button", { name: label });
+  await user.click(hitRegion);
+
+  const visualMask = document.querySelector(".body-area-map__visual-mask");
+  expect(visualMask).toHaveAttribute("data-area", area);
+  expect(visualMask).toHaveAttribute("data-mask-file", maskFile);
+  expect(visualMask).toHaveAttribute(
+    "src",
+    expect.stringContaining(`${sex}-${view}.jpg`),
+  );
+  expect(hitRegion).not.toHaveClass("is-selected");
 });
