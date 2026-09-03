@@ -56,6 +56,10 @@ it("renders meal cards in the catalogue", async () => {
   expect(screen.queryByText("ویرایش وعده")).not.toBeInTheDocument();
   expect(screen.queryByText("افزودن وعده")).not.toBeInTheDocument();
   expect(screen.queryByText("بارگذاری تصویر")).not.toBeInTheDocument();
+
+  // Verify background media is rendered
+  const background = document.querySelector(".member-page-background");
+  expect(background).toBeInTheDocument();
 });
 
 it("filters by category when a category chip is selected", async () => {

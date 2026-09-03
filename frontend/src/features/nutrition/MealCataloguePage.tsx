@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import foodAccent from "../../assets/landing/food.webp";
+import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
 import { MealThumbnail } from "../../shared/MealThumbnail";
 import { getMealCatalogue, type MealCatalogueCategory, type MealCatalogueResponse } from "./api";
 import "./mealCatalogue.css";
@@ -40,7 +42,9 @@ export function MealCataloguePage() {
   }, [selectedCategory, retry]);
 
   return (
-    <main className="meal-catalogue-page fitsho-page" dir={english ? "ltr" : "rtl"}>
+    <div className="meal-catalogue-shell" dir={english ? "ltr" : "rtl"}>
+      <MemberHeaderMedia className="member-page-background" imageSrc={foodAccent} />
+      <main className="meal-catalogue-page fitsho-page">
       <header className="meal-catalogue-hero">
         <p className="eyebrow eyebrow--accent">{t("mealCatalogue.eyebrow")}</p>
         <h1 className="fitsho-display">{t("mealCatalogue.title")}</h1>
@@ -126,5 +130,6 @@ export function MealCataloguePage() {
         </section>
       )}
     </main>
+  </div>
   );
 }
