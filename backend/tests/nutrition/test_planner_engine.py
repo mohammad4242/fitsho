@@ -487,6 +487,20 @@ def test_planner_uses_exact_program_schedule_and_redistributes_around_free_meal(
     assert inputs.daily_targets["goal_calories"] == Decimal("2000")
 
 
+def test_missing_scheduled_template_returns_structured_infeasible_outcome() -> None:
+    from app.nutrition.planner_engine import GenerationOutcome, plan_week
+
+    schedule = ((("main_meal", "missing-template", "lunch"),),) * 7
+    result = plan_week(
+        _input(main_meals_per_day=2, snacks_per_day=0, template_schedule=schedule),
+        _catalogue(),
+        _meal_templates(),
+    )
+
+    assert result.outcome is GenerationOutcome.INFEASIBLE
+    assert result.reason_codes == ("SCHEDULED_TEMPLATE_UNAVAILABLE",)
+
+
 def test_planner_is_deterministic_and_controls_repetition() -> None:
     from app.nutrition.planner_engine import plan_week
 

@@ -1,16 +1,20 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import app.nutrition.plan_service as plan_service
 from app.nutrition.enums import (
     EstimateConfidence,
     FoodRole,
     FoodVerificationStatus,
     MealCategory,
     MealIngredientRole,
+    NutritionDietStyle,
+    NutritionProgramSlotKind,
     PriceReferenceStatus,
 )
 from app.nutrition.models import (
@@ -21,8 +25,12 @@ from app.nutrition.models import (
     NutritionFoodComposition,
     NutritionFoodPriceReference,
     NutritionPlanGeneration,
+    NutritionProgram,
+    NutritionProgramDay,
+    NutritionProgramSlot,
     NutritionWeeklyPlan,
 )
+from app.nutrition.planner_engine import GenerationOutcome, NutrientComparison, PlannerResult
 
 ORIGIN = {"Origin": "http://localhost:5173"}
 
@@ -199,42 +207,87 @@ def _seed_foods_and_prices(db: Session) -> None:
                 accepted_at=now,
             )
         )
-    db.add_all(
-        [
-            NutritionCatalogueMeal(
-                code="TST-LU01",
-                name_fa="مرغ و برنج تست",
-                name_en="Test chicken and rice",
-                image_path="/media/meal-catalogue/test-lunch.png",
-                category=MealCategory.LUNCH,
-                verification_status=FoodVerificationStatus.VERIFIED,
-                items=[
-                    _meal_item(foods["task6-chicken"], "150", "80", "220", "protein"),
-                    _meal_item(foods["task6-rice"], "80", "50", "140", "carbohydrate"),
-                    _meal_item(foods["task6-oil"], "5", "2", "10", "fat", required=False),
-                ],
-            ),
-            NutritionCatalogueMeal(
-                code="TST-DN01",
-                name_fa="عدس و سیب‌زمینی تست",
-                name_en="Test lentils and potato",
-                category=MealCategory.DINNER,
-                verification_status=FoodVerificationStatus.VERIFIED,
-                items=[
-                    _meal_item(foods["task6-lentils"], "180", "100", "300", "protein"),
-                    _meal_item(foods["task6-potato"], "250", "150", "400", "carbohydrate"),
-                    _meal_item(foods["task6-oil"], "20", "10", "30", "fat"),
-                ],
-            ),
-            NutritionCatalogueMeal(
-                code="TST-SN01",
-                name_fa="میان‌وعده ماست تست",
-                name_en="Test yogurt snack",
-                category=MealCategory.SNACK,
-                verification_status=FoodVerificationStatus.VERIFIED,
-                items=[_meal_item(foods["task6-yogurt"], "200", "100", "350", "protein")],
-            ),
-        ]
+    breakfast = NutritionCatalogueMeal(
+        code="TST-BF01",
+        name_fa="ماست صبحانه تست",
+        name_en="Test breakfast yogurt",
+        category=MealCategory.BREAKFAST,
+        verification_status=FoodVerificationStatus.VERIFIED,
+        items=[_meal_item(foods["task6-yogurt"], "200", "100", "350", "protein")],
+    )
+    lunch = NutritionCatalogueMeal(
+        code="TST-LU01",
+        name_fa="مرغ و برنج تست",
+        name_en="Test chicken and rice",
+        image_path="/media/meal-catalogue/test-lunch.png",
+        category=MealCategory.LUNCH,
+        verification_status=FoodVerificationStatus.VERIFIED,
+        items=[
+            _meal_item(foods["task6-chicken"], "150", "80", "220", "protein"),
+            _meal_item(foods["task6-rice"], "80", "50", "140", "carbohydrate"),
+            _meal_item(foods["task6-oil"], "5", "2", "10", "fat", required=False),
+        ],
+    )
+    dinner = NutritionCatalogueMeal(
+        code="TST-DN01",
+        name_fa="عدس و سیب‌زمینی تست",
+        name_en="Test lentils and potato",
+        category=MealCategory.DINNER,
+        verification_status=FoodVerificationStatus.VERIFIED,
+        items=[
+            _meal_item(foods["task6-lentils"], "180", "100", "300", "protein"),
+            _meal_item(foods["task6-potato"], "250", "150", "400", "carbohydrate"),
+            _meal_item(foods["task6-oil"], "20", "10", "30", "fat"),
+        ],
+    )
+    snack = NutritionCatalogueMeal(
+        code="TST-SN01",
+        name_fa="میان‌وعده ماست تست",
+        name_en="Test yogurt snack",
+        category=MealCategory.SNACK,
+        verification_status=FoodVerificationStatus.VERIFIED,
+        items=[_meal_item(foods["task6-yogurt"], "200", "100", "350", "protein")],
+    )
+    db.add_all([breakfast, lunch, dinner, snack])
+    db.flush()
+    db.add(
+        NutritionProgram(
+            code="TST-PROGRAM",
+            slug="tst-program",
+            name_fa="برنامه تست",
+            name_en="Test program",
+            description_fa="برنامه تست",
+            description_en="Test program",
+            diet_style=NutritionDietStyle.BALANCED_IRANIAN,
+            days=[
+                NutritionProgramDay(
+                    day_number=day_number,
+                    slots=[
+                        NutritionProgramSlot(
+                            category=MealCategory.BREAKFAST,
+                            kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                            meal_id=breakfast.id,
+                        ),
+                        NutritionProgramSlot(
+                            category=MealCategory.LUNCH,
+                            kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                            meal_id=lunch.id,
+                        ),
+                        NutritionProgramSlot(
+                            category=MealCategory.DINNER,
+                            kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                            meal_id=dinner.id,
+                        ),
+                        NutritionProgramSlot(
+                            category=MealCategory.SNACK,
+                            kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                            meal_id=snack.id,
+                        ),
+                    ],
+                )
+                for day_number in range(1, 8)
+            ],
+        )
     )
     db.commit()
 
@@ -303,6 +356,130 @@ def test_generation_returns_visible_seven_day_draft_and_creates_review(
     revision = client.get(f"/api/v1/nutrition/plans/{body['plan']['id']}")
     assert revision.status_code == 200
     assert revision.json()["id"] == body["plan"]["id"]
+
+
+def test_generation_evaluates_every_program_and_persists_only_the_best_result(
+    client: TestClient, db: Session, monkeypatch
+) -> None:
+    _register_and_estimate(client, "weekly-plan-all-candidates@example.com")
+    programs = [
+        NutritionProgram(
+            code=f"TEST-{letter}",
+            slug=f"test-{letter.casefold()}",
+            name_fa=f"برنامه {letter}",
+            name_en=f"Test {letter}",
+            description_fa="برنامه تست",
+            description_en="Test program",
+            diet_style=NutritionDietStyle.BALANCED_IRANIAN,
+            is_active=True,
+        )
+        for letter in ("A", "B", "C")
+    ]
+    db.add_all(programs)
+    db.flush()
+
+    monkeypatch.setattr(plan_service, "list_programs", lambda _db: programs)
+    monkeypatch.setattr(plan_service, "_planner_foods", lambda _db: ((), {}, {"foods": []}))
+    monkeypatch.setattr(plan_service, "_planner_meal_templates", lambda _db: ((), []))
+    monkeypatch.setattr(
+        plan_service,
+        "adapt_program",
+        lambda *_args, **_kwargs: SimpleNamespace(days=()),
+    )
+    calls = []
+    results = (
+        PlannerResult(
+            outcome=GenerationOutcome.SUCCESS,
+            reason_codes=("SAFE_FEASIBLE_DRAFT_GENERATED",),
+            weekly_cost_irr=Decimal("100"),
+            budget_status="within_budget",
+            nutrient_comparisons={
+                "goal_calories": NutrientComparison(
+                    preferred=Decimal("2000"),
+                    minimum_or_maximum=None,
+                    planned=Decimal("1500"),
+                    difference_from_preferred=Decimal("-500"),
+                    difference_from_limit=None,
+                    status="within_target",
+                )
+            },
+        ),
+        PlannerResult(
+            outcome=GenerationOutcome.SUCCESS,
+            reason_codes=("SAFE_FEASIBLE_DRAFT_GENERATED",),
+            weekly_cost_irr=Decimal("100"),
+            budget_status="within_budget",
+            nutrient_comparisons={
+                "goal_calories": NutrientComparison(
+                    preferred=Decimal("2000"),
+                    minimum_or_maximum=None,
+                    planned=Decimal("2000"),
+                    difference_from_preferred=Decimal("0"),
+                    difference_from_limit=None,
+                    status="within_target",
+                )
+            },
+        ),
+        PlannerResult(
+            outcome=GenerationOutcome.INFEASIBLE,
+            reason_codes=("STRICT_BUDGET_EXCEEDED",),
+        ),
+    )
+
+    def fake_plan_week(inputs, foods, meal_templates, policy=plan_service.DEFAULT_POLICY):
+        calls.append((inputs, foods, meal_templates, policy))
+        return results[len(calls) - 1]
+
+    monkeypatch.setattr(plan_service, "plan_week", fake_plan_week)
+
+    response = client.post("/api/v1/nutrition/plans", headers=ORIGIN)
+
+    assert response.status_code == 201
+    assert response.json()["outcome"] == "success"
+    assert response.json()["plan"]["input_snapshot"]["nutrition_program_code"] == "TEST-B"
+    assert len(calls) == 3
+    assert db.scalar(select(NutritionWeeklyPlan)) is not None
+    assert len(db.scalars(select(NutritionWeeklyPlan)).all()) == 1
+    generation = db.scalar(select(NutritionPlanGeneration))
+    assert generation is not None
+    trace = generation.diagnostic_snapshot["selection_trace"]
+    assert trace["proposed_candidate_count"] == 3
+    assert trace["evaluated_candidate_count"] == 3
+    assert trace["successful_candidate_count"] == 2
+    assert trace["first_valid_program_code"] == "TEST-A"
+    assert trace["selected_program_code"] == "TEST-B"
+    assert trace["selected_differs_from_first_valid"] is True
+
+
+def test_generation_aggregates_all_candidate_failures_without_persisting_a_plan(
+    client: TestClient, db: Session, monkeypatch
+) -> None:
+    _register_and_estimate(client, "weekly-plan-all-candidates-fail@example.com")
+    _seed_foods_and_prices(db)
+    programs = plan_service.list_programs(db)
+
+    def fake_plan_week(inputs, foods, meal_templates, policy=plan_service.DEFAULT_POLICY):
+        return PlannerResult(
+            outcome=GenerationOutcome.INFEASIBLE,
+            reason_codes=("STRICT_BUDGET_NO_FEASIBLE_REPAIR",),
+        )
+
+    monkeypatch.setattr(plan_service, "plan_week", fake_plan_week)
+
+    response = client.post("/api/v1/nutrition/plans", headers=ORIGIN)
+
+    assert response.status_code == 201
+    assert response.json()["outcome"] == "infeasible"
+    assert response.json()["plan"] is None
+    assert db.scalar(select(NutritionWeeklyPlan)) is None
+    generation = db.scalar(select(NutritionPlanGeneration))
+    assert generation is not None
+    trace = generation.diagnostic_snapshot["selection_trace"]
+    assert trace["proposed_candidate_count"] == len(programs)
+    assert trace["evaluated_candidate_count"] == len(programs)
+    assert trace["successful_candidate_count"] == 0
+    assert trace["selected_program_code"] is None
+    assert trace["failure_reason_counts"] == {"STRICT_BUDGET_NO_FEASIBLE_REPAIR": len(programs)}
 
 
 def test_missing_price_coverage_is_a_generation_not_a_plan(client: TestClient, db: Session) -> None:

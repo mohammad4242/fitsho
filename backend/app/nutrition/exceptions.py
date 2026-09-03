@@ -45,3 +45,10 @@ class NutritionTargetInfeasibleDomainError(Exception):
 
 class NutritionProductModeError(Exception):
     pass
+
+
+class ScheduledTemplateUnavailableError(Exception):
+    def __init__(self, meal_id: str, category: str) -> None:
+        self.meal_id = meal_id
+        self.category = category
+        super().__init__(f"{meal_id}:{category}")

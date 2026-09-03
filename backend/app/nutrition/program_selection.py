@@ -1,5 +1,7 @@
-"""Deterministic Nutrition Program selection from existing profile signals."""
+"""Deterministic Nutrition Program proposal ordering from profile signals."""
 
+from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import NamedTuple
 from uuid import UUID
 
@@ -19,23 +21,57 @@ class ProgramSelectionContext(NamedTuple):
     preferred_variety: str
 
 
-def select_program(
-    programs: list[NutritionProgram],
+@dataclass(frozen=True)
+class ProgramCandidate:
+    program: NutritionProgram
+    preferred_style: bool
+    preconstruction_rank: int
+
+
+def enumerate_program_candidates(
+    programs: Iterable[NutritionProgram],
     context: ProgramSelectionContext,
-    user_id: UUID,
-) -> NutritionProgram:
-    style = _select_style(context)
-    candidates = sorted(
-        (
-            program
-            for program in programs
-            if program.is_active is not False and program.diet_style is style
+) -> tuple[ProgramCandidate, ...]:
+    """Return every active program in a stable, style-preferred order."""
+
+    preferred_style = _select_style(context)
+    active_programs = (program for program in programs if program.is_active is not False)
+    ordered = sorted(
+        active_programs,
+        key=lambda program: (
+            0 if program.diet_style is preferred_style else 1,
+            program.code,
+            str(program.id) if program.id is not None else "",
+            program.slug,
         ),
-        key=lambda program: program.code,
     )
+    return tuple(
+        ProgramCandidate(
+            program=program,
+            preferred_style=program.diet_style is preferred_style,
+            preconstruction_rank=index,
+        )
+        for index, program in enumerate(ordered)
+    )
+
+
+def select_program(
+    programs: Iterable[NutritionProgram],
+    context: ProgramSelectionContext,
+    user_id: UUID | None = None,
+) -> NutritionProgram:
+    """Compatibility wrapper returning the first proposal.
+
+    Weekly generation uses :func:`enumerate_program_candidates` and evaluates
+    every proposal. ``user_id`` remains accepted for older callers but has no
+    influence on the result.
+    """
+
+    del user_id
+    candidates = enumerate_program_candidates(programs, context)
     if not candidates:
-        raise ValueError(f"No active Nutrition Program is available for {style.value}")
-    return candidates[user_id.int % len(candidates)]
+        raise ValueError("No active Nutrition Program is available")
+    return candidates[0].program
 
 
 def _select_style(context: ProgramSelectionContext) -> NutritionDietStyle:

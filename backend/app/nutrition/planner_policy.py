@@ -4,7 +4,8 @@ from decimal import Decimal
 PLANNER_POLICY_VERSION = "weekly-planner-v1"
 MEAL_DISTRIBUTION_POLICY_VERSION = "meal-distribution-v1"
 PORTION_POLICY_VERSION = "portion-bounds-v1"
-PLANNER_VERSION = "deterministic-heuristic-v2"
+PLANNER_VERSION = "deterministic-candidate-search-v1"
+CANDIDATE_SELECTION_POLICY_VERSION = "best-admitted-all-active-programs-v1"
 
 
 @dataclass(frozen=True)

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 
+from app.nutrition.exceptions import ScheduledTemplateUnavailableError
 from app.nutrition.planner_policy import DEFAULT_POLICY, PlannerPolicy
 from app.nutrition.prepared_recipe import (
     PreparedRecipeCalculation,
@@ -217,13 +218,16 @@ def plan_week(
         return _failure(GenerationOutcome.LIVE_PRICE_UNAVAILABLE, "INSUFFICIENT_PRICE_COVERAGE")
 
     weekly_budget_cap = _weekly_budget_cap(inputs, policy)
-    days = _build_days(
-        inputs,
-        main_templates,
-        snack_templates,
-        policy,
-        maximum_recipe_cost_irr=weekly_budget_cap,
-    )
+    try:
+        days = _build_days(
+            inputs,
+            main_templates,
+            snack_templates,
+            policy,
+            maximum_recipe_cost_irr=weekly_budget_cap,
+        )
+    except ScheduledTemplateUnavailableError:
+        return _failure(GenerationOutcome.INFEASIBLE, "SCHEDULED_TEMPLATE_UNAVAILABLE")
     foods_by_id = {food.food_id: food for food in eligible}
     days, repairs = _repair_micronutrients(days, inputs, foods_by_id, policy)
     weekly_totals = _sum_nutrients(day.nutrients for day in days)
@@ -546,7 +550,7 @@ def _build_scheduled_days(
                 continue
             candidate = by_id.get(template_id)
             if candidate is None:
-                raise ValueError(f"Scheduled Meal Catalogue template is unavailable: {template_id}")
+                raise ScheduledTemplateUnavailableError(template_id, category)
             target = snack_kcal if role == "snack" else main_kcal
             meals.append(
                 _meal_from_template(
