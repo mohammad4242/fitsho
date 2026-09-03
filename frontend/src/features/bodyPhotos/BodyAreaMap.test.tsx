@@ -69,7 +69,14 @@ it("starts unselected, switches artwork, and selects an overlay region by pointe
   expect(visualMask).toHaveAttribute("aria-hidden", "true");
   expect(visualMask).toHaveAttribute("data-area", "chest");
   expect(visualMask).toHaveAttribute("data-mask-file", "male-front/chest.svg");
-  expect(visualMask).toHaveAttribute("src", expect.stringContaining("male-front.jpg"));
+  expect(visualMask?.tagName).toBe("svg");
+  expect(visualMask).toHaveAttribute("viewBox", "0 0 853 1280");
+  expect(visualMask).toHaveAttribute("preserveAspectRatio", "none");
+  expect(visualMask?.querySelector("clipPath path")).toBeInTheDocument();
+  expect(visualMask?.querySelector("image")).toHaveAttribute(
+    "href",
+    expect.stringContaining("male-front.jpg"),
+  );
   expect(screen.getByRole("heading", { name: "Chest" })).toBeInTheDocument();
   expect(screen.getByText(/chest is balanced/i)).toBeInTheDocument();
 
@@ -124,8 +131,12 @@ it.each([
   const visualMask = document.querySelector(".body-area-map__visual-mask");
   expect(visualMask).toHaveAttribute("data-area", area);
   expect(visualMask).toHaveAttribute("data-mask-file", maskFile);
-  expect(visualMask).toHaveAttribute(
-    "src",
+  expect(visualMask?.tagName).toBe("svg");
+  expect(visualMask).toHaveAttribute("viewBox", "0 0 853 1280");
+  expect(visualMask).toHaveAttribute("preserveAspectRatio", "none");
+  expect(visualMask?.querySelector("clipPath path")).toBeInTheDocument();
+  expect(visualMask?.querySelector("image")).toHaveAttribute(
+    "href",
     expect.stringContaining(`${sex}-${view}.jpg`),
   );
   expect(hitRegion).not.toHaveClass("is-selected");
