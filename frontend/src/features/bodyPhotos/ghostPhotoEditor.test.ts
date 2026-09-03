@@ -97,6 +97,18 @@ describe("ghost photo transform", () => {
     expect(line.end.x).toBeCloseTo(1.12, 6);
   });
 
+  it("mirrors the privacy line with a left side Ghost", () => {
+    const line = ghostPrivacyLineGeometry("side", {
+      ...GHOST_EDITOR_DEFAULT_TRANSFORM,
+      scale: 0.8,
+      translateX: 0.12,
+    }, true);
+
+    expect(line.anchor.x).toBeCloseTo(0.38, 6);
+    expect(line.start.x).toBeCloseTo(-0.02, 6);
+    expect(line.end.x).toBeCloseTo(0.78, 6);
+  });
+
   it("recomputes the privacy anchor when the Ghost is scaled", () => {
     const line = ghostPrivacyLineGeometry("front", {
       ...GHOST_EDITOR_DEFAULT_TRANSFORM,

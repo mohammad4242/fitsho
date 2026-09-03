@@ -143,19 +143,35 @@ export function isGhostFramingWithinTolerance(
 export function ghostPrivacyLineGeometry(
   view: BodyPhotoView,
   transform: GhostPhotoTransform,
+  mirrored = false,
 ): GhostPrivacyLineGeometry {
   const safeTransform = clampGhostPhotoTransform(transform);
-  const anchor = transformGhostPoint(
+  const transformedAnchor = transformGhostPoint(
     { x: 0.5, y: ghostPrivacyCutRatioForView(view) },
     safeTransform,
   );
   // The privacy boundary is a horizontal raster crop. Its row follows the
   // transformed neck anchor so the visible line and the encoded crop agree.
   const halfLineLength = safeTransform.scale / 2;
+  const transformedStart = {
+    x: transformedAnchor.x - halfLineLength,
+    y: transformedAnchor.y,
+  };
+  const transformedEnd = {
+    x: transformedAnchor.x + halfLineLength,
+    y: transformedAnchor.y,
+  };
+  if (mirrored) {
+    return {
+      anchor: mirrorGhostPoint(transformedAnchor),
+      start: mirrorGhostPoint(transformedEnd),
+      end: mirrorGhostPoint(transformedStart),
+    };
+  }
   return {
-    anchor,
-    start: { x: anchor.x - halfLineLength, y: anchor.y },
-    end: { x: anchor.x + halfLineLength, y: anchor.y },
+    anchor: transformedAnchor,
+    start: transformedStart,
+    end: transformedEnd,
   };
 }
 
@@ -299,6 +315,10 @@ function transformGhostPoint(point: GhostPoint, transform: GhostPhotoTransform):
     x: 0.5 + relativeX * cosine - relativeY * sine + transform.translateX,
     y: 0.5 + relativeX * sine + relativeY * cosine + transform.translateY,
   };
+}
+
+function mirrorGhostPoint(point: GhostPoint): GhostPoint {
+  return { x: 1 - point.x, y: point.y };
 }
 
 function formatNumber(value: number): string {

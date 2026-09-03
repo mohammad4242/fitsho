@@ -23,7 +23,8 @@ export function GhostOverlayGuide({
 }) {
   const { t } = useTranslation();
   const variant = resolveGhostOverlayVariant(sex);
-  const privacyLine = ghostPrivacyLineGeometry(view, transform);
+  const mirrored = view === "side" && sideProfile === "left";
+  const privacyLine = ghostPrivacyLineGeometry(view, transform, mirrored);
   return (
     <div className="ghost-overlay" aria-label={t("bodyPhotos.camera.overlayLabel")}>
       <div
@@ -44,7 +45,7 @@ export function GhostOverlayGuide({
         style={{
           transform: ghostPhotoTransformStyle(
             transform,
-            view === "side" && sideProfile === "left",
+            mirrored,
           ),
         }}
       >
