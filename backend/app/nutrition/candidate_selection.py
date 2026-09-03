@@ -1,11 +1,16 @@
 """Pure deterministic comparison of fully evaluated nutrition candidates."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from app.nutrition.planner_engine import GenerationOutcome, NutrientComparison, PlannerResult
 from app.nutrition.program_selection import ProgramCandidate
+
+if TYPE_CHECKING:
+    from app.nutrition.planner_engine import NutrientComparison, PlannerResult
 
 ZERO = Decimal("0")
 ONE = Decimal("1")
@@ -73,20 +78,22 @@ def evaluate_candidate(
     weekly_budget_irr: Decimal,
     stable_variant_key: tuple[str, ...] = ("base",),
 ) -> CandidateEvaluation:
+    effective_variant_key = _effective_variant_key(result, stable_variant_key)
     quality = (
-        _candidate_quality(
-            proposal,
+        _quality_for_result(
             result,
             weekly_budget_irr=weekly_budget_irr,
-            stable_variant_key=stable_variant_key,
+            preferred_style=proposal.preferred_style,
+            stable_program_code=proposal.program.code,
+            stable_variant_key=effective_variant_key,
         )
-        if result.outcome is GenerationOutcome.SUCCESS
+        if _is_success(result)
         else None
     )
     return CandidateEvaluation(
         program_id=proposal.program.id,
         program_code=proposal.program.code,
-        stable_variant_key=stable_variant_key,
+        stable_variant_key=effective_variant_key,
         preconstruction_rank=proposal.preconstruction_rank,
         preferred_style=proposal.preferred_style,
         result=result,
@@ -101,15 +108,14 @@ def select_best_candidate(
         (
             evaluation
             for evaluation in evaluations
-            if evaluation.result.outcome is GenerationOutcome.SUCCESS
-            and evaluation.quality is not None
+            if _is_success(evaluation.result) and evaluation.quality is not None
         ),
         None,
     )
     admitted = tuple(
         evaluation
         for evaluation in evaluations
-        if evaluation.result.outcome is GenerationOutcome.SUCCESS and evaluation.quality is not None
+        if _is_success(evaluation.result) and evaluation.quality is not None
     )
     selected = (
         min(
@@ -133,7 +139,7 @@ def failure_reason_counts(
 ) -> dict[str, int]:
     counts: dict[str, int] = {}
     for evaluation in evaluations:
-        if evaluation.result.outcome is GenerationOutcome.SUCCESS:
+        if _is_success(evaluation.result):
             continue
         for reason in evaluation.result.reason_codes:
             counts[reason] = counts.get(reason, 0) + 1
@@ -145,6 +151,40 @@ def _candidate_quality(
     result: PlannerResult,
     *,
     weekly_budget_irr: Decimal,
+    stable_variant_key: tuple[str, ...],
+) -> CandidateQuality:
+    return _quality_for_result(
+        result,
+        weekly_budget_irr=weekly_budget_irr,
+        preferred_style=proposal.preferred_style,
+        stable_program_code=proposal.program.code,
+        stable_variant_key=stable_variant_key,
+    )
+
+
+def quality_for_result(
+    result: PlannerResult,
+    *,
+    weekly_budget_irr: Decimal,
+    stable_variant_key: tuple[str, ...] = ("base",),
+) -> CandidateQuality:
+    """Score a fully validated result for comparing variants of one program."""
+
+    return _quality_for_result(
+        result,
+        weekly_budget_irr=weekly_budget_irr,
+        preferred_style=True,
+        stable_program_code="",
+        stable_variant_key=stable_variant_key,
+    )
+
+
+def _quality_for_result(
+    result: PlannerResult,
+    *,
+    weekly_budget_irr: Decimal,
+    preferred_style: bool,
+    stable_program_code: str,
     stable_variant_key: tuple[str, ...],
 ) -> CandidateQuality:
     comparisons = result.nutrient_comparisons or {}
@@ -162,11 +202,28 @@ def _candidate_quality(
         repetition_penalty=ZERO,
         warning_burden=len(result.warning_codes),
         repair_burden=len(result.repair_actions),
-        substitution_burden=0,
-        preferred_program_style_penalty=0 if proposal.preferred_style else 1,
-        stable_program_code=proposal.program.code,
+        substitution_burden=len(result.substitution_actions),
+        preferred_program_style_penalty=0 if preferred_style else 1,
+        stable_program_code=stable_program_code,
         stable_variant_key=stable_variant_key,
     )
+
+
+def _effective_variant_key(
+    result: PlannerResult,
+    stable_variant_key: tuple[str, ...],
+) -> tuple[str, ...]:
+    if stable_variant_key != ("base",) or not result.substitution_actions:
+        return stable_variant_key
+    return tuple(
+        f"{action.day_index:02d}:{action.role}:{action.slot_index:02d}:"
+        f"{action.replacement_template_id}"
+        for action in result.substitution_actions
+    )
+
+
+def _is_success(result: PlannerResult) -> bool:
+    return result.outcome.value == "success"
 
 
 def _normalized_core_deviation(

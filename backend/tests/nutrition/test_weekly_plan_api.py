@@ -426,7 +426,7 @@ def test_generation_evaluates_every_program_and_persists_only_the_best_result(
         ),
     )
 
-    def fake_plan_week(inputs, foods, meal_templates, policy=plan_service.DEFAULT_POLICY):
+    def fake_plan_week(inputs, foods, meal_templates, policy=plan_service.DEFAULT_POLICY, **kwargs):
         calls.append((inputs, foods, meal_templates, policy))
         return results[len(calls) - 1]
 
@@ -458,7 +458,7 @@ def test_generation_aggregates_all_candidate_failures_without_persisting_a_plan(
     _seed_foods_and_prices(db)
     programs = plan_service.list_programs(db)
 
-    def fake_plan_week(inputs, foods, meal_templates, policy=plan_service.DEFAULT_POLICY):
+    def fake_plan_week(inputs, foods, meal_templates, policy=plan_service.DEFAULT_POLICY, **kwargs):
         return PlannerResult(
             outcome=GenerationOutcome.INFEASIBLE,
             reason_codes=("STRICT_BUDGET_NO_FEASIBLE_REPAIR",),

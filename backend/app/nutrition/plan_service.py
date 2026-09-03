@@ -60,6 +60,7 @@ from app.nutrition.models import (
 )
 from app.nutrition.planner_engine import (
     GenerationOutcome,
+    PlannedFood,
     PlannerFood,
     PlannerInput,
     PlannerMealIngredient,
@@ -73,6 +74,7 @@ from app.nutrition.planner_policy import (
     DEFAULT_POLICY,
     PLANNER_POLICY_VERSION,
     PLANNER_VERSION,
+    TEMPLATE_SUBSTITUTION_POLICY_VERSION,
 )
 from app.nutrition.prepared_recipe import (
     PreparedRecipeDefinition,
@@ -288,6 +290,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "dietary_pattern": profile.dietary_pattern.value,
         "maximum_meal_repetition_per_week": profile.maximum_meal_repetition_per_week,
         "meal_distribution_policy_version": "meal-distribution-v1",
+        "template_substitution_policy_version": TEMPLATE_SUBSTITUTION_POLICY_VERSION,
         "budget_formula_version": "annualized-monthly-times-12-divided-52-v1",
         "meal_catalogue_template_ids": [item.meal_id for item in meal_templates],
         "nutrition_program_id": None,
@@ -309,6 +312,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         dietary_pattern=profile.dietary_pattern.value,
         maximum_meal_repetition_per_week=profile.maximum_meal_repetition_per_week,
     )
+    optimization_cache: dict[tuple[object, ...], PlannedFood] = {}
     evaluations: list[CandidateEvaluation] = []
     if program_candidates:
         for proposal in program_candidates:
@@ -326,6 +330,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
                 foods,
                 meal_templates,
                 policy=DEFAULT_POLICY,
+                optimization_cache=optimization_cache,
             )
             evaluations.append(
                 evaluate_candidate(
@@ -353,6 +358,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             foods,
             meal_templates,
             policy=DEFAULT_POLICY,
+            optimization_cache=optimization_cache,
         )
         selected_program = None
         selected_program_code = None
@@ -500,6 +506,7 @@ def _selection_trace(selection: CandidateSelection) -> dict[str, object]:
     return {
         "schema_version": "nutrition-selection-trace-v1",
         "strategy": CANDIDATE_SELECTION_POLICY_VERSION,
+        "template_substitution_policy_version": TEMPLATE_SUBSTITUTION_POLICY_VERSION,
         "proposed_candidate_count": len(selection.evaluations),
         "evaluated_candidate_count": len(selection.evaluations),
         "successful_candidate_count": len(successful),
@@ -520,6 +527,18 @@ def _selection_trace(selection: CandidateSelection) -> dict[str, object]:
                 "preferred_style": evaluation.preferred_style,
                 "outcome": evaluation.result.outcome.value,
                 "reason_codes": list(evaluation.result.reason_codes),
+                "substitution_actions": [
+                    {
+                        "day_index": action.day_index,
+                        "role": action.role,
+                        "slot_index": action.slot_index,
+                        "requested_template_id": action.requested_template_id,
+                        "replacement_template_id": action.replacement_template_id,
+                        "reason_code": action.reason_code,
+                    }
+                    for action in evaluation.result.substitution_actions[:32]
+                ],
+                "substitution_diagnostics": list(evaluation.result.substitution_diagnostics[:32]),
                 "quality": _quality_snapshot(evaluation.quality),
             }
             for evaluation in selection.evaluations
@@ -923,6 +942,7 @@ def _planner_meal_templates(
                 for item in meal.items
             ),
             prepared_recipe=_planner_prepared_recipe(meal),
+            verification_status=meal.verification_status.value,
         )
         for meal in meals
     )

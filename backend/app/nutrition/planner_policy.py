@@ -4,8 +4,9 @@ from decimal import Decimal
 PLANNER_POLICY_VERSION = "weekly-planner-v1"
 MEAL_DISTRIBUTION_POLICY_VERSION = "meal-distribution-v1"
 PORTION_POLICY_VERSION = "portion-bounds-v1"
-PLANNER_VERSION = "deterministic-candidate-search-v1"
+PLANNER_VERSION = "deterministic-candidate-search-template-substitution-v1"
 CANDIDATE_SELECTION_POLICY_VERSION = "best-admitted-all-active-programs-v1"
+TEMPLATE_SUBSTITUTION_POLICY_VERSION = "safe-template-substitution-beam-v1"
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,11 @@ class PlannerPolicy:
     micronutrient_score_weight: Decimal = Decimal("4")
     preference_score_weight: Decimal = Decimal("1")
     cost_score_weight: Decimal = Decimal("0.25")
+    maximum_template_substitution_attempts_per_slot: int = 2
+    maximum_candidate_rebuild_attempts: int = 2
+    maximum_substitutes_per_slot: int = 2
+    maximum_partial_variants_per_program: int = 8
+    maximum_full_variants_per_program: int = 2
 
 
 DEFAULT_POLICY = PlannerPolicy()

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 
+from app.nutrition.candidate_selection import quality_for_result
 from app.nutrition.exceptions import ScheduledTemplateUnavailableError
 from app.nutrition.planner_policy import DEFAULT_POLICY, PlannerPolicy
 from app.nutrition.prepared_recipe import (
@@ -13,8 +14,18 @@ from app.nutrition.prepared_recipe import (
     PreparedRecipeFood,
     calculate_prepared_recipe,
 )
+from app.nutrition.template_substitution import (
+    NoCompatibleTemplateSubstituteError,
+    PartialWeekVariant,
+    SubstitutionAction,
+    SubstitutionContext,
+    rank_template_substitutes,
+    substitution_rejection_diagnostics,
+    template_reference_metrics,
+)
 
 ZERO = Decimal("0")
+ONE = Decimal("1")
 HUNDRED = Decimal("100")
 TARGET_NUTRIENT_CODES = {
     "goal_calories": "energy_kcal",
@@ -70,6 +81,7 @@ class PlannerMealTemplate:
     category: str
     items: tuple[PlannerMealIngredient, ...]
     prepared_recipe: PlannerPreparedRecipe | None = None
+    verification_status: str = "verified"
 
 
 @dataclass(frozen=True)
@@ -177,10 +189,25 @@ class PlannerResult:
     nutrient_comparisons: dict[str, NutrientComparison] | None = None
     repair_actions: tuple[RepairAction, ...] = ()
     warning_codes: tuple[str, ...] = ()
+    substitution_actions: tuple[SubstitutionAction, ...] = ()
+    substitution_diagnostics: tuple[dict[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if self.nutrient_comparisons is None:
             object.__setattr__(self, "nutrient_comparisons", {})
+
+
+@dataclass(frozen=True)
+class _ScheduledWeekVariant:
+    days: tuple[PlannedDay, ...]
+    substitutions: tuple[SubstitutionAction, ...]
+    stable_variant_key: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _EvaluatedVariant:
+    result: PlannerResult
+    stable_variant_key: tuple[str, ...]
 
 
 def plan_week(
@@ -188,8 +215,11 @@ def plan_week(
     foods: tuple[PlannerFood, ...],
     meal_templates: tuple[PlannerMealTemplate, ...],
     policy: PlannerPolicy = DEFAULT_POLICY,
+    *,
+    optimization_cache: dict[tuple[object, ...], PlannedFood] | None = None,
 ) -> PlannerResult:
     _validate_inputs(inputs)
+    optimization_cache = optimization_cache if optimization_cache is not None else {}
     eligible = tuple(
         sorted(
             (
@@ -218,17 +248,78 @@ def plan_week(
         return _failure(GenerationOutcome.LIVE_PRICE_UNAVAILABLE, "INSUFFICIENT_PRICE_COVERAGE")
 
     weekly_budget_cap = _weekly_budget_cap(inputs, policy)
+    variants: tuple[_ScheduledWeekVariant, ...]
     try:
-        days = _build_days(
-            inputs,
-            main_templates,
-            snack_templates,
-            policy,
-            maximum_recipe_cost_irr=weekly_budget_cap,
+        if inputs.template_schedule is None:
+            days = _build_days(
+                inputs,
+                main_templates,
+                snack_templates,
+                policy,
+                maximum_recipe_cost_irr=weekly_budget_cap,
+                optimization_cache=optimization_cache,
+            )
+            variants = (_ScheduledWeekVariant(days, (), ("base",)),)
+        else:
+            variants = _build_scheduled_day_variants(
+                inputs,
+                main_templates,
+                snack_templates,
+                meal_templates,
+                policy,
+                maximum_recipe_cost_irr=weekly_budget_cap,
+                optimization_cache=optimization_cache,
+            )
+    except NoCompatibleTemplateSubstituteError as error:
+        return PlannerResult(
+            outcome=GenerationOutcome.INFEASIBLE,
+            reason_codes=("NO_COMPATIBLE_TEMPLATE_SUBSTITUTE",),
+            substitution_diagnostics=error.diagnostics,
         )
     except ScheduledTemplateUnavailableError:
         return _failure(GenerationOutcome.INFEASIBLE, "SCHEDULED_TEMPLATE_UNAVAILABLE")
+
     foods_by_id = {food.food_id: food for food in eligible}
+    evaluated = tuple(
+        _EvaluatedVariant(
+            result=_evaluate_built_days(
+                inputs,
+                variant.days,
+                eligible_templates,
+                foods_by_id,
+                policy,
+                substitution_actions=variant.substitutions,
+                optimization_cache=optimization_cache,
+            ),
+            stable_variant_key=variant.stable_variant_key,
+        )
+        for variant in variants[: policy.maximum_candidate_rebuild_attempts]
+    )
+    successful = tuple(
+        variant for variant in evaluated if variant.result.outcome is GenerationOutcome.SUCCESS
+    )
+    if successful:
+        return min(
+            successful,
+            key=lambda variant: quality_for_result(
+                variant.result,
+                weekly_budget_irr=Decimal(inputs.weekly_budget_irr),
+                stable_variant_key=variant.stable_variant_key,
+            ).sort_key(),
+        ).result
+    return min(evaluated, key=_failure_variant_key).result
+
+
+def _evaluate_built_days(
+    inputs: PlannerInput,
+    days: tuple[PlannedDay, ...],
+    eligible_templates: tuple[EligibleMealTemplate, ...],
+    foods_by_id: dict[str, PlannerFood],
+    policy: PlannerPolicy,
+    *,
+    substitution_actions: tuple[SubstitutionAction, ...],
+    optimization_cache: dict[tuple[object, ...], PlannedFood],
+) -> PlannerResult:
     days, repairs = _repair_micronutrients(days, inputs, foods_by_id, policy)
     weekly_totals = _sum_nutrients(day.nutrients for day in days)
     daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
@@ -240,6 +331,7 @@ def plan_week(
             reason_codes=("NUTRIENT_UPPER_LIMIT_EXCEEDED",),
             nutrient_comparisons=comparisons,
             repair_actions=repairs,
+            substitution_actions=substitution_actions,
         )
 
     validation = _validate_nutritional_feasibility(inputs, daily_average, policy)
@@ -249,9 +341,16 @@ def plan_week(
             reason_codes=validation,
             nutrient_comparisons=comparisons,
             repair_actions=repairs,
+            substitution_actions=substitution_actions,
         )
 
-    days = _repair_prepared_recipe_budget(days, inputs, eligible_templates, policy)
+    days = _repair_prepared_recipe_budget(
+        days,
+        inputs,
+        eligible_templates,
+        policy,
+        optimization_cache=optimization_cache,
+    )
     weekly_totals = _sum_nutrients(day.nutrients for day in days)
     daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
     data_completeness = _nutrient_data_completeness(days, inputs)
@@ -266,6 +365,7 @@ def plan_week(
             budget_status="over_budget",
             nutrient_comparisons=comparisons,
             repair_actions=repairs,
+            substitution_actions=substitution_actions,
         )
     if inputs.budget_mode == "flexible" and cost > allowance * (
         Decimal("1") + policy.flexible_budget_overage_cap
@@ -277,6 +377,7 @@ def plan_week(
             budget_status="over_budget",
             nutrient_comparisons=comparisons,
             repair_actions=repairs,
+            substitution_actions=substitution_actions,
         )
     budget_status = "flexible_overage" if cost > allowance else "within_budget"
     warning_codes = _warning_codes(
@@ -295,6 +396,22 @@ def plan_week(
         nutrient_comparisons=comparisons,
         repair_actions=repairs,
         warning_codes=warning_codes,
+        substitution_actions=substitution_actions,
+    )
+
+
+def _failure_variant_key(variant: _EvaluatedVariant) -> tuple[object, ...]:
+    outcome_priority = {
+        GenerationOutcome.TARGET_INFEASIBLE: 0,
+        GenerationOutcome.INFEASIBLE: 1,
+        GenerationOutcome.LIVE_PRICE_UNAVAILABLE: 2,
+        GenerationOutcome.FAILED: 3,
+    }
+    return (
+        outcome_priority.get(variant.result.outcome, 4),
+        variant.result.reason_codes,
+        len(variant.result.substitution_actions),
+        variant.stable_variant_key,
     )
 
 
@@ -370,9 +487,19 @@ def _eligible_templates(
     foods_by_id = {food.food_id: food for food in foods}
     eligible: list[EligibleMealTemplate] = []
     for template in sorted(templates, key=lambda item: (item.category, item.meal_id)):
+        if template.verification_status != "verified":
+            continue
         items: list[tuple[PlannerMealIngredient, PlannerFood]] = []
         missing_required = False
         for item in template.items:
+            if not _valid_portion_bounds(
+                item.min_grams,
+                item.reference_grams,
+                item.max_grams,
+                item.is_required,
+            ):
+                missing_required = True
+                break
             food = foods_by_id.get(item.food_id)
             if food is None:
                 if item.is_required:
@@ -388,6 +515,22 @@ def _eligible_templates(
                     missing_required = True
                     break
                 recipe_foods.append((str(ingredient.food_id), food))
+            if not missing_required and template.prepared_recipe is not None:
+                try:
+                    calculate_prepared_recipe(
+                        template.prepared_recipe.definition,
+                        {
+                            food_id: PreparedRecipeFood(
+                                food_id=food_id,
+                                nutrients_per_100g=food.nutrients_per_100g,
+                                price_irr_per_gram=food.price_irr_per_gram,
+                                price_reference_id=food.price_reference_id,
+                            )
+                            for food_id, food in recipe_foods
+                        },
+                    )
+                except ValueError:
+                    missing_required = True
         if not missing_required and (items or recipe_foods):
             eligible.append(
                 EligibleMealTemplate(
@@ -397,6 +540,19 @@ def _eligible_templates(
                 )
             )
     return tuple(eligible)
+
+
+def _valid_portion_bounds(
+    minimum: Decimal,
+    reference: Decimal,
+    maximum: Decimal,
+    is_required: bool,
+) -> bool:
+    if not all(value.is_finite() for value in (minimum, reference, maximum)):
+        return False
+    if minimum < ZERO or maximum <= ZERO or not minimum <= reference <= maximum:
+        return False
+    return not is_required or min(minimum, reference, maximum) > ZERO
 
 
 def _rank_templates(
@@ -457,6 +613,7 @@ def _build_days(
     policy: PlannerPolicy,
     *,
     maximum_recipe_cost_irr: Decimal,
+    optimization_cache: dict[tuple[object, ...], PlannedFood],
 ) -> tuple[PlannedDay, ...]:
     if inputs.template_schedule is not None:
         return _build_scheduled_days(
@@ -464,6 +621,7 @@ def _build_days(
             (*main_templates, *snack_templates),
             policy,
             maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+            optimization_cache=optimization_cache,
         )
     daily_kcal = inputs.daily_targets["goal_calories"]
     snack_total_share = policy.snack_energy_share if inputs.snacks_per_day else ZERO
@@ -488,6 +646,7 @@ def _build_days(
                     template,
                     main_slot_kcal,
                     maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+                    optimization_cache=optimization_cache,
                 )
             )
         for slot_index in range(inputs.snacks_per_day):
@@ -500,6 +659,7 @@ def _build_days(
                     template,
                     snack_slot_kcal,
                     maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+                    optimization_cache=optimization_cache,
                 )
             )
         days.append(_day(day_index, tuple(meals)))
@@ -512,10 +672,328 @@ def _build_scheduled_days(
     policy: PlannerPolicy,
     *,
     maximum_recipe_cost_irr: Decimal,
+    optimization_cache: dict[tuple[object, ...], PlannedFood],
 ) -> tuple[PlannedDay, ...]:
+    raw_templates = tuple(candidate.template for candidate in templates)
+    variants = _build_scheduled_day_variants(
+        inputs,
+        templates,
+        templates,
+        raw_templates,
+        policy,
+        maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+        optimization_cache=optimization_cache,
+    )
+    return variants[0].days
+
+
+def _build_scheduled_day_variants(
+    inputs: PlannerInput,
+    main_templates: tuple[EligibleMealTemplate, ...],
+    snack_templates: tuple[EligibleMealTemplate, ...],
+    all_templates: tuple[PlannerMealTemplate, ...],
+    policy: PlannerPolicy,
+    *,
+    maximum_recipe_cost_irr: Decimal,
+    optimization_cache: dict[tuple[object, ...], PlannedFood],
+) -> tuple[_ScheduledWeekVariant, ...]:
     if len(inputs.template_schedule or ()) != 7:
         raise ValueError("Template schedule must contain exactly seven days")
-    by_id = {candidate.template.meal_id: candidate for candidate in templates}
+    eligible_templates = tuple(
+        sorted(
+            {
+                candidate.template.meal_id: candidate
+                for candidate in (*main_templates, *snack_templates)
+            }.values(),
+            key=lambda candidate: candidate.template.meal_id,
+        )
+    )
+    by_id = {candidate.template.meal_id: candidate for candidate in eligible_templates}
+    requested_by_id = {template.meal_id: template for template in all_templates}
+    schedule = inputs.template_schedule or ()
+    pending_slots = _pending_schedule_slots(schedule)
+    initial_usage = _scheduled_template_usage(schedule, by_id)
+    empty_days = tuple(() for _ in schedule)
+    states: tuple[PartialWeekVariant, ...] = (
+        PartialWeekVariant(
+            days_built=empty_days,
+            pending_slots=pending_slots,
+            substitutions=(),
+            partial_quality_lower_bound=(),
+            stable_variant_key=("base",),
+            usage=tuple(sorted(initial_usage.items())),
+        ),
+    )
+    while states and states[0].pending_slots:
+        day_index, slot_index, role, requested_id, category = states[0].pending_slots[0]
+        next_states: list[PartialWeekVariant] = []
+        first_failure: NoCompatibleTemplateSubstituteError | None = None
+        for state in states:
+            usage = dict(state.usage)
+            if requested_id is None:
+                selected_days = [list(day) for day in state.days_built]
+                selected_days[day_index].append(None)
+                next_states.append(
+                    PartialWeekVariant(
+                        days_built=tuple(tuple(day) for day in selected_days),
+                        pending_slots=state.pending_slots[1:],
+                        substitutions=state.substitutions,
+                        partial_quality_lower_bound=state.partial_quality_lower_bound,
+                        stable_variant_key=state.stable_variant_key,
+                        usage=state.usage,
+                    )
+                )
+                continue
+            requested_candidate = by_id.get(requested_id or "")
+            original_available = (
+                requested_candidate is not None
+                and requested_candidate.template.category == category
+            )
+            options: tuple[EligibleMealTemplate, ...]
+            if original_available:
+                assert requested_candidate is not None
+                options = (requested_candidate,)
+            else:
+                requested = requested_by_id.get(requested_id) or PlannerMealTemplate(
+                    meal_id=requested_id,
+                    name_fa=requested_id,
+                    name_en=requested_id,
+                    category=category,
+                    items=(),
+                )
+                real_slots = [item for item in schedule[day_index] if item[1] is not None]
+                snack_count = sum(item[0] == "snack" for item in real_slots)
+                main_count = len(real_slots) - snack_count
+                snack_share = policy.snack_energy_share if snack_count else ZERO
+                target_kcal = (
+                    inputs.daily_targets["goal_calories"] * snack_share / snack_count
+                    if role == "snack" and snack_count
+                    else inputs.daily_targets["goal_calories"]
+                    * (Decimal("1") - snack_share)
+                    / main_count
+                )
+                target_protein = inputs.daily_targets.get("protein", ZERO)
+                target_protein = (
+                    target_protein * snack_share / snack_count
+                    if role == "snack" and snack_count
+                    else target_protein * (Decimal("1") - snack_share) / main_count
+                )
+                context = SubstitutionContext(
+                    slot_category=category,
+                    target_kcal=target_kcal,
+                    target_protein=target_protein,
+                    template_usage=tuple(sorted(usage.items())),
+                    maximum_repetition=inputs.maximum_meal_repetition_per_week,
+                    liked_food_ids=inputs.liked_food_ids,
+                    disliked_food_ids=inputs.disliked_food_ids,
+                    day_index=day_index,
+                    role=role,
+                    slot_index=slot_index,
+                    dietary_pattern=inputs.dietary_pattern,
+                    excluded_terms=inputs.excluded_terms,
+                )
+                options = rank_template_substitutes(
+                    requested,
+                    eligible_templates,
+                    context,
+                )[
+                    : min(
+                        policy.maximum_substitutes_per_slot,
+                        policy.maximum_template_substitution_attempts_per_slot,
+                    )
+                ]
+                if not options:
+                    first_failure = first_failure or NoCompatibleTemplateSubstituteError(
+                        day_index=day_index,
+                        role=role,
+                        slot_index=slot_index,
+                        requested_template_id=requested_id,
+                        category=category,
+                        diagnostics=substitution_rejection_diagnostics(
+                            requested,
+                            eligible_templates,
+                            context,
+                        ),
+                    )
+                    continue
+            for candidate in options:
+                selected_days = [list(day) for day in state.days_built]
+                selected_days[day_index].append(candidate.template.meal_id)
+                action = None
+                if not original_available:
+                    action = SubstitutionAction(
+                        day_index=day_index,
+                        role=role,
+                        slot_index=slot_index,
+                        requested_template_id=requested_id or "",
+                        replacement_template_id=candidate.template.meal_id,
+                        reason_code="SCHEDULED_TEMPLATE_UNAVAILABLE",
+                    )
+                substitutions = state.substitutions + ((action,) if action else ())
+                _candidate_energy, _candidate_protein, candidate_cost = template_reference_metrics(
+                    candidate
+                )
+                real_slots = [item for item in schedule[day_index] if item[1] is not None]
+                snack_count = sum(item[0] == "snack" for item in real_slots)
+                main_count = len(real_slots) - snack_count
+                snack_share = policy.snack_energy_share if snack_count else ZERO
+                target_kcal = (
+                    inputs.daily_targets["goal_calories"] * snack_share / snack_count
+                    if role == "snack" and snack_count
+                    else inputs.daily_targets["goal_calories"]
+                    * (Decimal("1") - snack_share)
+                    / main_count
+                )
+                target_protein = inputs.daily_targets.get("protein", ZERO)
+                target_protein = (
+                    target_protein * snack_share / snack_count
+                    if role == "snack" and snack_count
+                    else target_protein * (Decimal("1") - snack_share) / main_count
+                )
+                energy_lower_bound, protein_lower_bound = _template_slot_lower_bound(
+                    candidate,
+                    target_kcal,
+                    target_protein,
+                )
+                lower_bound = state.partial_quality_lower_bound + (
+                    energy_lower_bound,
+                    protein_lower_bound,
+                    Decimal(len(substitutions)),
+                    candidate_cost,
+                )
+                stable_key = state.stable_variant_key
+                if action is not None:
+                    if stable_key == ("base",):
+                        stable_key = ()
+                    stable_key += (
+                        f"{day_index:02d}:{role}:{slot_index:02d}:{candidate.template.meal_id}",
+                    )
+                next_states.append(
+                    PartialWeekVariant(
+                        days_built=tuple(tuple(day) for day in selected_days),
+                        pending_slots=state.pending_slots[1:],
+                        substitutions=substitutions,
+                        partial_quality_lower_bound=lower_bound,
+                        stable_variant_key=stable_key,
+                        usage=tuple(
+                            sorted(
+                                {
+                                    **usage,
+                                    candidate.template.meal_id: usage.get(
+                                        candidate.template.meal_id, 0
+                                    )
+                                    + (0 if original_available else 1),
+                                }.items()
+                            )
+                        ),
+                    )
+                )
+        if not next_states:
+            if first_failure is not None:
+                raise first_failure
+            break
+        states = tuple(
+            sorted(
+                next_states,
+                key=lambda state: (
+                    state.partial_quality_lower_bound,
+                    state.stable_variant_key,
+                ),
+            )[: policy.maximum_partial_variants_per_program]
+        )
+
+    max_variants = min(
+        policy.maximum_full_variants_per_program,
+        policy.maximum_candidate_rebuild_attempts,
+    )
+    variants: list[_ScheduledWeekVariant] = []
+    meal_cache: dict[tuple[str, str, Decimal], PlannedMeal] = {}
+    for state in states[:max_variants]:
+        variants.append(
+            _ScheduledWeekVariant(
+                days=_materialize_scheduled_days(
+                    inputs,
+                    state.days_built,
+                    by_id,
+                    policy,
+                    maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+                    meal_cache=meal_cache,
+                    optimization_cache=optimization_cache,
+                ),
+                substitutions=state.substitutions,
+                stable_variant_key=(state.stable_variant_key or ("base",)),
+            )
+        )
+    return tuple(variants)
+
+
+def _template_slot_lower_bound(
+    candidate: EligibleMealTemplate,
+    target_kcal: Decimal,
+    target_protein: Decimal,
+) -> tuple[Decimal, Decimal]:
+    minimum_energy = ZERO
+    maximum_energy = ZERO
+    minimum_protein = ZERO
+    maximum_protein = ZERO
+    for item, food in candidate.items:
+        energy = food.nutrients_per_100g.get("energy_kcal", ZERO) / HUNDRED
+        protein = food.nutrients_per_100g.get("protein_g", ZERO) / HUNDRED
+        minimum_energy += energy * item.min_grams
+        maximum_energy += energy * item.max_grams
+        minimum_protein += protein * item.min_grams
+        maximum_protein += protein * item.max_grams
+
+    def gap(target: Decimal, minimum: Decimal, maximum: Decimal) -> Decimal:
+        if target <= minimum:
+            return (minimum - target) / max(target, ONE)
+        if target >= maximum:
+            return (target - maximum) / max(target, ONE)
+        return ZERO
+
+    return (
+        gap(target_kcal, minimum_energy, maximum_energy),
+        gap(target_protein, minimum_protein, maximum_protein),
+    )
+
+
+def _pending_schedule_slots(
+    schedule: tuple[tuple[tuple[str, str | None, str], ...], ...],
+) -> tuple[tuple[int, int, str, str | None, str], ...]:
+    pending: list[tuple[int, int, str, str | None, str]] = []
+    for day_index, day in enumerate(schedule):
+        role_indexes: dict[str, int] = {}
+        for role, template_id, category in day:
+            slot_index = role_indexes.get(role, 0)
+            role_indexes[role] = slot_index + 1
+            pending.append((day_index, slot_index, role, template_id, category))
+    return tuple(pending)
+
+
+def _scheduled_template_usage(
+    schedule: tuple[tuple[tuple[str, str | None, str], ...], ...],
+    eligible_by_id: dict[str, EligibleMealTemplate],
+) -> dict[str, int]:
+    usage: dict[str, int] = {}
+    for day in schedule:
+        for _role, template_id, category in day:
+            candidate = eligible_by_id.get(template_id or "")
+            if candidate is not None and candidate.template.category == category:
+                usage[template_id or ""] = usage.get(template_id or "", 0) + 1
+    return usage
+
+
+def _materialize_scheduled_days(
+    inputs: PlannerInput,
+    selected_template_ids: tuple[tuple[str | None, ...], ...],
+    by_id: dict[str, EligibleMealTemplate],
+    policy: PlannerPolicy,
+    *,
+    maximum_recipe_cost_irr: Decimal,
+    meal_cache: dict[tuple[str, str, Decimal], PlannedMeal] | None = None,
+    optimization_cache: dict[tuple[object, ...], PlannedFood],
+) -> tuple[PlannedDay, ...]:
+    meal_cache = meal_cache if meal_cache is not None else {}
     days: list[PlannedDay] = []
     for day_index, schedule in enumerate(inputs.template_schedule or ()):
         real_slots = [slot for slot in schedule if slot[1] is not None]
@@ -532,10 +1010,11 @@ def _build_scheduled_days(
         )
         meals: list[PlannedMeal] = []
         role_indexes: dict[str, int] = {}
-        for role, template_id, category in schedule:
+        for physical_slot_index, (role, _requested_id, category) in enumerate(schedule):
             slot_index = role_indexes.get(role, 0)
             role_indexes[role] = slot_index + 1
-            if template_id is None:
+            selected_id = selected_template_ids[day_index][physical_slot_index]
+            if selected_id is None:
                 meals.append(
                     PlannedMeal(
                         role=role,
@@ -548,19 +1027,23 @@ def _build_scheduled_days(
                     )
                 )
                 continue
-            candidate = by_id.get(template_id)
+            candidate = by_id.get(selected_id)
             if candidate is None:
-                raise ScheduledTemplateUnavailableError(template_id, category)
+                raise ScheduledTemplateUnavailableError(selected_id, category)
             target = snack_kcal if role == "snack" else main_kcal
-            meals.append(
-                _meal_from_template(
+            cache_key = (candidate.template.meal_id, role, target)
+            cached_meal = meal_cache.get(cache_key)
+            if cached_meal is None:
+                cached_meal = _meal_from_template(
                     role,
                     slot_index,
                     candidate,
                     target,
                     maximum_recipe_cost_irr=maximum_recipe_cost_irr,
+                    optimization_cache=optimization_cache,
                 )
-            )
+                meal_cache[cache_key] = cached_meal
+            meals.append(replace(cached_meal, slot_index=slot_index))
         days.append(_day(day_index, tuple(meals)))
     return tuple(days)
 
@@ -572,6 +1055,7 @@ def _meal_from_template(
     target_kcal: Decimal,
     *,
     maximum_recipe_cost_irr: Decimal,
+    optimization_cache: dict[tuple[object, ...], PlannedFood],
 ) -> PlannedMeal:
     simple_reference_kcal = sum(
         (
@@ -606,12 +1090,13 @@ def _meal_from_template(
         target_recipe_protein = target_recipe_kcal * Decimal("0.20") / Decimal("4")
         planned_foods.insert(
             0,
-            optimize_prepared_recipe(
+            _cached_optimize_prepared_recipe(
                 candidate.template.prepared_recipe,
                 dict(candidate.prepared_recipe_foods),
                 target_kcal=target_recipe_kcal,
                 target_protein=target_recipe_protein,
                 maximum_cost_irr=maximum_recipe_cost_irr,
+                optimization_cache=optimization_cache,
             ),
         )
     foods = tuple(planned_foods)
@@ -809,6 +1294,8 @@ def _repair_prepared_recipe_budget(
     inputs: PlannerInput,
     templates: tuple[EligibleMealTemplate, ...],
     policy: PlannerPolicy,
+    *,
+    optimization_cache: dict[tuple[object, ...], PlannedFood],
 ) -> tuple[PlannedDay, ...]:
     budget_cap = _weekly_budget_cap(inputs, policy)
     mutable_days = list(days)
@@ -837,12 +1324,13 @@ def _repair_prepared_recipe_budget(
         nutrients = dict(current.nutrients)
         for fraction in (Decimal("1"), Decimal("0.75"), Decimal("0.5"), Decimal("0.25")):
             maximum_cost = max(current.cost_irr - overage * fraction, ZERO)
-            replacement = optimize_prepared_recipe(
+            replacement = _cached_optimize_prepared_recipe(
                 candidate.template.prepared_recipe,
                 dict(candidate.prepared_recipe_foods),
                 target_kcal=nutrients.get("energy_kcal", ZERO),
                 target_protein=nutrients.get("protein_g", ZERO),
                 maximum_cost_irr=maximum_cost,
+                optimization_cache=optimization_cache,
             )
             if replacement.cost_irr >= current.cost_irr:
                 continue
@@ -869,6 +1357,46 @@ def _repair_prepared_recipe_budget(
             mutable_days = candidate_days
             break
     return tuple(mutable_days)
+
+
+def _cached_optimize_prepared_recipe(
+    recipe: PlannerPreparedRecipe,
+    foods: dict[str, PlannerFood],
+    *,
+    target_kcal: Decimal,
+    target_protein: Decimal,
+    maximum_cost_irr: Decimal,
+    optimization_cache: dict[tuple[object, ...], PlannedFood],
+) -> PlannedFood:
+    food_key = tuple(
+        (
+            food_id,
+            food.price_irr_per_gram,
+            food.price_reference_id,
+            tuple(sorted(food.nutrients_per_100g.items())),
+        )
+        for food_id, food in sorted(foods.items())
+    )
+    key = (
+        recipe.revision_id,
+        recipe.definition,
+        food_key,
+        target_kcal,
+        target_protein,
+        maximum_cost_irr,
+    )
+    cached = optimization_cache.get(key)
+    if cached is not None:
+        return cached
+    result = optimize_prepared_recipe(
+        recipe,
+        foods,
+        target_kcal=target_kcal,
+        target_protein=target_protein,
+        maximum_cost_irr=maximum_cost_irr,
+    )
+    optimization_cache[key] = result
+    return result
 
 
 def _repair_micronutrients(
