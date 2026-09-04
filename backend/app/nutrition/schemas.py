@@ -21,6 +21,7 @@ from app.nutrition.enums import (
     MealPreparationPreference,
     MedicalConditionCode,
     MetabolicBasis,
+    NutritionBudgetTier,
     NutritionDailyCheckInStatus,
     NutritionDietStyle,
     NutritionEstimateStatus,
@@ -712,6 +713,7 @@ class NutritionProgramWrite(BaseModel):
     description_fa: str = Field(min_length=1, max_length=1000)
     description_en: str = Field(min_length=1, max_length=1000)
     diet_style: NutritionDietStyle
+    budget_tier_hint: NutritionBudgetTier | None = None
     post_workout_enabled: bool = False
     days: list[NutritionProgramDayWrite] = Field(min_length=7, max_length=7)
 
@@ -756,6 +758,7 @@ class NutritionProgramResponse(BaseModel):
     description_fa: str
     description_en: str
     diet_style: NutritionDietStyle
+    budget_tier_hint: NutritionBudgetTier | None = None
     post_workout_enabled: bool
     is_active: bool
     archived_at: datetime | None
@@ -767,6 +770,9 @@ class NutritionProgramResponse(BaseModel):
 class NutritionProgramPageResponse(BaseModel):
     items: list[NutritionProgramResponse]
     diet_styles: list[NutritionDietStyle]
+    budget_tiers: list[NutritionBudgetTier] = Field(
+        default_factory=lambda: list(NutritionBudgetTier)
+    )
 
 
 class NutritionEstimateResponse(BaseModel):

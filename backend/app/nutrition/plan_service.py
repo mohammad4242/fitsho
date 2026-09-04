@@ -76,6 +76,7 @@ from app.nutrition.planner_policy import (
     BUDGET_OPTIMIZER_POLICY_VERSION,
     CANDIDATE_SELECTION_POLICY_VERSION,
     DEFAULT_POLICY,
+    INITIAL_PROGRAM_BATCH_SIZE,
     PLANNER_POLICY_VERSION,
     PLANNER_VERSION,
     PREFERENCE_QUALITY_POLICY_VERSION,
@@ -93,6 +94,10 @@ from app.nutrition.price_mass_conversion import planner_price_irr_per_gram
 from app.nutrition.price_overrides import effective_prices
 from app.nutrition.program_adaptation import AdaptedWeek, adapt_program
 from app.nutrition.program_catalogue import list_programs
+from app.nutrition.program_costing import (
+    ProgramCostEstimate,
+    estimate_program_cost,
+)
 from app.nutrition.program_selection import (
     ProgramCandidate,
     ProgramSelectionResult,
@@ -270,6 +275,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     structured_exercise = db.get(NutritionStructuredExercise, user_id)
     program_candidates: tuple[ProgramCandidate, ...] = ()
     selection_result: ProgramSelectionResult | None = None
+    cost_estimates: dict[str, ProgramCostEstimate] = {}
     if programs and user_profile is not None and user_profile.fitness_goal is not None:
         normalized_request = build_normalized_nutrition_request(
             user_id=user_id,
@@ -278,7 +284,26 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             structured_exercise=structured_exercise,
             estimate=estimate,
         )
-        selection_result = select_program_candidates(programs, normalized_request)
+        foods_by_id = {food.food_id: food for food in foods}
+
+        meal_templates_by_id = {t.meal_id: t for t in meal_templates}
+        cost_estimates = {
+            prog.code: estimate_program_cost(
+                prog,
+                main_meal_slots=normalized_request.main_meal_slots,
+                snack_slots=normalized_request.snack_slots,
+                daily_kcal=normalized_request.tdee_kcal,
+                meal_templates_by_id=meal_templates_by_id,
+                foods_by_id=foods_by_id,
+                user_monthly_budget_irr=normalized_request.monthly_budget_irr,
+            )
+            for prog in programs
+        }
+        selection_result = select_program_candidates(
+            programs,
+            normalized_request,
+            cost_estimates=cost_estimates,
+        )
         program_candidates = selection_result.candidates
 
     food_manifest["meals"] = meal_manifest
@@ -353,33 +378,43 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     )
     optimization_cache: dict[tuple[object, ...], PlannedFood] = {}
     evaluations: list[CandidateEvaluation] = []
+    fallback_batches_used = 0
     if program_candidates:
-        for proposal in program_candidates:
-            adapted = adapt_program(
-                proposal.program,
-                profile.main_meal_count_bucket,
-                profile.snack_count_bucket,
-            )
-            candidate_input = replace(
-                base_planner_input,
-                template_schedule=_template_schedule(adapted),
-            )
-            candidate_result = plan_week(
-                candidate_input,
-                foods,
-                meal_templates,
-                policy=DEFAULT_POLICY,
-                optimization_cache=optimization_cache,
-            )
-            evaluations.append(
-                evaluate_candidate(
-                    proposal,
-                    candidate_result,
-                    weekly_budget_irr=Decimal(weekly_budget),
-                    preference_snapshot=preference_snapshot,
+        batch_size = INITIAL_PROGRAM_BATCH_SIZE
+        num_candidates = len(program_candidates)
+        selection = CandidateSelection(selected=None, first_valid=None, evaluations=())
+        for batch_start in range(0, num_candidates, batch_size):
+            batch = program_candidates[batch_start : batch_start + batch_size]
+            if batch_start > 0:
+                fallback_batches_used += 1
+            for proposal in batch:
+                adapted = adapt_program(
+                    proposal.program,
+                    profile.main_meal_count_bucket,
+                    profile.snack_count_bucket,
                 )
-            )
-        selection = select_best_candidate(tuple(evaluations))
+                candidate_input = replace(
+                    base_planner_input,
+                    template_schedule=_template_schedule(adapted),
+                )
+                candidate_result = plan_week(
+                    candidate_input,
+                    foods,
+                    meal_templates,
+                    policy=DEFAULT_POLICY,
+                    optimization_cache=optimization_cache,
+                )
+                evaluations.append(
+                    evaluate_candidate(
+                        proposal,
+                        candidate_result,
+                        weekly_budget_irr=Decimal(weekly_budget),
+                        preference_snapshot=preference_snapshot,
+                    )
+                )
+            selection = select_best_candidate(tuple(evaluations))
+            if selection.selected is not None:
+                break
         result = (
             selection.selected.result
             if selection.selected is not None
@@ -405,6 +440,14 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
 
     input_snapshot = {
         **base_input_snapshot,
+        "program_selection_trace": (
+            selection_result.decision_trace(
+                programs_constructed=len(evaluations),
+                fallback_batches_used=fallback_batches_used,
+            )
+            if selection_result is not None
+            else None
+        ),
         "nutrition_program_id": str(selected_program) if selected_program else None,
         "nutrition_program_code": selected_program_code,
         "goal_contract_version": estimate.input_snapshot.get("goal_contract_version"),
@@ -412,12 +455,14 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             "training_alignment_warning_codes", []
         ),
     }
+
     goal_warning_codes, _ = _estimate_goal_contract_codes(estimate)
     result = replace(
         result,
         warning_codes=tuple(sorted(set(result.warning_codes).union(goal_warning_codes))),
     )
     outcome = NutritionPlanGenerationOutcome(result.outcome.value)
+
     generation = _persist_generation(
         db,
         user_id=user_id,

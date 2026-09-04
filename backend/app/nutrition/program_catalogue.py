@@ -199,6 +199,7 @@ def _replace_program_content(
     program.description_fa = payload.description_fa
     program.description_en = payload.description_en
     program.diet_style = payload.diet_style
+    program.budget_tier_hint = payload.budget_tier_hint
     program.post_workout_enabled = payload.post_workout_enabled
     for day_payload in sorted(payload.days, key=lambda item: item.day_number):
         day = NutritionProgramDay(

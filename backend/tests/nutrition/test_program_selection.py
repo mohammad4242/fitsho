@@ -1,11 +1,14 @@
+from decimal import Decimal
 from uuid import UUID
 
 from app.nutrition.enums import NutritionDietStyle
 from app.nutrition.models import NutritionProgram
+from app.nutrition.nutrition_request import NormalizedNutritionRequest
 from app.nutrition.program_selection import (
     ProgramSelectionContext,
     enumerate_program_candidates,
     select_program,
+    select_program_candidates,
 )
 
 
@@ -177,3 +180,73 @@ def test_select_program_candidates_records_trace_and_rejects_inactive() -> None:
     assert trace1["programs_considered"] == len(programs)
     assert len(trace1["hard_rejections"]) == 1
     assert len(trace1["candidates"]) == len(programs) - 1
+
+
+def test_select_program_candidates_ranks_by_budget_feasibility() -> None:
+    from app.nutrition.enums import NutritionBudgetTier
+    from app.nutrition.program_costing import ProgramCostEstimate
+
+    programs = _programs()
+    for prog in programs:
+        if prog.code.startswith("ECO"):
+            prog.budget_tier_hint = NutritionBudgetTier.ECONOMY
+        elif prog.code.startswith("PREM"):
+            prog.budget_tier_hint = NutritionBudgetTier.VARIED
+        else:
+            prog.budget_tier_hint = NutritionBudgetTier.NORMAL
+
+    # User with economy budget (90M IRR = 9M Toman)
+    req = NormalizedNutritionRequest(
+        user_id="u1",
+        fitness_goal="lose_weight",
+        body_weight_kg=Decimal("70.0"),
+        protein_calculation_weight_kg=Decimal("70.0"),
+        tdee_kcal=Decimal("2000.0"),
+        monthly_budget_irr=90_000_000,
+        weekly_budget_irr=20_769_230,
+        budget_style="strict",
+        trains=False,
+        exercise_type=None,
+        training_days_per_week=None,
+        training_minutes_per_session=None,
+        training_intensity=None,
+        training_experience=None,
+        main_meal_slots=3,
+        snack_slots=1,
+        dietary_pattern="omnivore",
+        maximum_meal_repetition_per_week=2,
+        preferred_variety="medium",
+        requested_weight_change_kg_per_week=None,
+        plan_style="economical",
+    )
+
+    cost_estimates = {
+        prog.code: ProgramCostEstimate(
+            program_code=prog.code,
+            estimated_monthly_cost_irr=(
+                Decimal("88000000") if prog.code.startswith("ECO") else Decimal("180000000")
+            ),
+            minimum_adapted_monthly_cost_irr=(
+                Decimal("80000000") if prog.code.startswith("ECO") else Decimal("150000000")
+            ),
+            effective_budget_tier="economy" if prog.code.startswith("ECO") else "varied",
+            price_coverage_complete=True,
+            estimate_confidence="high",
+            reason_codes=(),
+        )
+        for prog in programs
+    }
+
+    result = select_program_candidates(programs, req, cost_estimates=cost_estimates)
+
+    # Top 5 candidates should be economy programs!
+    top_5_codes = [c.program.code for c in result.candidates[:5]]
+    assert all(code.startswith("ECO") for code in top_5_codes)
+
+    trace = result.decision_trace(programs_constructed=5, fallback_batches_used=0)
+    assert trace["programs_considered"] == 25
+    assert trace["programs_hard_rejected"] >= 0
+    assert trace["programs_constructed"] == 5
+    assert trace["fallback_batches_used"] == 0
+    assert "program_cost_estimates" in trace
+    assert len(trace["program_cost_estimates"]) == 25

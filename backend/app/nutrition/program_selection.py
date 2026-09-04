@@ -9,6 +9,7 @@ from uuid import UUID
 from app.nutrition.models import NutritionProgram
 from app.nutrition.nutrition_request import NormalizedNutritionRequest
 from app.nutrition.planner_policy import PROGRAM_SELECTION_POLICY_VERSION
+from app.nutrition.program_costing import ProgramCostEstimate
 from app.nutrition.program_eligibility import (
     ProgramEligibilityResult,
     ProgramHardRejection,
@@ -75,14 +76,43 @@ class ProgramSelectionResult:
     hard_rejections: tuple[ProgramHardRejection, ...]
     candidates: tuple[ProgramCandidate, ...]
     policy_version: str
+    cost_estimates: tuple[ProgramCostEstimate, ...] = ()
 
-    def decision_trace(self) -> dict[str, object]:
+    def decision_trace(
+        self,
+        *,
+        programs_constructed: int | None = None,
+        fallback_batches_used: int | None = None,
+    ) -> dict[str, object]:
         return {
             "policy_version": self.policy_version,
             "programs_considered": self.programs_considered,
+            "programs_hard_rejected": len(self.hard_rejections),
+            "programs_constructed": (
+                programs_constructed if programs_constructed is not None else len(self.candidates)
+            ),
+            "fallback_batches_used": (
+                fallback_batches_used if fallback_batches_used is not None else 0
+            ),
             "hard_rejections": [
                 {"program_code": r.program_code, "reason_codes": list(r.reason_codes)}
                 for r in self.hard_rejections
+            ],
+            "program_cost_estimates": [
+                {
+                    "program_code": est.program_code,
+                    "estimated_monthly_cost_irr": str(est.estimated_monthly_cost_irr),
+                    "minimum_adapted_monthly_cost_irr": (
+                        str(est.minimum_adapted_monthly_cost_irr)
+                        if est.minimum_adapted_monthly_cost_irr is not None
+                        else None
+                    ),
+                    "effective_budget_tier": est.effective_budget_tier,
+                    "price_coverage_complete": est.price_coverage_complete,
+                    "estimate_confidence": est.estimate_confidence,
+                    "reason_codes": list(est.reason_codes),
+                }
+                for est in self.cost_estimates
             ],
             "candidates": [
                 {
@@ -100,16 +130,20 @@ def select_program_candidates(
     programs: Iterable[NutritionProgram],
     request: NormalizedNutritionRequest,
     *,
+    cost_estimates: dict[str, ProgramCostEstimate] | None = None,
     policy_version: str = PROGRAM_SELECTION_POLICY_VERSION,
 ) -> ProgramSelectionResult:
     """Evaluate and rank nutrition programs using eligibility and deterministic scoring."""
     programs_list = list(programs)
     programs_considered = len(programs_list)
     hard_rejections: list[ProgramHardRejection] = []
-    eligible_programs: list[NutritionProgram] = []
+    eligible_programs: list[tuple[NutritionProgram, ProgramCostEstimate | None]] = []
 
     for program in programs_list:
-        eligibility: ProgramEligibilityResult = check_program_eligibility(program, request)
+        estimate = cost_estimates.get(program.code) if cost_estimates else None
+        eligibility: ProgramEligibilityResult = check_program_eligibility(
+            program, request, cost_estimate=estimate
+        )
         if not eligibility.eligible:
             hard_rejections.append(
                 ProgramHardRejection(
@@ -118,10 +152,11 @@ def select_program_candidates(
                 )
             )
         else:
-            eligible_programs.append(program)
+            eligible_programs.append((program, estimate))
 
     scored: list[tuple[NutritionProgram, ProgramScoringResult]] = [
-        (program, score_program(program, request)) for program in eligible_programs
+        (program, score_program(program, request, cost_estimate=estimate))
+        for program, estimate in eligible_programs
     ]
 
     ordered = sorted(
@@ -143,11 +178,16 @@ def select_program_candidates(
         for index, (program, scoring_result) in enumerate(ordered)
     )
 
+    recorded_estimates: tuple[ProgramCostEstimate, ...] = ()
+    if cost_estimates:
+        recorded_estimates = tuple(cost_estimates.values())
+
     return ProgramSelectionResult(
         programs_considered=programs_considered,
         hard_rejections=tuple(hard_rejections),
         candidates=candidates,
         policy_version=policy_version,
+        cost_estimates=recorded_estimates,
     )
 
 

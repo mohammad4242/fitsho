@@ -16,6 +16,7 @@ from app.nutrition.models import (
 )
 from app.nutrition.program_catalogue import list_programs
 from app.nutrition.program_catalogue_seed_data import (
+    BUDGET_TIER_HINT_BY_PROGRAM,
     CANONICAL_MEAL_REGISTRY,
     PROGRAM_WEEKS,
     STYLE_BY_PREFIX,
@@ -60,7 +61,9 @@ def seed_program_catalogue(db: Session, *, commit: bool = True) -> list[Nutritio
             "by the nutrition engine."
         )
         program.diet_style = STYLE_BY_PREFIX[prefix]
+        program.budget_tier_hint = BUDGET_TIER_HINT_BY_PROGRAM.get(code)
         program.post_workout_enabled = False
+
         program.is_active = True
         program.archived_at = None
         program.days = [_program_day(index + 1, row, meals) for index, row in enumerate(week)]

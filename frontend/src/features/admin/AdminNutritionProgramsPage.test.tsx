@@ -27,7 +27,9 @@ const program = {
   description_fa: "ساختار هفت‌روزه",
   description_en: "Seven-day structure",
   diet_style: "balanced_iranian",
+  budget_tier_hint: "normal" as const,
   post_workout_enabled: true,
+
   is_active: true,
   archived_at: null,
   created_at: "2026-08-12T10:00:00Z",
@@ -71,9 +73,12 @@ it("filters weekly programs by diet style and archives them", async () => {
     "aria-expanded",
     "false",
   );
+  expect(screen.getByText(/راهنمای بودجه کاتالوگ: عادی/)).toBeInTheDocument();
+  expect(screen.getByText(/صرفاً متادیتای کاتالوگ است و نه استعلام قیمت زنده کاربر/)).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "ویرایش هفته ایرانی متعادل" })).toHaveAttribute(
     "href", "/admin/nutrition-programs/program-1/edit",
   );
+
 
   await user.click(screen.getByRole("button", { name: "باز کردن برنامه: هفته ایرانی متعادل" }));
 

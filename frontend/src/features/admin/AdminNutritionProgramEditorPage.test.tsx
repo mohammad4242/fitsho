@@ -38,7 +38,9 @@ const program = {
   description_fa: "ساختار اقتصادی",
   description_en: "Economy structure",
   diet_style: "economy",
+  budget_tier_hint: "economy" as const,
   post_workout_enabled: true,
+
   is_active: true,
   archived_at: null,
   created_at: "2026-08-12T10:00:00Z",
@@ -90,7 +92,9 @@ it("renders seven days and saves global post-workout with per-day overrides", as
     "program-1",
     expect.objectContaining({
       diet_style: "economy",
+      budget_tier_hint: "economy",
       post_workout_enabled: true,
+
       days: expect.arrayContaining([
         expect.objectContaining({
           day_number: 2,

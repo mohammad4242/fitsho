@@ -1,10 +1,14 @@
-"""Pure deterministic preconstruction scoring for nutrition programs."""
-
 from dataclasses import dataclass
+from decimal import Decimal
+from typing import TYPE_CHECKING
 
-from app.nutrition.enums import NutritionDietStyle
+from app.nutrition.enums import NutritionBudgetTier, NutritionDietStyle
 from app.nutrition.models import NutritionProgram
 from app.nutrition.nutrition_request import NormalizedNutritionRequest
+from app.nutrition.planner_policy import resolve_budget_tier
+
+if TYPE_CHECKING:
+    from app.nutrition.program_costing import ProgramCostEstimate
 
 
 @dataclass(frozen=True)
@@ -47,22 +51,92 @@ def select_preferred_diet_style(request: NormalizedNutritionRequest) -> Nutritio
     return NutritionDietStyle.BALANCED_IRANIAN
 
 
+_TIER_LEVELS = {
+    NutritionBudgetTier.ECONOMY.value: 0,
+    NutritionBudgetTier.NORMAL.value: 1,
+    NutritionBudgetTier.VARIED.value: 2,
+}
+
+
 def score_program(
     program: NutritionProgram,
     request: NormalizedNutritionRequest,
+    *,
+    cost_estimate: "ProgramCostEstimate | None" = None,
 ) -> ProgramScoringResult:
+    reason_codes: list[str] = []
+
+    user_budget_irr = request.monthly_budget_irr if request.monthly_budget_irr else 150_000_000
+    user_tier = resolve_budget_tier(user_budget_irr)
+    user_level = _TIER_LEVELS.get(user_tier.value, 1)
+
+    if cost_estimate is not None:
+        prog_tier_str = cost_estimate.effective_budget_tier
+        if not cost_estimate.price_coverage_complete:
+            reason_codes.append("PROGRAM_COST_PREFLIGHT_UNCERTAIN")
+    elif program.budget_tier_hint is not None:
+        prog_tier_str = (
+            program.budget_tier_hint.value
+            if hasattr(program.budget_tier_hint, "value")
+            else str(program.budget_tier_hint)
+        )
+    else:
+        prog_tier_str = NutritionBudgetTier.NORMAL.value
+
+    prog_level = _TIER_LEVELS.get(prog_tier_str, 1)
+    delta_tier = prog_level - user_level
+
+    user_monthly_budget = (
+        Decimal(str(request.monthly_budget_irr)) if request.monthly_budget_irr is not None else None
+    )
+
+    if delta_tier <= 0:
+        reason_codes.append("BUDGET_TIER_MATCH")
+    elif delta_tier == 1:
+        reason_codes.append("BUDGET_TIER_ONE_LEVEL_HIGHER")
+    else:
+        reason_codes.append("BUDGET_TIER_TWO_LEVELS_HIGHER")
+
+    if cost_estimate is not None and user_monthly_budget is not None:
+        if cost_estimate.estimated_monthly_cost_irr <= user_monthly_budget:
+            reason_codes.append("PROGRAM_COST_WITHIN_USER_BUDGET")
+            within_direct_budget = True
+        else:
+            reason_codes.append("PROGRAM_COST_ABOVE_USER_BUDGET")
+            within_direct_budget = False
+    else:
+        within_direct_budget = delta_tier <= 0
+
+    if (
+        cost_estimate is not None
+        and cost_estimate.minimum_adapted_monthly_cost_irr is not None
+        and user_monthly_budget is not None
+        and cost_estimate.minimum_adapted_monthly_cost_irr > user_monthly_budget
+    ):
+        reason_codes.append("PROGRAM_BUDGET_PROVABLY_INFEASIBLE")
+        budget_score = 0
+    else:
+        if delta_tier <= 0:
+            budget_score = 100 if within_direct_budget else 70
+        elif delta_tier == 1:
+            budget_score = 60 if within_direct_budget else 35
+        else:
+            budget_score = 30 if within_direct_budget else 10
+
     preferred_style = select_preferred_diet_style(request)
     is_preferred = program.diet_style is preferred_style
     preference_score = 100 if is_preferred else 0
-    total = preference_score
-
-    reason_codes: list[str] = []
     if is_preferred:
         reason_codes.append("PREFERRED_DIET_STYLE")
 
+    # Weighting: Budget 40%, Preference 15% (Goal 25%, Training 10%, Meal structure 10% in Phase 2)
+    budget_part = Decimal(str(budget_score)) * Decimal("0.40")
+    pref_part = Decimal(str(preference_score)) * Decimal("0.15")
+    total = int(round(budget_part + pref_part))
+
     return ProgramScoringResult(
         score=ProgramScore(
-            budget_score=0,
+            budget_score=budget_score,
             goal_score=0,
             training_score=0,
             meal_structure_score=0,

@@ -51,6 +51,7 @@ from app.nutrition.enums import (
     MicronutrientReferenceKind,
     MicronutrientSex,
     MicronutrientUpperLimitScope,
+    NutritionBudgetTier,
     NutritionConsumptionSource,
     NutritionDailyCheckInStatus,
     NutritionDietStyle,
@@ -977,6 +978,10 @@ class NutritionProgram(Base):
         enum_column(NutritionDietStyle, "ck_nutrition_programs_diet_style_values"),
         nullable=False,
         index=True,
+    )
+    budget_tier_hint: Mapped[NutritionBudgetTier | None] = mapped_column(
+        enum_column(NutritionBudgetTier, "ck_nutrition_programs_budget_tier_hint_values"),
+        nullable=True,
     )
     post_workout_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_active: Mapped[bool] = mapped_column(

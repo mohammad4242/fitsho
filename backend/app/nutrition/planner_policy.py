@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.nutrition.enums import NutritionBudgetTier
+
 PLANNER_POLICY_VERSION = "weekly-planner-v1"
 MEAL_DISTRIBUTION_POLICY_VERSION = "meal-distribution-v1"
 PORTION_POLICY_VERSION = "bounded-portion-solver-v1"
@@ -10,6 +12,20 @@ PREFERENCE_QUALITY_POLICY_VERSION = "preference-adherence-quality-v1"
 TEMPLATE_SUBSTITUTION_POLICY_VERSION = "safe-template-substitution-beam-v1"
 BUDGET_OPTIMIZER_POLICY_VERSION = "deterministic-budget-optimizer-v1"
 PROGRAM_SELECTION_POLICY_VERSION = "nutrition-program-selection-v3"
+PROGRAM_COSTING_POLICY_VERSION = "nutrition-program-costing-v1"
+
+ECONOMY_MONTHLY_MAX_IRR = 130_000_000
+NORMAL_MONTHLY_MAX_IRR = 180_000_000
+INITIAL_PROGRAM_BATCH_SIZE = 5
+
+
+def resolve_budget_tier(monthly_cost_irr: int | Decimal) -> NutritionBudgetTier:
+    cost = Decimal(monthly_cost_irr)
+    if cost <= Decimal(ECONOMY_MONTHLY_MAX_IRR):
+        return NutritionBudgetTier.ECONOMY
+    if cost <= Decimal(NORMAL_MONTHLY_MAX_IRR):
+        return NutritionBudgetTier.NORMAL
+    return NutritionBudgetTier.VARIED
 
 
 @dataclass(frozen=True)

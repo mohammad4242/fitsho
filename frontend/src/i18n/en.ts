@@ -415,6 +415,9 @@ const en = {
         restore: "Restore program",
         restoreAria: "Restore {{name}}",
         add: "Add weekly program",
+        budgetTierHint: "Catalogue budget tier hint",
+        budgetTiers: { economy: "Economy", normal: "Normal", varied: "Varied" },
+        budgetTierCatalogueDisclaimer: "Catalogue metadata only, not a live user quote",
       },
       nutritionProgramEditor: {
         eyebrow: "Weekly meal layout",
@@ -430,6 +433,8 @@ const en = {
         descriptionFa: "Persian description",
         descriptionEn: "English description",
         dietStyle: "Diet style",
+        budgetTierHint: "Catalogue budget tier hint",
+        budgetTierHintHelp: "This hint is catalogue metadata only, not a live user quote.",
         globalPostWorkout: "Enable post-workout meal",
         week: "Seven-day structure",
         dailyPostWorkout: "This day has a post-workout meal",
@@ -442,6 +447,7 @@ const en = {
         saving: "Saving…",
         saveError: "The program was not saved. Check its meals and diet style.",
       },
+
       meals: {
         eyebrow: "Controlled nutrition compositions",
         title: "Nutrition Meal Catalogue",

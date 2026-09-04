@@ -25,6 +25,12 @@ class BudgetStyle(StrEnum):
     FLEXIBLE = "flexible"
 
 
+class NutritionBudgetTier(StrEnum):
+    ECONOMY = "economy"
+    NORMAL = "normal"
+    VARIED = "varied"
+
+
 class MainMealCountBucket(StrEnum):
     TWO = "two_main_meals"
     THREE = "three_main_meals"

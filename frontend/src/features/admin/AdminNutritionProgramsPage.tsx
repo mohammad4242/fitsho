@@ -130,10 +130,19 @@ export function AdminNutritionProgramsPage() {
                       type="button"
                     >
                       <span className="admin-program-accordion-copy">
-                        <span className="eyebrow">{t(`admin.nutritionPrograms.dietStyles.${program.diet_style}`)}</span>
+                        <span className="eyebrow">
+                          {t(`admin.nutritionPrograms.dietStyles.${program.diet_style}`)}
+                          {program.budget_tier_hint ? (
+                            <> · {t("admin.nutritionPrograms.budgetTierHint")}: {t(`admin.nutritionPrograms.budgetTiers.${program.budget_tier_hint}`)}</>
+                          ) : null}
+                        </span>
                         <span className="admin-program-accordion-title">{program.code ? <>{program.code} — </> : null}{name}</span>
                         <span className="admin-program-accordion-description">{english ? program.description_en : program.description_fa}</span>
+                        {program.budget_tier_hint ? (
+                          <small className="admin-budget-tier-disclaimer">{t("admin.nutritionPrograms.budgetTierCatalogueDisclaimer")}</small>
+                        ) : null}
                       </span>
+
                       <span className="admin-program-accordion-meta">
                         <span className="admin-template-level">{t(`admin.nutritionPrograms.lifecycle.${program.is_active ? "active" : "archived"}`)}</span>
                         <span aria-hidden="true" className="admin-accordion-chevron">⌄</span>

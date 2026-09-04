@@ -415,6 +415,9 @@ const fa = {
         restore: "بازیابی برنامه",
         restoreAria: "بازیابی {{name}}",
         add: "افزودن برنامه هفتگی",
+        budgetTierHint: "راهنمای بودجه کاتالوگ",
+        budgetTiers: { economy: "اقتصادی", normal: "عادی", varied: "متنوع" },
+        budgetTierCatalogueDisclaimer: "صرفاً متادیتای کاتالوگ است و نه استعلام قیمت زنده کاربر",
       },
       nutritionProgramEditor: {
         eyebrow: "چیدمان هفتگی وعده‌ها",
@@ -430,6 +433,8 @@ const fa = {
         descriptionFa: "توضیح فارسی",
         descriptionEn: "توضیح انگلیسی",
         dietStyle: "سبک رژیم",
+        budgetTierHint: "راهنمای بودجه کاتالوگ",
+        budgetTierHintHelp: "این راهنما صرفاً متادیتای کاتالوگ است و نه استعلام قیمت زنده کاربر.",
         globalPostWorkout: "فعال‌سازی وعده پس از تمرین",
         week: "ساختار هفت روز",
         dailyPostWorkout: "این روز وعده پس از تمرین دارد",
@@ -442,6 +447,7 @@ const fa = {
         saving: "در حال ذخیره…",
         saveError: "برنامه ذخیره نشد. وعده‌ها و سبک رژیم را بررسی کنید.",
       },
+
       meals: {
         eyebrow: "ترکیب‌های کنترل‌شده تغذیه",
         title: "کاتالوگ وعده‌های غذایی",

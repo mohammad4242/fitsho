@@ -796,6 +796,8 @@ export type AdminNutritionProgramDay = {
   slots: AdminNutritionProgramSlot[];
 };
 
+export type NutritionBudgetTier = "economy" | "normal" | "varied";
+
 export type AdminNutritionProgram = {
   id: string;
   code?: string;
@@ -805,6 +807,7 @@ export type AdminNutritionProgram = {
   description_fa: string;
   description_en: string;
   diet_style: NutritionDietStyle;
+  budget_tier_hint?: NutritionBudgetTier | null;
   post_workout_enabled: boolean;
   is_active: boolean;
   archived_at: string | null;
@@ -816,6 +819,7 @@ export type AdminNutritionProgram = {
 export type AdminNutritionProgramPage = {
   items: AdminNutritionProgram[];
   diet_styles: NutritionDietStyle[];
+  budget_tiers?: NutritionBudgetTier[];
 };
 
 export type AdminNutritionProgramSlotWrite = {
@@ -837,6 +841,8 @@ export type AdminNutritionProgramWrite = {
   description_fa: string;
   description_en: string;
   diet_style: NutritionDietStyle;
+  budget_tier_hint?: NutritionBudgetTier | null;
   post_workout_enabled: boolean;
   days: AdminNutritionProgramDayWrite[];
 };
+

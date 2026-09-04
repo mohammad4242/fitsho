@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.nutrition.enums import MealCategory, NutritionDietStyle
+from app.nutrition.enums import MealCategory, NutritionBudgetTier, NutritionDietStyle
 
 
 @dataclass(frozen=True)
@@ -300,4 +300,32 @@ STYLE_BY_PREFIX = {
     "GYM": NutritionDietStyle.HIGH_PROTEIN_GYM,
     "FAST": NutritionDietStyle.QUICK_EASY,
     "PREM": NutritionDietStyle.PREMIUM_VARIED,
+}
+
+BUDGET_TIER_HINT_BY_PROGRAM: dict[str, NutritionBudgetTier] = {
+    "ECO01": NutritionBudgetTier.ECONOMY,
+    "ECO02": NutritionBudgetTier.ECONOMY,
+    "ECO03": NutritionBudgetTier.ECONOMY,
+    "ECO04": NutritionBudgetTier.ECONOMY,
+    "ECO05": NutritionBudgetTier.ECONOMY,
+    "FAST01": NutritionBudgetTier.NORMAL,
+    "FAST02": NutritionBudgetTier.NORMAL,
+    "FAST03": NutritionBudgetTier.NORMAL,
+    "FAST04": NutritionBudgetTier.NORMAL,
+    "FAST05": NutritionBudgetTier.NORMAL,
+    "GYM01": NutritionBudgetTier.NORMAL,
+    "GYM02": NutritionBudgetTier.NORMAL,
+    "GYM03": NutritionBudgetTier.NORMAL,
+    "GYM04": NutritionBudgetTier.NORMAL,
+    "GYM05": NutritionBudgetTier.NORMAL,
+    "IRN01": NutritionBudgetTier.NORMAL,
+    "IRN02": NutritionBudgetTier.NORMAL,
+    "IRN03": NutritionBudgetTier.NORMAL,
+    "IRN04": NutritionBudgetTier.NORMAL,
+    "IRN05": NutritionBudgetTier.NORMAL,
+    "PREM01": NutritionBudgetTier.VARIED,
+    "PREM02": NutritionBudgetTier.VARIED,
+    "PREM03": NutritionBudgetTier.VARIED,
+    "PREM04": NutritionBudgetTier.VARIED,
+    "PREM05": NutritionBudgetTier.VARIED,
 }

@@ -16,6 +16,7 @@ import type {
   AdminNutritionProgram,
   AdminNutritionProgramWrite,
   MealCategory,
+  NutritionBudgetTier,
   NutritionDietStyle,
 } from "./types";
 import "./admin.css";
@@ -23,6 +24,8 @@ import "./admin.css";
 const requiredCategories: MealCategory[] = ["breakfast", "lunch", "snack", "dinner"];
 const allCategories: MealCategory[] = [...requiredCategories, "post_workout"];
 const dietStyles: NutritionDietStyle[] = ["economy", "balanced_iranian", "high_protein_gym", "quick_easy", "premium_varied"];
+const budgetTiers: NutritionBudgetTier[] = ["economy", "normal", "varied"];
+
 type DayForm = { day_number: number; post_workout_enabled: boolean; free_meal: boolean; meals: Record<MealCategory, string> };
 type ProgramForm = Omit<AdminNutritionProgramWrite, "days"> & { days: DayForm[] };
 
@@ -80,6 +83,7 @@ export function AdminNutritionProgramEditorPage() {
       description_fa: form.description_fa,
       description_en: form.description_en,
       diet_style: form.diet_style,
+      budget_tier_hint: form.budget_tier_hint ?? "normal",
       post_workout_enabled: form.post_workout_enabled,
       days: form.days.map((day) => ({
         day_number: day.day_number,
@@ -124,9 +128,11 @@ export function AdminNutritionProgramEditorPage() {
                 <TextArea label={t("admin.nutritionProgramEditor.descriptionFa")} value={form.description_fa} onChange={(description_fa) => setForm((current) => ({ ...current, description_fa }))} />
                 <TextArea label={t("admin.nutritionProgramEditor.descriptionEn")} value={form.description_en} onChange={(description_en) => setForm((current) => ({ ...current, description_en }))} />
                 <label>{t("admin.nutritionProgramEditor.dietStyle")}<select value={form.diet_style} onChange={(event) => setForm((current) => ({ ...current, diet_style: event.target.value as NutritionDietStyle }))}>{dietStyles.map((style) => <option key={style} value={style}>{t(`admin.nutritionPrograms.dietStyles.${style}`)}</option>)}</select></label>
+                <label>{t("admin.nutritionProgramEditor.budgetTierHint")}<select value={form.budget_tier_hint ?? "normal"} onChange={(event) => setForm((current) => ({ ...current, budget_tier_hint: event.target.value as NutritionBudgetTier }))}>{budgetTiers.map((tier) => <option key={tier} value={tier}>{t(`admin.nutritionPrograms.budgetTiers.${tier}`)}</option>)}</select></label>
                 <label className="admin-program-toggle"><input aria-label={t("admin.nutritionProgramEditor.globalPostWorkout")} checked={form.post_workout_enabled} type="checkbox" onChange={(event) => setGlobalPostWorkout(event.target.checked)} />{t("admin.nutritionProgramEditor.globalPostWorkout")}</label>
               </div>
             </section>
+
             <section>
               <h2>{t("admin.nutritionProgramEditor.week")}</h2>
               <div className="admin-program-editor-week">
@@ -157,7 +163,7 @@ function MealSelect({ category, dayNumber, meals, value, onChange }: { category:
 
 function emptyProgram(): ProgramForm {
   return {
-    code: null, name_fa: "", name_en: "", description_fa: "", description_en: "", diet_style: "balanced_iranian", post_workout_enabled: false,
+    code: null, name_fa: "", name_en: "", description_fa: "", description_en: "", diet_style: "balanced_iranian", budget_tier_hint: "normal", post_workout_enabled: false,
     days: Array.from({ length: 7 }, (_, index) => ({ day_number: index + 1, post_workout_enabled: false, free_meal: false, meals: { breakfast: "", lunch: "", snack: "", dinner: "", post_workout: "" } })),
   };
 }
@@ -169,7 +175,7 @@ function emptyMealOptions(): Record<MealCategory, AdminMealCatalogueItem[]> {
 function formFromProgram(program: AdminNutritionProgram): ProgramForm {
   return {
     code: program.code, name_fa: program.name_fa, name_en: program.name_en, description_fa: program.description_fa, description_en: program.description_en,
-    diet_style: program.diet_style, post_workout_enabled: program.post_workout_enabled,
+    diet_style: program.diet_style, budget_tier_hint: program.budget_tier_hint ?? "normal", post_workout_enabled: program.post_workout_enabled,
     days: program.days.map((day) => ({
       day_number: day.day_number,
       post_workout_enabled: day.post_workout_enabled,
@@ -178,6 +184,7 @@ function formFromProgram(program: AdminNutritionProgram): ProgramForm {
     })),
   };
 }
+
 
 function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return <label>{label}<input aria-label={label} required value={value} onChange={(event) => onChange(event.target.value)} /></label>;
