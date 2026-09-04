@@ -27,7 +27,11 @@ from app.body_analysis.providers.models import (
     StructuredGenerationResponse,
 )
 from app.config import Settings
-from app.nutrition.food_photo_service import _normalize_image, build_food_photo_request
+from app.nutrition.food_photo_service import (
+    EstimatedPhotoItem,
+    _normalize_image,
+    build_food_photo_request,
+)
 from app.nutrition.models import (
     NutritionConsumptionEntry,
     NutritionFoodPhotoEstimate,
@@ -116,30 +120,50 @@ def _image() -> bytes:
 
 
 def test_food_photo_request_builder_is_the_canonical_task_contract() -> None:
-    request = build_food_photo_request(
+    request_fa = build_food_photo_request(
         primary_model="vision-primary",
         fallback_models=("vision-fallback",),
         provider_preferences=ProviderRoutingPreferences(zdr=True),
         temperature=0.2,
         max_output_tokens=777,
+        language="fa",
     )
 
-    assert request.system_prompt == (
-        "Identify all visible food items and estimate their portion in grams ('g'). "
-        "For each food item, calculate estimated calories, protein_g, carbohydrate_g, "
-        "and fat_g based on standard nutritional data for the estimated portion. "
-        "Return uncertainty. Do not provide medical advice or allergy claims."
-    )
-    assert request.input_payload == {
-        "instruction": "Analyze this food image without personal data."
+    assert "name_guess" in request_fa.system_prompt
+    assert "فارسی روان" in request_fa.system_prompt
+    assert "calories" in request_fa.system_prompt
+    assert "protein_g" in request_fa.system_prompt
+    assert "carbohydrate_g" in request_fa.system_prompt
+    assert "fat_g" in request_fa.system_prompt
+    assert request_fa.input_payload == {
+        "instruction": (
+            "این تصویر غذا را بدون اطلاعات شخصی تحلیل کن و خروجی را با نام‌های فارسی روان "
+            "و روزمره ارائه بده."
+        )
     }
-    assert request.schema_name == "fitsho_food_photo_estimate_v1"
-    assert request.route.primary_model == "vision-primary"
-    assert request.route.fallback_models == ("vision-fallback",)
-    assert request.provider_preferences == ProviderRoutingPreferences(zdr=True)
-    assert request.temperature == 0.2
-    assert request.max_output_tokens == 777
-    assert request.web_access == "disabled"
+    assert request_fa.schema_name == "fitsho_food_photo_estimate_v1"
+    assert request_fa.route.primary_model == "vision-primary"
+    assert request_fa.route.fallback_models == ("vision-fallback",)
+    assert request_fa.provider_preferences == ProviderRoutingPreferences(zdr=True)
+    assert request_fa.temperature == 0.2
+    assert request_fa.max_output_tokens == 777
+    assert request_fa.web_access == "disabled"
+
+    request_en = build_food_photo_request(
+        primary_model="vision-primary",
+        fallback_models=("vision-fallback",),
+        provider_preferences=ProviderRoutingPreferences(zdr=True),
+        temperature=0.2,
+        max_output_tokens=777,
+        language="en",
+    )
+    assert "everyday English" in request_en.system_prompt
+    assert "calories" in request_en.system_prompt
+    assert request_en.input_payload == {
+        "instruction": (
+            "Analyze this food image without personal data and provide nutritional estimates."
+        )
+    }
 
 
 def _register(client: TestClient) -> None:
@@ -778,21 +802,56 @@ def test_food_photo_ai_contract_direct_nutrition(
     test_settings: Settings,
 ) -> None:
     """The canonical AI contract test — prompt instructs model to calculate macros in grams."""
-    request = build_food_photo_request(
+    request_fa = build_food_photo_request(
         primary_model="vision-primary",
         fallback_models=("vision-fallback",),
         provider_preferences=ProviderRoutingPreferences(zdr=True),
         temperature=0.2,
         max_output_tokens=777,
+        language="fa",
     )
-    prompt_lower = request.system_prompt.lower()
-    assert "identify" in prompt_lower
-    assert "grams" in prompt_lower
-    assert "calories" in prompt_lower
-    assert "protein_g" in prompt_lower
-    assert "carbohydrate_g" in prompt_lower
-    assert "fat_g" in prompt_lower
-    assert "medical advice" in prompt_lower
+    prompt_fa = request_fa.system_prompt.lower()
+    assert "فارسی روان" in prompt_fa
+    assert "calories" in prompt_fa
+    assert "protein_g" in prompt_fa
+    assert "carbohydrate_g" in prompt_fa
+    assert "fat_g" in prompt_fa
+
+    request_en = build_food_photo_request(
+        primary_model="vision-primary",
+        fallback_models=("vision-fallback",),
+        provider_preferences=ProviderRoutingPreferences(zdr=True),
+        temperature=0.2,
+        max_output_tokens=777,
+        language="en",
+    )
+    prompt_en = request_en.system_prompt.lower()
+    assert "identify" in prompt_en
+    assert "grams" in prompt_en
+    assert "calories" in prompt_en
+    assert "protein_g" in prompt_en
+    assert "carbohydrate_g" in prompt_en
+    assert "fat_g" in prompt_en
+    assert "medical advice" in prompt_en
+
+
+def test_estimated_photo_item_calculates_atwater_calories_when_zero() -> None:
+    item = EstimatedPhotoItem.model_validate(
+        {
+            "name_guess": "جوجه کباب",
+            "estimated_amount": 200,
+            "unit": "g",
+            "confidence": 0.9,
+            "visible_evidence": ["Grilled chicken"],
+            "uncertainties": [],
+            "calories": 0.0,
+            "protein_g": 36.3,
+            "carbohydrate_g": 4.0,
+            "fat_g": 22.9,
+        }
+    )
+    expected = round(36.3 * 4.0 + 4.0 * 4.0 + 22.9 * 9.0, 1)
+    assert item.calories == expected
 
 
 def test_unmapped_food_with_direct_ai_macros_is_complete_and_confirms(

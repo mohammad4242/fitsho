@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 import httpx
 from fastapi import UploadFile
 from PIL import Image, UnidentifiedImageError
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -57,10 +57,30 @@ class EstimatedPhotoItem(BaseModel):
     confidence: float = Field(ge=0, le=1)
     visible_evidence: list[str] = Field(max_length=10)
     uncertainties: list[str] = Field(max_length=10)
-    calories: float = Field(default=0.0, ge=0, le=10000)
-    protein_g: float = Field(default=0.0, ge=0, le=1000)
-    carbohydrate_g: float = Field(default=0.0, ge=0, le=1000)
-    fat_g: float = Field(default=0.0, ge=0, le=1000)
+    calories: float = Field(ge=0, le=10000)
+    protein_g: float = Field(ge=0, le=1000)
+    carbohydrate_g: float = Field(ge=0, le=1000)
+    fat_g: float = Field(ge=0, le=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_and_calculate_macros(cls, data: object) -> object:
+        if isinstance(data, dict):
+            p = float(data.get("protein_g") or 0.0)
+            c = float(data.get("carbohydrate_g") or 0.0)
+            f = float(data.get("fat_g") or 0.0)
+            cal = float(data.get("calories") or 0.0)
+            if cal <= 0 and (p > 0 or c > 0 or f > 0):
+                data["calories"] = round(p * 4.0 + c * 4.0 + f * 9.0, 1)
+            elif "calories" not in data:
+                data["calories"] = round(p * 4.0 + c * 4.0 + f * 9.0, 1)
+            if "protein_g" not in data:
+                data["protein_g"] = 0.0
+            if "carbohydrate_g" not in data:
+                data["carbohydrate_g"] = 0.0
+            if "fat_g" not in data:
+                data["fat_g"] = 0.0
+        return data
 
 
 class FoodPhotoOutput(BaseModel):
@@ -81,16 +101,61 @@ def build_food_photo_request(
     provider_preferences: ProviderRoutingPreferences,
     temperature: float,
     max_output_tokens: int,
+    language: str = "fa",
 ) -> StructuredGenerationRequest:
     """Build the one production food-photo task request for any provider."""
+    is_fa = language.lower().startswith("fa")
+    if is_fa:
+        system_prompt = (
+            "تو دستیار هوشمند و متخصص تحلیل تصاویر غذا و تغذیه هستی. "
+            "وظیفه تو شناسایی دقیق تمام اجزای خوراکی بشقاب و برآورد مقدار و ارزش غذایی آن‌هاست.\n\n"
+            "قوانین اجباری:\n"
+            "۱. زبان نام‌گذاری: تمام نام‌ها (فیلد name_guess برای هر جزء و فیلد meal_name_guess "
+            "برای کل وعده) باید حتماً به زبان فارسی روان، متداول، امروزی و کوتاه باشد. "
+            "از به کار بردن کلمات انگلیسی یا توضیحات طولانی و کتابی در نام غذا اکیداً خودداری کن "
+            "(مثال‌های درست: 'جوجه کباب'، 'کباب کوبیده'، 'برنج زعفرانی'، 'گوجه کبابی'، "
+            "'پیاز کبابی'، 'سالاد شیرازی'، 'سبزی خوردن'). "
+            "توضیحات و شواهد دیداری را در visible_evidence بنویس.\n"
+            "۲. مقدار و واحد: مقدار تخمینی هر جزء (estimated_amount) را به گرم تخمین بزن "
+            "و فیلد unit را حتماً 'g' قرار بده.\n"
+            "۳. محاسبه کالری و ماکروها: برای هر جزء، بر اساس وزن تخمینی آن، مقادیر دقیق "
+            "protein_g، carbohydrate_g، fat_g و همچنین calories (کل انرژی به کیلوکالری) "
+            "را محاسبه کن. فرمول اساسی محاسبه کالری: "
+            "calories = (protein_g × 4) + (carbohydrate_g × 4) + (fat_g × 9). "
+            "فیلد calories برای هر غذایی که کالری دارد باید حتماً بیشتر از صفر باشد "
+            "و هرگز نباید ۰ ثبت شود.\n"
+            "۴. شواهد دیداری و عدم قطعیت‌ها را بنویس. ادعای پزشکی یا آلرژی ارائه نده."
+        )
+        instruction = (
+            "این تصویر غذا را بدون اطلاعات شخصی تحلیل کن و خروجی را با نام‌های فارسی روان "
+            "و روزمره ارائه بده."
+        )
+    else:
+        system_prompt = (
+            "You are an expert food image recognition and nutrition assistant. "
+            "Identify all visible food items and estimate their portions and nutritional value.\n\n"
+            "Mandatory rules:\n"
+            "1. Language & Naming: All food names ('name_guess') and the overall meal name "
+            "('meal_name_guess') must be in natural, concise, everyday English "
+            "(e.g. 'Chicken Kebab', 'Ground Beef Kebab', 'Saffron Rice', 'Grilled Tomato', "
+            "'Grilled Onion', 'Fresh Herbs'). Keep names concise; "
+            "put detailed observations in visible_evidence.\n"
+            "2. Portions & Units: Estimate the portion of each item in grams ('estimated_amount') "
+            "and set unit to 'g'.\n"
+            "3. Calories & Macronutrients: Calculate estimated calories ('calories' in kcal), "
+            "protein_g, carbohydrate_g, and fat_g based on the estimated portion. "
+            "Standard Atwater formula: "
+            "calories = (4 * protein_g) + (4 * carbohydrate_g) + (9 * fat_g). "
+            "4. Note visible evidence and uncertainties. "
+            "Do not provide medical advice or allergy claims."
+        )
+        instruction = (
+            "Analyze this food image without personal data and provide nutritional estimates."
+        )
+
     return StructuredGenerationRequest(
-        system_prompt=(
-            "Identify all visible food items and estimate their portion in grams ('g'). "
-            "For each food item, calculate estimated calories, protein_g, carbohydrate_g, "
-            "and fat_g based on standard nutritional data for the estimated portion. "
-            "Return uncertainty. Do not provide medical advice or allergy claims."
-        ),
-        input_payload={"instruction": "Analyze this food image without personal data."},
+        system_prompt=system_prompt,
+        input_payload={"instruction": instruction},
         response_schema=RESPONSE_SCHEMA,
         schema_name="fitsho_food_photo_estimate_v1",
         route=ModelRoute(primary_model=primary_model, fallback_models=fallback_models),
@@ -207,6 +272,7 @@ async def estimate_photo(
     client: httpx.AsyncClient,
     idempotency_key: str | None = None,
     agent_http_client: httpx.AsyncClient | None = None,
+    language: str = "fa",
 ) -> dict[str, object]:
     if not consent:
         raise FoodPhotoError("THIRD_PARTY_PROCESSING_CONSENT_REQUIRED")
@@ -251,6 +317,7 @@ async def estimate_photo(
         provider_preferences=configured.routing_preferences,
         temperature=config.temperature,
         max_output_tokens=config.max_output_tokens,
+        language=language,
     )
     try:
         result = await configured.provider.analyze_images(
@@ -409,10 +476,17 @@ def _calculate_photo_macro_totals(
                     totals[output_key] += composition.value_per_100g * factor
 
     for item in direct_items:
-        totals["calories"] += Decimal(str(round(_item_float(item, "calories"), 2)))
-        totals["protein_g"] += Decimal(str(round(_item_float(item, "protein_g"), 2)))
-        totals["carbohydrate_g"] += Decimal(str(round(_item_float(item, "carbohydrate_g"), 2)))
-        totals["fat_g"] += Decimal(str(round(_item_float(item, "fat_g"), 2)))
+        cal = _item_float(item, "calories")
+        prot = _item_float(item, "protein_g")
+        carb = _item_float(item, "carbohydrate_g")
+        fat = _item_float(item, "fat_g")
+        if cal <= 0 and (prot > 0 or carb > 0 or fat > 0):
+            cal = round(prot * 4.0 + carb * 4.0 + fat * 9.0, 1)
+            item["calories"] = cal
+        totals["calories"] += Decimal(str(round(cal, 2)))
+        totals["protein_g"] += Decimal(str(round(prot, 2)))
+        totals["carbohydrate_g"] += Decimal(str(round(carb, 2)))
+        totals["fat_g"] += Decimal(str(round(fat, 2)))
 
     complete = len(items) > 0 and not_ready_count == 0
 
@@ -422,10 +496,24 @@ def _calculate_photo_macro_totals(
 def photo_response(
     row: NutritionFoodPhotoEstimate, *, db: Session | None = None
 ) -> dict[str, object]:
-    items = [
-        {**item, "item_id": item.get("item_id") or f"legacy-{index}"}
-        for index, item in enumerate(row.mapped_items)
-    ]
+    items: list[dict[str, object]] = []
+    for index, item in enumerate(row.mapped_items):
+        cal = _item_float(item, "calories", 0.0)
+        prot = _item_float(item, "protein_g", 0.0)
+        carb = _item_float(item, "carbohydrate_g", 0.0)
+        fat = _item_float(item, "fat_g", 0.0)
+        if cal <= 0 and (prot > 0 or carb > 0 or fat > 0):
+            cal = round(prot * 4.0 + carb * 4.0 + fat * 9.0, 1)
+        items.append(
+            {
+                **item,
+                "item_id": item.get("item_id") or f"legacy-{index}",
+                "calories": cal,
+                "protein_g": prot,
+                "carbohydrate_g": carb,
+                "fat_g": fat,
+            }
+        )
     macro_totals: dict[str, float] = {
         "calories": 0.0,
         "protein_g": 0.0,
@@ -586,11 +674,17 @@ def confirm_photo(
             display_name = food.name_fa
             entry_food_id: UUID | None = food.id
         else:
+            p = _item_float(item, "protein_g", 0.0)
+            c = _item_float(item, "carbohydrate_g", 0.0)
+            f = _item_float(item, "fat_g", 0.0)
+            cal = _item_float(item, "calories", 0.0)
+            if cal <= 0 and (p > 0 or c > 0 or f > 0):
+                cal = round(p * 4.0 + c * 4.0 + f * 9.0, 1)
             nutrients = {
-                "energy_kcal": str(round(_item_float(item, "calories"), 2)),
-                "protein_g": str(round(_item_float(item, "protein_g"), 2)),
-                "carbohydrate_g": str(round(_item_float(item, "carbohydrate_g"), 2)),
-                "total_fat_g": str(round(_item_float(item, "fat_g"), 2)),
+                "energy_kcal": str(round(cal, 2)),
+                "protein_g": str(round(p, 2)),
+                "carbohydrate_g": str(round(c, 2)),
+                "total_fat_g": str(round(f, 2)),
             }
             warning_codes = ["PHOTO_ESTIMATE_APPROXIMATE"]
             display_name = str(item.get("name_guess", "غذای تخمینی"))

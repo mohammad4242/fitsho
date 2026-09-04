@@ -499,12 +499,16 @@ export type FoodPhotoEstimate = {
   macro_totals_complete: boolean;
 };
 
-export function estimateFoodPhoto(file: File): Promise<FoodPhotoEstimate> {
+export function estimateFoodPhoto(file: File, language: string = "fa"): Promise<FoodPhotoEstimate> {
   const body = new FormData();
   body.append("file", file);
-  return request<FoodPhotoEstimate>(`${nutritionPath}/tracking/photo-estimates`, {
+  const normalizedLang = language.startsWith("en") ? "en" : "fa";
+  return request<FoodPhotoEstimate>(`${nutritionPath}/tracking/photo-estimates?language=${normalizedLang}`, {
     method: "POST",
-    headers: { "X-Fitsho-Food-Photo-Consent": "true" },
+    headers: {
+      "X-Fitsho-Food-Photo-Consent": "true",
+      "Accept-Language": normalizedLang,
+    },
     body,
   });
 }

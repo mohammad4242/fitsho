@@ -1888,6 +1888,8 @@ async def create_food_photo_estimate(
     file: Annotated[UploadFile, File()],
     consent: Annotated[bool, Header(alias="X-Fitsho-Food-Photo-Consent")],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+    language: str = Query(default="fa"),
 ) -> dict[str, object]:
     try:
         if idempotency_key is not None and not 8 <= len(idempotency_key) <= 128:
@@ -1902,6 +1904,11 @@ async def create_food_photo_estimate(
             limit=settings.food_photo_rate_limit,
             window_seconds=settings.nutrition_upload_rate_window_seconds,
         )
+        resolved_lang = (
+            "en"
+            if (language == "en" or (accept_language and accept_language.lower().startswith("en")))
+            else "fa"
+        )
         return await estimate_photo(
             db,
             user.id,
@@ -1911,6 +1918,7 @@ async def create_food_photo_estimate(
             request.app.state.ai_http_client,
             idempotency_key,
             getattr(request.app.state, "agent_http_client", None),
+            language=resolved_lang,
         )
     except RateLimitExceeded as error:
         raise HTTPException(

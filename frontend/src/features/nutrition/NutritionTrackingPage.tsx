@@ -75,7 +75,7 @@ export function NutritionTrackingPage() {
     reader.addEventListener("load", () => setPhotoPreview(typeof reader.result === "string" ? reader.result : null), { once: true });
     reader.readAsDataURL(file);
     setBusy(true);
-    try { setPhotoEstimate(await api.estimateFoodPhoto(file)); }
+    try { setPhotoEstimate(await api.estimateFoodPhoto(file, fa ? "fa" : "en")); }
     catch { setError(l("برآورد عکس فعلاً در دسترس نیست؛ ثبت دستی همچنان کار می‌کند.", "Photo estimation is unavailable; manual tracking still works.")); }
     finally { setBusy(false); }
   }
