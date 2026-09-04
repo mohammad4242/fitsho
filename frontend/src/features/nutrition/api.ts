@@ -37,6 +37,8 @@ export type FoodCatalogueItem = {
   image_url: string | null;
   category: string;
   measurement_basis: "raw" | "dry" | "as_purchased";
+  allergen_tags?: string[];
+  allergen_metadata_verified?: boolean;
   nutrient_basis: { quantity: string; unit: string };
   portions: FoodCataloguePortion[];
   macros: Record<"energy_kcal" | "protein_g" | "carbohydrate_g" | "total_fat_g" | "fibre_g", string | null>;

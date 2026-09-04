@@ -40,9 +40,7 @@ def summarize_audit(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
             quality_comparisons.append(comparison)
 
     violations = Counter(
-        str(code)
-        for row in rows
-        for code in row.get("safety_invariant_violations", ())
+        str(code) for row in rows for code in row.get("safety_invariant_violations", ())
     )
     return {
         "total_profiles": len(rows),
@@ -64,9 +62,8 @@ def summarize_audit(records: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "acceptance": {
             "safety_invariants_passed": not violations,
             "selection_quality_never_worse": all(quality_comparisons),
-            "automatically_eligible_success_over_90_percent": _rate(
-                len(successes), len(automatic)
-            ) > 90.0,
+            "automatically_eligible_success_over_90_percent": _rate(len(successes), len(automatic))
+            > 90.0,
             "safe_resolution_100_percent": safe_resolutions == len(rows),
         },
     }
@@ -77,9 +74,7 @@ def _automatically_eligible(row: Mapping[str, Any]) -> bool:
     if not isinstance(spec, Mapping):
         return True
     flags = spec.get("safety_flags", {})
-    return not spec.get("medical_conditions") and not any(
-        value is True for value in flags.values()
-    )
+    return not spec.get("medical_conditions") and not any(value is True for value in flags.values())
 
 
 def _safe_block(row: Mapping[str, Any]) -> bool:

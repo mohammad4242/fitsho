@@ -756,6 +756,20 @@ def _template_is_safe(candidate: EligibleMealTemplate, inputs: PlannerInput) -> 
 
 
 def _food_is_safe(food: PlannerFood, inputs: PlannerInput) -> bool:
+    if getattr(inputs, "food_constraints", ()):
+        from app.nutrition.food_constraints import evaluate_food_constraints
+
+        decision = evaluate_food_constraints(
+            constraints=inputs.food_constraints,
+            slug=food.slug,
+            name_fa=food.name_fa,
+            name_en=food.name_en,
+            allergen_tags=getattr(food, "allergen_tags", ()),
+            allergen_metadata_verified=getattr(food, "allergen_metadata_verified", False),
+        )
+        if decision.is_hard_blocked:
+            return False
+
     return (
         food.price_irr_per_gram > ZERO
         and food.price_reference_id not in {"", "unavailable"}

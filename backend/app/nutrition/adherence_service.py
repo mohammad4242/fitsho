@@ -177,9 +177,7 @@ def adaptive_preferences(db: Session, user_id: UUID) -> dict[str, object]:
     return {
         "feedback_counts": dict(counts),
         "avoid_meal_ids": [
-            row.meal_id
-            for row in feedback
-            if row.feedback_type.value == "do_not_suggest_again"
+            row.meal_id for row in feedback if row.feedback_type.value == "do_not_suggest_again"
         ],
         "disliked_meal_ids": [
             row.meal_id for row in feedback if row.feedback_type.value == "disliked"

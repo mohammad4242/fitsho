@@ -1,6 +1,19 @@
 from enum import StrEnum
 
 
+class CanonicalAllergen(StrEnum):
+    GLUTEN = "gluten"
+    WHEAT = "wheat"
+    MILK = "milk"
+    EGG = "egg"
+    PEANUT = "peanut"
+    TREE_NUT = "tree_nut"
+    SOY = "soy"
+    FISH = "fish"
+    SHELLFISH = "shellfish"
+    SESAME = "sesame"
+
+
 class SafetyOutcome(StrEnum):
     STANDARD_AUTOMATIC = "standard_automatic"
     AUTOMATIC_DRAFT_REQUIRES_PHYSICIAN_REVIEW = "automatic_draft_requires_physician_review"

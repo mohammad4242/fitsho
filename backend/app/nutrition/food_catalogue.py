@@ -192,6 +192,8 @@ def save_catalogue_food(db: Session, payload: CatalogueFoodWrite) -> CatalogueFo
     food.data_version = payload.data_version
     food.source_access_date = payload.source_access_date
     food.dietary_patterns = payload.dietary_patterns
+    food.allergen_tags = list(payload.allergen_tags)
+    food.allergen_metadata_verified = payload.allergen_metadata_verified
     food.roles = [NutritionCatalogueFoodRole(role=role) for role in roles]
     food.aliases = [
         NutritionCatalogueFoodAlias(
@@ -252,6 +254,8 @@ def _food_response(food: NutritionCatalogueFood) -> CatalogueFoodResponse:
         source_access_date=food.source_access_date,
         aliases=[alias.alias for alias in food.aliases],
         dietary_patterns=food.dietary_patterns,
+        allergen_tags=list(food.allergen_tags or []),
+        allergen_metadata_verified=bool(food.allergen_metadata_verified),
         roles=[role.role.value for role in food.roles],
         nutrients=[
             {
@@ -415,6 +419,8 @@ def seed_base_iranian_food_catalogue(
             date.fromisoformat(compositions[0].source_access_date) if compositions else None
         )
         food.dietary_patterns = _dietary_patterns_for_slug(item.slug)
+        food.allergen_tags = list(item.allergen_tags)
+        food.allergen_metadata_verified = item.allergen_metadata_verified
         if preserve_retirement:
             food.verification_status = FoodVerificationStatus.RETIRED
         else:

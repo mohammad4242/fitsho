@@ -659,6 +659,16 @@ class NutritionCatalogueFood(Base):
         nullable=False,
         default=lambda: ["omnivore", "vegetarian", "vegan"],
     )
+    allergen_tags: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
+    )
+    allergen_metadata_verified: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

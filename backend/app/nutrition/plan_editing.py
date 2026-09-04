@@ -215,9 +215,7 @@ def meal_replacement_options(
         meal
         for day in plan.days
         for meal in day.meals
-        if meal.id != target.id
-        and meal.slot_role == target.slot_role
-        and not meal.is_locked
+        if meal.id != target.id and meal.slot_role == target.slot_role and not meal.is_locked
     ]
     return {
         "target_meal_id": target.id,
@@ -264,9 +262,7 @@ def food_replacement_options(
     catalogue_foods = {
         food.id: food
         for food in db.scalars(
-            select(NutritionCatalogueFood).where(
-                NutritionCatalogueFood.id.in_(source_by_food_id)
-            )
+            select(NutritionCatalogueFood).where(NutritionCatalogueFood.id.in_(source_by_food_id))
         )
     }
     options = []

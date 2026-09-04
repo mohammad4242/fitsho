@@ -79,6 +79,8 @@ class ApprovedFoodSeed:
     measurement_basis: str
     source_food_id: str | None
     portions: tuple["FoodPortionSeed", ...] = ()
+    allergen_tags: tuple[str, ...] = ()
+    allergen_metadata_verified: bool = True
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,8 @@ def _food(
     source_food_id: str | None,
     *aliases: str,
     portions: tuple[FoodPortionSeed, ...] = (),
+    allergen_tags: tuple[str, ...] = (),
+    allergen_metadata_verified: bool = True,
 ) -> ApprovedFoodSeed:
     return ApprovedFoodSeed(
         slug=slug,
@@ -125,6 +129,8 @@ def _food(
         measurement_basis=basis,
         source_food_id=source_food_id,
         portions=portions,
+        allergen_tags=allergen_tags,
+        allergen_metadata_verified=allergen_metadata_verified,
     )
 
 
@@ -175,7 +181,16 @@ APPROVED_FOODS = (
         "Beef chuck roast",
     ),
     _food("lamb", "گوشت گوسفند", "Lamb", "red_meat", "main_protein", "raw", "174370"),
-    _food("white-fish", "ماهی سفید", "White fish", "fish", "main_protein", "raw", "173711"),
+    _food(
+        "white-fish",
+        "ماهی سفید",
+        "White fish",
+        "fish",
+        "main_protein",
+        "raw",
+        "173711",
+        allergen_tags=("fish",),
+    ),
     _food(
         "rainbow-trout",
         "ماهی قزل‌آلا",
@@ -185,6 +200,7 @@ APPROVED_FOODS = (
         "raw",
         "173717",
         "قزل آلا",
+        allergen_tags=("fish",),
     ),
     _food(
         "canned-tuna",
@@ -195,6 +211,7 @@ APPROVED_FOODS = (
         "as_purchased",
         "173709",
         "کنسرو تن ماهی",
+        allergen_tags=("fish",),
     ),
     _food(
         "egg",
@@ -218,6 +235,7 @@ APPROVED_FOODS = (
                 USDA_SOURCE_REFERENCE,
             ),
         ),
+        allergen_tags=("egg",),
     ),
     _food("lentils", "عدس", "Lentils", "legumes", "main_protein", "dry", "172420", "عدس خشک"),
     _food("chickpeas", "نخود", "Chickpeas", "legumes", "main_protein", "dry", "173756", "نخود خشک"),
@@ -244,7 +262,17 @@ APPROVED_FOODS = (
     ),
     _food("split-peas", "لپه", "Split peas", "legumes", "main_protein", "dry", "172428"),
     _food("mung-beans", "ماش", "Mung beans", "legumes", "main_protein", "dry", "174256"),
-    _food("soybeans", "سویا", "Soybeans", "legumes", "main_protein", "dry", "174270", "دانه سویا"),
+    _food(
+        "soybeans",
+        "سویا",
+        "Soybeans",
+        "legumes",
+        "main_protein",
+        "dry",
+        "174270",
+        "دانه سویا",
+        allergen_tags=("soy",),
+    ),
     _food(
         "basmati-rice",
         "برنج",
@@ -277,6 +305,7 @@ APPROVED_FOODS = (
                 IRANIAN_BREAD_PORTION_SOURCE_REFERENCE,
             ),
         ),
+        allergen_tags=("wheat", "gluten"),
     ),
     _food(
         "barbari-bread",
@@ -299,6 +328,7 @@ APPROVED_FOODS = (
                 IRANIAN_BREAD_PORTION_SOURCE_REFERENCE,
             ),
         ),
+        allergen_tags=("wheat", "gluten", "sesame"),
     ),
     _food(
         "lavash-bread",
@@ -321,6 +351,7 @@ APPROVED_FOODS = (
                 IRANIAN_BREAD_PORTION_SOURCE_REFERENCE,
             ),
         ),
+        allergen_tags=("wheat", "gluten"),
     ),
     _food(
         "taftoon-bread",
@@ -343,8 +374,19 @@ APPROVED_FOODS = (
                 IRANIAN_BREAD_PORTION_SOURCE_REFERENCE,
             ),
         ),
+        allergen_tags=("wheat", "gluten"),
     ),
-    _food("oats", "جو دوسر", "Oats", "grains", "main_staple", "dry", "173904", "اوتمیل"),
+    _food(
+        "oats",
+        "جو دوسر",
+        "Oats",
+        "grains",
+        "main_staple",
+        "dry",
+        "173904",
+        "اوتمیل",
+        allergen_tags=("gluten",),
+    ),
     _food(
         "wheat-flour",
         "آرد گندم سفید",
@@ -354,8 +396,19 @@ APPROVED_FOODS = (
         "dry",
         "790018",
         "آرد سفید",
+        allergen_tags=("wheat", "gluten"),
     ),
-    _food("barley", "جو", "Barley", "grains", "main_staple", "dry", "170284", "جو پوست کنده"),
+    _food(
+        "barley",
+        "جو",
+        "Barley",
+        "grains",
+        "main_staple",
+        "dry",
+        "170284",
+        "جو پوست کنده",
+        allergen_tags=("gluten",),
+    ),
     _food(
         "potato",
         "سیب‌زمینی",
@@ -367,8 +420,28 @@ APPROVED_FOODS = (
         "سیب زمینی",
     ),
     _food("corn", "ذرت", "Corn", "starchy_vegetables", "main_staple", "raw", "169998"),
-    _food("pasta", "ماکارونی", "Pasta", "grains", "main_staple", "dry", "169736", "پاستا"),
-    _food("milk", "شیر", "Milk", "dairy", "flexible", "as_purchased", "172217", "شیر کامل"),
+    _food(
+        "pasta",
+        "ماکارونی",
+        "Pasta",
+        "grains",
+        "main_staple",
+        "dry",
+        "169736",
+        "پاستا",
+        allergen_tags=("wheat", "gluten"),
+    ),
+    _food(
+        "milk",
+        "شیر",
+        "Milk",
+        "dairy",
+        "flexible",
+        "as_purchased",
+        "172217",
+        "شیر کامل",
+        allergen_tags=("milk",),
+    ),
     _food(
         "plain-yogurt",
         "ماست ساده",
@@ -378,6 +451,7 @@ APPROVED_FOODS = (
         "as_purchased",
         "171284",
         "ماست",
+        allergen_tags=("milk",),
     ),
     _food(
         "low-fat-cheese",
@@ -388,6 +462,7 @@ APPROVED_FOODS = (
         "as_purchased",
         "172182",
         "پنیر کم چرب",
+        allergen_tags=("milk",),
     ),
     _food(
         "mozzarella",
@@ -399,6 +474,7 @@ APPROVED_FOODS = (
         "170846",
         "پنیر پیتزا",
         "موزارلا",
+        allergen_tags=("milk",),
     ),
     _food("tomato", "گوجه‌فرنگی", "Tomato", "vegetables", "flexible", "raw", "170457", "گوجه فرنگی"),
     _food(
@@ -465,11 +541,46 @@ APPROVED_FOODS = (
         "171411",
         "روغن گیاهی",
     ),
-    _food("butter", "کره", "Butter", "fats", "flexible", "as_purchased", "173410"),
-    _food("walnuts", "گردو", "Walnuts", "nuts_seeds", "flexible", "raw", "170187"),
-    _food("almonds", "بادام", "Almonds", "nuts_seeds", "flexible", "raw", "170567"),
     _food(
-        "peanuts", "بادام‌زمینی", "Peanuts", "nuts_seeds", "flexible", "raw", "172430", "بادام زمینی"
+        "butter",
+        "کره",
+        "Butter",
+        "fats",
+        "flexible",
+        "as_purchased",
+        "173410",
+        allergen_tags=("milk",),
+    ),
+    _food(
+        "walnuts",
+        "گردو",
+        "Walnuts",
+        "nuts_seeds",
+        "flexible",
+        "raw",
+        "170187",
+        allergen_tags=("tree_nut",),
+    ),
+    _food(
+        "almonds",
+        "بادام",
+        "Almonds",
+        "nuts_seeds",
+        "flexible",
+        "raw",
+        "170567",
+        allergen_tags=("tree_nut",),
+    ),
+    _food(
+        "peanuts",
+        "بادام‌زمینی",
+        "Peanuts",
+        "nuts_seeds",
+        "flexible",
+        "raw",
+        "172430",
+        "بادام زمینی",
+        allergen_tags=("peanut",),
     ),
     _food(
         "creamy-peanut-butter",
@@ -480,9 +591,28 @@ APPROVED_FOODS = (
         "as_purchased",
         "2262072",
         "کره بادام زمینی",
+        allergen_tags=("peanut",),
     ),
-    _food("sesame", "کنجد", "Sesame", "nuts_seeds", "flexible", "raw", "170150"),
-    _food("tahini", "ارده", "Tahini", "nuts_seeds", "flexible", "as_purchased", "170189"),
+    _food(
+        "sesame",
+        "کنجد",
+        "Sesame",
+        "nuts_seeds",
+        "flexible",
+        "raw",
+        "170150",
+        allergen_tags=("sesame",),
+    ),
+    _food(
+        "tahini",
+        "ارده",
+        "Tahini",
+        "nuts_seeds",
+        "flexible",
+        "as_purchased",
+        "170189",
+        allergen_tags=("sesame",),
+    ),
     _food("apple", "سیب", "Apple", "fruit", "snack", "raw", "171688"),
     _food("banana", "موز", "Banana", "fruit", "snack", "raw", "173944"),
     _food("orange", "پرتقال", "Orange", "fruit", "snack", "raw", "169097"),

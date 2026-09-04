@@ -38,6 +38,7 @@ from app.nutrition.exceptions import (
     NutritionTargetInfeasibleDomainError,
     StructuredExerciseRequiredError,
 )
+from app.nutrition.food_constraints import normalize_food_constraints
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionCatalogueMeal,
@@ -262,6 +263,32 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     food_items = db.scalars(
         select(NutritionFoodItem).where(NutritionFoodItem.user_id == user_id)
     ).all()
+    raw_constraints = [
+        {"kind": item.kind.value, "term": item.name, "details": item.details}
+        for item in food_items
+    ]
+    normalized_constraints = normalize_food_constraints(raw_constraints)
+    unresolved_hard = tuple(
+        c for c in normalized_constraints if c.code == "UNRESOLVED_HARD_FOOD_CONSTRAINT"
+    )
+    if unresolved_hard:
+        unresolved_terms = [c.raw_term for c in unresolved_hard]
+        generation = _persist_generation(
+            db,
+            user_id=user_id,
+            safety=safety,
+            estimate=estimate,
+            outcome=NutritionPlanGenerationOutcome.FAILED,
+            reasons=("UNRESOLVED_HARD_FOOD_CONSTRAINT",),
+            warnings=(),
+            input_snapshot={
+                "estimate_id": str(estimate.id),
+                "estimate_revision": estimate.revision,
+                "unresolved_food_constraints": unresolved_terms,
+            },
+            diagnostics={"unresolved_hard_constraints": unresolved_terms},
+        )
+        return _generation_response(generation, None)
     preference_snapshot = load_preference_snapshot(db, user_id, food_items)
     exclusions = tuple(
         item.normalized_name for item in food_items if item.kind in _HARD_EXCLUSION_KINDS
@@ -328,6 +355,16 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "micronutrient_targets": _json_decimal_map(micro_targets),
         "micronutrient_upper_limits": _json_decimal_map(upper_limits),
         "micronutrient_reference_rows": micro_metadata,
+        "food_constraints": [
+            {
+                "kind": c.kind,
+                "term": c.raw_term,
+                "severity": c.severity.value,
+                "allergen": c.canonical_allergen.value if c.canonical_allergen else None,
+                "code": c.code,
+            }
+            for c in normalized_constraints
+        ],
         "hard_exclusions": list(exclusions),
         "liked_food_ids": list(liked_food_ids),
         "disliked_food_ids": list(disliked_food_ids),
@@ -375,6 +412,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         dietary_pattern=profile.dietary_pattern.value,
         maximum_meal_repetition_per_week=profile.maximum_meal_repetition_per_week,
         preference_snapshot=preference_snapshot,
+        food_constraints=tuple(normalized_constraints),
     )
     optimization_cache: dict[tuple[object, ...], PlannedFood] = {}
     evaluations: list[CandidateEvaluation] = []
@@ -1009,6 +1047,8 @@ def _planner_foods(
                 price_irr_per_gram=conversion.price_irr_per_gram,
                 price_reference_id=reference.reference_id,
                 dietary_patterns=tuple(food.dietary_patterns),
+                allergen_tags=tuple(food.allergen_tags or []),
+                allergen_metadata_verified=bool(food.allergen_metadata_verified),
             )
         )
         snapshots.append(

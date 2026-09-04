@@ -8,6 +8,11 @@ from enum import StrEnum
 from app.nutrition.budget_optimizer import BudgetRepairAction, optimize_weekly_budget
 from app.nutrition.candidate_selection import quality_for_result
 from app.nutrition.exceptions import ScheduledTemplateUnavailableError
+from app.nutrition.food_constraints import (
+    ConstraintSeverity,
+    NormalizedFoodConstraint,
+    evaluate_food_constraints,
+)
 from app.nutrition.planner_policy import DEFAULT_POLICY, PlannerPolicy
 from app.nutrition.portion_solver import (
     PortionAdjustmentAction,
@@ -68,6 +73,8 @@ class PlannerFood:
     price_irr_per_gram: Decimal
     price_reference_id: str
     dietary_patterns: tuple[str, ...] = ("omnivore", "vegetarian", "vegan")
+    allergen_tags: tuple[str, ...] = ()
+    allergen_metadata_verified: bool = False
 
 
 @dataclass(frozen=True)
@@ -127,6 +134,7 @@ class PlannerInput:
     maximum_meal_repetition_per_week: int
     template_schedule: tuple[tuple[tuple[str, str | None, str], ...], ...] | None = None
     preference_snapshot: PreferenceSnapshot | None = None
+    food_constraints: tuple[NormalizedFoodConstraint, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -240,7 +248,7 @@ def plan_week(
                 for food in foods
                 if food.price_irr_per_gram > ZERO
                 and _has_mandatory_nutrients(food)
-                and not _excluded(food, inputs.excluded_terms)
+                and not _is_food_blocked(food, inputs)
                 and inputs.dietary_pattern in food.dietary_patterns
             ),
             key=lambda item: item.slug,
@@ -289,6 +297,7 @@ def plan_week(
                 policy,
                 maximum_recipe_cost_irr=weekly_budget_cap,
                 optimization_cache=optimization_cache,
+                all_foods_by_id={food.food_id: food for food in foods},
             )
     except NoCompatibleTemplateSubstituteError as error:
         if inputs.preference_snapshot is not None and inputs.preference_snapshot.excluded_meal_ids:
@@ -545,6 +554,23 @@ def _excluded(food: PlannerFood, excluded_terms: tuple[str, ...]) -> bool:
     return any(term.strip().casefold() in haystack for term in excluded_terms if term.strip())
 
 
+def _is_food_blocked(food: PlannerFood, inputs: PlannerInput) -> bool:
+    if _excluded(food, inputs.excluded_terms):
+        return True
+    if inputs.food_constraints:
+        decision = evaluate_food_constraints(
+            constraints=inputs.food_constraints,
+            slug=food.slug,
+            name_fa=food.name_fa,
+            name_en=food.name_en,
+            allergen_tags=food.allergen_tags,
+            allergen_metadata_verified=food.allergen_metadata_verified,
+        )
+        if decision.is_hard_blocked:
+            return True
+    return False
+
+
 def _rank_candidates(
     inputs: PlannerInput,
     foods: tuple[PlannerFood, ...],
@@ -563,6 +589,17 @@ def _rank_candidates(
         preference = (Decimal("1") if food.food_id in inputs.liked_food_ids else ZERO) - (
             Decimal("1") if food.food_id in inputs.disliked_food_ids else ZERO
         )
+        if inputs.food_constraints:
+            decision = evaluate_food_constraints(
+                constraints=inputs.food_constraints,
+                slug=food.slug,
+                name_fa=food.name_fa,
+                name_en=food.name_en,
+                allergen_tags=food.allergen_tags,
+                allergen_metadata_verified=food.allergen_metadata_verified,
+            )
+            if decision.penalty > ZERO:
+                preference -= decision.penalty
         cost_per_kcal = food.price_irr_per_gram * HUNDRED / energy
         value = (
             micronutrient_adequacy * policy.micronutrient_score_weight
@@ -766,6 +803,56 @@ def _build_days(
     return tuple(days)
 
 
+def _determine_substitution_reason(
+    requested: PlannerMealTemplate | None,
+    all_foods_by_id: dict[str, PlannerFood],
+    constraints: tuple[NormalizedFoodConstraint, ...],
+) -> str:
+    if requested is None:
+        return "SCHEDULED_TEMPLATE_UNAVAILABLE"
+    if constraints:
+        for item in requested.items:
+            food = all_foods_by_id.get(item.food_id)
+            if food is not None:
+                for constraint in constraints:
+                    if constraint.severity == ConstraintSeverity.HARD:
+                        decision = evaluate_food_constraints(
+                            constraints=(constraint,),
+                            slug=food.slug,
+                            name_fa=food.name_fa,
+                            name_en=food.name_en,
+                            allergen_tags=food.allergen_tags,
+                            allergen_metadata_verified=food.allergen_metadata_verified,
+                        )
+                        if decision.is_hard_blocked:
+                            if constraint.source == "allergy":
+                                return "MEAL_SUBSTITUTED_FOR_ALLERGY"
+                            if constraint.source == "intolerance":
+                                return "MEAL_SUBSTITUTED_FOR_INTOLERANCE"
+                            return "MEAL_SUBSTITUTED_FOR_HARD_EXCLUSION"
+        if requested.prepared_recipe is not None:
+            for ingredient in requested.prepared_recipe.definition.ingredients:
+                recipe_food = all_foods_by_id.get(str(ingredient.food_id))
+                if recipe_food is not None:
+                    for constraint in constraints:
+                        if constraint.severity == ConstraintSeverity.HARD:
+                            decision = evaluate_food_constraints(
+                                constraints=(constraint,),
+                                slug=recipe_food.slug,
+                                name_fa=recipe_food.name_fa,
+                                name_en=recipe_food.name_en,
+                                allergen_tags=recipe_food.allergen_tags,
+                                allergen_metadata_verified=recipe_food.allergen_metadata_verified,
+                            )
+                            if decision.is_hard_blocked:
+                                if constraint.source == "allergy":
+                                    return "MEAL_SUBSTITUTED_FOR_ALLERGY"
+                                if constraint.source == "intolerance":
+                                    return "MEAL_SUBSTITUTED_FOR_INTOLERANCE"
+                                return "MEAL_SUBSTITUTED_FOR_HARD_EXCLUSION"
+    return "SCHEDULED_TEMPLATE_UNAVAILABLE"
+
+
 def _build_scheduled_days(
     inputs: PlannerInput,
     templates: tuple[EligibleMealTemplate, ...],
@@ -775,6 +862,7 @@ def _build_scheduled_days(
     optimization_cache: dict[tuple[object, ...], PlannedFood],
 ) -> tuple[PlannedDay, ...]:
     raw_templates = tuple(candidate.template for candidate in templates)
+    all_foods = {food.food_id: food for template in templates for _item, food in template.items}
     variants = _build_scheduled_day_variants(
         inputs,
         templates,
@@ -783,6 +871,7 @@ def _build_scheduled_days(
         policy,
         maximum_recipe_cost_irr=maximum_recipe_cost_irr,
         optimization_cache=optimization_cache,
+        all_foods_by_id=all_foods,
     )
     return variants[0].days
 
@@ -796,7 +885,9 @@ def _build_scheduled_day_variants(
     *,
     maximum_recipe_cost_irr: Decimal,
     optimization_cache: dict[tuple[object, ...], PlannedFood],
+    all_foods_by_id: dict[str, PlannerFood] | None = None,
 ) -> tuple[_ScheduledWeekVariant, ...]:
+    all_foods = all_foods_by_id if all_foods_by_id is not None else {}
     if len(inputs.template_schedule or ()) != 7:
         raise ValueError("Template schedule must contain exactly seven days")
     eligible_templates = tuple(
@@ -891,6 +982,7 @@ def _build_scheduled_day_variants(
                     slot_index=slot_index,
                     dietary_pattern=inputs.dietary_pattern,
                     excluded_terms=inputs.excluded_terms,
+                    food_constraints=inputs.food_constraints,
                 )
                 options = rank_template_substitutes(
                     requested,
@@ -921,13 +1013,18 @@ def _build_scheduled_day_variants(
                 selected_days[day_index].append(candidate.template.meal_id)
                 action = None
                 if not original_available:
+                    reason = _determine_substitution_reason(
+                        requested=requested_by_id.get(requested_id or ""),
+                        all_foods_by_id=all_foods,
+                        constraints=inputs.food_constraints,
+                    )
                     action = SubstitutionAction(
                         day_index=day_index,
                         role=role,
                         slot_index=slot_index,
                         requested_template_id=requested_id or "",
                         replacement_template_id=candidate.template.meal_id,
-                        reason_code="SCHEDULED_TEMPLATE_UNAVAILABLE",
+                        reason_code=reason,
                     )
                 substitutions = state.substitutions + ((action,) if action else ())
                 _candidate_energy, _candidate_protein, candidate_cost = template_reference_metrics(
@@ -1102,6 +1199,8 @@ def _materialize_scheduled_days(
         snack_share = policy.snack_energy_share if snack_count else ZERO
         main_kcal = (
             inputs.daily_targets["goal_calories"] * (Decimal("1") - snack_share) / main_count
+            if main_count
+            else ZERO
         )
         snack_kcal = (
             inputs.daily_targets["goal_calories"] * snack_share / snack_count

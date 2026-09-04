@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from app.nutrition.candidate_selection import evaluate_candidate
 from app.nutrition.enums import NutritionDietStyle
+from app.nutrition.food_constraints import normalize_food_constraints
 from app.nutrition.models import NutritionProgram
 from app.nutrition.planner_engine import (
     EligibleMealTemplate,
@@ -37,6 +38,8 @@ def _food(
     carbs: str = "20",
     fat: str = "5",
     dietary_patterns: tuple[str, ...] = ("omnivore", "vegetarian", "vegan"),
+    allergen_tags: tuple[str, ...] = (),
+    allergen_metadata_verified: bool = False,
 ) -> PlannerFood:
     return PlannerFood(
         food_id=slug,
@@ -54,6 +57,8 @@ def _food(
         price_irr_per_gram=Decimal("10"),
         price_reference_id=f"price-{slug}",
         dietary_patterns=dietary_patterns,
+        allergen_tags=allergen_tags,
+        allergen_metadata_verified=allergen_metadata_verified,
     )
 
 
@@ -439,3 +444,110 @@ def test_candidate_quality_counts_substitutions_and_uses_variant_identity() -> N
     assert evaluation.quality is not None
     assert evaluation.quality.substitution_burden == 1
     assert evaluation.stable_variant_key == ("00:main_meal:00:replacement",)
+
+
+def test_substitution_for_allergy_produces_allergy_reason_code() -> None:
+    fish_food = _food("fish", allergen_tags=("fish",), allergen_metadata_verified=True)
+    safe_chicken = _food("chicken", allergen_tags=(), allergen_metadata_verified=True)
+    fish_meal = _template("fish-meal", "lunch", fish_food.food_id)
+    chicken_meal = _template("chicken-meal", "lunch", safe_chicken.food_id)
+
+    constraints = normalize_food_constraints([{"kind": "allergy", "term": "ماهی"}])
+    inputs = _input()
+    schedule = tuple((("main_meal", fish_meal.meal_id, "lunch"),) for _ in range(7))
+    inputs = replace(inputs, template_schedule=schedule, food_constraints=tuple(constraints))
+
+    result = plan_week(inputs, (fish_food, safe_chicken), (fish_meal, chicken_meal))
+
+    assert result.outcome == GenerationOutcome.SUCCESS
+    assert len(result.substitution_actions) == 7
+    for action in result.substitution_actions:
+        assert action.requested_template_id == "fish-meal"
+        assert action.replacement_template_id == "chicken-meal"
+        assert action.reason_code == "MEAL_SUBSTITUTED_FOR_ALLERGY"
+
+    for day in result.days:
+        for meal in day.meals:
+            for food in meal.foods:
+                assert food.slug != "fish"
+
+
+def test_substitution_for_intolerance_produces_intolerance_reason_code() -> None:
+    main_food = _food("rice", allergen_tags=(), allergen_metadata_verified=True)
+    main_meal = _template("rice-meal", "lunch", main_food.food_id)
+    dairy_food = _food("milk", allergen_tags=("milk",), allergen_metadata_verified=True)
+    oat_food = _food("oat-milk", allergen_tags=(), allergen_metadata_verified=True)
+    dairy_snack = _template("dairy-snack", "snack", dairy_food.food_id)
+    oat_snack = _template("oat-snack", "snack", oat_food.food_id)
+
+    constraints = normalize_food_constraints([{"kind": "intolerance", "term": "لاکتوز"}])
+    inputs = _input()
+    schedule = tuple((("snack", dairy_snack.meal_id, "snack"),) for _ in range(7))
+    inputs = replace(
+        inputs,
+        template_schedule=schedule,
+        food_constraints=tuple(constraints),
+        snacks_per_day=1,
+    )
+
+    result = plan_week(
+        inputs,
+        (main_food, dairy_food, oat_food),
+        (main_meal, dairy_snack, oat_snack),
+    )
+
+    assert result.outcome == GenerationOutcome.SUCCESS
+    assert len(result.substitution_actions) == 7
+    for action in result.substitution_actions:
+        assert action.requested_template_id == "dairy-snack"
+        assert action.replacement_template_id == "oat-snack"
+        assert action.reason_code == "MEAL_SUBSTITUTED_FOR_INTOLERANCE"
+
+
+def test_substitution_for_hard_exclusion_produces_exclusion_reason_code() -> None:
+    beef_food = _food("beef", allergen_tags=(), allergen_metadata_verified=True)
+    chicken_food = _food("chicken", allergen_tags=(), allergen_metadata_verified=True)
+    beef_meal = _template("beef-meal", "lunch", beef_food.food_id)
+    chicken_meal = _template("chicken-meal", "lunch", chicken_food.food_id)
+
+    constraints = normalize_food_constraints([{"kind": "never_suggest", "term": "beef"}])
+    inputs = _input()
+    schedule = tuple((("main_meal", beef_meal.meal_id, "lunch"),) for _ in range(7))
+    inputs = replace(inputs, template_schedule=schedule, food_constraints=tuple(constraints))
+
+    result = plan_week(inputs, (beef_food, chicken_food), (beef_meal, chicken_meal))
+
+    assert result.outcome == GenerationOutcome.SUCCESS
+    assert len(result.substitution_actions) == 7
+    for action in result.substitution_actions:
+        assert action.reason_code == "MEAL_SUBSTITUTED_FOR_HARD_EXCLUSION"
+        assert action.replacement_template_id == "chicken-meal"
+
+
+def test_program_with_incompatible_meal_survives_when_substitute_available() -> None:
+    main_food = _food("rice", allergen_tags=(), allergen_metadata_verified=True)
+    main_meal = _template("rice-meal", "lunch", main_food.food_id)
+    bad_food = _food("peanuts", allergen_tags=("peanut",), allergen_metadata_verified=True)
+    good_food = _food("almonds", allergen_tags=("tree_nut",), allergen_metadata_verified=True)
+    bad_snack = _template("peanut-snack", "snack", bad_food.food_id)
+    good_snack = _template("almond-snack", "snack", good_food.food_id)
+
+    constraints = normalize_food_constraints([{"kind": "allergy", "term": "peanut"}])
+    inputs = _input()
+    schedule = tuple((("snack", bad_snack.meal_id, "snack"),) for _ in range(7))
+    inputs = replace(
+        inputs,
+        template_schedule=schedule,
+        food_constraints=tuple(constraints),
+        snacks_per_day=1,
+    )
+
+    result = plan_week(
+        inputs,
+        (main_food, bad_food, good_food),
+        (main_meal, bad_snack, good_snack),
+    )
+
+    assert result.outcome == GenerationOutcome.SUCCESS
+    assert result.days[0].meals[0].template_id == "almond-snack"
+

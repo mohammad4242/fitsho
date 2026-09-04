@@ -155,6 +155,8 @@ def _member_item(food: NutritionCatalogueFood) -> FoodCatalogueItemResponse:
             data_version=food.data_version,
             access_date=food.source_access_date,
         ),
+        allergen_tags=list(food.allergen_tags or ()),
+        allergen_metadata_verified=food.allergen_metadata_verified,
     )
 
 

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from app.nutrition.food_constraints import NormalizedFoodConstraint, evaluate_food_constraints
+
 if TYPE_CHECKING:
     from app.nutrition.planner_engine import EligibleMealTemplate, PlannerMealTemplate
 
@@ -38,6 +40,7 @@ class SubstitutionContext:
     slot_index: int | None = None
     dietary_pattern: str = ""
     excluded_terms: tuple[str, ...] = ()
+    food_constraints: tuple[NormalizedFoodConstraint, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -82,7 +85,11 @@ def rank_template_substitutes(
         candidate
         for candidate in eligible_candidates
         if _is_eligible_for_slot(
-            candidate, context.slot_category, usage, context.maximum_repetition
+            candidate,
+            context.slot_category,
+            usage,
+            context.maximum_repetition,
+            context.food_constraints,
         )
     )
     return tuple(
@@ -170,12 +177,40 @@ def _is_eligible_for_slot(
     category: str,
     usage: dict[str, int],
     maximum_repetition: int,
+    constraints: tuple[NormalizedFoodConstraint, ...] = (),
 ) -> bool:
-    return (
-        getattr(candidate.template, "verification_status", "verified") == "verified"
-        and candidate.template.category == category
-        and usage.get(candidate.template.meal_id, 0) < maximum_repetition
-    )
+    if getattr(candidate.template, "verification_status", "verified") != "verified":
+        return False
+    if candidate.template.category != category:
+        return False
+    if usage.get(candidate.template.meal_id, 0) >= maximum_repetition:
+        return False
+    if constraints:
+        for _item, food in candidate.items:
+            decision = evaluate_food_constraints(
+                constraints=constraints,
+                slug=food.slug,
+                name_fa=food.name_fa,
+                name_en=food.name_en,
+                allergen_tags=getattr(food, "allergen_tags", ()),
+                allergen_metadata_verified=getattr(food, "allergen_metadata_verified", False),
+            )
+            if decision.is_hard_blocked:
+                return False
+        for _food_id, recipe_food in candidate.prepared_recipe_foods:
+            decision = evaluate_food_constraints(
+                constraints=constraints,
+                slug=recipe_food.slug,
+                name_fa=recipe_food.name_fa,
+                name_en=recipe_food.name_en,
+                allergen_tags=getattr(recipe_food, "allergen_tags", ()),
+                allergen_metadata_verified=getattr(
+                    recipe_food, "allergen_metadata_verified", False
+                ),
+            )
+            if decision.is_hard_blocked:
+                return False
+    return True
 
 
 def _ranking_key(
@@ -221,6 +256,17 @@ def _candidate_metrics(
             preference_penalty -= 1
         if food.food_id in context.disliked_food_ids:
             preference_penalty += 1
+        if context.food_constraints:
+            decision = evaluate_food_constraints(
+                constraints=context.food_constraints,
+                slug=food.slug,
+                name_fa=food.name_fa,
+                name_en=food.name_en,
+                allergen_tags=getattr(food, "allergen_tags", ()),
+                allergen_metadata_verified=getattr(food, "allergen_metadata_verified", False),
+            )
+            if decision.penalty > ZERO:
+                preference_penalty += 1
     if candidate.template.prepared_recipe is not None:
         foods_by_id = dict(candidate.prepared_recipe_foods)
         for ingredient in candidate.template.prepared_recipe.definition.ingredients:
@@ -235,6 +281,19 @@ def _candidate_metrics(
                 preference_penalty -= 1
             if recipe_food.food_id in context.disliked_food_ids:
                 preference_penalty += 1
+            if context.food_constraints:
+                decision = evaluate_food_constraints(
+                    constraints=context.food_constraints,
+                    slug=recipe_food.slug,
+                    name_fa=recipe_food.name_fa,
+                    name_en=recipe_food.name_en,
+                    allergen_tags=getattr(recipe_food, "allergen_tags", ()),
+                    allergen_metadata_verified=getattr(
+                        recipe_food, "allergen_metadata_verified", False
+                    ),
+                )
+                if decision.penalty > ZERO:
+                    preference_penalty += 1
     return (
         nutrients.get("energy_kcal", ZERO),
         nutrients.get("protein_g", ZERO),

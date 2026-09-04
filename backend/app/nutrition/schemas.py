@@ -328,6 +328,8 @@ class CatalogueFoodWrite(BaseModel):
         max_length=3,
     )
     roles: list[str] = Field(min_length=1, max_length=4)
+    allergen_tags: list[str] = Field(default_factory=list, max_length=20)
+    allergen_metadata_verified: bool = False
     nutrients: list[CatalogueNutrientInput] = Field(default_factory=list, max_length=64)
     portions: list[CatalogueFoodPortionInput] = Field(default_factory=list, max_length=12)
 
@@ -385,6 +387,8 @@ class FoodCatalogueItemResponse(BaseModel):
     nutrients: list[CatalogueNutrientInput]
     portions: list[FoodCataloguePortionResponse]
     source: FoodCatalogueSourceResponse
+    allergen_tags: list[str] = Field(default_factory=list)
+    allergen_metadata_verified: bool = False
 
 
 class AdminFoodCatalogueItemResponse(FoodCatalogueItemResponse):
