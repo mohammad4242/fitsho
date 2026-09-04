@@ -124,11 +124,154 @@
   background-color: #1d2222;
 }
 .birth-date-picker__select option:checked { color: #071313; background-color: var(--turquoise); }
-.guided-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; }
-.guided-choice-grid button { min-height: 5rem; padding: 1rem; border: 1px solid rgb(255 255 255 / 14%); border-radius: 1rem; color: #f4f1e9; background: rgb(255 255 255 / 5%); font-weight: 850; cursor: pointer; }
-.guided-choice-grid button.is-selected { border-color: var(--turquoise); background: rgb(27 185 164 / 20%); box-shadow: inset 0 0 0 1px rgb(27 185 164 / 28%); }
-.guided-choice-grid--sex { width: min(100%, 34rem); grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.guided-choice-grid--sex button { min-height: 6.5rem; font-size: 1.1rem; }
+.guided-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.guided-choice-grid button,
+.guided-choice-card {
+  position: relative;
+  min-height: 5.25rem;
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 1.15rem;
+  color: #f4f1e9;
+  background: linear-gradient(145deg, rgb(255 255 255 / 7%) 0%, rgb(255 255 255 / 3%) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+  box-shadow: 0 4px 14px -2px rgb(0 0 0 / 25%);
+}
+
+.guided-choice-grid button:hover,
+.guided-choice-card:hover {
+  border-color: rgb(27 185 164 / 45%);
+  background: linear-gradient(145deg, rgb(255 255 255 / 11%) 0%, rgb(255 255 255 / 5%) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px rgb(0 0 0 / 35%), 0 0 16px -4px rgb(27 185 164 / 25%);
+}
+
+.guided-choice-grid button.is-selected,
+.guided-choice-card.is-selected {
+  border-color: var(--turquoise);
+  background: linear-gradient(145deg, rgb(27 185 164 / 22%) 0%, rgb(27 185 164 / 8%) 100%);
+  box-shadow: inset 0 0 0 1.5px var(--turquoise), 0 10px 24px -4px rgb(27 185 164 / 32%);
+  color: #ffffff;
+}
+
+/* Sex Grid Choice Cards */
+.guided-choice-grid--sex {
+  width: min(100%, 36rem);
+  margin-inline: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.guided-choice-grid--sex button,
+.guided-choice-grid--sex .guided-choice-card {
+  min-height: 8.5rem;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  gap: 0.9rem;
+  font-size: 1.15rem;
+  border-radius: 1.35rem;
+}
+
+.guided-choice-card__icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgb(255 255 255 / 10%) 0%, rgb(255 255 255 / 4%) 100%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  color: var(--turquoise);
+  transition: all 0.22s ease;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 20%);
+}
+
+.guided-choice-card__icon svg {
+  width: 1.85rem;
+  height: 1.85rem;
+}
+
+.guided-choice-card:hover .guided-choice-card__icon {
+  transform: scale(1.08);
+  border-color: rgb(27 185 164 / 50%);
+  background: linear-gradient(135deg, rgb(27 185 164 / 20%) 0%, rgb(255 255 255 / 6%) 100%);
+}
+
+.guided-choice-card.is-selected .guided-choice-card__icon {
+  background: linear-gradient(135deg, rgb(27 185 164 / 35%) 0%, rgb(27 185 164 / 15%) 100%);
+  border-color: var(--turquoise);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgb(27 185 164 / 45%);
+}
+
+.guided-choice-card__label {
+  font-weight: 850;
+  letter-spacing: -0.01em;
+}
+
+/* Activity Grid Choice Cards */
+.guided-choice-grid--activity {
+  width: min(100%, 42rem);
+  margin-inline: auto;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+}
+
+.guided-choice-grid--activity .guided-choice-card {
+  min-height: 5.25rem;
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: start;
+  padding: 1rem 1.25rem;
+  gap: 1.15rem;
+}
+
+.guided-choice-grid--activity .guided-choice-card__icon {
+  width: 3.15rem;
+  height: 3.15rem;
+  flex-shrink: 0;
+}
+
+.guided-choice-grid--activity .guided-choice-card__icon svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.guided-choice-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.guided-choice-card__content strong {
+  font-size: 1.05rem;
+  color: #f4f1e9;
+}
+
+.guided-choice-card__content small {
+  font-size: 0.82rem;
+  color: rgb(255 255 255 / 55%);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.guided-choice-card.is-selected .guided-choice-card__content small {
+  color: rgb(255 255 255 / 85%);
+}
 .public-onboarding .profile-fieldset { border-color: rgb(255 255 255 / 11%); background: rgb(255 255 255 / 3%); }
 .public-onboarding .profile-field input,
 .public-onboarding .profile-field select,
@@ -156,8 +299,11 @@
   .birth-date-picker { grid-template-columns: 1fr; }
   .guided-body-fields { grid-template-columns: 1fr; }
   .guided-choice-grid { grid-template-columns: 1fr; }
-  .guided-choice-grid--sex { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
-  .guided-choice-grid--sex button { min-height: 6rem; padding-inline: 0.65rem; }
+  .guided-choice-grid--sex { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+  .guided-choice-grid--sex button,
+  .guided-choice-grid--sex .guided-choice-card { min-height: 7.25rem; padding: 1rem 0.65rem; }
+  .guided-choice-grid--sex .guided-choice-card__icon { width: 3rem; height: 3rem; }
+  .guided-choice-grid--sex .guided-choice-card__icon svg { width: 1.6rem; height: 1.6rem; }
 }
 
 .guided-question__nav {

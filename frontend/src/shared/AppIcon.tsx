@@ -7,7 +7,8 @@ export type IconName =
   | "document" | "feedback" | "lock"
   | "calendar" | "scale" | "ruler" | "gender" | "flame"
   | "award" | "clock" | "zap" | "shield" | "sparkles"
-  | "wallet" | "utensils" | "heart";
+  | "wallet" | "utensils" | "heart"
+  | "male" | "female";
 
 type Props = {
   name: IconName;
@@ -47,6 +48,8 @@ export function AppIcon({ name, className }: Props) {
     wallet: <><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="16.5" cy="14.5" r="1"/></>,
     utensils: <><path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2M15 2v20M5 2v7a3 3 0 0 0 3 3v10M2 2h6"/></>,
     heart: <><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></>,
+    male: <><circle cx="10" cy="14" r="5"/><path d="M19 5h-5M19 5v5M19 5l-5.5 5.5"/></>,
+    female: <><circle cx="12" cy="9" r="5"/><path d="M12 14v7M9 18h6"/></>,
   };
 
   return (

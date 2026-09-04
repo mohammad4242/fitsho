@@ -844,22 +844,34 @@ function PreAccountNutritionQuestions(props: {
         </div>
       )}
       {question === 1 && (
-        <SelectField
-          label={l("فعالیت روزانه", "Daily activity")}
-          value={props.dailyActivityLevel}
-          onChange={(value) => {
-            selectAndAdvance(
-              () => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"]),
-              () => advance(),
-            );
-          }}
-          options={[
-            ["sedentary", l("کم‌تحرک", "Mostly sedentary")],
-            ["light", l("کمی فعال", "Lightly active")],
-            ["moderate", l("فعالیت متوسط", "Moderately active")],
-            ["very_active", l("بسیار فعال", "Very active")],
-          ]}
-        />
+        <div className="guided-choice-grid guided-choice-grid--activity">
+          {([
+            ["sedentary", l("کم‌تحرک", "Mostly sedentary"), l("بیشتر روز نشسته، بدون تمرین خاص", "Mostly sitting, little to no exercise"), "clock"],
+            ["light", l("کمی فعال", "Lightly active"), l("پیاده‌روی روزانه یا کارهای سبک", "Light walking or daily chores"), "scale"],
+            ["moderate", l("فعالیت متوسط", "Moderately active"), l("ورزش منظم یا شغل با تحرک ۳ تا ۵ روز در هفته", "Moderate exercise or active job 3-5 days/week"), "flame"],
+            ["very_active", l("بسیار فعال", "Very active"), l("تمرین سنگین روزانه یا فعالیت بدنی شدید", "Intense daily training or heavy physical labor"), "zap"],
+          ] as const).map(([value, label, desc, icon]) => (
+            <button
+              key={value}
+              type="button"
+              className={`guided-choice-card ${props.dailyActivityLevel === value ? "is-selected" : ""}`}
+              onClick={() => {
+                selectAndAdvance(
+                  () => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"]),
+                  () => advance(),
+                );
+              }}
+            >
+              <span className="guided-choice-card__icon" aria-hidden="true">
+                <AppIcon name={icon as IconName} />
+              </span>
+              <span className="guided-choice-card__content">
+                <strong className="guided-choice-card__label">{label}</strong>
+                <small className="guided-choice-card__hint">{desc}</small>
+              </span>
+            </button>
+          ))}
+        </div>
       )}
       {question === 2 && (
         <LabeledInput

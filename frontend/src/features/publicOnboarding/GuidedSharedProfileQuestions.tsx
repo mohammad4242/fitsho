@@ -122,7 +122,7 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
           <div className="guided-choice-grid guided-choice-grid--sex">
             {sexes.map((sex) => (
               <button
-                className={values.sex === sex ? "is-selected" : ""}
+                className={`guided-choice-card ${values.sex === sex ? "is-selected" : ""}`}
                 key={sex}
                 type="button"
                 onClick={() => selectAndAdvance(
@@ -130,7 +130,12 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
                   () => setQuestion(3),
                 )}
               >
-                {t(`onboarding.options.sex.${sex}`)}
+                <span className="guided-choice-card__icon" aria-hidden="true">
+                  <AppIcon name={sex === "male" ? "male" : "female"} />
+                </span>
+                <span className="guided-choice-card__label">
+                  {t(`onboarding.options.sex.${sex}`)}
+                </span>
               </button>
             ))}
           </div>
