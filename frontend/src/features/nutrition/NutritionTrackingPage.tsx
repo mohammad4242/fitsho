@@ -170,7 +170,12 @@ export function NutritionTrackingPage() {
   const todayAdherence = adherence?.days.find((day) => day.date === today);
   const visibleEntries = summary?.entries.filter((entry) => sourceFilter === "all" || entry.source === sourceFilter) ?? [];
 
-  const isItemReady = (item: FoodPhotoEstimateItem) => Boolean(item.food_id) && item.unit === "g";
+  const isItemReady = (item: FoodPhotoEstimateItem) =>
+    (Boolean(item.food_id) && item.unit === "g") ||
+    ((item.calories ?? 0) > 0 ||
+      (item.protein_g ?? 0) > 0 ||
+      (item.carbohydrate_g ?? 0) > 0 ||
+      (item.fat_g ?? 0) > 0);
   const fmt = (n: number) => Math.round(n).toLocaleString(fa ? "fa-IR" : "en-US");
 
   return <main className="nutrition-estimate-page nutrition-tracking-page" dir={fa ? "rtl" : "ltr"}>
@@ -249,7 +254,7 @@ export function NutritionTrackingPage() {
                   <strong>{item.name_guess}</strong>
                   {needsReview
                     ? <span className="nutrition-photo-item__status nutrition-photo-item__status--review">{l("نیاز به بررسی", "Needs review")}</span>
-                    : <span className="nutrition-photo-item__status nutrition-photo-item__status--ok">{l("تطبیق‌یافته", "Matched")}</span>
+                    : <span className="nutrition-photo-item__status nutrition-photo-item__status--ok">{item.food_id ? l("تطبیق‌یافته", "Matched") : l("تخمین هوش مصنوعی", "AI estimated")}</span>
                   }
                 </div>
 

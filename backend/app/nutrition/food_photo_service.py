@@ -57,6 +57,10 @@ class EstimatedPhotoItem(BaseModel):
     confidence: float = Field(ge=0, le=1)
     visible_evidence: list[str] = Field(max_length=10)
     uncertainties: list[str] = Field(max_length=10)
+    calories: float = Field(default=0.0, ge=0, le=10000)
+    protein_g: float = Field(default=0.0, ge=0, le=1000)
+    carbohydrate_g: float = Field(default=0.0, ge=0, le=1000)
+    fat_g: float = Field(default=0.0, ge=0, le=1000)
 
 
 class FoodPhotoOutput(BaseModel):
@@ -81,8 +85,10 @@ def build_food_photo_request(
     """Build the one production food-photo task request for any provider."""
     return StructuredGenerationRequest(
         system_prompt=(
-            "Identify only visible foods and estimate portions. Return uncertainty. "
-            "Do not provide calories, medical advice, allergy claims, or suitability."
+            "Identify all visible food items and estimate their portion in grams ('g'). "
+            "For each food item, calculate estimated calories, protein_g, carbohydrate_g, "
+            "and fat_g based on standard nutritional data for the estimated portion. "
+            "Return uncertainty. Do not provide medical advice or allergy claims."
         ),
         input_payload={"instruction": "Analyze this food image without personal data."},
         response_schema=RESPONSE_SCHEMA,
@@ -320,19 +326,35 @@ async def estimate_photo(
     return photo_response(row, db=db)
 
 
+def _item_float(item: dict[str, object], key: str, default: float = 0.0) -> float:
+    val = item.get(key)
+    if val is None:
+        return default
+    try:
+        return float(str(val))
+    except (ValueError, TypeError):
+        return default
+
+
 def _item_is_nutrition_ready(item: dict[str, object]) -> bool:
-    """Return True iff this item can safely contribute to the nutrition summary."""
-    return bool(item.get("food_id")) and item.get("unit") == "g"
+    """Return True iff this item can contribute to the nutrition summary."""
+    has_catalogue = bool(item.get("food_id")) and item.get("unit") == "g"
+    has_ai_macros = item.get("calories") is not None and (
+        _item_float(item, "calories") > 0
+        or _item_float(item, "protein_g") > 0
+        or _item_float(item, "carbohydrate_g") > 0
+        or _item_float(item, "fat_g") > 0
+    )
+    return has_catalogue or has_ai_macros
 
 
 def _calculate_photo_macro_totals(
     db: Session, items: list[dict[str, object]]
 ) -> tuple[dict[str, float], bool]:
-    """Pure read-only helper: calculate nutrition totals from mapped_items.
+    """Calculate nutrition totals from mapped_items (catalogue or direct AI).
 
-    Returns (totals_dict, complete) where ``complete`` is True only when every
-    remaining item is nutrition-ready (has a verified food_id and unit=="g").
-    Uses a single batched catalogue query to avoid N+1 issues.
+    Uses batched catalogue queries for items linked to the catalogue,
+    and direct AI-estimated macros for items without a catalogue link.
     """
     nutrient_keys = {
         "energy_kcal": "calories",
@@ -347,14 +369,20 @@ def _calculate_photo_macro_totals(
         "fat_g": Decimal(),
     }
 
-    ready_items = [
-        (item, UUID(str(item["food_id"]))) for item in items if _item_is_nutrition_ready(item)
-    ]
-    not_ready_count = len(items) - len(ready_items)
+    catalogue_items: list[tuple[dict[str, object], UUID]] = []
+    direct_items: list[dict[str, object]] = []
+    not_ready_count = 0
 
-    verified_ready_count = 0
-    if ready_items:
-        food_ids = [fid for _, fid in ready_items]
+    for item in items:
+        if bool(item.get("food_id")) and item.get("unit") == "g":
+            catalogue_items.append((item, UUID(str(item["food_id"]))))
+        elif _item_is_nutrition_ready(item):
+            direct_items.append(item)
+        else:
+            not_ready_count += 1
+
+    if catalogue_items:
+        food_ids = [fid for _, fid in catalogue_items]
         foods_with_compositions = db.scalars(
             select(NutritionCatalogueFood)
             .where(
@@ -365,24 +393,28 @@ def _calculate_photo_macro_totals(
         ).all()
         food_map = {food.id: food for food in foods_with_compositions}
 
-        for item, food_id in ready_items:
+        for item, food_id in catalogue_items:
             food = food_map.get(food_id)
             if food is None:
-                # Food no longer verified — treat as unresolved
-                not_ready_count += 1
+                # If food verification expired, fall back to direct item macros if present
+                if _item_is_nutrition_ready(item):
+                    direct_items.append(item)
+                else:
+                    not_ready_count += 1
                 continue
-            verified_ready_count += 1
             factor = Decimal(str(item["estimated_amount"])) / Decimal("100")
             for composition in food.compositions:
                 output_key = nutrient_keys.get(composition.nutrient_code)
                 if output_key is not None:
                     totals[output_key] += composition.value_per_100g * factor
 
-    # Complete means no unresolvable items remain
-    if not items:
-        complete = True
-    else:
-        complete = not_ready_count == 0 and verified_ready_count == len(ready_items)
+    for item in direct_items:
+        totals["calories"] += Decimal(str(round(_item_float(item, "calories"), 2)))
+        totals["protein_g"] += Decimal(str(round(_item_float(item, "protein_g"), 2)))
+        totals["carbohydrate_g"] += Decimal(str(round(_item_float(item, "carbohydrate_g"), 2)))
+        totals["fat_g"] += Decimal(str(round(_item_float(item, "fat_g"), 2)))
+
+    complete = len(items) > 0 and not_ready_count == 0
 
     return {key: float(value) for key, value in totals.items()}, complete
 
@@ -456,7 +488,14 @@ def correct_photo_item(
         item = items[index]
         item["item_id"] = item.get("item_id") or item_id
         if estimated_amount is not None:
-            item["estimated_amount"] = float(estimated_amount)
+            old_amount = _item_float(item, "estimated_amount", 1.0)
+            new_amount = float(estimated_amount)
+            if old_amount > 0 and new_amount > 0:
+                ratio = new_amount / old_amount
+                for key in ("calories", "protein_g", "carbohydrate_g", "fat_g"):
+                    if key in item and item[key] is not None:
+                        item[key] = round(_item_float(item, key) * ratio, 2)
+            item["estimated_amount"] = new_amount
         if food_id is not None:
             food = db.scalar(
                 select(NutritionCatalogueFood).where(
@@ -501,54 +540,77 @@ def confirm_photo(
     )
     if row is None:
         raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
-    # Reject if any remaining item is unresolved or cannot safely contribute grams.
     if not row.mapped_items:
         raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
     for item in row.mapped_items:
         if not _item_is_nutrition_ready(item):
             raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
-    # All items are nutrition-ready; fetch compositions in one query.
-    food_ids = [UUID(str(item["food_id"])) for item in row.mapped_items]
-    foods_with_compositions = db.scalars(
-        select(NutritionCatalogueFood)
-        .where(
-            NutritionCatalogueFood.id.in_(food_ids),
-            NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
-        )
-        .options(selectinload(NutritionCatalogueFood.compositions))
-    ).all()
-    food_map = {food.id: food for food in foods_with_compositions}
-    if len(food_map) != len(food_ids):
-        # At least one food is no longer verified.
-        raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
+
+    catalogue_food_ids = [
+        UUID(str(item["food_id"]))
+        for item in row.mapped_items
+        if bool(item.get("food_id")) and item.get("unit") == "g"
+    ]
+    food_map: dict[UUID, NutritionCatalogueFood] = {}
+    if catalogue_food_ids:
+        foods_with_compositions = db.scalars(
+            select(NutritionCatalogueFood)
+            .where(
+                NutritionCatalogueFood.id.in_(catalogue_food_ids),
+                NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
+            )
+            .options(selectinload(NutritionCatalogueFood.compositions))
+        ).all()
+        food_map = {food.id: food for food in foods_with_compositions}
+        if len(food_map) != len(catalogue_food_ids):
+            raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
+
     created: list[NutritionConsumptionEntry] = []
     for item in row.mapped_items:
-        food = food_map[UUID(str(item["food_id"]))]
-        grams = float(str(item["estimated_amount"]))
-        nutrients = {
-            composition.nutrient_code: str(
-                composition.value_per_100g * (Decimal(str(grams)) / Decimal("100"))
+        fid = UUID(str(item["food_id"])) if item.get("food_id") else None
+        food = food_map.get(fid) if fid else None
+        grams = _item_float(item, "estimated_amount", 100.0)
+
+        if food is not None:
+            nutrients = {
+                composition.nutrient_code: str(
+                    composition.value_per_100g * (Decimal(str(grams)) / Decimal("100"))
+                )
+                for composition in food.compositions
+            }
+            warning_codes = list(
+                dict.fromkeys(
+                    ["PHOTO_ESTIMATE_APPROXIMATE", *actual_intake_warnings(db, user_id, food)]
+                )
             )
-            for composition in food.compositions
-        }
+            display_name = food.name_fa
+            entry_food_id: UUID | None = food.id
+        else:
+            nutrients = {
+                "energy_kcal": str(round(_item_float(item, "calories"), 2)),
+                "protein_g": str(round(_item_float(item, "protein_g"), 2)),
+                "carbohydrate_g": str(round(_item_float(item, "carbohydrate_g"), 2)),
+                "total_fat_g": str(round(_item_float(item, "fat_g"), 2)),
+            }
+            warning_codes = ["PHOTO_ESTIMATE_APPROXIMATE"]
+            display_name = str(item.get("name_guess", "غذای تخمینی"))
+            entry_food_id = None
+
         entry = NutritionConsumptionEntry(
             user_id=user_id,
             entry_date=entry_date,
-            food_id=food.id,
-            display_name=food.name_fa,
-            quantity_grams=Decimal(str(grams)),
+            food_id=entry_food_id,
+            display_name=display_name,
+            quantity_grams=Decimal(str(grams)) if item.get("unit") == "g" else None,
             source=NutritionConsumptionSource.PHOTO_ESTIMATED_CONFIRMED,
             confidence=EstimateConfidence.LOW,
             user_confirmed=True,
             nutrients=nutrients,
-            warning_codes=list(
-                dict.fromkeys(
-                    ["PHOTO_ESTIMATE_APPROXIMATE", *actual_intake_warnings(db, user_id, food)]
-                )
-            ),
+            warning_codes=warning_codes,
         )
         db.add(entry)
         created.append(entry)
+
     row.status = "confirmed"
     row.confirmed_at = datetime.now(UTC)
     db.commit()

@@ -483,6 +483,10 @@ export type FoodPhotoEstimateItem = {
   confidence?: number;
   visible_evidence?: string[];
   uncertainties?: string[];
+  calories?: number;
+  protein_g?: number;
+  carbohydrate_g?: number;
+  fat_g?: number;
 };
 
 export type FoodPhotoEstimate = {

@@ -125,8 +125,10 @@ def test_food_photo_request_builder_is_the_canonical_task_contract() -> None:
     )
 
     assert request.system_prompt == (
-        "Identify only visible foods and estimate portions. Return uncertainty. "
-        "Do not provide calories, medical advice, allergy claims, or suitability."
+        "Identify all visible food items and estimate their portion in grams ('g'). "
+        "For each food item, calculate estimated calories, protein_g, carbohydrate_g, "
+        "and fat_g based on standard nutritional data for the estimated portion. "
+        "Return uncertainty. Do not provide medical advice or allergy claims."
     )
     assert request.input_payload == {
         "instruction": "Analyze this food image without personal data."
@@ -769,13 +771,13 @@ def test_macro_totals_do_not_confirm_estimate(
     assert db.scalar(select(NutritionConsumptionEntry)) is None
 
 
-def test_food_photo_ai_contract_unchanged(
+def test_food_photo_ai_contract_direct_nutrition(
     client: TestClient,
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
 ) -> None:
-    """I: The canonical AI contract test — prompt must NOT request calories from the model."""
+    """The canonical AI contract test — prompt instructs model to calculate macros in grams."""
     request = build_food_photo_request(
         primary_model="vision-primary",
         fallback_models=("vision-fallback",),
@@ -783,12 +785,114 @@ def test_food_photo_ai_contract_unchanged(
         temperature=0.2,
         max_output_tokens=777,
     )
-    # The system prompt must explicitly forbid calorie calculation (not request it)
-    assert "do not provide calories" in request.system_prompt.lower()
-    # Must instruct the model to identify foods and estimate portions
-    assert "identify" in request.system_prompt.lower()
-    assert "portions" in request.system_prompt.lower()
-    # Must not ask the model to calculate or return calories
-    assert "calculate" not in request.system_prompt.lower()
-    assert "return calories" not in request.system_prompt.lower()
-    assert "return macros" not in request.system_prompt.lower()
+    prompt_lower = request.system_prompt.lower()
+    assert "identify" in prompt_lower
+    assert "grams" in prompt_lower
+    assert "calories" in prompt_lower
+    assert "protein_g" in prompt_lower
+    assert "carbohydrate_g" in prompt_lower
+    assert "fat_g" in prompt_lower
+    assert "medical advice" in prompt_lower
+
+
+def test_unmapped_food_with_direct_ai_macros_is_complete_and_confirms(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """Option 1 test: unmapped food with direct AI macros is complete and confirms directly."""
+
+    class JoojehVisionProvider:
+        async def analyze_images(
+            self, request: StructuredGenerationRequest, *, images: tuple[ImageInput, ...]
+        ) -> StructuredGenerationResponse:
+            return StructuredGenerationResponse(
+                payload={
+                    "meal_name_guess": "جوجه کباب با برنج",
+                    "items": [
+                        {
+                            "name_guess": "جوجه کباب",
+                            "estimated_amount": 250,
+                            "unit": "g",
+                            "confidence": 0.9,
+                            "visible_evidence": ["Grilled chicken skewers"],
+                            "uncertainties": [],
+                            "calories": 350.0,
+                            "protein_g": 52.0,
+                            "carbohydrate_g": 2.0,
+                            "fat_g": 14.0,
+                        },
+                        {
+                            "name_guess": "برنج زعفرانی",
+                            "estimated_amount": 200,
+                            "unit": "g",
+                            "confidence": 0.88,
+                            "visible_evidence": ["Yellow saffron rice"],
+                            "uncertainties": [],
+                            "calories": 260.0,
+                            "protein_g": 5.0,
+                            "carbohydrate_g": 58.0,
+                            "fat_g": 1.0,
+                        },
+                    ],
+                    "overall_confidence": 0.89,
+                    "needs_user_confirmation": True,
+                },
+                model_id="test-vision",
+                attempted_models=("test-vision",),
+                input_tokens=100,
+                output_tokens=60,
+                cost="0.001",
+            )
+
+    provider = JoojehVisionProvider()
+    _register(client)
+    db.add(
+        AITaskConfig(
+            task_type=AITaskType.FOOD_PHOTO_ESTIMATION,
+            provider=AIProviderName.OPENROUTER,
+            enabled=True,
+            primary_model_id="test/vision",
+        )
+    )
+    db.flush()
+    monkeypatch.setattr(
+        "app.nutrition.food_photo_service.decrypted_key", lambda *_a, **_k: "secret"
+    )
+    monkeypatch.setattr(
+        "app.nutrition.food_photo_service.build_task_provider",
+        lambda *_a, **_k: _configured_provider(provider, name="openrouter", model_id="test/vision"),
+    )
+
+    resp = client.post(
+        "/api/v1/nutrition/tracking/photo-estimates",
+        files={"file": ("joojeh.jpg", _image(), "image/png")},
+        headers={**ORIGIN, "X-Fitsho-Food-Photo-Consent": "true"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["macro_totals_complete"] is True
+    assert body["macro_totals"]["calories"] == 610.0
+    assert body["macro_totals"]["protein_g"] == 57.0
+    assert body["macro_totals"]["carbohydrate_g"] == 60.0
+    assert body["macro_totals"]["fat_g"] == 15.0
+
+    # User confirms the estimate directly without manual mapping
+    confirm_resp = client.post(
+        f"/api/v1/nutrition/tracking/photo-estimates/{body['id']}/confirm",
+        headers=ORIGIN,
+        json={"entry_date": "2026-09-04"},
+    )
+    assert confirm_resp.status_code == 200
+
+    # Two consumption entries created with direct nutrients
+    entries = db.scalars(
+        select(NutritionConsumptionEntry).where(
+            NutritionConsumptionEntry.entry_date == date(2026, 9, 4)
+        )
+    ).all()
+    assert len(entries) == 2
+    names = {e.display_name for e in entries}
+    assert "جوجه کباب" in names
+    assert "برنج زعفرانی" in names

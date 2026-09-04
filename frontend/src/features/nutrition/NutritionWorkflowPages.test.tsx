@@ -516,4 +516,46 @@ describe("Food photo nutrition estimation redesigned flow", () => {
       expect(api.confirmFreeMealPhotoPreview).toHaveBeenCalledWith("estimate-1")
     );
   });
+
+  it("I: unmapped food with direct AI macros is considered ready without review and enables confirm immediately", async () => {
+    const user = userEvent.setup();
+    const directAiEstimate: api.FoodPhotoEstimate = {
+      id: "estimate-direct",
+      overall_confidence: 0.9,
+      needs_user_confirmation: true,
+      macro_totals: { calories: 610, protein_g: 57, carbohydrate_g: 60, fat_g: 15 },
+      macro_totals_complete: true,
+      items: [
+        {
+          item_id: "item-joojeh",
+          food_id: null,
+          name_guess: "Joojeh Kabab",
+          estimated_amount: 250,
+          unit: "g",
+          mapping_status: "unresolved",
+          calories: 350,
+          protein_g: 52,
+          carbohydrate_g: 2,
+          fat_g: 14,
+        },
+      ],
+    };
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(directAiEstimate);
+    vi.mocked(api.confirmFoodPhoto).mockResolvedValue({});
+    render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+    expect(await screen.findByText("Estimated calories")).toBeInTheDocument();
+    expect(screen.getByText("≈ 610 kcal")).toBeInTheDocument();
+    expect(screen.queryByText(/Partial estimate/i)).not.toBeInTheDocument();
+    expect(screen.getByText("AI estimated")).toBeInTheDocument();
+    expect(screen.queryByText("Needs review")).not.toBeInTheDocument();
+
+    const confirmBtn = screen.getByRole("button", { name: "Confirm and log" });
+    expect(confirmBtn).toBeEnabled();
+    await user.click(confirmBtn);
+    await waitFor(() =>
+      expect(api.confirmFoodPhoto).toHaveBeenCalledWith("estimate-direct", today)
+    );
+  });
 });
