@@ -83,6 +83,7 @@ services:
       - "8001:8000"
     volumes:
       - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
       - ./backend/var/media:/var/lib/fitsho/media
       - ./backend/var/private/body-photos:/var/lib/fitsho/private/body-photos
       - ./backend/var/private/food-photos:/var/lib/fitsho/private/food-photos
@@ -98,7 +99,7 @@ services:
     command:
       - sh
       - -c
-      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
+      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   fitsho_postgres_data:
