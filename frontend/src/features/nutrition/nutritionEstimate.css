@@ -107,7 +107,7 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan__history button.is-current { color: var(--fitsho-petrol); background: var(--fitsho-aqua); }
 .weekly-plan__nutrients { margin-top: 1rem; padding: 1.2rem; border: 1px solid rgb(234 244 241 / 10%); border-radius: 1.2rem; background: rgb(9 54 51 / 45%); }
 .weekly-plan__nutrients h3 { margin: 0 0 1rem; }
-.weekly-plan__nutrients > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; }
+.weekly-plan__nutrient-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; }
 .weekly-plan__nutrients article { display: flex; flex-direction: column; gap: .35rem; padding: .9rem; border-radius: .9rem; background: rgb(3 28 27 / 52%); }
 .weekly-plan__nutrients span, .weekly-plan__nutrients small { color: rgb(234 244 241 / 58%); font-size: .75rem; }
 .weekly-plan__nutrients small[data-status="data_incomplete"], .weekly-plan__nutrients small[data-status="above_applicable_limit"] { color: #ffd798; }
@@ -119,8 +119,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   .nutrition-estimate-tools > * { min-width: 0; margin: 0; }
   .nutrition-estimate-back, .nutrition-catalogue-entry { grid-column: 1 / -1; }
 }
-@media (max-width: 800px) { .weekly-plan__heading, .weekly-plan__meals { grid-template-columns: 1fr; } .weekly-plan__nutrients > div { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .nutrition-target-grid, .nutrition-estimate-notes dl, .nutrition-micronutrient-grid, .weekly-plan__ledger, .weekly-plan__nutrients > div, .weekly-plan__shopping ul { grid-template-columns: 1fr; } .weekly-plan__meal-totals, .weekly-plan__prepared-recipe dl { grid-template-columns: repeat(2, 1fr); } .weekly-plan__ledger > div + div { border-inline-start: 0; border-top: 1px solid rgb(234 244 241 / 12%); } .nutrition-calorie-card { min-height: 12rem; border-radius: 1.2rem; } }
+@media (max-width: 800px) { .weekly-plan__heading, .weekly-plan__meals { grid-template-columns: 1fr; } .weekly-plan__nutrient-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .nutrition-target-grid, .nutrition-estimate-notes dl, .nutrition-micronutrient-grid, .weekly-plan__ledger, .weekly-plan__nutrient-grid, .weekly-plan__shopping ul { grid-template-columns: 1fr; } .weekly-plan__meal-totals, .weekly-plan__prepared-recipe dl { grid-template-columns: repeat(2, 1fr); } .weekly-plan__ledger > div + div { border-inline-start: 0; border-top: 1px solid rgb(234 244 241 / 12%); } .nutrition-calorie-card { min-height: 12rem; border-radius: 1.2rem; } }
 .nutrition-adherence-chart { display: grid; gap: .75rem; margin-top: 1rem; }
 .nutrition-adherence-chart article { display: grid; grid-template-columns: 5rem 1fr 1fr; gap: .65rem; align-items: center; padding: .8rem; border: 1px solid rgb(255 255 255 / 10%); border-radius: 1rem; }
 .nutrition-adherence-chart label { display: grid; gap: .3rem; font-size: .8rem; }
@@ -398,3 +398,45 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan__free-fields span { grid-column: 1 / -1; color: var(--fitsho-muted); font-size: .72rem; }
 .weekly-plan__free-fields input { min-width: 0; border: 0; background: transparent; color: var(--fitsho-ink); font: inherit; }
 @media (max-width: 600px) { .weekly-plan__free-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Native weekly plan disclosures */
+.weekly-plan__section { overflow: hidden; margin-top: .8rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
+.weekly-plan__section > summary { min-height: 3.4rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .8rem 1rem; color: var(--fitsho-ink); font-size: .9rem; font-weight: 850; list-style: none; cursor: pointer; }
+.weekly-plan__section > summary::-webkit-details-marker, .weekly-plan__meal > summary::-webkit-details-marker { display: none; }
+.weekly-plan__section > summary:focus-visible, .weekly-plan__meal > summary:focus-visible { outline: .16rem solid rgb(80 223 206 / 48%); outline-offset: -.2rem; }
+.weekly-plan__section[open] > summary { border-bottom: 1px solid var(--fitsho-line); background: rgb(80 223 206 / 4%); }
+.weekly-plan__section-chevron, .weekly-plan__meal-chevron { width: .58rem; height: .58rem; display: block; flex: 0 0 auto; border-inline-end: .13rem solid var(--fitsho-aqua); border-block-end: .13rem solid var(--fitsho-aqua); transform: rotate(45deg) translateY(-.12rem); transition: transform var(--fitsho-duration-fast) var(--fitsho-ease); }
+.weekly-plan__section[open] > summary .weekly-plan__section-chevron, .weekly-plan__meal[open] > .weekly-plan__meal-summary .weekly-plan__meal-chevron { transform: rotate(225deg) translateY(-.12rem); }
+.weekly-plan__section-content { padding: 1rem; }
+.weekly-plan__section-content > .weekly-plan__ledger { margin: 0 0 1rem; }
+.weekly-plan__section-content > .weekly-plan__days { margin-bottom: .7rem; }
+.weekly-plan__nutrients, .weekly-plan__shopping { padding: 0; background: var(--fitsho-surface); }
+.weekly-plan__nutrients .weekly-plan__section-content, .weekly-plan__shopping .weekly-plan__section-content { background: rgb(9 54 51 / 22%); }
+
+.weekly-plan__meal { min-width: 0; }
+.weekly-plan__meal > summary { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .85rem .95rem; list-style: none; cursor: pointer; }
+.weekly-plan__meal[open] > summary { border-bottom: 1px solid rgb(234 244 241 / 8%); background: rgb(80 223 206 / 3%); }
+.weekly-plan__meal-heading { min-width: 0; flex: 1 1 auto; }
+.weekly-plan__meal-heading > div { overflow: hidden; }
+.weekly-plan__meal-heading span { color: rgb(234 244 241 / 58%); font-size: .72rem; }
+.weekly-plan__meal-title { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.weekly-plan__meal-summary-metrics { min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: .55rem; flex: 0 1 auto; color: var(--fitsho-muted); font-size: .72rem; }
+.weekly-plan__meal-summary-metrics > span:not(.weekly-plan__meal-chevron) { white-space: nowrap; }
+.weekly-plan__meal-content { min-width: 0; }
+.weekly-plan__meal-content > ul { margin: 0; padding: .5rem 1.1rem 1rem; list-style: none; }
+.weekly-plan__meal-content > ul li { display: flex; justify-content: space-between; gap: 1rem; padding-block: .7rem; }
+.weekly-plan__meal-content > ul li + li { border-top: 1px dashed rgb(234 244 241 / 10%); }
+.weekly-plan__nutrients .weekly-plan__nutrient-grid { margin: 0; }
+
+@media (max-width: 520px) {
+  .weekly-plan__section > summary { padding-inline: .8rem; }
+  .weekly-plan__section-content { padding: .8rem; }
+  .weekly-plan__meal > summary { flex-wrap: wrap; gap: .55rem; padding: .75rem .8rem; }
+  .weekly-plan__meal-heading { flex-basis: 11rem; }
+  .weekly-plan__meal-summary-metrics { margin-inline-start: auto; font-size: .68rem; }
+  .weekly-plan__meal-title { max-width: min(52vw, 15rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weekly-plan__section-chevron, .weekly-plan__meal-chevron { transition: none; }
+}

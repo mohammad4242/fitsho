@@ -119,6 +119,12 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       {currentPlan.physician_change_summary.length > 0 && <aside className="weekly-plan__notice"><strong>{l("خلاصه تغییرات پزشک", "Physician change summary")}</strong><ul>{currentPlan.physician_change_summary.map((change, index) => <li key={index}>{String(change.operation ?? change.action ?? l("تغییر برنامه", "Plan change"))}</li>)}</ul></aside>}
       {actionError && <p className="weekly-plan__error" role="alert">{l("عملیات انجام نشد؛ دوباره تلاش کن.", "The action failed. Please try again.")}</p>}
 
+      <details className="weekly-plan__section">
+        <summary>
+          <span>{l("برنامه تغذیه", "Nutrition plan")}</span>
+          <span aria-hidden="true" className="weekly-plan__section-chevron" />
+        </summary>
+        <div className="weekly-plan__section-content">
       <div className="weekly-plan__ledger" aria-label={l("بودجه برنامه", "Plan budget")}>
         <div>
           <span>{l("هزینه برآوردی هفته", "Estimated weekly cost")}</span>
@@ -153,8 +159,8 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       {day && (
         <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(Math.floor(day.cost_irr / 10))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div><div className="weekly-plan__day-actions"><button disabled={busyMeal === "regenerate" || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div><div className="weekly-plan__meals" role="tabpanel">
           {day.meals.map((meal) => (
-            meal.slot_role === "free_meal" ? <FreeMealCard key={meal.id} meal={meal} entryDate={day.plan_date} language={language} /> : <article className="weekly-plan__meal" key={meal.id}>
-              <header>
+            meal.slot_role === "free_meal" ? <FreeMealCard key={meal.id} meal={meal} entryDate={day.plan_date} language={language} /> : <details className="weekly-plan__meal" key={meal.id}>
+              <summary className="weekly-plan__meal-summary">
                 <div className="weekly-plan__meal-heading">
                   <MealThumbnail
                     alt={meal.name_fa && meal.name_en ? (language === "en" ? meal.name_en : meal.name_fa) : mealTitle(meal, language)}
@@ -165,11 +171,15 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
                   <div>
                     <span>{meal.slot_role === "snack" ? l("میان‌وعده", "Snack") : l("وعده اصلی", "Main meal")}</span>
                     <strong className="weekly-plan__meal-title">{mealTitle(meal, language)}</strong>
-                    <small>{number.format(meal.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</small>
                   </div>
                 </div>
-                <small>{number.format(Math.floor(meal.cost_irr / 10))} {l("تومان", "Toman")}</small>
-              </header>
+                <div className="weekly-plan__meal-summary-metrics">
+                  <span>{number.format(meal.nutrient_totals.energy_kcal ?? 0)} kcal</span>
+                  <span>{number.format(Math.floor(meal.cost_irr / 10))} {l("تومان", "Toman")}</span>
+                  <span aria-hidden="true" className="weekly-plan__meal-chevron" />
+                </div>
+              </summary>
+              <div className="weekly-plan__meal-content">
               <ul>
                 {meal.foods.map((food) => (
                   <li key={`${meal.id}-${food.food_id ?? food.slug}`}>
@@ -203,14 +213,27 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
                 {findMealAlternative(currentPlan, meal.id, meal.slot_role) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginMealReplacement(meal.id, findMealAlternative(currentPlan, meal.id, meal.slot_role)!.id)}>{l("پیش‌نمایش تعویض وعده", "Preview meal replacement")}</button>}
                 {meal.foods[0]?.food_id && findFoodAlternative(currentPlan, meal.foods[0].food_id) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginFoodReplacement(meal.id, meal.foods[0]!.food_id!, findFoodAlternative(currentPlan, meal.foods[0]!.food_id!)!.food_id!)}>{l("پیش‌نمایش تعویض ماده", "Preview food replacement")}</button>}
               </div>
-            </article>
+              </div>
+            </details>
           ))}
         </div></>
       )}
 
-      <div className="weekly-plan__nutrients">
-        <h3>{l("هدف در برابر مقدار برنامه", "Target versus planned")}</h3>
-        <div>
+      <section className="weekly-plan__history">
+        <h3>{l("تاریخچه نسخه‌ها", "Revision history")}</h3>
+        {history.length === 0 ? <p>{l("نسخه دیگری وجود ندارد.", "No other revision exists.")}</p> : <div>{history.map((item) => <button className={item.id === currentPlan.id ? "is-current" : undefined} key={item.id} type="button" onClick={() => void api.getWeeklyNutritionPlan(item.id).then(setCurrentPlan)}>{l("نسخه", "Revision")} {number.format(item.revision)} · {lifecycleLabel(item.lifecycle_status, language)}</button>)}</div>}
+      </section>
+
+      </div>
+      </details>
+
+      <details className="weekly-plan__section weekly-plan__nutrients">
+        <summary>
+          <span>{l("هدف در برابر مقدار برنامه", "Target versus planned")}</span>
+          <span aria-hidden="true" className="weekly-plan__section-chevron" />
+        </summary>
+        <div className="weekly-plan__section-content">
+        <div className="weekly-plan__nutrient-grid">
           {Object.values(currentPlan.nutrients).map((nutrient) => (
             <article key={nutrient.nutrient_code}>
               <span>{nutrientLabel(nutrient.nutrient_code, language)}</span>
@@ -221,20 +244,22 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
             </article>
           ))}
         </div>
-      </div>
+        </div>
+      </details>
 
       {preview && <section className="weekly-plan__confirm" role="dialog" aria-modal="true" aria-labelledby="edit-preview-title"><h3 id="edit-preview-title">{preview.kind === "remove" ? l("تأیید حذف وعده", "Confirm meal removal") : preview.kind === "meal" ? l("تأیید تعویض وعده", "Confirm meal replacement") : l("تأیید تعویض ماده غذایی", "Confirm food replacement")}</h3><p>{l("این تغییر یک نسخه جدید می‌سازد و باید دوباره توسط پزشک بررسی شود.", "This creates a new revision that requires physician review again.")}</p><p>{l("تغییر هزینه", "Cost change")}: {number.format(Math.floor(editPreviewCost(preview.data) / 10))} {l("تومان", "Toman")}</p><button className="primary-button" type="button" onClick={() => void confirmRemoval()}>{l("ساخت نسخه جدید", "Create new revision")}</button><button type="button" onClick={() => setPreview(null)}>{l("انصراف", "Cancel")}</button></section>}
 
-      <section className="weekly-plan__shopping">
-        <h3>{l("لیست خرید دقیق", "Exact shopping list")}</h3>
-        {!currentPlan.physician_approved && <p className="weekly-plan__warning">{l("تا تأیید پزشک، خرید نهایی را انجام نده.", "Wait for physician approval before making final purchases.")}</p>}
-        {shopping === null ? <p role="status">{l("در حال دریافت…", "Loading…")}</p> : <><ul>{shopping.items.map((item) => <li key={item.food_id}><span>{language === "en" ? item.name_en : item.name_fa}</span><strong>{number.format(item.required_quantity)} {item.canonical_unit}</strong><small>{number.format(Math.floor(item.cost_irr / 10))} {l("تومان", "Toman")}</small></li>)}</ul><strong>{l("جمع", "Total")}: {number.format(Math.floor(shopping.total_cost_irr / 10))} {l("تومان", "Toman")}</strong></>}
-      </section>
+      <details className="weekly-plan__section weekly-plan__shopping">
+        <summary>
+          <span>{l("لیست خرید دقیق", "Exact shopping list")}</span>
+          <span aria-hidden="true" className="weekly-plan__section-chevron" />
+        </summary>
+        <div className="weekly-plan__section-content">
+          {!currentPlan.physician_approved && <p className="weekly-plan__warning">{l("تا تأیید پزشک، خرید نهایی را انجام نده.", "Wait for physician approval before making final purchases.")}</p>}
+          {shopping === null ? <p role="status">{l("در حال دریافت…", "Loading…")}</p> : <><ul>{shopping.items.map((item) => <li key={item.food_id}><span>{language === "en" ? item.name_en : item.name_fa}</span><strong>{number.format(item.required_quantity)} {item.canonical_unit}</strong><small>{number.format(Math.floor(item.cost_irr / 10))} {l("تومان", "Toman")}</small></li>)}</ul><strong>{l("جمع", "Total")}: {number.format(Math.floor(shopping.total_cost_irr / 10))} {l("تومان", "Toman")}</strong></>}
+        </div>
+      </details>
 
-      <section className="weekly-plan__history">
-        <h3>{l("تاریخچه نسخه‌ها", "Revision history")}</h3>
-        {history.length === 0 ? <p>{l("نسخه دیگری وجود ندارد.", "No other revision exists.")}</p> : <div>{history.map((item) => <button className={item.id === currentPlan.id ? "is-current" : undefined} key={item.id} type="button" onClick={() => void api.getWeeklyNutritionPlan(item.id).then(setCurrentPlan)}>{l("نسخه", "Revision")} {number.format(item.revision)} · {lifecycleLabel(item.lifecycle_status, language)}</button>)}</div>}
-      </section>
     </section>
   );
 }
@@ -282,13 +307,25 @@ function FreeMealCard({ meal, entryDate, language }: { meal: WeeklyPlan["days"][
       setActualTotal(summary.actual_totals.energy_kcal ?? 0);
     } finally { setSaving(false); }
   }
-  return <article className="weekly-plan__meal weekly-plan__free-meal">
-    <header><div><span>{l("ناهار جمعه", "Friday lunch")}</span><strong>{l("وعده آزاد", "Free Meal")}</strong></div></header>
-    <p>{l("لطفاً جهت محاسبه کالری روزانه از وعده آزاد عکس بگیرید و اطلاعات مهم وعده آزاد را اینجا وارد کنید.", "Optionally take a photo, then enter the Free Meal nutrition details here.")}</p>
-    <div className="weekly-plan__free-fields">{fields.map(([key, label, unit]) => <label key={key}><i aria-hidden="true" /><span>{label}</span><input aria-label={label} min="0" type="number" value={values[key]} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} /><b>{unit}</b></label>)}</div>
-    <div className="weekly-plan__meal-actions"><Link to={`/nutrition-tracking?freeMealId=${meal.id}&entryDate=${entryDate}&return=${encodeURIComponent("/nutrition-estimate")}`}>{l("محاسبه با عکس اختیاری", "Optional photo estimate")}</Link><button disabled={saving} type="button" onClick={() => void save()}>{saving ? l("در حال ثبت…", "Saving…") : l("ثبت وعده آزاد", "Save Free Meal")}</button></div>
-    {actualTotal !== null && <strong role="status">{l("جمع مصرف واقعی این روز", "Actual daily total")}: {actualTotal.toLocaleString(language === "fa" ? "fa-IR" : "en-US")} kcal</strong>}
-  </article>;
+  const plannedCalories = meal.nutrient_totals.energy_kcal;
+  return <details className="weekly-plan__meal weekly-plan__free-meal">
+    <summary className="weekly-plan__meal-summary">
+      <div className="weekly-plan__meal-heading">
+        <div><span>{l("ناهار جمعه", "Friday lunch")}</span><strong className="weekly-plan__meal-title">{l("وعده آزاد", "Free Meal")}</strong></div>
+      </div>
+      <div className="weekly-plan__meal-summary-metrics">
+        <span>{plannedCalories === undefined ? "—" : new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR").format(plannedCalories)} kcal</span>
+        <span>{new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR").format(Math.floor(meal.cost_irr / 10))} {l("تومان", "Toman")}</span>
+        <span aria-hidden="true" className="weekly-plan__meal-chevron" />
+      </div>
+    </summary>
+    <div className="weekly-plan__meal-content">
+      <p>{l("لطفاً جهت محاسبه کالری روزانه از وعده آزاد عکس بگیرید و اطلاعات مهم وعده آزاد را اینجا وارد کنید.", "Optionally take a photo, then enter the Free Meal nutrition details here.")}</p>
+      <div className="weekly-plan__free-fields">{fields.map(([key, label, unit]) => <label key={key}><i aria-hidden="true" /><span>{label}</span><input aria-label={label} min="0" type="number" value={values[key]} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value }))} /><b>{unit}</b></label>)}</div>
+      <div className="weekly-plan__meal-actions"><Link to={`/nutrition-tracking?freeMealId=${meal.id}&entryDate=${entryDate}&return=${encodeURIComponent("/nutrition-estimate")}`}>{l("محاسبه با عکس اختیاری", "Optional photo estimate")}</Link><button disabled={saving} type="button" onClick={() => void save()}>{saving ? l("در حال ثبت…", "Saving…") : l("ثبت وعده آزاد", "Save Free Meal")}</button></div>
+      {actualTotal !== null && <strong role="status">{l("جمع مصرف واقعی این روز", "Actual daily total")}: {actualTotal.toLocaleString(language === "fa" ? "fa-IR" : "en-US")} kcal</strong>}
+    </div>
+  </details>;
 }
 
 function findMealAlternative(plan: WeeklyPlan, mealId: string, role: "main_meal" | "snack" | "free_meal" | "post_workout") {

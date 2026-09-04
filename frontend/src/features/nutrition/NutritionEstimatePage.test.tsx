@@ -189,10 +189,25 @@ async function generatePlan(result: WeeklyPlanGeneration) {
   await user.click(await screen.findByRole("button", { name: /ساخت برنامه تغذیه هفتگی|Build weekly nutrition plan/ }));
 }
 
+async function openWeeklyPlan(user: ReturnType<typeof userEvent.setup>) {
+  const summary = screen.queryByText("Nutrition plan", { exact: true }) ?? screen.getByText("برنامه تغذیه", { exact: true });
+  await user.click(summary);
+}
+
+async function openFirstMeal(user: ReturnType<typeof userEvent.setup>) {
+  const mealTitle = screen.queryByText("LU01 — جوجه کباب + برنج + گوجه کبابی", { exact: true })
+    ?? screen.getByText("LU01 — Chicken kebab, rice, and grilled tomato", { exact: true });
+  await user.click(mealTitle.closest("summary")!);
+}
+
 it("shows the safe per-100g summary and only تخمینی for an estimated recipe", async () => {
   await i18n.changeLanguage("fa");
 
   render(<MemoryRouter><WeeklyNutritionPlan language="fa" plan={preparedRecipePlan("estimated")} /></MemoryRouter>);
+
+  const user = userEvent.setup();
+  await openWeeklyPlan(user);
+  await openFirstMeal(user);
 
   const estimatedLabel = await screen.findByText("تخمینی");
   const recipeSummary = estimatedLabel.closest("aside");
@@ -215,6 +230,10 @@ it("does not show the estimated label for a verified recipe", async () => {
   await i18n.changeLanguage("fa");
 
   render(<MemoryRouter><WeeklyNutritionPlan language="fa" plan={preparedRecipePlan("verified")} /></MemoryRouter>);
+
+  const user = userEvent.setup();
+  await openWeeklyPlan(user);
+  await openFirstMeal(user);
 
   await waitFor(() => expect(nutritionApi.getShoppingList).toHaveBeenCalled());
   expect(screen.queryByText("تخمینی")).not.toBeInTheDocument();
@@ -280,11 +299,88 @@ it("shows the catalogue meal title and thumbnail in the weekly plan", async () =
 
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
 
+  const user = userEvent.setup();
+  await screen.findByRole("heading", { name: "برنامه غذایی تو" });
+  await openWeeklyPlan(user);
   expect(await screen.findByText("LU01 — جوجه کباب + برنج + گوجه کبابی")).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "جوجه کباب + برنج + گوجه کبابی" })).toHaveAttribute(
     "src", "/media/meal-catalogue/lu01.png",
   );
   expect(screen.queryByText("catalogue-meal-1")).not.toBeInTheDocument();
+});
+
+it("starts with the three weekly plan sections collapsed", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  await screen.findByRole("heading", { name: "برنامه غذایی تو" });
+  expect(screen.getByText("برنامه تغذیه").closest("details")).not.toHaveAttribute("open");
+  expect(screen.getByText("هدف در برابر مقدار برنامه").closest("details")).not.toHaveAttribute("open");
+  expect(screen.getByText("لیست خرید دقیق").closest("details")).not.toHaveAttribute("open");
+});
+
+it("reveals the selected day and compact meal summaries when the plan opens", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  await screen.findByRole("heading", { name: "برنامه غذایی تو" });
+  await openWeeklyPlan(user);
+
+  expect(screen.getAllByRole("tab")).toHaveLength(7);
+  expect(screen.getByText(/جمع روز/)).toBeInTheDocument();
+  expect(screen.getByText("LU01 — جوجه کباب + برنج + گوجه کبابی")).toBeVisible();
+});
+
+it("keeps meal details hidden while showing name, calories, and price in its summary", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  await screen.findByRole("heading", { name: "برنامه غذایی تو" });
+  await openWeeklyPlan(user);
+  const mealTitle = screen.getByText("LU01 — جوجه کباب + برنج + گوجه کبابی");
+  const meal = mealTitle.closest("details")!;
+  expect(meal).not.toHaveAttribute("open");
+  expect(mealTitle).toBeVisible();
+  expect(within(meal).getByText("۷۰۰ kcal")).toBeVisible();
+  expect(within(meal).getByText("۳۰٬۰۰۰ تومان")).toBeVisible();
+  expect(within(meal).getByText("سینه مرغ")).not.toBeVisible();
+  expect(within(meal).getByText("انرژی")).not.toBeVisible();
+
+  await openFirstMeal(user);
+  expect(within(meal).getByText("سینه مرغ")).toBeVisible();
+  expect(within(meal).getByText("انرژی")).toBeVisible();
+});
+
+it("reveals the nutrient comparison and shopping list only after their summaries open", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  await screen.findByRole("heading", { name: "برنامه غذایی تو" });
+  await waitFor(() => expect(nutritionApi.getShoppingList).toHaveBeenCalled());
+  const nutrientSection = screen.getByText("هدف در برابر مقدار برنامه").closest("details")!;
+  const shoppingSection = screen.getByText("لیست خرید دقیق").closest("details")!;
+  expect(within(nutrientSection).getByText("پروتئین")).not.toBeVisible();
+  expect(within(shoppingSection).getByText("سینه مرغ")).not.toBeVisible();
+
+  await user.click(screen.getByText("هدف در برابر مقدار برنامه"));
+  expect(within(nutrientSection).getByText("۱۱۲ g/day")).toBeVisible();
+
+  await user.click(screen.getByText("لیست خرید دقیق"));
+  expect(within(shoppingSection).getByText("سینه مرغ")).toBeVisible();
+  expect(within(shoppingSection).getByText("۱٬۰۵۰ g")).toBeVisible();
+  expect(within(shoppingSection).getByText("۱۴۰٬۰۰۰ تومان")).toBeVisible();
+  expect(within(shoppingSection).getByText(/جمع.*۱۴۰٬۰۰۰ تومان/)).toBeVisible();
 });
 
 it("uses one compact weekly nutrition plan action", async () => {
@@ -429,11 +525,13 @@ it("generates and displays a seven-day draft without claiming physician approval
   });
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
 
-  await userEvent.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
 
   expect(await screen.findByRole("heading", { name: "برنامه غذایی تو" })).toBeInTheDocument();
   expect(screen.getByText("در انتظار بررسی پزشک")).toBeInTheDocument();
   expect(screen.queryByText("تأییدشده توسط پزشک")).not.toBeInTheDocument();
+  await openWeeklyPlan(user);
   expect(screen.getAllByRole("tab")).toHaveLength(7);
   expect(screen.getAllByText("سینه مرغ")).toHaveLength(2);
 });
@@ -456,7 +554,10 @@ it("shows four Free Meal macro inputs and adds the saved intake to the actual da
   const user = userEvent.setup();
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
 
+  await screen.findByRole("heading", { name: "برنامه غذایی تو" });
+  await openWeeklyPlan(user);
   expect(await screen.findAllByText("وعده آزاد")).toHaveLength(2);
+  await user.click(screen.getAllByText("وعده آزاد")[0]!.closest("summary")!);
   expect(screen.getByText(/لطفاً جهت محاسبه کالری روزانه/)).toBeInTheDocument();
   await user.type(screen.getByRole("spinbutton", { name: "کالری" }), "700");
   await user.type(screen.getByRole("spinbutton", { name: "پروتئین" }), "35");
@@ -505,14 +606,18 @@ it("supports locking, feedback, and a confirmed revision-safe meal removal", asy
   vi.mocked(nutritionApi.confirmMealRemoval).mockResolvedValue({ ...weeklyPlan, id: "plan-2", revision: 2, supersedes_plan_id: "plan-1" });
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
 
-  await userEvent.click(await screen.findByRole("button", { name: "Lock meal" }));
+  const user = userEvent.setup();
+  await screen.findByRole("heading", { name: "Nutrition" });
+  await openWeeklyPlan(user);
+  await openFirstMeal(user);
+  await user.click(await screen.findByRole("button", { name: "Lock meal" }));
   expect(nutritionApi.setMealLock).toHaveBeenCalledWith("plan-1", "meal-0", true);
-  await userEvent.click(screen.getByRole("button", { name: "Unlock" }));
-  await userEvent.click(screen.getByRole("button", { name: "Liked" }));
+  await user.click(screen.getByRole("button", { name: "Unlock" }));
+  await user.click(screen.getByRole("button", { name: "Liked" }));
   expect(nutritionApi.saveMealFeedback).toHaveBeenCalledWith("plan-1", "meal-0", "liked");
-  await userEvent.click(screen.getByRole("button", { name: "Preview removal" }));
+  await user.click(screen.getByRole("button", { name: "Preview removal" }));
   expect(await screen.findByRole("dialog", { name: "Confirm meal removal" })).toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Create new revision" }));
+  await user.click(screen.getByRole("button", { name: "Create new revision" }));
   expect(nutritionApi.confirmMealRemoval).toHaveBeenCalledWith("plan-1", "meal-0", "plan-1");
   expect(await screen.findByText("Revision 2")).toBeInTheDocument();
 });
