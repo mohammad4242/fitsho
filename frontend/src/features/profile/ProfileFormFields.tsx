@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import type { InputHTMLAttributes } from "react";
 
+import { AppIcon, type IconName } from "../../shared/AppIcon";
+
 import type {
   BodyAnalysisMeasurementErrors,
   ProfileValidationCode,
@@ -36,6 +38,46 @@ type FieldGroupProps = {
     value: ProfileFormValue,
   ) => void;
 };
+
+export function FieldLabel({
+  htmlFor,
+  icon,
+  children,
+}: {
+  htmlFor?: string;
+  icon?: IconName;
+  children: React.ReactNode;
+}) {
+  return (
+    <label htmlFor={htmlFor}>
+      {icon && (
+        <span className="profile-field__icon-badge" aria-hidden="true">
+          <AppIcon name={icon} />
+        </span>
+      )}
+      <span>{children}</span>
+    </label>
+  );
+}
+
+export function FieldLegend({
+  icon,
+  children,
+}: {
+  icon?: IconName;
+  children: React.ReactNode;
+}) {
+  return (
+    <legend>
+      {icon && (
+        <span className="profile-field__icon-badge" aria-hidden="true">
+          <AppIcon name={icon} />
+        </span>
+      )}
+      <span>{children}</span>
+    </legend>
+  );
+}
 
 function describedBy(
   field: string,
@@ -74,10 +116,12 @@ export function PersonalFields({
   const { t } = useTranslation();
   return (
     <fieldset className="profile-fieldset" disabled={disabled}>
-      <legend>{t("onboarding.steps.personal")}</legend>
+      <FieldLegend icon="profile">{t("onboarding.steps.personal")}</FieldLegend>
 
       <div className="profile-field">
-        <label htmlFor="profile-display-name">{t("onboarding.fields.displayName")}</label>
+        <FieldLabel htmlFor="profile-display-name" icon="profile">
+          {t("onboarding.fields.displayName")}
+        </FieldLabel>
         <input
           id="profile-display-name"
           name="display_name"
@@ -95,7 +139,9 @@ export function PersonalFields({
       </div>
 
       <div className="profile-field">
-        <label htmlFor="profile-birth-date">{t("onboarding.fields.birthDate")}</label>
+        <FieldLabel htmlFor="profile-birth-date" icon="calendar">
+          {t("onboarding.fields.birthDate")}
+        </FieldLabel>
         <input
           id="profile-birth-date"
           name="birth_date"
@@ -114,7 +160,9 @@ export function PersonalFields({
       </div>
 
       <div className="profile-field">
-        <label htmlFor="profile-sex">{t("onboarding.fields.sex")}</label>
+        <FieldLabel htmlFor="profile-sex" icon="gender">
+          {t("onboarding.fields.sex")}
+        </FieldLabel>
         <select
           id="profile-sex"
           name="sex"
@@ -150,7 +198,7 @@ export function BodyGoalFields({
   const { t } = useTranslation();
   return (
     <fieldset className="profile-fieldset" disabled={disabled}>
-      <legend>{t("onboarding.steps.bodyGoal")}</legend>
+      <FieldLegend icon="target">{t("onboarding.steps.bodyGoal")}</FieldLegend>
 
       <MeasurementFields
         values={values}
@@ -161,7 +209,9 @@ export function BodyGoalFields({
       />
 
       <div className="profile-field">
-        <label htmlFor="profile-fitness-goal">{t("onboarding.fields.fitnessGoal")}</label>
+        <FieldLabel htmlFor="profile-fitness-goal" icon="target">
+          {t("onboarding.fields.fitnessGoal")}
+        </FieldLabel>
         <select
           id="profile-fitness-goal"
           name="fitness_goal"
@@ -216,7 +266,9 @@ export function MeasurementFields({
       {showPrimaryMeasurements && (
         <div className="profile-field profile-field--paired">
           <div>
-            <label htmlFor={`${idPrefix}-height`}>{t("onboarding.fields.height")}</label>
+            <FieldLabel htmlFor={`${idPrefix}-height`} icon="ruler">
+              {t("onboarding.fields.height")}
+            </FieldLabel>
             <MeasurementInput
               unit={showUnits ? "cm" : undefined}
               id={`${idPrefix}-height`}
@@ -237,7 +289,9 @@ export function MeasurementFields({
             <FieldError field="height_cm" error={errors.height_cm} />
           </div>
           <div>
-            <label htmlFor={`${idPrefix}-current-weight`}>{t("onboarding.fields.weight")}</label>
+            <FieldLabel htmlFor={`${idPrefix}-current-weight`} icon="scale">
+              {t("onboarding.fields.weight")}
+            </FieldLabel>
             <MeasurementInput
               unit={showUnits ? "kg" : undefined}
               id={`${idPrefix}-current-weight`}
@@ -268,11 +322,11 @@ export function MeasurementFields({
             ["hip_circumference_cm", "hipCircumference"],
           ] as const).map(([field, label]) => (
             <div key={field}>
-              <label htmlFor={`${idPrefix}-${field}`}>
+              <FieldLabel htmlFor={`${idPrefix}-${field}`} icon="body">
                 {requiredCircumferences
                   ? t(`bodyPhotos.measurements.fields.${label}`)
                   : t(`onboarding.fields.${label}`)}
-              </label>
+              </FieldLabel>
               <MeasurementInput
                 unit={showUnits ? "cm" : undefined}
                 id={`${idPrefix}-${field}`}
@@ -376,10 +430,12 @@ export function ExperienceFields({
 
   return (
     <fieldset className="profile-fieldset" disabled={disabled}>
-      <legend>{t("onboarding.steps.experience")}</legend>
+      <FieldLegend icon="dumbbell">{t("onboarding.steps.experience")}</FieldLegend>
 
       <div className="profile-field">
-        <label htmlFor="profile-experience">{t("onboarding.fields.experience")}</label>
+        <FieldLabel htmlFor="profile-experience" icon="award">
+          {t("onboarding.fields.experience")}
+        </FieldLabel>
         <select
           id="profile-experience"
           name="experience_level"
@@ -406,7 +462,9 @@ export function ExperienceFields({
       </div>
 
       <div className="profile-field">
-        <label htmlFor="profile-training-days">{t("onboarding.fields.trainingDays")}</label>
+        <FieldLabel htmlFor="profile-training-days" icon="flame">
+          {t("onboarding.fields.trainingDays")}
+        </FieldLabel>
         <input
           id="profile-training-days"
           name="training_days_per_week"
@@ -432,7 +490,9 @@ export function ExperienceFields({
       </div>
 
       <div className="profile-field">
-        <label htmlFor="profile-training-age">{t("onboarding.fields.trainingAge")}</label>
+        <FieldLabel htmlFor="profile-training-age" icon="clock">
+          {t("onboarding.fields.trainingAge")}
+        </FieldLabel>
         <input
           id="profile-training-age"
           name="training_age_months"
@@ -454,7 +514,7 @@ export function ExperienceFields({
       </div>
 
       <fieldset className="profile-field" aria-describedby={describedBy("preferred_weekdays", errors.preferred_weekdays)}>
-        <legend>{t("onboarding.fields.preferredWeekdays")}</legend>
+        <FieldLegend icon="calendar">{t("onboarding.fields.preferredWeekdays")}</FieldLegend>
         <p className="profile-field__hint">{t("onboarding.hints.preferredWeekdays")}</p>
         <div className="profile-checkboxes">
           {preferredWeekdays.map((day) => (
@@ -474,7 +534,7 @@ export function ExperienceFields({
       </fieldset>
 
       <fieldset className="profile-field">
-        <legend>{t("onboarding.fields.priorityMuscles")}</legend>
+        <FieldLegend icon="body">{t("onboarding.fields.priorityMuscles")}</FieldLegend>
         <p className="profile-field__hint">{t("onboarding.hints.priorityMuscles")}</p>
         <div className="profile-checkboxes">
           <label>
@@ -503,9 +563,9 @@ export function ExperienceFields({
       </fieldset>
 
       <div className="profile-field">
-        <label htmlFor="profile-training-location">
+        <FieldLabel htmlFor="profile-training-location" icon="home">
           {t("onboarding.fields.trainingLocation")}
-        </label>
+        </FieldLabel>
         <select
           id="profile-training-location"
           name="training_location"
@@ -536,9 +596,9 @@ export function ExperienceFields({
           className="profile-field"
           aria-describedby={describedBy("available_equipment", errors.available_equipment)}
         >
-          <legend>
+          <FieldLegend icon="dumbbell">
             {t("onboarding.fields.homeTrainingSetup")}
-          </legend>
+          </FieldLegend>
           <p className="profile-field__hint">{t("onboarding.hints.homeTrainingSetup")}</p>
           <div className="profile-checkboxes">
             {availableEquipment.map((equipment) => (
@@ -561,9 +621,9 @@ export function ExperienceFields({
       )}
 
       <div className="profile-field">
-        <label htmlFor="profile-session-duration">
+        <FieldLabel htmlFor="profile-session-duration" icon="clock">
           {t("onboarding.fields.sessionDuration")}
-        </label>
+        </FieldLabel>
         <select
           id="profile-session-duration"
           name="session_duration_minutes"
@@ -595,7 +655,9 @@ export function ExperienceFields({
       </div>
 
       <div className="profile-field">
-        <label htmlFor="profile-training-intensity">{t("onboarding.fields.trainingIntensity")}</label>
+        <FieldLabel htmlFor="profile-training-intensity" icon="zap">
+          {t("onboarding.fields.trainingIntensity")}
+        </FieldLabel>
         <select
           id="profile-training-intensity"
           name="training_intensity"
@@ -617,7 +679,7 @@ export function ExperienceFields({
         className="profile-field"
         aria-describedby={describedBy("training_cautions", errors.training_cautions)}
       >
-        <legend>{t("onboarding.fields.trainingCautions")}</legend>
+        <FieldLegend icon="shield">{t("onboarding.fields.trainingCautions")}</FieldLegend>
         <div className="profile-checkboxes">
           <label>
             <input
@@ -643,7 +705,9 @@ export function ExperienceFields({
       </fieldset>
 
       <div className="profile-field">
-        <label htmlFor="profile-plan-duration">{t("onboarding.fields.planDuration")}</label>
+        <FieldLabel htmlFor="profile-plan-duration" icon="sparkles">
+          {t("onboarding.fields.planDuration")}
+        </FieldLabel>
         <select
           id="profile-plan-duration"
           name="plan_duration_weeks"

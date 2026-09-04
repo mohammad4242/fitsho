@@ -157,9 +157,51 @@
 }
 
 .profile-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   color: var(--ink);
   font-size: 0.86rem;
   font-weight: 760;
+}
+
+.profile-fieldset legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.profile-field__icon-badge {
+  width: 1.65rem;
+  height: 1.65rem;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgb(80 223 206 / 28%);
+  border-radius: 0.5rem;
+  color: var(--fitsho-aqua);
+  background: linear-gradient(135deg, rgb(80 223 206 / 15%), rgb(80 223 206 / 4%));
+  box-shadow: 0 1px 4px rgb(0 0 0 / 12%), inset 0 1px 1px rgb(255 255 255 / 15%);
+  backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+
+.profile-field__icon-badge svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.profile-fieldset legend .profile-field__icon-badge {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.55rem;
+  border-color: rgb(80 223 206 / 40%);
+  background: linear-gradient(135deg, rgb(80 223 206 / 22%), rgb(80 223 206 / 8%));
+  box-shadow: 0 0 10px rgb(80 223 206 / 15%);
+}
+
+.profile-fieldset legend .profile-field__icon-badge svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .profile-field input,
