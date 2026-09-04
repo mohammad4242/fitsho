@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import authTrainingAccent from "../../assets/landing/auth-training-accent.jpg";
 import { MemberHeaderMedia } from "../../shared/MemberHeaderMedia";
+import { AppIcon, type IconName } from "../../shared/AppIcon";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import { useAuth } from "../auth/AuthContext";
 import * as profileApi from "./api";
@@ -34,6 +35,11 @@ type SaveStatus = "idle" | "saved" | "unchanged";
 type ProfileSection = "personal" | "training" | "nutrition";
 
 const sections: ProfileSection[] = ["personal", "training", "nutrition"];
+const sectionIcons: Record<ProfileSection, IconName> = {
+  personal: "profile",
+  training: "dumbbell",
+  nutrition: "nutrition",
+};
 const personalFields = new Set<keyof ProfilePatch>([
   "display_name", "birth_date", "sex", "height_cm", "current_weight_kg",
   "shoulder_circumference_cm", "waist_circumference_cm", "hip_circumference_cm",
@@ -290,11 +296,53 @@ function ReadyProfilePage({
             <a href="#profile-editor">{l("ویرایش پروفایل", "Edit profile")}</a>
           </header>
           <dl>
-            <div><dt>{l("قد", "Height")}</dt><dd>{new Intl.NumberFormat(locale).format(baselineShared.height_cm)} {l("سانتی‌متر", "cm")}</dd></div>
-            <div><dt>{l("وزن", "Weight")}</dt><dd>{measuredWeight} {l("کیلوگرم", "kg")}</dd></div>
-            <div><dt>{l("سن", "Age")}</dt><dd>{new Intl.NumberFormat(locale).format(ageFromBirthDate(baselineShared.birth_date))}</dd></div>
-            {baselineProfile?.training_days_per_week && <div><dt>{l("فعالیت", "Activity")}</dt><dd>{l(`${new Intl.NumberFormat(locale).format(baselineProfile.training_days_per_week)} روز در هفته`, `${baselineProfile.training_days_per_week} days/week`)}</dd></div>}
-            <div><dt>{l("هدف", "Goal")}</dt><dd>{profileValueLabel(baselineShared.fitness_goal, language)}</dd></div>
+            <div className="profile-summary-stat">
+              <span className="profile-summary-stat__icon" aria-hidden="true">
+                <AppIcon name="ruler" />
+              </span>
+              <div className="profile-summary-stat__content">
+                <dt>{l("قد", "Height")}</dt>
+                <dd>{new Intl.NumberFormat(locale).format(baselineShared.height_cm)} {l("سانتی‌متر", "cm")}</dd>
+              </div>
+            </div>
+            <div className="profile-summary-stat">
+              <span className="profile-summary-stat__icon" aria-hidden="true">
+                <AppIcon name="scale" />
+              </span>
+              <div className="profile-summary-stat__content">
+                <dt>{l("وزن", "Weight")}</dt>
+                <dd>{measuredWeight} {l("کیلوگرم", "kg")}</dd>
+              </div>
+            </div>
+            <div className="profile-summary-stat">
+              <span className="profile-summary-stat__icon" aria-hidden="true">
+                <AppIcon name="calendar" />
+              </span>
+              <div className="profile-summary-stat__content">
+                <dt>{l("سن", "Age")}</dt>
+                <dd>{new Intl.NumberFormat(locale).format(ageFromBirthDate(baselineShared.birth_date))}</dd>
+              </div>
+            </div>
+            {baselineProfile?.training_days_per_week && (
+              <div className="profile-summary-stat">
+                <span className="profile-summary-stat__icon" aria-hidden="true">
+                  <AppIcon name="flame" />
+                </span>
+                <div className="profile-summary-stat__content">
+                  <dt>{l("فعالیت", "Activity")}</dt>
+                  <dd>{l(`${new Intl.NumberFormat(locale).format(baselineProfile.training_days_per_week)} روز در هفته`, `${baselineProfile.training_days_per_week} days/week`)}</dd>
+                </div>
+              </div>
+            )}
+            <div className="profile-summary-stat">
+              <span className="profile-summary-stat__icon" aria-hidden="true">
+                <AppIcon name="target" />
+              </span>
+              <div className="profile-summary-stat__content">
+                <dt>{l("هدف", "Goal")}</dt>
+                <dd>{profileValueLabel(baselineShared.fitness_goal, language)}</dd>
+              </div>
+            </div>
           </dl>
         </section>
 
@@ -421,12 +469,18 @@ function ProfileProgress({ section, language }: { section: ProfileSection; langu
     <nav className="profile-progress" aria-label={language === "en" ? "Profile progress" : "پیشرفت پروفایل"}>
       <p className="profile-progress__count">{language === "en" ? `Step ${localizedStep} of ${localizedTotal}` : `مرحله ${localizedStep} از ${localizedTotal}`}</p>
       <ol>
-        {labels.map((label, index) => (
-          <li className={index <= current ? "is-active" : undefined} aria-current={index === current ? "step" : undefined} key={label}>
-            <span aria-hidden="true">{index + 1}</span>
-            <strong>{label}</strong>
-          </li>
-        ))}
+        {labels.map((label, index) => {
+          const s = sections[index];
+          const icon = sectionIcons[s];
+          return (
+            <li className={index <= current ? "is-active" : undefined} aria-current={index === current ? "step" : undefined} key={label}>
+              <span aria-hidden="true" className="profile-progress__badge">
+                <AppIcon name={icon} className="profile-progress__icon" />
+              </span>
+              <strong>{label}</strong>
+            </li>
+          );
+        })}
       </ol>
     </nav>
   );

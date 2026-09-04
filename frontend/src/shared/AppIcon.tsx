@@ -4,7 +4,9 @@ export type IconName =
   | "home" | "dumbbell" | "nutrition" | "progress" | "more"
   | "arrow" | "profile" | "camera" | "catalogue" | "settings"
   | "body" | "target" | "language" | "logout" | "chevron"
-  | "document" | "feedback" | "lock";
+  | "document" | "feedback" | "lock"
+  | "calendar" | "scale" | "ruler" | "gender" | "flame"
+  | "award" | "clock" | "zap" | "shield" | "sparkles";
 
 type Props = {
   name: IconName;
@@ -31,6 +33,16 @@ export function AppIcon({ name, className }: Props) {
     document: <><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h4M9 13h6M9 17h4"/></>,
     feedback: <><path d="M4 5h16v12H9l-5 4Z"/><path d="m9 11 2 2 4-5"/></>,
     lock: <><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></>,
+    scale: <><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="12" cy="8" r="2.5"/><path d="m12 8 1.5-1.5"/></>,
+    ruler: <><path d="m21.3 8.7-6-6a2 2 0 0 0-2.8 0L2.7 12.5a2 2 0 0 0 0 2.8l6 6a2 2 0 0 0 2.8 0l9.8-9.8a2 2 0 0 0 0-2.8Z"/><path d="m7.5 10.5 2 2M10.5 7.5 12 9M13.5 4.5 15 6M4.5 13.5 6 15"/></>,
+    gender: <><circle cx="9" cy="9" r="4"/><path d="m12 6 6-3M15 3h3v3M9 13v7M6 17h6"/></>,
+    flame: <><path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c1.38 0 2.5-1.12 2.5-2.5 0-.61-.22-1.18-.6-1.61L12 11.8l-.9 1.09c-.38.43-.6 1-.6 1.61z"/><path d="M12 2c1 3 4 5.5 4 9.5a6 6 0 1 1-12 0c0-3.5 2.5-6.5 4.5-8 0 2 1.5 3.5 3.5 3.5.5-2 0-3.5 0-5z"/></>,
+    award: <><circle cx="12" cy="8" r="5"/><path d="m8.21 13.89-1.21 7.11 5-3 5 3-1.21-7.11"/></>,
+    clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
+    shield: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
+    sparkles: <><path d="m12 3-1.9 4.1L6 9l4.1 1.9L12 15l1.9-4.1L18 9l-4.1-1.9zM19 16l-.9 1.9L16 19l2.1.9.9 2.1.9-2.1L22 19l-2.1-.9z"/></>,
   };
 
   return (

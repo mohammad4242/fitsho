@@ -613,8 +613,40 @@ html[dir="rtl"] .profile-page-heading h1 {
 .profile-account-summary p { overflow: hidden; color: var(--fitsho-muted); font-size: .72rem; text-overflow: ellipsis; }
 .profile-account-summary header a { color: var(--fitsho-aqua); font-size: .72rem; font-weight: 850; text-decoration: none; }
 .profile-account-summary dl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; }
-.profile-account-summary dl div { min-width: 0; display: grid; gap: .2rem; padding: .7rem .8rem; }
-.profile-account-summary dl div + div { border-inline-start: 1px solid var(--fitsho-line); }
+.profile-account-summary dl > div { min-width: 0; display: grid; gap: .2rem; padding: .7rem .8rem; }
+.profile-account-summary dl > div + div { border-inline-start: 1px solid var(--fitsho-line); }
+.profile-summary-stat {
+  display: flex !important;
+  align-items: center;
+  gap: .65rem;
+  padding: .75rem .9rem;
+  transition: background 180ms ease;
+}
+.profile-summary-stat:hover {
+  background: rgb(80 223 206 / 6%);
+}
+.profile-summary-stat__icon {
+  flex-shrink: 0;
+  width: 2.1rem;
+  height: 2.1rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgb(80 223 206 / 28%);
+  border-radius: 0.65rem;
+  color: var(--fitsho-aqua);
+  background: linear-gradient(135deg, rgb(80 223 206 / 15%), rgb(80 223 206 / 5%));
+  box-shadow: 0 2px 8px rgb(0 0 0 / 12%), inset 0 1px 1px rgb(255 255 255 / 15%);
+  backdrop-filter: blur(8px);
+}
+.profile-summary-stat__icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.profile-summary-stat__content {
+  min-width: 0;
+  display: grid;
+  gap: .15rem;
+}
 .profile-account-summary dt { color: var(--fitsho-muted); font-size: .64rem; }
 .profile-account-summary dd { margin: 0; overflow-wrap: anywhere; font-size: .78rem; font-weight: 850; }
 .measurement-card { min-height: 4.5rem; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .2rem .75rem; justify-content: initial; padding: .7rem .85rem; border-radius: var(--fitsho-radius-md); box-shadow: none; }
@@ -629,9 +661,13 @@ html[dir="rtl"] .profile-page-heading h1 {
 .profile-progress__count { display: none; }
 .profile-progress ol { gap: .35rem; }
 .profile-progress ol::before { display: none; }
-.profile-progress li { display: flex; align-items: center; justify-content: center; gap: .35rem; min-height: 2.3rem; border: 1px solid var(--fitsho-line); border-radius: .65rem; background: var(--fitsho-surface-subtle); }
-.profile-progress li > span { width: 1.35rem; height: 1.35rem; font-size: .65rem; }
-.profile-progress li > strong { margin: 0; font-size: .68rem; }
+.profile-progress li { display: flex; align-items: center; justify-content: center; gap: .45rem; min-height: 2.4rem; padding: .35rem .6rem; border: 1px solid var(--fitsho-line); border-radius: .75rem; background: var(--fitsho-surface-subtle); backdrop-filter: blur(8px); transition: all 180ms ease; }
+.profile-progress li.is-active { border-color: rgb(80 223 206 / 35%); background: rgb(80 223 206 / 8%); }
+.profile-progress li[aria-current="step"] { border-color: var(--fitsho-aqua); background: linear-gradient(135deg, rgb(80 223 206 / 16%), rgb(80 223 206 / 5%)); box-shadow: 0 0 12px rgb(80 223 206 / 15%); }
+.profile-progress__badge { width: 1.55rem; height: 1.55rem; display: grid; place-items: center; border-radius: 0.5rem; border: 1px solid rgb(80 223 206 / 25%); background: rgb(80 223 206 / 10%); color: var(--fitsho-aqua); flex-shrink: 0; }
+.profile-progress li.is-active .profile-progress__badge { border-color: var(--fitsho-aqua); background: var(--fitsho-aqua); color: var(--fitsho-canvas); box-shadow: 0 0 8px rgb(80 223 206 / 35%); }
+.profile-progress__icon { width: 0.95rem; height: 0.95rem; }
+.profile-progress li > strong { margin: 0; font-size: .72rem; font-weight: 750; }
 .profile-wizard__page { padding: .8rem; border-radius: var(--fitsho-radius-md); box-shadow: none; }
 .profile-wizard__page > h2 { font-size: 1.15rem; }
 .profile-fieldset { padding: .75rem; border-radius: var(--fitsho-radius-md); }
