@@ -342,6 +342,11 @@ def test_generation_returns_visible_seven_day_draft_and_creates_review(
     )
     assert body["plan"]["weekly_cost_irr"] > 0
     assert body["plan"]["input_snapshot"]["main_meals_per_day"] == 2
+    assert (
+        body["plan"]["input_snapshot"]["program_selection_policy_version"]
+        == "nutrition-program-selection-v3"
+    )
+    assert "program_selection_trace" in body["plan"]["input_snapshot"]
     assert body["plan"]["price_snapshot"]["currency"] == "IRR"
     assert all(
         meal["catalogue_meal_id"] is not None and meal["catalogue_meal_category"]

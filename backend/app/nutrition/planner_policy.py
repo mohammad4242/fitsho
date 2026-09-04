@@ -9,6 +9,7 @@ CANDIDATE_SELECTION_POLICY_VERSION = "best-admitted-all-active-programs-quality-
 PREFERENCE_QUALITY_POLICY_VERSION = "preference-adherence-quality-v1"
 TEMPLATE_SUBSTITUTION_POLICY_VERSION = "safe-template-substitution-beam-v1"
 BUDGET_OPTIMIZER_POLICY_VERSION = "deterministic-budget-optimizer-v1"
+PROGRAM_SELECTION_POLICY_VERSION = "nutrition-program-selection-v3"
 
 
 @dataclass(frozen=True)

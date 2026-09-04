@@ -58,6 +58,9 @@ from app.nutrition.models import (
     NutritionWeeklyPlanMeal,
     NutritionWeeklyPlanNutrient,
 )
+from app.nutrition.nutrition_request import (
+    build_normalized_nutrition_request,
+)
 from app.nutrition.planner_engine import (
     GenerationOutcome,
     PlannedFood,
@@ -76,6 +79,7 @@ from app.nutrition.planner_policy import (
     PLANNER_POLICY_VERSION,
     PLANNER_VERSION,
     PREFERENCE_QUALITY_POLICY_VERSION,
+    PROGRAM_SELECTION_POLICY_VERSION,
     TEMPLATE_SUBSTITUTION_POLICY_VERSION,
 )
 from app.nutrition.preference_snapshot import load_preference_snapshot
@@ -91,8 +95,8 @@ from app.nutrition.program_adaptation import AdaptedWeek, adapt_program
 from app.nutrition.program_catalogue import list_programs
 from app.nutrition.program_selection import (
     ProgramCandidate,
-    ProgramSelectionContext,
-    enumerate_program_candidates,
+    ProgramSelectionResult,
+    select_program_candidates,
 )
 from app.nutrition.schemas import (
     WeeklyPlanDayResponse,
@@ -265,23 +269,17 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     user_profile = db.get(UserProfile, user_id)
     structured_exercise = db.get(NutritionStructuredExercise, user_id)
     program_candidates: tuple[ProgramCandidate, ...] = ()
+    selection_result: ProgramSelectionResult | None = None
     if programs and user_profile is not None and user_profile.fitness_goal is not None:
-        selection_context = ProgramSelectionContext(
-            fitness_goal=user_profile.fitness_goal.value,
-            trains=structured_exercise.trains if structured_exercise else False,
-            exercise_type=(
-                structured_exercise.exercise_type.value
-                if structured_exercise and structured_exercise.exercise_type
-                else None
-            ),
-            plan_style=profile.plan_style.value,
-            budget_style=profile.budget_style.value,
-            cooking_skill=profile.cooking_skill.value,
-            maximum_cooking_time_minutes=profile.maximum_cooking_time_minutes,
-            meal_preparation_preference=profile.meal_preparation_preference.value,
-            preferred_variety=profile.preferred_variety.value,
+        normalized_request = build_normalized_nutrition_request(
+            user_id=user_id,
+            profile=profile,
+            user_profile=user_profile,
+            structured_exercise=structured_exercise,
+            estimate=estimate,
         )
-        program_candidates = enumerate_program_candidates(programs, selection_context)
+        selection_result = select_program_candidates(programs, normalized_request)
+        program_candidates = selection_result.candidates
 
     food_manifest["meals"] = meal_manifest
     minimums, maximums = _daily_limits(estimate.targets)
@@ -325,6 +323,14 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "budget_optimizer_policy_version": BUDGET_OPTIMIZER_POLICY_VERSION,
         "budget_formula_version": "annualized-monthly-times-12-divided-52-v1",
         "meal_catalogue_template_ids": [item.meal_id for item in meal_templates],
+        "program_selection_policy_version": (
+            selection_result.policy_version
+            if selection_result is not None
+            else PROGRAM_SELECTION_POLICY_VERSION
+        ),
+        "program_selection_trace": (
+            selection_result.decision_trace() if selection_result is not None else None
+        ),
         "nutrition_program_id": None,
         "nutrition_program_code": None,
     }
