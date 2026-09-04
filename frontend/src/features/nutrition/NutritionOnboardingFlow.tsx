@@ -1,6 +1,7 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { AppIcon } from "../../shared/AppIcon";
 import * as profileApi from "../profile/api";
 import {
   toProfileInput,
@@ -20,6 +21,7 @@ import type {
 import type { OnboardingDraft, PreAccountNutritionBasics } from "../publicOnboarding/onboardingDraft";
 import { GuidedSharedProfileQuestions } from "../publicOnboarding/GuidedSharedProfileQuestions";
 import { GuidedTrainingQuestions } from "../publicOnboarding/GuidedTrainingQuestions";
+import { useAutoAdvance } from "../publicOnboarding/useAutoAdvance";
 import { NutritionExerciseQuestions } from "./NutritionExerciseQuestions";
 import { formatTomanInput, irrToToman, tomanToIrr } from "./money";
 import type { StructuredExerciseInput } from "./types";
@@ -668,6 +670,8 @@ function NutritionQuestionFrame(props: {
   stage: 0 | 1 | 2;
   optional?: boolean;
   nextLabel?: string;
+  showContinue?: boolean;
+  hideBottomBack?: boolean;
   onBack: () => void;
   onSubmit: () => void;
   children: ReactNode;
@@ -676,6 +680,16 @@ function NutritionQuestionFrame(props: {
   const stages = [l("ایمنی", "Safety"), l("سبک زندگی", "Routine"), l("غذاها", "Food")];
   return (
     <section className="guided-question nutrition-question" aria-labelledby="nutrition-question-title">
+      <div className="guided-question__nav">
+        <button
+          type="button"
+          className="guided-back-button"
+          onClick={props.onBack}
+          aria-label={l("بازگشت", "Back")}
+        >
+          <AppIcon name="arrow" />
+        </button>
+      </div>
       <ol className="guided-stage-track" aria-label={l("بخش‌های تغذیه", "Nutrition sections")}>
         {stages.map((stage, index) => (
           <li className={index < props.stage ? "is-complete" : index === props.stage ? "is-active" : ""} key={stage}>
@@ -691,7 +705,12 @@ function NutritionQuestionFrame(props: {
       <form className="guided-question__form" onSubmit={(event) => { event.preventDefault(); props.onSubmit(); }}>
         <fieldset className="nutrition-question__control" disabled={props.busy}>{props.children}</fieldset>
         {props.optional && <button className="text-button" type="submit">{l("رد کردن این سؤال", "Skip this question")}</button>}
-        <Actions busy={props.busy} onBack={props.onBack} nextLabel={props.nextLabel ?? l("ادامه", "Continue")} />
+        <Actions
+          busy={props.busy}
+          onBack={props.hideBottomBack ? undefined : props.onBack}
+          nextLabel={props.nextLabel ?? l("ادامه", "Continue")}
+          showContinue={props.showContinue ?? true}
+        />
       </form>
     </section>
   );
@@ -763,15 +782,108 @@ function PreAccountNutritionQuestions(props: {
     l("بودجه ماهانه غذای تو چقدر است؟", "What is your monthly food budget?"),
     l("چه سبک غذایی را ترجیح می‌دهی؟", "Which food style do you prefer?"),
   ];
-  const advance = () => question === titles.length - 1 ? props.onComplete() : setQuestion((current) => current + 1);
-  const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
-  return <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={question === 0 ? 0 : question < 3 ? 1 : 2} nextLabel={question === titles.length - 1 ? l("ادامه و ساخت حساب", "Continue to account setup") : undefined} onBack={back} onSubmit={advance}>
-    {question === 0 && <div className="profile-checkboxes nutrition-option-grid">{conditionOptions.map(([code, fa, en]) => <label className="nutrition-option" key={code}><input type="checkbox" checked={props.conditions.includes(code)} onChange={() => props.onConditions(props.conditions.includes(code) ? props.conditions.filter((item) => item !== code) : [...props.conditions, code])} />{l(fa, en)}</label>)}</div>}
-    {question === 1 && <SelectField label={l("فعالیت روزانه", "Daily activity")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Mostly sedentary")], ["light", l("کمی فعال", "Lightly active")], ["moderate", l("فعالیت متوسط", "Moderately active")], ["very_active", l("بسیار فعال", "Very active")]]} />}
-    {question === 2 && <LabeledInput label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />}
-    {question === 3 && <SelectField label={l("سبک غذا", "Food style")} value={props.foods.dietaryPattern} onChange={(dietaryPattern) => props.onFoods({ ...props.foods, dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />}
-  </NutritionQuestionFrame>;
+  const { selectAndAdvance, resetAdvancing } = useAutoAdvance();
+  const onCompleteRef = useRef(props.onComplete);
+  useEffect(() => {
+    onCompleteRef.current = props.onComplete;
+  });
+
+  const advance = () => {
+    if (question === titles.length - 1) onCompleteRef.current();
+    else setQuestion((current) => current + 1);
+  };
+
+
+  const back = () => {
+    resetAdvancing();
+    if (question === 0) props.onBack();
+    else setQuestion((current) => current - 1);
+  };
+
+  const showContinue = question === 0 || question === 2;
+
+  return (
+    <NutritionQuestionFrame
+      busy={props.busy}
+      current={question}
+      total={titles.length}
+      title={titles[question]}
+      stage={question === 0 ? 0 : question < 3 ? 1 : 2}
+      nextLabel={question === titles.length - 1 ? l("ادامه و ساخت حساب", "Continue to account setup") : undefined}
+      showContinue={showContinue}
+      hideBottomBack={true}
+      onBack={back}
+      onSubmit={advance}
+    >
+      {question === 0 && (
+        <div className="profile-checkboxes nutrition-option-grid">
+          {conditionOptions.map(([code, fa, en]) => (
+            <label className="nutrition-option" key={code}>
+              <input
+                type="checkbox"
+                checked={props.conditions.includes(code)}
+                onChange={() => props.onConditions(
+                  props.conditions.includes(code)
+                    ? props.conditions.filter((item) => item !== code)
+                    : [...props.conditions, code],
+                )}
+              />
+              {l(fa, en)}
+            </label>
+          ))}
+        </div>
+      )}
+      {question === 1 && (
+        <SelectField
+          label={l("فعالیت روزانه", "Daily activity")}
+          value={props.dailyActivityLevel}
+          onChange={(value) => {
+            selectAndAdvance(
+              () => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"]),
+              () => advance(),
+            );
+          }}
+          options={[
+            ["sedentary", l("کم‌تحرک", "Mostly sedentary")],
+            ["light", l("کمی فعال", "Lightly active")],
+            ["moderate", l("فعالیت متوسط", "Moderately active")],
+            ["very_active", l("بسیار فعال", "Very active")],
+          ]}
+        />
+      )}
+      {question === 2 && (
+        <LabeledInput
+          label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")}
+          inputMode="numeric"
+          required
+          value={props.budget}
+          onChange={props.onBudget}
+        />
+      )}
+      {question === 3 && (
+        <SelectField
+          label={l("سبک غذا", "Food style")}
+          value={props.foods.dietaryPattern}
+          onChange={(dietaryPattern) => {
+            selectAndAdvance(
+              () => props.onFoods({
+                ...props.foods,
+                dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"],
+              }),
+              () => advance(),
+            );
+          }}
+          options={[
+            ["omnivore", l("همه‌چیزخوار", "Omnivore")],
+            ["vegetarian", l("گیاه‌خوار", "Vegetarian")],
+            ["vegan", l("وگان", "Vegan")],
+          ]}
+        />
+      )}
+    </NutritionQuestionFrame>
+  );
 }
+
 
 function BudgetForm(props: {
   busy: boolean; budget: string; budgetStyle: "strict" | "flexible"; mealCount: string;
@@ -823,7 +935,24 @@ function SelectField(props: { label: string; value: string; options: Array<[stri
   return <div className="profile-field"><label>{props.label}<select value={props.value} onChange={(event) => props.onChange(event.target.value)}>{props.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>;
 }
 
-function Actions({ busy, onBack, nextLabel }: { busy: boolean; onBack?: () => void; nextLabel: string }) {
+function Actions({
+  busy,
+  onBack,
+  nextLabel,
+  showContinue = true,
+}: {
+  busy: boolean;
+  onBack?: () => void;
+  nextLabel: string;
+  showContinue?: boolean;
+}) {
   const l = useLocalizer();
-  return <div className="profile-actions">{onBack && <button className="secondary-button" type="button" disabled={busy} onClick={onBack}>{l("بازگشت", "Back")}</button>}<button className="primary-button" type="submit" disabled={busy}>{busy ? l("در حال ذخیره…", "Saving…") : nextLabel}</button></div>;
+  if (!onBack && !showContinue) return null;
+  return (
+    <div className="profile-actions">
+      {onBack && <button className="secondary-button" type="button" disabled={busy} onClick={onBack}>{l("بازگشت", "Back")}</button>}
+      {showContinue && <button className="primary-button" type="submit" disabled={busy}>{busy ? l("در حال ذخیره…", "Saving…") : nextLabel}</button>}
+    </div>
+  );
 }
+

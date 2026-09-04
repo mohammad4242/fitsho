@@ -35,7 +35,7 @@ function TrainingHarness({ allowNoTraining = false, onNoTraining = vi.fn() }: { 
   </>;
 }
 
-it("uses fixed experience, weekly-day, and workout-time choices", async () => {
+it("uses fixed experience, weekly-day, and workout-time choices with auto-advancing", async () => {
   await i18n.changeLanguage("fa");
   const user = userEvent.setup();
   render(<TrainingHarness />);
@@ -43,37 +43,108 @@ it("uses fixed experience, weekly-day, and workout-time choices", async () => {
   expect(screen.getByRole("heading", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "ماه اولمه" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "مبتدی (زیر ۶ ماه)" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
+
+  // Experience auto-advances to trainingAge
   await user.click(screen.getByRole("button", { name: "مبتدی (زیر ۶ ماه)" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.type(screen.getByLabelText("سابقه تمرین به ماه"), "24");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.click(screen.getByRole("button", { name: "۴ روز در هفته" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.click(screen.getByRole("button", { name: "باشگاه" }));
+
+  // trainingAge requires Continue
+  await user.type(await screen.findByLabelText("سابقه تمرین به ماه"), "24");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
 
+  // days auto-advances to location
+  expect(await screen.findByRole("heading", { name: "چند روز در هفته تمرین می‌کنی؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "۴ روز در هفته" }));
+
+  // location: gym auto-advances and skips home-equipment to duration
+  expect(await screen.findByRole("heading", { name: "کجا تمرین می‌کنی؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "باشگاه" }));
+
+  // duration auto-advances to intensity
+  expect(await screen.findByRole("heading", { name: "برای هر جلسه چقدر زمان داری؟" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "۲۰ تا ۳۰ دقیقه" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "بیش از ۹۰ دقیقه" })).toBeInTheDocument();
-  expect(screen.queryByText("مربی دربارهٔ محدودیت جسمی دیگری بداند؟")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "۴۵ تا ۶۰ دقیقه" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  expect(screen.getByRole("heading", { name: "شدت معمول تمرینت چقدر است؟" })).toBeInTheDocument();
+
+  // intensity auto-advances to priority
+  expect(await screen.findByRole("heading", { name: "شدت معمول تمرینت چقدر است؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "متوسط" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  expect(screen.getByRole("heading", { name: "دوست داری در برنامه روی کدام عضله بیشتر تمرکز شود؟" })).toBeInTheDocument();
+
+  // priority muscle auto-advances to cautions
+  expect(await screen.findByRole("heading", { name: "دوست داری در برنامه روی کدام عضله بیشتر تمرکز شود؟" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "بالاتنه" })).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "سینه" }));
-  expect(screen.getByRole("button", { name: "سینه" })).toHaveClass("is-selected");
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "جلو بازو" }));
-  expect(screen.getByRole("button", { name: "سینه" })).not.toHaveClass("is-selected");
-  expect(screen.getByRole("button", { name: "جلو بازو" })).toHaveClass("is-selected");
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  // cautions is multi-select: requires Continue or Skip
+  expect(await screen.findByRole("heading", { name: "برای تمرین مورد احتیاطی داری؟" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "ادامه" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(screen.getByText("cautions-set")).toBeInTheDocument();
+
+  // weeks auto-advances and completes
+  expect(await screen.findByRole("heading", { name: "این برنامه چند هفته باشد؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "۴ هفته" }));
+
+  expect(await screen.findByText("completed")).toBeInTheDocument();
+});
+
+it("advances to home-equipment question when home location is chosen", async () => {
+  await i18n.changeLanguage("fa");
+  const user = userEvent.setup();
+  render(<TrainingHarness />);
+
+  await user.click(screen.getByRole("button", { name: "مبتدی (زیر ۶ ماه)" }));
+  await user.click(await screen.findByRole("button", { name: "ادامه" }));
+  await user.click(await screen.findByRole("button", { name: "۳ روز در هفته" }));
+
+  expect(await screen.findByRole("heading", { name: "کجا تمرین می‌کنی؟" })).toBeInTheDocument();
+  await user.click(await screen.findByRole("button", { name: "خانه" }));
+
+  // Home equipment question appears and auto-advances
+  expect(await screen.findByRole("heading", { name: "در خانه چه امکاناتی داری؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
+  await user.click(await screen.findByRole("button", { name: "فقط وزن بدن" }));
+
+  expect(await screen.findByRole("heading", { name: "برای هر جلسه چقدر زمان داری؟" })).toBeInTheDocument();
+});
+
+it("cautions allows multiple selections without auto-advancing", async () => {
+  await i18n.changeLanguage("fa");
+  const user = userEvent.setup();
+  render(<TrainingHarness />);
+
+  await user.click(screen.getByRole("button", { name: "مبتدی (زیر ۶ ماه)" }));
+  await user.click(await screen.findByRole("button", { name: "ادامه" }));
+  await user.click(await screen.findByRole("button", { name: "۳ روز در هفته" }));
+  await user.click(await screen.findByRole("button", { name: "باشگاه" }));
+  await user.click(await screen.findByRole("button", { name: "۴۵ تا ۶۰ دقیقه" }));
+  await user.click(await screen.findByRole("button", { name: "متوسط" }));
+  await user.click(await screen.findByRole("button", { name: "تمرکز ویژه‌ای ندارم" }));
+
+  expect(await screen.findByRole("heading", { name: "برای تمرین مورد احتیاطی داری؟" })).toBeInTheDocument();
+  const kneeBtn = screen.getByRole("button", { name: "احتیاط برای زانو" });
+  const shoulderBtn = screen.getByRole("button", { name: "احتیاط برای شانه" });
+
+  await user.click(kneeBtn);
+  // Does not advance! Both knee and shoulder are still on screen
+  expect(kneeBtn).toHaveClass("is-selected");
+  expect(shoulderBtn).not.toHaveClass("is-selected");
+
+  await user.click(shoulderBtn);
+  expect(kneeBtn).toHaveClass("is-selected");
+  expect(shoulderBtn).toHaveClass("is-selected");
+
+  // Still on cautions question
+  expect(screen.getByRole("heading", { name: "برای تمرین مورد احتیاطی داری؟" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "ادامه" }));
 
-  expect(screen.getByText("completed")).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "این برنامه چند هفته باشد؟" })).toBeInTheDocument();
 });
 
 it("offers no-training only for nutrition and skips all training details", async () => {
@@ -82,10 +153,10 @@ it("offers no-training only for nutrition and skips all training details", async
   const onNoTraining = vi.fn();
   render(<TrainingHarness allowNoTraining onNoTraining={onNoTraining} />);
 
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "تمرین نمی‌کنم" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
 
-  expect(onNoTraining).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(onNoTraining).toHaveBeenCalledOnce());
   expect(screen.queryByRole("heading", { name: "چند روز در هفته تمرین می‌کنی؟" })).not.toBeInTheDocument();
 });
 

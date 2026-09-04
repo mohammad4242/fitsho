@@ -1,7 +1,9 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { AppIcon } from "../../shared/AppIcon";
 import type { ProfileFormValues } from "../profile/types";
+import { useAutoAdvance } from "./useAutoAdvance";
 
 type Props = {
   values: ProfileFormValues;
@@ -29,6 +31,12 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
     const [year = "", month = "", day = ""] = values.birth_date.split("-");
     return { year, month, day };
   });
+  const { selectAndAdvance, resetAdvancing } = useAutoAdvance();
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  });
+
   const labels = language === "en"
     ? ["What should we call you?", "When were you born?", "What is your sex?", "What are your height and weight?", "What is your main goal?"]
     : ["دوست داری چه صدایت کنیم؟", "چه تاریخی به دنیا آمدی؟", "جنسیتت چیست؟", "قد و وزنت چقدر است؟", "هدف اصلی تو چیست؟"];
@@ -71,14 +79,32 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
     else setQuestion((current) => current + 1);
   }
 
+  function handleBack() {
+    resetAdvancing();
+    if (question === 0) onBack();
+    else setQuestion((current) => current - 1);
+  }
+
   function updateBodyValue(field: "height_cm" | "current_weight_kg", value: string) {
     setShowBodyConfirmation(false);
     setBodyValuesConfirmed(false);
     onChange(field, value);
   }
 
+  const showContinue = question === 0 || question === 1 || question === 3;
+
   return (
     <section className="guided-question" aria-labelledby="guided-question-title">
+      <div className="guided-question__nav">
+        <button
+          type="button"
+          className="guided-back-button"
+          onClick={handleBack}
+          aria-label={back}
+        >
+          <AppIcon name="arrow" />
+        </button>
+      </div>
       <ol className="guided-stage-track" aria-label={language === "en" ? "Profile sections" : "بخش‌های پروفایل"}>{stages.map((stage, index) => <li className={index < activeStage ? "is-complete" : index === activeStage ? "is-active" : ""} key={stage}><span aria-hidden="true">{index < activeStage ? "✓" : index + 1}</span>{stage}</li>)}</ol>
       <div className="public-onboarding-progress" aria-label={language === "en" ? "Personal details progress" : "پیشرفت اطلاعات شخصی"}>
         <span>{language === "en" ? `Step ${question + 1} of ${labels.length}` : `مرحله ${question + 1} از ${labels.length}`}</span>
@@ -92,18 +118,53 @@ export function GuidedSharedProfileQuestions({ values, onChange, onBack, onCompl
           <label>{language === "en" ? "Month" : "ماه"}<select className="birth-date-picker__select" required value={birthParts.month} onChange={(event) => setBirthParts((current) => ({ ...current, month: event.target.value }))}><option value="" />{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</select></label>
           <label>{language === "en" ? "Year" : "سال"}<select className="birth-date-picker__select" required value={birthParts.year} onChange={(event) => setBirthParts((current) => ({ ...current, year: event.target.value }))}><option value="" />{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
         </fieldset>}
-        {question === 2 && <div className="guided-choice-grid guided-choice-grid--sex">{sexes.map((sex) => <button className={values.sex === sex ? "is-selected" : ""} key={sex} type="button" onClick={() => onChange("sex", sex)}>{t(`onboarding.options.sex.${sex}`)}</button>)}</div>}
+        {question === 2 && (
+          <div className="guided-choice-grid guided-choice-grid--sex">
+            {sexes.map((sex) => (
+              <button
+                className={values.sex === sex ? "is-selected" : ""}
+                key={sex}
+                type="button"
+                onClick={() => selectAndAdvance(
+                  () => onChange("sex", sex),
+                  () => setQuestion(3),
+                )}
+              >
+                {t(`onboarding.options.sex.${sex}`)}
+              </button>
+            ))}
+          </div>
+        )}
         {question === 3 && <div className="guided-body-fields">
           <label>{t("onboarding.fields.height")}<input aria-label={t("onboarding.fields.height")} name="height_cm" type="number" inputMode="numeric" required min={120} max={230} value={values.height_cm} onChange={(event) => updateBodyValue("height_cm", event.target.value)} /><small>{language === "en" ? "120–230 cm" : "۱۲۰ تا ۲۳۰ سانتی‌متر"}</small></label>
           <label>{t("onboarding.fields.weight")}<input aria-label={t("onboarding.fields.weight")} name="current_weight_kg" type="number" inputMode="decimal" required min={35} max={300} step="0.01" value={values.current_weight_kg} onChange={(event) => updateBodyValue("current_weight_kg", event.target.value)} /><small>{language === "en" ? "35–300 kg" : "۳۵ تا ۳۰۰ کیلوگرم"}</small></label>
           {showBodyConfirmation && <label className="guided-body-confirmation"><input type="checkbox" checked={bodyValuesConfirmed} onChange={(event) => setBodyValuesConfirmed(event.target.checked)} />{language === "en" ? "These values are correct." : "این مقادیر درست هستند."}</label>}
         </div>}
-        {question === 4 && <div className="guided-choice-grid">{goals.map(([goal, emoji]) => <button className={values.fitness_goal === goal ? "is-selected" : ""} key={goal} type="button" onClick={() => onChange("fitness_goal", goal)}>{t(`onboarding.options.fitnessGoal.${goal}`)} {emoji}</button>)}</div>}
-        <div className="profile-actions">
-          <button className="secondary-button" type="button" onClick={() => question === 0 ? onBack() : setQuestion((current) => current - 1)}>{back}</button>
-          <button className="primary-button" type="submit" disabled={!ready}>{next}</button>
-        </div>
+        {question === 4 && (
+          <div className="guided-choice-grid">
+            {goals.map(([goal, emoji]) => (
+              <button
+                className={values.fitness_goal === goal ? "is-selected" : ""}
+                key={goal}
+                type="button"
+                onClick={() => selectAndAdvance(
+                  () => onChange("fitness_goal", goal),
+                  () => onCompleteRef.current(),
+                )}
+              >
+                {t(`onboarding.options.fitnessGoal.${goal}`)} {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {showContinue && (
+          <div className="profile-actions">
+            <button className="primary-button" type="submit" disabled={!ready}>{next}</button>
+          </div>
+        )}
       </form>
     </section>
   );
 }
+

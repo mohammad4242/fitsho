@@ -42,7 +42,7 @@ it("keeps English and asks one shared-profile question per screen", async () => 
   expect(screen.getByLabelText("Year")).toHaveClass("birth-date-picker__select");
 });
 
-it("groups height and weight with the selected valid ranges", async () => {
+it("groups height and weight with the selected valid ranges and auto-advances sex", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
 
@@ -53,9 +53,12 @@ it("groups height and weight with the selected valid ranges", async () => {
   await user.selectOptions(screen.getByLabelText("ماه"), "5");
   await user.selectOptions(screen.getByLabelText("سال"), "2000");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.click(screen.getByRole("button", { name: "زن" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
 
+  expect(screen.getByRole("heading", { name: "جنسیتت چیست؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "زن" }));
+
+  expect(await screen.findByLabelText("قد (سانتی‌متر)")).toBeInTheDocument();
   expect(screen.getByLabelText("قد (سانتی‌متر)")).toHaveAttribute("min", "120");
   expect(screen.getByLabelText("قد (سانتی‌متر)")).toHaveAttribute("max", "230");
   expect(screen.getByLabelText("وزن فعلی (کیلوگرم)")).toHaveAttribute("min", "35");
@@ -67,12 +70,83 @@ it("groups height and weight with the selected valid ranges", async () => {
   await user.click(screen.getByLabelText("این مقادیر درست هستند."));
   await user.click(screen.getByRole("button", { name: "ادامه" }));
 
-  expect(screen.getByRole("button", { name: "کاهش وزن 🔻⬆️" })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "کاهش وزن 🔻⬆️" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "افزایش وزن 🔺️⬇️" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "چربی‌سوزی 🔥" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "عضله‌سازی 💪" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "چربی‌سوزی + عضله‌سازی 🔥💪" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
 });
+
+it("auto-advances on fitness goal and completes shared profile flow", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  await user.click(screen.getByRole("button", { name: "برنامه تمرینی" }));
+  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.selectOptions(screen.getByLabelText("روز"), "14");
+  await user.selectOptions(screen.getByLabelText("ماه"), "5");
+  await user.selectOptions(screen.getByLabelText("سال"), "2000");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.click(screen.getByRole("button", { name: "زن" }));
+
+  await user.type(await screen.findByLabelText("قد (سانتی‌متر)"), "165");
+  await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  expect(await screen.findByRole("heading", { name: "هدف اصلی تو چیست؟" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "عضله‌سازی 💪" }));
+
+  expect(await screen.findByRole("heading", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeInTheDocument();
+});
+
+it("preserves previously selected value on back navigation without auto-advancing", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  await user.click(screen.getByRole("button", { name: "برنامه تمرینی" }));
+  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.selectOptions(screen.getByLabelText("روز"), "14");
+  await user.selectOptions(screen.getByLabelText("ماه"), "5");
+  await user.selectOptions(screen.getByLabelText("سال"), "2000");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  await user.click(screen.getByRole("button", { name: "مرد" }));
+  expect(await screen.findByLabelText("قد (سانتی‌متر)")).toBeInTheDocument();
+
+  // Go back to sex question using compact top back button
+  await user.click(screen.getByRole("button", { name: "بازگشت" }));
+  expect(await screen.findByRole("heading", { name: "جنسیتت چیست؟" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "مرد" })).toHaveClass("is-selected");
+  // Still on sex screen; did not auto-advance merely because answer exists
+  expect(screen.queryByLabelText("قد (سانتی‌متر)")).not.toBeInTheDocument();
+});
+
+it("prevents double-tap from skipping questions on single-choice options", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  await user.click(screen.getByRole("button", { name: "برنامه تمرینی" }));
+  await user.type(screen.getByLabelText("نام نمایشی"), "سارا");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.selectOptions(screen.getByLabelText("روز"), "14");
+  await user.selectOptions(screen.getByLabelText("ماه"), "5");
+  await user.selectOptions(screen.getByLabelText("سال"), "2000");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  // Rapid double-click on sex option
+  const femaleBtn = screen.getByRole("button", { name: "زن" });
+  await user.click(femaleBtn);
+  await user.click(femaleBtn);
+
+  // Advances to question 3 (height/weight), NOT question 4 (goal)
+  expect(await screen.findByLabelText("قد (سانتی‌متر)")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "هدف اصلی تو چیست؟" })).not.toBeInTheDocument();
+});
+
 
 it("starts with product mode and marks the combined path as recommended", () => {
   render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);

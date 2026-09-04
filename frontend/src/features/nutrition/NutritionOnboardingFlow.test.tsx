@@ -89,16 +89,13 @@ it("asks training status and medical questions before account creation", async (
   await user.selectOptions(screen.getByLabelText("Year"), "2000");
   await user.click(screen.getByRole("button", { name: "Continue" }));
   await user.click(screen.getByRole("button", { name: "Female" }));
-  await user.click(screen.getByRole("button", { name: "Continue" }));
-  await user.type(screen.getByLabelText("Height (centimeters)"), "165");
+  await user.type(await screen.findByLabelText("Height (centimeters)"), "165");
   await user.type(screen.getByLabelText("Current weight (kilograms)"), "62.5");
   await user.click(screen.getByRole("button", { name: "Continue" }));
-  await user.click(screen.getByRole("button", { name: "Fat loss 🔥" }));
-  await user.click(screen.getByRole("button", { name: "Continue" }));
-  await user.click(screen.getByRole("button", { name: "I do not train" }));
-  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(await screen.findByRole("button", { name: "Fat loss 🔥" }));
+  await user.click(await screen.findByRole("button", { name: "I do not train" }));
 
-  expect(screen.getByRole("heading", { name: "Do you have any medical conditions?" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Do you have any medical conditions?" })).toBeInTheDocument();
 });
 
 async function completeSharedQuestions(user: ReturnType<typeof userEvent.setup>) {
@@ -109,12 +106,13 @@ async function completeSharedQuestions(user: ReturnType<typeof userEvent.setup>)
   await user.selectOptions(screen.getByLabelText("سال"), "2000");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "زن" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.type(screen.getByLabelText("قد (سانتی‌متر)"), "165");
+  await user.type(await screen.findByLabelText("قد (سانتی‌متر)"), "165");
   await user.type(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "62.5");
   await user.click(screen.getByRole("button", { name: "ادامه" }));
-  await user.click(screen.getByRole("button", { name: "چربی‌سوزی 🔥" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
+  await user.click(await screen.findByRole("button", { name: "چربی‌سوزی 🔥" }));
+  await waitFor(() => {
+    expect(screen.queryByRole("heading", { name: "هدف اصلی تو چیست؟" })).not.toBeInTheDocument();
+  });
 }
 
 async function reachSafety() {
@@ -191,7 +189,6 @@ it("lets nutrition-only members opt out of training before medical questions", a
 
   expect(await screen.findByRole("heading", { name: "در حال حاضر تمرین منظم داری؟" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "تمرین نمی‌کنم" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
   expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "چند روز در هفته تمرین می‌کنی؟" })).not.toBeInTheDocument();
 
@@ -291,8 +288,6 @@ it("converts a grouped Toman budget to the existing IRR payload", async () => {
   await completeSafetyQuestions(user);
 
   await user.click(await screen.findByRole("button", { name: "تمرین نمی‌کنم" }));
-  await user.click(screen.getByRole("button", { name: "ادامه" }));
-
   await user.type(await screen.findByLabelText("بودجه ماهانه غذا (تومان)"), "1300000");
   for (let index = 0; index < 5; index += 1) await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "ثبت پروفایل تغذیه" }));
