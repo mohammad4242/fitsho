@@ -235,6 +235,7 @@ from app.nutrition.schemas import (
     SupplementCatalogueInput,
     SupplementTransitionInput,
     TargetUpdateConfirmationInput,
+    WeeklyPlanFeedbackResponse,
     WeeklyPlanGenerationResponse,
     WeeklyPlanHistoryItemResponse,
     WeeklyPlanResponse,
@@ -1422,7 +1423,7 @@ def _plan_edit_error(error: PlanEditError) -> HTTPException:
     )
 
 
-@router.get("/plans/{plan_id}/feedback")
+@router.get("/plans/{plan_id}/feedback", response_model=WeeklyPlanFeedbackResponse)
 def read_meal_feedback(
     plan_id: UUID, db: DatabaseSession, user: CurrentUser
 ) -> dict[str, object]:

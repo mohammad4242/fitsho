@@ -218,7 +218,6 @@ def meal_replacement_options(
         if meal.id != target.id
         and meal.slot_role == target.slot_role
         and not meal.is_locked
-        and meal.catalogue_meal_id != target.catalogue_meal_id
     ]
     return {
         "target_meal_id": target.id,
