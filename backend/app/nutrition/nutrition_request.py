@@ -98,13 +98,17 @@ def build_normalized_nutrition_request(
             if structured_exercise and structured_exercise.intensity
             else None
         ),
-        training_experience=None,
+        training_experience=(
+            user_profile.experience_level.value
+            if user_profile.experience_level is not None
+            else None
+        ),
         main_meal_slots=profile.effective_main_meal_slots,
         snack_slots=profile.effective_snack_slots,
         dietary_pattern=profile.dietary_pattern.value,
         maximum_meal_repetition_per_week=profile.maximum_meal_repetition_per_week,
         preferred_variety=profile.preferred_variety.value,
-        requested_weight_change_kg_per_week=None,
+        requested_weight_change_kg_per_week=profile.target_weight_change_kg_per_week,
         plan_style=profile.plan_style.value,
         cooking_skill=profile.cooking_skill.value,
         maximum_cooking_time_minutes=profile.maximum_cooking_time_minutes,

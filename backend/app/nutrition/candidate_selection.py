@@ -34,11 +34,13 @@ class CandidateQuality:
     preferred_program_style_penalty: int
     stable_program_code: str
     stable_variant_key: tuple[str, ...]
+    goal_target_penalty: Decimal = ZERO
 
     def sort_key(self) -> tuple[object, ...]:
         return (
             self.core_nutrition_max_deviation,
             self.core_nutrition_total_deviation,
+            self.goal_target_penalty,
             self.micronutrient_gap_penalty,
             self.diet_quality_penalty,
             self.sports_nutrition_distribution_penalty,

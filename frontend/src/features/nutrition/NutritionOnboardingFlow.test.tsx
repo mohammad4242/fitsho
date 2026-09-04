@@ -289,7 +289,7 @@ it("converts a grouped Toman budget to the existing IRR payload", async () => {
 
   await user.click(await screen.findByRole("button", { name: "تمرین نمی‌کنم" }));
   await user.type(await screen.findByLabelText("بودجه ماهانه غذا (تومان)"), "1300000");
-  for (let index = 0; index < 5; index += 1) await user.click(screen.getByRole("button", { name: "ادامه" }));
+  for (let index = 0; index < 6; index += 1) await user.click(screen.getByRole("button", { name: "ادامه" }));
   await user.click(screen.getByRole("button", { name: "ثبت پروفایل تغذیه" }));
 
   await waitFor(() => expect(nutritionApi.saveNutritionProfile).toHaveBeenCalledOnce());
@@ -298,6 +298,7 @@ it("converts a grouped Toman budget to the existing IRR payload", async () => {
       individual_monthly_food_budget_irr: 13_000_000,
       main_meal_count_bucket: "three_main_meals",
       snack_count_bucket: "one_snack",
+      target_weight_change_kg_per_week: 0.5,
     }),
   );
   const submitted = vi.mocked(nutritionApi.saveNutritionProfile).mock.calls[0][0];
@@ -308,3 +309,43 @@ it("converts a grouped Toman budget to the existing IRR payload", async () => {
   expect(onComplete).not.toHaveBeenCalled();
   expect(screen.getByRole("heading", { name: "پروفایل تغذیه‌ات ثبت شد" })).toBeInTheDocument();
 });
+
+it("shows warning when target weight change rate is above 1.0 kg/week", async () => {
+  vi.mocked(nutritionApi.getNutritionProfile).mockResolvedValue({
+    daily_activity_level: "moderate",
+    individual_monthly_food_budget_irr: 13_000_000,
+    budget_style: "strict",
+    meals_per_day: 3,
+    snacks_per_day: 1,
+    target_weight_change_kg_per_week: 1.5,
+    preferred_plan_start_day: "saturday",
+    favourite_foods: [],
+    disliked_foods: [],
+    allergies: [],
+    intolerances: [],
+    dietary_pattern: "omnivore",
+    religious_cultural_exclusions: [],
+    work_shift_context: null,
+    daily_check_in_enabled: false,
+    preferred_check_in_time: null,
+    user_id: "user-1",
+    onboarding_status: "completed",
+    currency: "IRR",
+    weekly_budget_irr: 3_000_000,
+    physician_review_required: false,
+    created_at: "2026-08-05T12:00:00Z",
+    updated_at: "2026-08-05T12:00:00Z",
+  });
+  vi.mocked(profileApi.getSharedProfile).mockResolvedValue({
+    user_id: "user-1", product_mode: "nutrition", display_name: "سارا",
+    birth_date: "2000-05-14", sex: "female", height_cm: 165,
+    current_weight_kg: 62.5, fitness_goal: "fat_loss",
+    weight_measured_at: "2026-08-05T12:00:00Z",
+  });
+
+  render(<NutritionOnboardingFlow productMode="nutrition" editExisting onCreateTrainingProfile={vi.fn()} onComplete={vi.fn()} />);
+
+  expect(await screen.findByRole("heading", { name: "اطلاعات تغذیه‌ای" })).toBeInTheDocument();
+  expect(screen.getByText("نرخ بالای ۱.۰ کیلوگرم در هفته پیشنهاد نمی‌شود.")).toBeInTheDocument();
+});
+

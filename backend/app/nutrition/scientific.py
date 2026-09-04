@@ -3,6 +3,16 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
 
+from app.nutrition.goal_strategy import (
+    GoalMacroStrategy,
+    GoalStrategyInputs,
+    resolve_goal_strategy,
+)
+from app.nutrition.nutrition_targets import (
+    NutrientTargets,
+    TargetBand,
+)
+
 POLICY_VERSION = "nutrition-science-v1"
 FORMULA_VERSION = "mifflin-net-met-v1"
 GOAL_CONTRACT_VERSION = "nutrition-goal-contract-v1"
@@ -44,15 +54,6 @@ class TargetInfeasibleError(ValueError):
 
 
 @dataclass(frozen=True)
-class TargetBand:
-    unit: str
-    minimum: Decimal | None = None
-    preferred: Decimal | None = None
-    preferred_maximum: Decimal | None = None
-    maximum: Decimal | None = None
-
-
-@dataclass(frozen=True)
 class TrainingAlignment:
     warning_codes: tuple[str, ...] = ()
     explanation_codes: tuple[str, ...] = ()
@@ -84,24 +85,14 @@ class ScientificInputs:
     daily_activity_level: DailyActivity
     fitness_goal: FitnessGoal
     structured_exercise: StructuredExercise | None
+    requested_weight_change_kg_per_week: Decimal | None = None
+    training_experience: str | None = None
 
     def __post_init__(self) -> None:
         if not 18 <= self.age <= 100:
             raise ValueError("Age must be between 18 and 100")
         if self.height_cm <= ZERO or self.weight_kg <= ZERO:
             raise ValueError("Height and weight must be positive")
-
-
-@dataclass(frozen=True)
-class NutrientTargets:
-    carbohydrate: TargetBand
-    total_fat: TargetBand
-    fibre: TargetBand
-    free_sugar: TargetBand
-    added_sugar: TargetBand
-    saturated_fat: TargetBand
-    trans_fat: TargetBand
-    sodium: TargetBand
 
 
 @dataclass(frozen=True)
@@ -127,6 +118,7 @@ class ScientificResult:
     saturated_fat: TargetBand
     trans_fat: TargetBand
     sodium: TargetBand
+    goal_strategy: "GoalMacroStrategy | None" = None
 
 
 def nutrient_targets_for_calories(calories: Decimal) -> NutrientTargets:
@@ -180,18 +172,60 @@ def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
     daily_exercise = _daily_exercise_energy(inputs.weight_kg, inputs.structured_exercise)
     exercise = _point_band(daily_exercise, "kcal/day")
     tdee = _map_band(non_exercise, lambda value: value + daily_exercise)
-    goal_calories = calculate_safe_nutrition_target(inputs, bmr, tdee)
     training_alignment = assess_training_stimulus_alignment(inputs)
     calculation_weight = _protein_calculation_weight(inputs.height_cm, inputs.weight_kg)
-    protein = TargetBand(
-        unit="g/day",
-        minimum=calculation_weight * Decimal("0.8"),
-        preferred=calculation_weight * _preferred_protein_multiplier(inputs),
-        maximum=calculation_weight * Decimal("2.2"),
+
+    strategy_inputs = GoalStrategyInputs(
+        fitness_goal=inputs.fitness_goal,
+        body_weight_kg=inputs.weight_kg,
+        protein_calculation_weight_kg=calculation_weight,
+        requested_weight_change_kg_per_week=inputs.requested_weight_change_kg_per_week,
+        exercise_type=inputs.structured_exercise.exercise_type
+        if inputs.structured_exercise is not None
+        else None,
+        training_days_per_week=inputs.structured_exercise.days_per_week
+        if inputs.structured_exercise is not None
+        else None,
+        training_minutes_per_session=inputs.structured_exercise.minutes_per_session
+        if inputs.structured_exercise is not None
+        else None,
+        training_experience=inputs.training_experience,
     )
-    assert goal_calories.preferred is not None
-    nutrients = nutrient_targets_for_calories(goal_calories.preferred)
-    validate_macro_energy_feasibility(goal_calories.preferred, protein, nutrients)
+    strategy = resolve_goal_strategy(
+        strategy_inputs,
+        bmr=bmr,
+        tdee=tdee,
+        protein_calculation_weight_kg=calculation_weight,
+    )
+
+    if inputs.requested_weight_change_kg_per_week is not None:
+        goal_calories = strategy.goal_calories
+        protein = strategy.protein
+        base_nutrients = nutrient_targets_for_calories(goal_calories.preferred or Decimal("2000"))
+        nutrients = NutrientTargets(
+            carbohydrate=strategy.carbohydrate,
+            total_fat=strategy.total_fat,
+            fibre=strategy.fibre,
+            free_sugar=base_nutrients.free_sugar,
+            added_sugar=base_nutrients.added_sugar,
+            saturated_fat=base_nutrients.saturated_fat,
+            trans_fat=base_nutrients.trans_fat,
+            sodium=base_nutrients.sodium,
+        )
+    else:
+        goal_calories = calculate_safe_nutrition_target(inputs, bmr, tdee)
+        protein = TargetBand(
+            unit="g/day",
+            minimum=calculation_weight * Decimal("0.8"),
+            preferred=calculation_weight * _preferred_protein_multiplier(inputs),
+            maximum=calculation_weight * Decimal("2.2"),
+        )
+        assert goal_calories.preferred is not None
+        nutrients = nutrient_targets_for_calories(goal_calories.preferred)
+
+    validate_macro_energy_feasibility(
+        goal_calories.preferred or Decimal("2000"), protein, nutrients
+    )
     confidence, reasons = _confidence(inputs)
     return ScientificResult(
         policy_version=POLICY_VERSION,
@@ -215,6 +249,7 @@ def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
         saturated_fat=nutrients.saturated_fat,
         trans_fat=nutrients.trans_fat,
         sodium=nutrients.sodium,
+        goal_strategy=strategy,
     )
 
 

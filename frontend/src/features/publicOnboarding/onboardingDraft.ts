@@ -15,7 +15,9 @@ export const HYDRATED_ACCOUNT_EVENT = "fitsho:profile-hydrated";
 export type PreAccountNutritionBasics = Pick<
   NutritionProfileInput,
   "daily_activity_level" | "individual_monthly_food_budget_irr" | "budget_style" | "plan_style" | "allergies" | "intolerances" | "dietary_pattern"
->;
+> & {
+  target_weight_change_kg_per_week?: number | null;
+};
 
 export type PendingNutritionSetup = {
   safety: SafetyProfileInput;

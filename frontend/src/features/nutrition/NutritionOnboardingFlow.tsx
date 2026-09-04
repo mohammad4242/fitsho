@@ -164,6 +164,12 @@ export function NutritionOnboardingFlow({
   const [structuredExercise, setStructuredExercise] = useState<StructuredExerciseInput | undefined>(() => initialDraft?.structuredExercise);
   const [budget, setBudget] = useState(() => initialNutritionBasics === undefined ? "" : irrToToman(initialNutritionBasics.individual_monthly_food_budget_irr));
   const [budgetStyle, setBudgetStyle] = useState<"strict" | "flexible">(() => initialNutritionBasics?.budget_style ?? "strict");
+  const [targetWeightChangeRate, setTargetWeightChangeRate] = useState<string>(() => {
+    if (initialNutritionBasics?.target_weight_change_kg_per_week != null) {
+      return String(initialNutritionBasics.target_weight_change_kg_per_week);
+    }
+    return "";
+  });
   const [mealCount, setMealCount] = useState("3");
   const [snackCount, setSnackCount] = useState("1");
   const [startDay, setStartDay] = useState<NutritionProfileInput["preferred_plan_start_day"]>("saturday");
@@ -174,6 +180,10 @@ export function NutritionOnboardingFlow({
     dietaryPattern: initialNutritionBasics?.dietary_pattern ?? "omnivore",
     checkIn: false, checkInTime: "21:00",
   });
+
+  const isWeightLoss = values.fitness_goal === "lose_weight" || values.fitness_goal === "fat_loss";
+  const isWeightGain = values.fitness_goal === "gain_weight" || values.fitness_goal === "build_muscle";
+  const isWeightChangeGoal = isWeightLoss || isWeightGain;
 
   useEffect(() => {
     if (draftMode) return;
@@ -194,16 +204,6 @@ export function NutritionOnboardingFlow({
           intensity: savedExercise.intensity ?? "moderate",
         } : { trains: false });
       }
-      if (nutrition !== null) {
-        setDecision(savedDecision);
-        if (!editExisting) {
-          setStep("complete");
-          return;
-        }
-        populateExistingNutrition(nutrition);
-        setStep("budget");
-        return;
-      }
       if (shared !== null) {
         setValues((current) => ({
           ...current,
@@ -214,6 +214,16 @@ export function NutritionOnboardingFlow({
           current_weight_kg: String(shared.current_weight_kg),
           fitness_goal: shared.fitness_goal,
         }));
+      }
+      if (nutrition !== null) {
+        setDecision(savedDecision);
+        if (!editExisting) {
+          setStep("complete");
+          return;
+        }
+        populateExistingNutrition(nutrition);
+        setStep("budget");
+        return;
       }
       setDecision(savedDecision);
       if (savedDecision !== null && !savedDecision.can_continue_onboarding) {
@@ -236,6 +246,9 @@ export function NutritionOnboardingFlow({
     setDailyActivityLevel(nutrition.daily_activity_level);
     setBudget(irrToToman(nutrition.individual_monthly_food_budget_irr));
     setBudgetStyle(nutrition.budget_style);
+    if (nutrition.target_weight_change_kg_per_week != null) {
+      setTargetWeightChangeRate(String(nutrition.target_weight_change_kg_per_week));
+    }
     setMealCount(String(nutrition.effective_main_meal_slots ?? nutrition.meals_per_day));
     setSnackCount(String(nutrition.effective_snack_slots ?? nutrition.snacks_per_day));
     setStartDay(nutrition.preferred_plan_start_day);
@@ -343,25 +356,31 @@ export function NutritionOnboardingFlow({
     setStep("budget");
   }
 
-  const nutritionInput = useMemo<NutritionProfileInput>(() => ({
-    daily_activity_level: dailyActivityLevel,
-    individual_monthly_food_budget_irr: tomanToIrr(budget),
-    budget_style: budgetStyle,
-    main_meal_count_bucket: mealCount === "2" ? "two_main_meals" : mealCount === "3" ? "three_main_meals" : "four_or_more_main_meals",
-    snack_count_bucket: snackCount === "0" ? "zero_snacks" : snackCount === "1" ? "one_snack" : snackCount === "2" ? "two_snacks" : "three_or_more_snacks",
-    meals_per_day: Number(mealCount),
-    snacks_per_day: Number(snackCount),
-    preferred_plan_start_day: startDay,
-    favourite_foods: splitNames(foods.favourites),
-    disliked_foods: splitNames(foods.disliked),
-    allergies: splitNames(foods.allergies).map((name) => ({ name, details: null })),
-    intolerances: splitNames(foods.intolerances).map((name) => ({ name, details: null })),
-    dietary_pattern: foods.dietaryPattern,
-    religious_cultural_exclusions: splitNames(foods.cultural),
-    work_shift_context: foods.workContext.trim() || null,
-    daily_check_in_enabled: foods.checkIn,
-    preferred_check_in_time: foods.checkIn ? `${foods.checkInTime}:00` : null,
-  }), [budget, budgetStyle, dailyActivityLevel, foods, mealCount, snackCount, startDay]);
+  const nutritionInput = useMemo<NutritionProfileInput>(() => {
+    const effectiveRate = isWeightChangeGoal
+      ? Number(targetWeightChangeRate || (isWeightLoss ? "0.5" : "0.3"))
+      : null;
+    return {
+      daily_activity_level: dailyActivityLevel,
+      target_weight_change_kg_per_week: effectiveRate,
+      individual_monthly_food_budget_irr: tomanToIrr(budget),
+      budget_style: budgetStyle,
+      main_meal_count_bucket: mealCount === "2" ? "two_main_meals" : mealCount === "3" ? "three_main_meals" : "four_or_more_main_meals",
+      snack_count_bucket: snackCount === "0" ? "zero_snacks" : snackCount === "1" ? "one_snack" : snackCount === "2" ? "two_snacks" : "three_or_more_snacks",
+      meals_per_day: Number(mealCount),
+      snacks_per_day: Number(snackCount),
+      preferred_plan_start_day: startDay,
+      favourite_foods: splitNames(foods.favourites),
+      disliked_foods: splitNames(foods.disliked),
+      allergies: splitNames(foods.allergies).map((name) => ({ name, details: null })),
+      intolerances: splitNames(foods.intolerances).map((name) => ({ name, details: null })),
+      dietary_pattern: foods.dietaryPattern,
+      religious_cultural_exclusions: splitNames(foods.cultural),
+      work_shift_context: foods.workContext.trim() || null,
+      daily_check_in_enabled: foods.checkIn,
+      preferred_check_in_time: foods.checkIn ? `${foods.checkInTime}:00` : null,
+    };
+  }, [budget, budgetStyle, dailyActivityLevel, foods, isWeightChangeGoal, isWeightLoss, mealCount, snackCount, startDay, targetWeightChangeRate]);
 
   function finish(event: FormEvent) {
     event.preventDefault();
@@ -445,6 +464,8 @@ export function NutritionOnboardingFlow({
         mealCount={mealCount}
         snackCount={snackCount}
         startDay={startDay}
+        targetWeightChangeRate={targetWeightChangeRate}
+        fitnessGoal={values.fitness_goal}
         foods={foods}
         saved={detailsSaved}
         saveError={requestError}
@@ -454,6 +475,7 @@ export function NutritionOnboardingFlow({
         onMealCount={setMealCount}
         onSnackCount={setSnackCount}
         onStartDay={setStartDay}
+        onTargetWeightChangeRate={setTargetWeightChangeRate}
         onFoods={setFoods}
         onBack={onBack}
         onSave={() => {
@@ -541,16 +563,28 @@ export function NutritionOnboardingFlow({
       {step === "budget" && (
         <BudgetForm
           busy={busy} budget={budget} budgetStyle={budgetStyle} mealCount={mealCount}
-          snackCount={snackCount} startDay={startDay} onBudget={(value) => setBudget(formatTomanInput(value))}
+          snackCount={snackCount} startDay={startDay}
+          targetWeightChangeRate={targetWeightChangeRate}
+          fitnessGoal={values.fitness_goal}
+          onBudget={(value) => setBudget(formatTomanInput(value))}
           onBudgetStyle={setBudgetStyle} onMealCount={setMealCount} onSnackCount={setSnackCount}
-          onStartDay={setStartDay} onBack={() => setStep(productMode === "nutrition" || !trainingProfileExists ? "training" : "safety")}
-    onNext={() => setStep("review")}
+          onStartDay={setStartDay}
+          onTargetWeightChangeRate={setTargetWeightChangeRate}
+          onBack={() => setStep(productMode === "nutrition" || !trainingProfileExists ? "training" : "safety")}
+          onNext={() => setStep("review")}
         />
       )}
       {step === "review" && (
         <form className="profile-form" onSubmit={finish}>
           <div className="nutrition-review-card">
             <strong>{language === "en" ? `Monthly budget: ${budget} Toman` : `بودجه ماهانه: ${new Intl.NumberFormat("fa-IR").format(Number(budget.replaceAll(",", "")))} تومان`}</strong>
+            {isWeightChangeGoal && (
+              <span>
+                {language === "en"
+                  ? `Weekly weight rate: ${targetWeightChangeRate || (isWeightLoss ? "0.5" : "0.3")} kg/week`
+                  : `نرخ تغییر وزن هفتگی: ${targetWeightChangeRate || (isWeightLoss ? "0.5" : "0.3")} کیلوگرم در هفته`}
+              </span>
+            )}
             <span>{language === "en" ? `${mealCount} meals and ${snackCount} snacks per day` : `${mealCount} وعده اصلی و ${snackCount} میان‌وعده در روز`}</span>
             <span>{language === "en" ? "Safety policy" : "سیاست ایمنی"}: {decision?.policy_version}</span>
             <span>{language === "en" ? `Allergies: ${splitNames(foods.allergies).join(", ") || "None"}` : `حساسیت ثبت‌شده: ${splitNames(foods.allergies).join("، ") || "ندارد"}`}</span>
@@ -572,6 +606,8 @@ function PostAccountNutritionDetails(props: {
   mealCount: string;
   snackCount: string;
   startDay: NutritionProfileInput["preferred_plan_start_day"];
+  targetWeightChangeRate: string;
+  fitnessGoal: string;
   foods: FoodsState;
   saved: boolean;
   saveError: boolean;
@@ -581,11 +617,31 @@ function PostAccountNutritionDetails(props: {
   onMealCount: (value: string) => void;
   onSnackCount: (value: string) => void;
   onStartDay: (value: NutritionProfileInput["preferred_plan_start_day"]) => void;
+  onTargetWeightChangeRate: (value: string) => void;
   onFoods: (value: FoodsState) => void;
   onBack?: () => void;
   onSave: () => void;
 }) {
   const l = (fa: string, en: string) => props.language === "en" ? en : fa;
+  const isLoss = props.fitnessGoal === "lose_weight" || props.fitnessGoal === "fat_loss";
+  const isGain = props.fitnessGoal === "gain_weight" || props.fitnessGoal === "build_muscle";
+  const isRecomp = props.fitnessGoal === "body_recomposition";
+  const isWeightChangeGoal = isLoss || isGain;
+
+  const rateOptions: Array<{ value: string; label: string; isHigh: boolean }> = [];
+  for (let r = 3; r <= 20; r += 1) {
+    const v = (r / 10).toFixed(1);
+    const isHigh = r > 10;
+    rateOptions.push({
+      value: v,
+      label: l(
+        `${v} کیلوگرم در هفته${isHigh ? " (پیشنهاد نمی‌شود)" : ""}`,
+        `${v} kg/week${isHigh ? " (not recommended)" : ""}`,
+      ),
+      isHigh,
+    });
+  }
+
   return (
     <section className="nutrition-step profile-details-page" dir={props.language === "fa" ? "rtl" : "ltr"}>
       <p className="eyebrow eyebrow--accent">{l("پروفایل", "Profile")}</p>
@@ -601,6 +657,46 @@ function PostAccountNutritionDetails(props: {
           <SelectField icon="flame" label={l("میزان فعالیت روزانه", "Daily activity level")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Sedentary")], ["light", l("فعالیت سبک", "Light")], ["moderate", l("فعالیت متوسط", "Moderate")], ["very_active", l("بسیار فعال", "Very active")]]} />
           <LabeledInput icon="wallet" label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />
           <SelectField icon="target" label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as NutritionProfileInput["budget_style"])} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />
+          {isWeightChangeGoal && (
+            <div className="profile-field">
+              <label className="profile-field-wrapped-label">
+                <span className="profile-field__title">
+                  <span className="profile-field__icon-badge" aria-hidden="true">
+                    <AppIcon name="target" />
+                  </span>
+                  <span>
+                    {isLoss
+                      ? l("نرخ کاهش وزن هفتگی", "Weekly weight loss rate")
+                      : l("نرخ افزایش وزن هفتگی", "Weekly weight gain rate")}
+                  </span>
+                </span>
+                <select
+                  value={props.targetWeightChangeRate || (isLoss ? "0.5" : "0.3")}
+                  onChange={(event) => props.onTargetWeightChangeRate(event.target.value)}
+                >
+                  {rateOptions.map((opt) => (
+                    <option
+                      key={opt.value}
+                      value={opt.value}
+                      style={opt.isHigh ? { color: "#dc2626", fontWeight: 600 } : undefined}
+                    >
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {Number(props.targetWeightChangeRate || (isLoss ? "0.5" : "0.3")) > 1.0 && (
+                <small style={{ color: "#ef4444", display: "block", marginTop: "0.35rem" }}>
+                  {l("نرخ بالای ۱.۰ کیلوگرم در هفته پیشنهاد نمی‌شود.", "Rates above 1.0 kg/week are not recommended.")}
+                </small>
+              )}
+            </div>
+          )}
+          {isRecomp && (
+            <p style={{ color: "var(--fitsho-aqua)", fontSize: "0.85rem", margin: "0.25rem 0" }}>
+              {l("هدف روند وزن: تقریباً ثابت (بدون تغییر وزن هفتگی)", "Target weight trend: approximately stable")}
+            </p>
+          )}
           <SelectField icon="utensils" label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />
           <SelectField icon="nutrition" label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />
           <SelectField icon="catalogue" label={l("الگوی غذایی", "Dietary pattern")} value={props.foods.dietaryPattern} onChange={(value) => props.onFoods({ ...props.foods, dietaryPattern: value as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />
@@ -908,32 +1004,170 @@ function PreAccountNutritionQuestions(props: {
 
 
 function BudgetForm(props: {
-  busy: boolean; budget: string; budgetStyle: "strict" | "flexible"; mealCount: string;
-  snackCount: string; startDay: NutritionProfileInput["preferred_plan_start_day"];
-  onBudget: (value: string) => void; onBudgetStyle: (value: "strict" | "flexible") => void;
-  onMealCount: (value: string) => void; onSnackCount: (value: string) => void;
+  busy: boolean;
+  budget: string;
+  budgetStyle: "strict" | "flexible";
+  mealCount: string;
+  snackCount: string;
+  startDay: NutritionProfileInput["preferred_plan_start_day"];
+  targetWeightChangeRate: string;
+  fitnessGoal: string;
+  onBudget: (value: string) => void;
+  onBudgetStyle: (value: "strict" | "flexible") => void;
+  onMealCount: (value: string) => void;
+  onSnackCount: (value: string) => void;
   onStartDay: (value: NutritionProfileInput["preferred_plan_start_day"]) => void;
-  onBack: () => void; onNext: () => void;
+  onTargetWeightChangeRate: (value: string) => void;
+  onBack: () => void;
+  onNext: () => void;
 }) {
   const l = useLocalizer();
   const [question, setQuestion] = useState(0);
-  const titles = [
-    l("بودجه ماهانه غذای تو چقدر است؟", "What is your monthly food budget?"),
-    l("بودجه را چقدر سخت‌گیرانه رعایت کنیم؟", "How strictly should we follow your budget?"),
-    l("روزانه چند وعده اصلی می‌خوری؟", "How many main meals do you eat each day?"),
-    l("روزانه چند میان‌وعده می‌خواهی؟", "How many snacks would you like each day?"),
-    l("برنامه غذایی از چه روزی شروع شود؟", "Which day should your plan start?"),
+
+  const isLoss = props.fitnessGoal === "lose_weight" || props.fitnessGoal === "fat_loss";
+  const isGain = props.fitnessGoal === "gain_weight" || props.fitnessGoal === "build_muscle";
+  const isWeightChangeGoal = isLoss || isGain;
+
+  const rateOptions: Array<{ value: string; label: string; isHigh: boolean }> = [];
+  for (let r = 3; r <= 20; r += 1) {
+    const v = (r / 10).toFixed(1);
+    const isHigh = r > 10;
+    rateOptions.push({
+      value: v,
+      label: l(
+        `${v} کیلوگرم در هفته${isHigh ? " (پیشنهاد نمی‌شود)" : ""}`,
+        `${v} kg/week${isHigh ? " (not recommended)" : ""}`,
+      ),
+      isHigh,
+    });
+  }
+
+  const questionsList: Array<{
+    id: "budget" | "budget_style" | "weight_rate" | "meals" | "snacks" | "start_day";
+    title: string;
+  }> = [
+    { id: "budget", title: l("بودجه ماهانه غذای تو چقدر است؟", "What is your monthly food budget?") },
+    { id: "budget_style", title: l("بودجه را چقدر سخت‌گیرانه رعایت کنیم؟", "How strictly should we follow your budget?") },
   ];
-  const advance = () => question === titles.length - 1 ? props.onNext() : setQuestion((current) => current + 1);
-  const back = () => question === 0 ? props.onBack() : setQuestion((current) => current - 1);
+
+  if (isWeightChangeGoal) {
+    questionsList.push({
+      id: "weight_rate",
+      title: isLoss
+        ? l("هفته‌ای چقدر می‌خواهی وزن کم کنی؟", "How much weight do you want to lose per week?")
+        : l("هفته‌ای چقدر می‌خواهی وزن اضافه کنی؟", "How much weight do you want to gain per week?"),
+    });
+  }
+
+  questionsList.push(
+    { id: "meals", title: l("روزانه چند وعده اصلی می‌خوری؟", "How many main meals do you eat each day?") },
+    { id: "snacks", title: l("روزانه چند میان‌وعده می‌خواهی؟", "How many snacks would you like each day?") },
+    { id: "start_day", title: l("برنامه غذایی از چه روزی شروع شود؟", "Which day should your plan start?") },
+  );
+
+  const currentQ = questionsList[question];
+  const advance = () => (question === questionsList.length - 1 ? props.onNext() : setQuestion((current) => current + 1));
+  const back = () => (question === 0 ? props.onBack() : setQuestion((current) => current - 1));
+
   return (
-    <NutritionQuestionFrame busy={props.busy} current={question} total={titles.length} title={titles[question]} stage={1}
-      onBack={back} onSubmit={advance}>
-      {question === 0 && <LabeledInput label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />}
-      {question === 1 && <SelectField label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as "strict" | "flexible")} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />}
-      {question === 2 && <SelectField label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />}
-      {question === 3 && <SelectField label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />}
-      {question === 4 && <SelectField label={l("روز شروع برنامه", "Plan start day")} value={props.startDay} onChange={(value) => props.onStartDay(value as NutritionProfileInput["preferred_plan_start_day"])} options={[["saturday", l("شنبه", "Saturday")], ["sunday", l("یکشنبه", "Sunday")], ["monday", l("دوشنبه", "Monday")], ["tuesday", l("سه‌شنبه", "Tuesday")], ["wednesday", l("چهارشنبه", "Wednesday")], ["thursday", l("پنجشنبه", "Thursday")], ["friday", l("جمعه", "Friday")]]} />}
+    <NutritionQuestionFrame
+      busy={props.busy}
+      current={question}
+      total={questionsList.length}
+      title={currentQ.title}
+      stage={1}
+      onBack={back}
+      onSubmit={advance}
+    >
+      {currentQ.id === "budget" && (
+        <LabeledInput
+          label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")}
+          inputMode="numeric"
+          required
+          value={props.budget}
+          onChange={props.onBudget}
+        />
+      )}
+      {currentQ.id === "budget_style" && (
+        <SelectField
+          label={l("نوع بودجه", "Budget style")}
+          value={props.budgetStyle}
+          onChange={(value) => props.onBudgetStyle(value as "strict" | "flexible")}
+          options={[
+            ["strict", l("سخت‌گیرانه", "Strict")],
+            ["flexible", l("انعطاف‌پذیر", "Flexible")],
+          ]}
+        />
+      )}
+      {currentQ.id === "weight_rate" && (
+        <div className="profile-field">
+          <label className="profile-field-wrapped-label">
+            <span className="profile-field__title">
+              <span>{currentQ.title}</span>
+            </span>
+            <select
+              value={props.targetWeightChangeRate || (isLoss ? "0.5" : "0.3")}
+              onChange={(event) => props.onTargetWeightChangeRate(event.target.value)}
+            >
+              {rateOptions.map((opt) => (
+                <option
+                  key={opt.value}
+                  value={opt.value}
+                  style={opt.isHigh ? { color: "#dc2626", fontWeight: 600 } : undefined}
+                >
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {Number(props.targetWeightChangeRate || (isLoss ? "0.5" : "0.3")) > 1.0 && (
+            <small style={{ color: "#ef4444", display: "block", marginTop: "0.35rem" }}>
+              {l("نرخ بالای ۱.۰ کیلوگرم در هفته پیشنهاد نمی‌شود.", "Rates above 1.0 kg/week are not recommended.")}
+            </small>
+          )}
+        </div>
+      )}
+      {currentQ.id === "meals" && (
+        <SelectField
+          label={l("وعده اصلی در روز", "Main meals per day")}
+          value={props.mealCount}
+          onChange={props.onMealCount}
+          options={[
+            ["2", l("۲ وعده", "2 meals")],
+            ["3", l("۳ وعده", "3 meals")],
+            ["4", l("۴ وعده یا بیشتر", "4 or more meals")],
+          ]}
+        />
+      )}
+      {currentQ.id === "snacks" && (
+        <SelectField
+          label={l("میان‌وعده در روز", "Snacks per day")}
+          value={props.snackCount}
+          onChange={props.onSnackCount}
+          options={[
+            ["0", l("هیچ‌کدام", "None")],
+            ["1", l("۱ میان‌وعده", "1 snack")],
+            ["2", l("۲ میان‌وعده", "2 snacks")],
+            ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")],
+          ]}
+        />
+      )}
+      {currentQ.id === "start_day" && (
+        <SelectField
+          label={l("روز شروع برنامه", "Plan start day")}
+          value={props.startDay}
+          onChange={(value) => props.onStartDay(value as NutritionProfileInput["preferred_plan_start_day"])}
+          options={[
+            ["saturday", l("شنبه", "Saturday")],
+            ["sunday", l("یکشنبه", "Sunday")],
+            ["monday", l("دوشنبه", "Monday")],
+            ["tuesday", l("سه‌شنبه", "Tuesday")],
+            ["wednesday", l("چهارشنبه", "Wednesday")],
+            ["thursday", l("پنجشنبه", "Thursday")],
+            ["friday", l("جمعه", "Friday")],
+          ]}
+        />
+      )}
     </NutritionQuestionFrame>
   );
 }

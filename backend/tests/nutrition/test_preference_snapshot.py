@@ -23,9 +23,7 @@ def test_feedback_snapshot_keeps_hard_and_soft_preferences_separate() -> None:
     assert snapshot.liked_meal_ids == (str(UUID(int=10)),)
     assert snapshot.disliked_meal_ids == (str(UUID(int=11)),)
     assert snapshot.excluded_meal_ids == (str(UUID(int=12)),)
-    assert snapshot.prefer_more_often_meal_ids == (
-        str(UUID(int=13)),
-    )
+    assert snapshot.prefer_more_often_meal_ids == (str(UUID(int=13)),)
 
 
 def test_preference_snapshot_is_deterministic_and_adherence_neutral_without_data() -> None:

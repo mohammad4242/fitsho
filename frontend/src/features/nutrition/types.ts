@@ -103,6 +103,7 @@ export type NutritionEstimate = {
   is_stale: boolean;
   targets: Record<string, NutritionTarget>;
   micronutrients?: Record<string, NutritionMicronutrientTarget>;
+  input_snapshot?: Record<string, unknown>;
   created_at: string;
 };
 
@@ -274,6 +275,7 @@ export type NutritionAdherence = {
 export type NutritionProfileInput = {
   daily_activity_level: "sedentary" | "light" | "moderate" | "very_active";
   metabolic_basis?: "female_coefficient" | "male_coefficient" | null;
+  target_weight_change_kg_per_week?: number | null;
   individual_monthly_food_budget_irr: number;
   budget_style: "strict" | "flexible";
   main_meal_count_bucket?: "two_main_meals" | "three_main_meals" | "four_or_more_main_meals";

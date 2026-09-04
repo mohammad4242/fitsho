@@ -13,6 +13,9 @@ TEMPLATE_SUBSTITUTION_POLICY_VERSION = "safe-template-substitution-beam-v1"
 BUDGET_OPTIMIZER_POLICY_VERSION = "deterministic-budget-optimizer-v1"
 PROGRAM_SELECTION_POLICY_VERSION = "nutrition-program-selection-v3"
 PROGRAM_COSTING_POLICY_VERSION = "nutrition-program-costing-v1"
+GOAL_STRATEGY_VERSION = "nutrition-goal-strategy-v1"
+WEIGHT_RATE_POLICY_VERSION = "nutrition-weight-rate-v1"
+MACRO_RESOLUTION_POLICY_VERSION = "nutrition-macro-resolution-v2"
 
 ECONOMY_MONTHLY_MAX_IRR = 130_000_000
 NORMAL_MONTHLY_MAX_IRR = 180_000_000

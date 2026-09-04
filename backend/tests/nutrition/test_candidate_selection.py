@@ -176,9 +176,7 @@ def test_missing_comparison_data_is_not_perfect_quality() -> None:
 
 
 def test_liked_meal_wins_an_equal_nutrition_tie() -> None:
-    snapshot = build_preference_snapshot(
-        feedback=(PreferenceFeedback(UUID(int=2), "liked"),)
-    )
+    snapshot = build_preference_snapshot(feedback=(PreferenceFeedback(UUID(int=2), "liked"),))
     neutral = evaluate_candidate(
         _proposal("P01", 0),
         _success_with_meals("00000000-0000-0000-0000-000000000001"),
@@ -196,9 +194,7 @@ def test_liked_meal_wins_an_equal_nutrition_tie() -> None:
 
 
 def test_preference_cannot_beat_worse_core_nutrition() -> None:
-    snapshot = build_preference_snapshot(
-        feedback=(PreferenceFeedback(UUID(int=2), "liked"),)
-    )
+    snapshot = build_preference_snapshot(feedback=(PreferenceFeedback(UUID(int=2), "liked"),))
     worse_core = evaluate_candidate(
         _proposal("P01", 0),
         _success_with_meals("00000000-0000-0000-0000-000000000002", calories="1500"),
@@ -216,9 +212,7 @@ def test_preference_cannot_beat_worse_core_nutrition() -> None:
 
 
 def test_disliked_meal_is_penalized_and_variety_breaks_a_quality_tie() -> None:
-    snapshot = build_preference_snapshot(
-        feedback=(PreferenceFeedback(UUID(int=2), "disliked"),)
-    )
+    snapshot = build_preference_snapshot(feedback=(PreferenceFeedback(UUID(int=2), "disliked"),))
     disliked = evaluate_candidate(
         _proposal("P01", 0),
         _success_with_meals(

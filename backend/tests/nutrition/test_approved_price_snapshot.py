@@ -45,9 +45,11 @@ def test_snapshot_has_exact_approved_food_set_and_valid_values() -> None:
         isinstance(entry.reference_price_toman, Decimal) for entry in APPROVED_PRICE_SNAPSHOT
     )
     assert all(entry.reference_price_toman > Decimal("0") for entry in APPROVED_PRICE_SNAPSHOT)
-    assert {
-        entry.canonical_unit for entry in APPROVED_PRICE_SNAPSHOT
-    } <= {"TOMAN_PER_KG", "TOMAN_PER_LITER", "TOMAN_PER_UNIT"}
+    assert {entry.canonical_unit for entry in APPROVED_PRICE_SNAPSHOT} <= {
+        "TOMAN_PER_KG",
+        "TOMAN_PER_LITER",
+        "TOMAN_PER_UNIT",
+    }
 
 
 def test_snapshot_contains_the_exact_non_kg_price_baselines() -> None:
@@ -96,9 +98,7 @@ def test_apply_preserves_automatic_reference_and_price_history(db) -> None:
 
     _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-preserve-admin@example.com", is_admin=True)
-    food = db.scalar(
-        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg")
-    )
+    food = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg"))
     assert food is not None
     now = datetime(2026, 9, 2, 12, tzinfo=UTC)
     reference = NutritionFoodPriceReference(
@@ -137,9 +137,7 @@ def test_apply_replaces_previous_override_without_deleting_it(db) -> None:
 
     _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-replace-admin@example.com", is_admin=True)
-    food = db.scalar(
-        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg")
-    )
+    food = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "egg"))
     assert food is not None
     previous = NutritionFoodPriceOverride(
         food_id=food.id,
@@ -203,9 +201,7 @@ def test_apply_missing_catalogue_food_fails_before_any_partial_override(db) -> N
 
     _seed_approved_catalogue(db)
     admin = _user(db, email="snapshot-missing-admin@example.com", is_admin=True)
-    food = db.scalar(
-        select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "melon")
-    )
+    food = db.scalar(select(NutritionCatalogueFood).where(NutritionCatalogueFood.slug == "melon"))
     assert food is not None
     food.verification_status = FoodVerificationStatus.DRAFT
     db.flush()
@@ -327,6 +323,5 @@ def test_applied_snapshot_keeps_non_kg_units_and_planner_mass_audit(db) -> None:
         assert snapshots_by_slug[slug]["canonical_unit"] == unit
         assert snapshots_by_slug[slug]["grams_per_price_unit"] == grams
         assert (
-            snapshots_by_slug[slug]["price_mass_conversion_version"]
-            == "price-mass-equivalent-v1"
+            snapshots_by_slug[slug]["price_mass_conversion_version"] == "price-mass-equivalent-v1"
         )

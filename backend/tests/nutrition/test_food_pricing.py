@@ -419,7 +419,7 @@ def test_scheduler_commits_run_outside_advisory_lock_transaction(
             delete(NutritionFoodPriceUpdateRun).where(
                 NutritionFoodPriceUpdateRun.scheduled_for == due_now
             )
-            )
+        )
 
 
 def test_scheduler_passes_resolved_agent_execution_to_update(
@@ -753,7 +753,9 @@ def _agent_researcher(slug: str, payloads: list[dict[str, object]]):
     from app.nutrition.ai_price_research import AgentFoodPriceResearcher
 
     provider = _AgentStructuredProvider(payloads)
-    return AgentFoodPriceResearcher(provider, route=ModelRoute(primary_model=f"model-{slug}")), provider
+    return AgentFoodPriceResearcher(
+        provider, route=ModelRoute(primary_model=f"model-{slug}")
+    ), provider
 
 
 def _verified_price_food(db, slug: str):
@@ -1014,7 +1016,9 @@ def test_agent_promotional_price_is_persisted_but_normal_price_drives_reference(
             _agent_output(
                 food.slug,
                 [
-                    _agent_quote_payload(food.slug, "digikala.com", 250000, promotional_price=210000),
+                    _agent_quote_payload(
+                        food.slug, "digikala.com", 250000, promotional_price=210000
+                    ),
                     _agent_quote_payload(food.slug, "okala.ir", 250000),
                     _agent_quote_payload(food.slug, "basalam.com", 250000),
                 ],
@@ -1030,7 +1034,9 @@ def test_agent_promotional_price_is_persisted_but_normal_price_drives_reference(
     )
 
     reference = db.get(NutritionFoodPriceReference, food.id)
-    quote = db.scalar(select(NutritionFoodPriceQuote).where(NutritionFoodPriceQuote.food_id == food.id))
+    quote = db.scalar(
+        select(NutritionFoodPriceQuote).where(NutritionFoodPriceQuote.food_id == food.id)
+    )
     assert reference is not None
     assert reference.reference_price_toman == Decimal("250000")
     assert quote is not None
@@ -1149,6 +1155,11 @@ def test_agent_research_failure_isolated_to_one_food(db) -> None:
     assert run.details["execution_mode"] == "agent_service"
     assert run.details["agent_research_failures"] == 1
     assert db.get(NutritionFoodPriceReference, second_food.id) is not None
-    assert db.scalar(
-        select(NutritionFoodPriceReview).where(NutritionFoodPriceReview.food_id == first_food.id)
-    ) is not None
+    assert (
+        db.scalar(
+            select(NutritionFoodPriceReview).where(
+                NutritionFoodPriceReview.food_id == first_food.id
+            )
+        )
+        is not None
+    )

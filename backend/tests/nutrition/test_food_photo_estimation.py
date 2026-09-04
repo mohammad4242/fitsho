@@ -98,9 +98,7 @@ class InvalidOutputVisionProvider:
         )
 
 
-def _configured_provider(
-    provider: Any, *, name: str, model_id: str
-) -> ConfiguredAIProvider:
+def _configured_provider(provider: Any, *, name: str, model_id: str) -> ConfiguredAIProvider:
     return ConfiguredAIProvider(
         provider=cast(AIProvider, provider),
         provider_name=name,
@@ -323,9 +321,7 @@ def test_agent_photo_estimate_uses_agent_metadata_without_api_credential_decrypt
     assert provider.images[0][0].storage_scope == "food"
     assert provider.images[0][0].storage_key
     assert provider.images[0][0].base64_data is None
-    normalized, normalized_mime = _normalize_image(
-        _image(), test_settings.food_photo_max_pixels
-    )
+    normalized, normalized_mime = _normalize_image(_image(), test_settings.food_photo_max_pixels)
     assert normalized_mime == "image/jpeg"
     stored_path = test_settings.food_photo_storage_root / provider.images[0][0].storage_key
     assert stored_path.is_file()

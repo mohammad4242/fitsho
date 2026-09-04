@@ -260,9 +260,7 @@ def test_monitoring_returns_only_quote_evidence_referenced_by_review(
 
     assert monitoring.status_code == 200, monitoring.text
     review = next(
-        item
-        for item in monitoring.json()["price_reviews"]
-        if item["food_slug"] == food.slug
+        item for item in monitoring.json()["price_reviews"] if item["food_slug"] == food.slug
     )
     assert review["reason_codes"] == ["source_disagreement"]
     assert review["candidate_reference_price_toman"] == "194000"

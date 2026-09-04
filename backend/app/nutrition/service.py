@@ -266,7 +266,7 @@ def save_nutrition_profile(
     user_id: UUID,
     payload: NutritionProfileInput,
 ) -> NutritionSnapshot:
-    _require_shared_profile(db, user_id)
+    shared_profile = _require_shared_profile(db, user_id)
     try:
         decision = current_safety_decision(db, user_id)
     except SafetyDecisionNotFoundError as error:
@@ -314,6 +314,11 @@ def save_nutrition_profile(
         payload.main_meal_count_bucket
     )
     scalar_values["effective_snack_slots"] = snack_effective_slots(payload.snack_count_bucket)
+    if (
+        shared_profile.fitness_goal is not None
+        and shared_profile.fitness_goal.value == "body_recomposition"
+    ):
+        scalar_values["target_weight_change_kg_per_week"] = None
     if profile is None:
         # These columns predate Task 2A. Keep safe defaults for old non-null columns,
         # but never expose or ask them as Nutrition inputs.
@@ -504,6 +509,7 @@ def nutrition_profile_response(snapshot: NutritionSnapshot) -> NutritionProfileR
         physician_review_required=(snapshot.safety.outcome is not SafetyOutcome.STANDARD_AUTOMATIC),
         daily_check_in_enabled=profile.daily_check_in_enabled,
         preferred_check_in_time=profile.preferred_check_in_time,
+        target_weight_change_kg_per_week=profile.target_weight_change_kg_per_week,
         effective_main_meal_slots=profile.effective_main_meal_slots,
         effective_snack_slots=profile.effective_snack_slots,
         created_at=profile.created_at,

@@ -129,19 +129,63 @@ def score_program(
     if is_preferred:
         reason_codes.append("PREFERRED_DIET_STYLE")
 
-    # Weighting: Budget 40%, Preference 15% (Goal 25%, Training 10%, Meal structure 10% in Phase 2)
+    # Goal alignment scoring (25%)
+    goal = request.fitness_goal.lower()
+    if goal in {"build_muscle", "body_recomposition"}:
+        if program.diet_style == NutritionDietStyle.HIGH_PROTEIN_GYM:
+            goal_score = 100
+            reason_codes.append("GOAL_PROTEIN_ALIGNMENT")
+        else:
+            goal_score = 50
+    elif goal == "fat_loss":
+        if program.diet_style == NutritionDietStyle.HIGH_PROTEIN_GYM:
+            goal_score = 95
+            reason_codes.append("GOAL_PROTEIN_ALIGNMENT")
+        elif program.diet_style == NutritionDietStyle.BALANCED_IRANIAN:
+            goal_score = 85
+        else:
+            goal_score = 65
+    elif goal in {"lose_weight", "gain_weight"}:
+        if program.diet_style in {
+            NutritionDietStyle.BALANCED_IRANIAN,
+            NutritionDietStyle.ECONOMY,
+            NutritionDietStyle.PREMIUM_VARIED,
+        }:
+            goal_score = 90
+        else:
+            goal_score = 75
+    else:
+        goal_score = 80
+
+    # Training alignment scoring (10%)
+    if request.trains and request.exercise_type in {"resistance", "mixed"}:
+        if program.diet_style == NutritionDietStyle.HIGH_PROTEIN_GYM:
+            training_score = 100
+            reason_codes.append("TRAINING_STYLE_MATCH")
+        else:
+            training_score = 70
+    else:
+        training_score = 80
+
+    # Meal structure scoring (10%)
+    meal_structure_score = 100
+
+    # Weighting: Budget 40%, Goal 25%, Preference 15%, Training 10%, Meal structure 10%
     budget_part = Decimal(str(budget_score)) * Decimal("0.40")
+    goal_part = Decimal(str(goal_score)) * Decimal("0.25")
     pref_part = Decimal(str(preference_score)) * Decimal("0.15")
-    total = int(round(budget_part + pref_part))
+    train_part = Decimal(str(training_score)) * Decimal("0.10")
+    meal_part = Decimal(str(meal_structure_score)) * Decimal("0.10")
+    total = int(round(budget_part + goal_part + pref_part + train_part + meal_part))
 
     return ProgramScoringResult(
         score=ProgramScore(
             budget_score=budget_score,
-            goal_score=0,
-            training_score=0,
-            meal_structure_score=0,
+            goal_score=goal_score,
+            training_score=training_score,
+            meal_structure_score=meal_structure_score,
             preference_score=preference_score,
             total=total,
         ),
-        reason_codes=tuple(reason_codes),
+        reason_codes=tuple(dict.fromkeys(reason_codes)),
     )

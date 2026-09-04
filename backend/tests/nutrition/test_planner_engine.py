@@ -101,9 +101,7 @@ def test_do_not_suggest_again_excludes_a_meal_template() -> None:
         )
         for meal_id in (excluded_id, allowed_id)
     )
-    inputs = _input(
-        preference_snapshot=PreferenceSnapshot(excluded_meal_ids=(excluded_id,))
-    )
+    inputs = _input(preference_snapshot=PreferenceSnapshot(excluded_meal_ids=(excluded_id,)))
 
     eligible = _eligible_templates(
         inputs,

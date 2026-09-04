@@ -160,6 +160,9 @@ class NutritionProfileInput(BaseModel):
     work_shift_context: str | None = Field(default=None, max_length=500)
     daily_check_in_enabled: bool
     preferred_check_in_time: time | None = None
+    target_weight_change_kg_per_week: Decimal | None = Field(
+        default=None, ge=Decimal("0.3"), le=Decimal("2.0")
+    )
 
     _normalize_optional = field_validator(
         "supplied_meal_source", "work_shift_context", mode="before"
@@ -787,6 +790,7 @@ class NutritionEstimateResponse(BaseModel):
     targets: dict[str, NutritionTargetResponse]
     micronutrients: dict[str, NutritionMicronutrientTargetResponse]
     created_at: datetime
+    input_snapshot: dict[str, object] = Field(default_factory=dict)
 
 
 class PhysicianReviewRequirementResponse(BaseModel):

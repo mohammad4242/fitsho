@@ -1424,9 +1424,7 @@ def _plan_edit_error(error: PlanEditError) -> HTTPException:
 
 
 @router.get("/plans/{plan_id}/feedback", response_model=WeeklyPlanFeedbackResponse)
-def read_meal_feedback(
-    plan_id: UUID, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+def read_meal_feedback(plan_id: UUID, db: DatabaseSession, user: CurrentUser) -> dict[str, object]:
     try:
         return meal_feedback(db, user.id, plan_id)
     except PlanEditError as error:

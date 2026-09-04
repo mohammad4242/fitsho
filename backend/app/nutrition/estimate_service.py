@@ -176,6 +176,28 @@ def create_estimate(db: Session, user_id: UUID) -> NutritionEstimateResponse:
         .order_by(NutritionEstimate.revision.desc())
         .limit(1)
     )
+    confidence_reasons = list(result.confidence_reasons)
+    snapshot = dict(context.snapshot)
+    if result.goal_strategy is not None:
+        rate_res = result.goal_strategy.target_weight_rate
+        snapshot["requested_weight_change_kg_per_week"] = (
+            str(rate_res.requested_kg_per_week)
+            if rate_res.requested_kg_per_week is not None
+            else None
+        )
+        snapshot["recommended_weight_change_kg_per_week"] = (
+            str(rate_res.recommended_kg_per_week)
+            if rate_res.recommended_kg_per_week is not None
+            else None
+        )
+        snapshot["applied_weight_change_kg_per_week"] = (
+            str(rate_res.applied_kg_per_week) if rate_res.applied_kg_per_week is not None else None
+        )
+        snapshot["weight_rate_policy_version"] = "nutrition-weight-rate-v1"
+        snapshot["goal_strategy_version"] = "nutrition-goal-strategy-v1"
+        snapshot["goal_strategy_reason_codes"] = list(result.goal_strategy.goal_reason_codes)
+        confidence_reasons.extend(rate_res.warning_codes)
+
     estimate_id = uuid4()
     estimate = NutritionEstimate(
         id=estimate_id,
@@ -185,14 +207,14 @@ def create_estimate(db: Session, user_id: UUID) -> NutritionEstimateResponse:
         formula_version=FORMULA_VERSION,
         revision=(latest_revision or 0) + 1,
         input_signature=context.signature,
-        input_snapshot=context.snapshot,
+        input_snapshot=snapshot,
         status=(
             NutritionEstimateStatus.ACTIVE
             if context.safety.outcome is SafetyOutcome.STANDARD_AUTOMATIC
             else NutritionEstimateStatus.REVIEW_REQUIRED
         ),
         overall_confidence=EstimateConfidence(result.confidence),
-        confidence_reasons=list(result.confidence_reasons),
+        confidence_reasons=list(dict.fromkeys(confidence_reasons)),
         targets=_target_rows(estimate_id, result),
         micronutrient_targets=_micronutrient_rows(estimate_id, context),
     )
@@ -287,6 +309,7 @@ def estimate_response(
         targets=targets,
         micronutrients=micronutrients,
         created_at=estimate.created_at,
+        input_snapshot=estimate.input_snapshot,
     )
 
 
@@ -324,6 +347,10 @@ def _estimate_context(db: Session, user_id: UUID) -> EstimateContext:
         daily_activity_level=nutrition_profile.daily_activity_level.value,
         fitness_goal=profile.fitness_goal.value,
         structured_exercise=scientific_exercise,
+        requested_weight_change_kg_per_week=nutrition_profile.target_weight_change_kg_per_week,
+        training_experience=(
+            profile.experience_level.value if profile.experience_level is not None else None
+        ),
     )
     training_alignment = assess_training_stimulus_alignment(inputs)
     snapshot: dict[str, object] = {
@@ -338,6 +365,11 @@ def _estimate_context(db: Session, user_id: UUID) -> EstimateContext:
         "metabolic_basis": metabolic_basis,
         "fitness_goal": profile.fitness_goal.value,
         "daily_activity_level": nutrition_profile.daily_activity_level.value,
+        "target_weight_change_kg_per_week": (
+            str(nutrition_profile.target_weight_change_kg_per_week)
+            if nutrition_profile.target_weight_change_kg_per_week is not None
+            else None
+        ),
         "structured_exercise": _exercise_snapshot(exercise),
         "safety_decision_id": str(safety.id),
         "safety_outcome": safety.outcome.value,

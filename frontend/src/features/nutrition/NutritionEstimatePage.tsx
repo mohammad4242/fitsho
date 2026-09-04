@@ -349,6 +349,8 @@ function EstimateContent({ estimate, language, onRefresh, plan, tracking }: { es
       </div>
     </section>
 
+    <WeightRateCard estimate={estimate} language={language} />
+
     {todayPlan && <section className="nutrition-meal-summary" aria-label={l("وعده‌های امروز", "Today's meals")}>
       <header><h2>{l("وعده‌های امروز", "Today's meals")}</h2><Link to="/nutrition-tracking">{l("ثبت وعده", "Track meal")}</Link></header>
       <div>{todayPlan.meals.map((meal) => <article key={meal.id}><span>{mealLabel(meal.slot_role, meal.slot_index, language)}</span><strong>{meal.nutrient_totals.energy_kcal === undefined ? "—" : `${number.format(meal.nutrient_totals.energy_kcal)} ${l("کیلوکالری", "kcal")}`}</strong></article>)}</div>
@@ -409,3 +411,74 @@ function formatRange(target: NutritionTarget | undefined, number: Intl.NumberFor
   const unit = target.unit === "g/day" ? (language === "en" ? "g" : "گرم") : target.unit;
   return `${number.format(target.minimum)}–${number.format(target.maximum)} ${unit}`;
 }
+
+function WeightRateCard({
+  estimate,
+  language,
+}: {
+  estimate: NutritionEstimate;
+  language: "fa" | "en";
+}) {
+  const l = (fa: string, en: string) => (language === "en" ? en : fa);
+  const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
+    maximumFractionDigits: 1,
+  });
+  const snapshot = estimate.input_snapshot;
+  if (!snapshot) return null;
+
+  const requested = snapshot["requested_weight_change_kg_per_week"] != null
+    ? Number(snapshot["requested_weight_change_kg_per_week"])
+    : null;
+  const recommended = snapshot["recommended_weight_change_kg_per_week"] != null
+    ? Number(snapshot["recommended_weight_change_kg_per_week"])
+    : null;
+  const applied = snapshot["applied_weight_change_kg_per_week"] != null
+    ? Number(snapshot["applied_weight_change_kg_per_week"])
+    : null;
+
+  if (requested == null && recommended == null && applied == null) {
+    return null;
+  }
+
+  const isClamped = estimate.confidence_reasons.includes(
+    "WEIGHT_RATE_CLAMPED_FOR_AUTOMATIC_SAFETY",
+  );
+
+  return (
+    <section className="nutrition-weight-rate-card" aria-label={l("نرخ تغییر وزن هفتگی", "Weekly weight change rate")}>
+      <header>
+        <h3>{l("نرخ تغییر وزن هفتگی", "Weekly Weight Change Rate")}</h3>
+        {isClamped && (
+          <span className="nutrition-rate-badge--clamped">
+            {l("تنظیم‌شده برای ایمنی خودکار", "Adjusted for automatic safety")}
+          </span>
+        )}
+      </header>
+      <div className="nutrition-weight-rate-grid">
+        <div className="nutrition-weight-rate-item">
+          <span className="nutrition-weight-rate-label">{l("درخواست شما", "Your request")}</span>
+          <strong className="nutrition-weight-rate-val">
+            {requested != null ? `${number.format(requested)} ${l("کیلوگرم/هفته", "kg/week")}` : "—"}
+          </strong>
+        </div>
+        <div className="nutrition-weight-rate-item">
+          <span className="nutrition-weight-rate-label">{l("مقدار پیشنهادی", "Recommended")}</span>
+          <strong className="nutrition-weight-rate-val">
+            {recommended != null ? `${number.format(recommended)} ${l("کیلوگرم/هفته", "kg/week")}` : "—"}
+          </strong>
+        </div>
+        <div className={`nutrition-weight-rate-item ${isClamped ? "nutrition-weight-rate-item--clamped" : ""}`}>
+          <span className="nutrition-weight-rate-label">
+            {isClamped
+              ? l("مقدار اعمال‌شده (تنظیم ایمنی)", "Applied (safety clamped)")
+              : l("مقدار اعمال‌شده", "Applied")}
+          </span>
+          <strong className="nutrition-weight-rate-val">
+            {applied != null ? `${number.format(applied)} ${l("کیلوگرم/هفته", "kg/week")}` : "—"}
+          </strong>
+        </div>
+      </div>
+    </section>
+  );
+}
+

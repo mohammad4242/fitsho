@@ -365,6 +365,10 @@ class NutritionProfile(Base):
             "maximum_meal_repetition_per_week BETWEEN 1 AND 7",
             name="ck_nutrition_profiles_repetition_range",
         ),
+        CheckConstraint(
+            "target_weight_change_kg_per_week IS NULL OR (target_weight_change_kg_per_week >= 0.3 AND target_weight_change_kg_per_week <= 2.0)",
+            name="ck_nutrition_profiles_target_weight_rate_range",
+        ),
     )
 
     user_id: Mapped[UUID] = mapped_column(
@@ -434,6 +438,9 @@ class NutritionProfile(Base):
     work_shift_context: Mapped[str | None] = mapped_column(String(500))
     daily_check_in_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
     preferred_check_in_time: Mapped[time | None] = mapped_column(Time)
+    target_weight_change_kg_per_week: Mapped[Decimal | None] = mapped_column(
+        Numeric(3, 1), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -622,3 +622,31 @@ it("supports locking, feedback, and a confirmed revision-safe meal removal", asy
   expect(nutritionApi.confirmMealRemoval).toHaveBeenCalledWith("plan-1", "meal-0", "plan-1");
   expect(await screen.findByText("Revision 2")).toBeInTheDocument();
 });
+
+it("renders weekly weight rate card with requested, recommended, and applied rates", async () => {
+  await i18n.changeLanguage("fa");
+  const clampedEstimate: NutritionEstimate = {
+    ...estimate,
+    confidence_reasons: ["complete_anthropometrics", "WEIGHT_RATE_CLAMPED_FOR_AUTOMATIC_SAFETY"],
+    input_snapshot: {
+      requested_weight_change_kg_per_week: "1.8",
+      recommended_weight_change_kg_per_week: "0.5",
+      applied_weight_change_kg_per_week: "0.8",
+    },
+  };
+  vi.mocked(nutritionApi.getCurrentNutritionEstimate).mockResolvedValue(clampedEstimate);
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(null);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  expect(await screen.findByRole("heading", { name: "تغذیه" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "نرخ تغییر وزن هفتگی" })).toBeInTheDocument();
+  expect(screen.getByText("تنظیم‌شده برای ایمنی خودکار")).toBeInTheDocument();
+  expect(screen.getByText("درخواست شما")).toBeInTheDocument();
+  expect(screen.getByText("۱٫۸ کیلوگرم/هفته")).toBeInTheDocument();
+  expect(screen.getByText("مقدار پیشنهادی")).toBeInTheDocument();
+  expect(screen.getByText("۰٫۵ کیلوگرم/هفته")).toBeInTheDocument();
+  expect(screen.getByText("مقدار اعمال‌شده (تنظیم ایمنی)")).toBeInTheDocument();
+  expect(screen.getByText("۰٫۸ کیلوگرم/هفته")).toBeInTheDocument();
+});
+
