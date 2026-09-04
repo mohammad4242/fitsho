@@ -442,3 +442,14 @@ class PhysicianReviewStatus(StrEnum):
     APPROVED = "approved"
     REJECTED = "rejected"
     CHANGES_REQUESTED = "changes_requested"
+
+
+class NutritionOptimizationMode(StrEnum):
+    BUDGET_CONSTRAINED = "budget_constrained"
+    IDEAL_REFERENCE = "ideal_reference"
+
+
+class NutritionPlanRole(StrEnum):
+    BUDGET = "budget"
+    IDEAL_REFERENCE = "ideal_reference"
+    LEGACY = "legacy"

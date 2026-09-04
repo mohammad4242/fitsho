@@ -461,7 +461,7 @@ def test_generation_evaluates_every_program_and_persists_only_the_best_result(
 
     def fake_plan_week(inputs, foods, meal_templates, policy=plan_service.DEFAULT_POLICY, **kwargs):
         calls.append((inputs, foods, meal_templates, policy))
-        return results[len(calls) - 1]
+        return results[(len(calls) - 1) % len(results)]
 
     monkeypatch.setattr(plan_service, "plan_week", fake_plan_week)
 
@@ -470,10 +470,14 @@ def test_generation_evaluates_every_program_and_persists_only_the_best_result(
     assert response.status_code == 201
     assert response.json()["outcome"] == "success"
     assert response.json()["plan"]["input_snapshot"]["nutrition_program_code"] == "TEST-B"
-    assert len(calls) == 3
-    assert db.scalar(select(NutritionWeeklyPlan)) is not None
-    assert len(db.scalars(select(NutritionWeeklyPlan)).all()) == 1
-    generation = db.scalar(select(NutritionPlanGeneration))
+    assert response.json()["budget_plan"]["input_snapshot"]["nutrition_program_code"] == "TEST-B"
+    assert response.json()["ideal_plan"] is not None
+    assert response.json()["comparison"] is not None
+    assert len(calls) == 6
+    assert len(db.scalars(select(NutritionWeeklyPlan)).all()) == 2
+    generation = db.scalar(
+        select(NutritionPlanGeneration).where(NutritionPlanGeneration.plan_role == "budget")
+    )
     assert generation is not None
     trace = generation.diagnostic_snapshot["selection_trace"]
     assert trace["proposed_candidate_count"] == 3

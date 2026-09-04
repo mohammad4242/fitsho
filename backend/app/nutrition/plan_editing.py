@@ -16,6 +16,7 @@ from app.nutrition.enums import (
     NutritionPlanGenerationOutcome,
     NutritionPlanLifecycleStatus,
     NutritionPlanReviewStatus,
+    NutritionPlanRole,
 )
 from app.nutrition.models import (
     NutritionCatalogueFood,
@@ -40,6 +41,7 @@ class PlanEditError(Exception):
 
 def _query() -> Select[tuple[NutritionWeeklyPlan]]:
     return select(NutritionWeeklyPlan).options(
+        selectinload(NutritionWeeklyPlan.generation),
         selectinload(NutritionWeeklyPlan.review),
         selectinload(NutritionWeeklyPlan.nutrients),
         selectinload(NutritionWeeklyPlan.days)
@@ -771,6 +773,8 @@ def partial_regenerate(
 def _assert_editable(plan: NutritionWeeklyPlan, expected: UUID) -> None:
     if plan.id != expected:
         raise PlanEditError("STALE_PLAN_REVISION")
+    if plan.generation and plan.generation.plan_role == NutritionPlanRole.IDEAL_REFERENCE.value:
+        raise PlanEditError("IDEAL_REFERENCE_PLAN_CANNOT_BE_EDITED")
     if plan.review and plan.review.status == NutritionPlanReviewStatus.IN_REVIEW:
         raise PlanEditError("PLAN_REVIEW_IN_PROGRESS")
 

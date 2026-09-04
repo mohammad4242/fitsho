@@ -550,4 +550,3 @@ def test_program_with_incompatible_meal_survives_when_substitute_available() -> 
 
     assert result.outcome == GenerationOutcome.SUCCESS
     assert result.days[0].meals[0].template_id == "almond-snack"
-

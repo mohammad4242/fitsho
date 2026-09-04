@@ -931,12 +931,39 @@ class WeeklyPlanResponse(BaseModel):
     created_at: datetime
 
 
+class PlanComparisonResponse(BaseModel):
+    user_monthly_budget_irr: int
+    budget_plan_monthly_cost_irr: int | None = None
+    ideal_plan_monthly_cost_irr: int | None = None
+    minimum_feasible_monthly_cost_irr: int | None = None
+    monthly_cost_gap_irr: int | None = None
+
+    calorie_gap_kcal_per_day: Decimal | None = None
+    protein_gap_g_per_day: Decimal | None = None
+    carbohydrate_gap_g_per_day: Decimal | None = None
+    fat_gap_g_per_day: Decimal | None = None
+    fibre_gap_g_per_day: Decimal | None = None
+
+    micronutrient_gaps_improved: list[str] = Field(default_factory=list)
+    unique_meal_count_budget: int | None = None
+    unique_meal_count_ideal: int | None = None
+    unique_protein_sources_budget: int | None = None
+    unique_protein_sources_ideal: int | None = None
+
+    meaningful_quality_improvement: bool = False
+    show_ideal_plan: bool = False
+    reason_codes: list[str] = Field(default_factory=list)
+
+
 class WeeklyPlanGenerationResponse(BaseModel):
     generation_id: UUID
     outcome: str
     reason_codes: list[str]
     warning_codes: list[str]
-    plan: WeeklyPlanResponse | None
+    plan: WeeklyPlanResponse | None = None
+    budget_plan: WeeklyPlanResponse | None = None
+    ideal_plan: WeeklyPlanResponse | None = None
+    comparison: PlanComparisonResponse | None = None
 
 
 class WeeklyPlanHistoryItemResponse(BaseModel):

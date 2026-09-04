@@ -2,7 +2,11 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from app.nutrition.enums import NutritionBudgetTier, NutritionDietStyle
+from app.nutrition.enums import (
+    NutritionBudgetTier,
+    NutritionDietStyle,
+    NutritionOptimizationMode,
+)
 from app.nutrition.models import NutritionProgram
 from app.nutrition.nutrition_request import NormalizedNutritionRequest
 from app.nutrition.planner_policy import resolve_budget_tier
@@ -63,6 +67,7 @@ def score_program(
     request: NormalizedNutritionRequest,
     *,
     cost_estimate: "ProgramCostEstimate | None" = None,
+    mode: NutritionOptimizationMode = NutritionOptimizationMode.BUDGET_CONSTRAINED,
 ) -> ProgramScoringResult:
     reason_codes: list[str] = []
 
@@ -170,13 +175,22 @@ def score_program(
     # Meal structure scoring (10%)
     meal_structure_score = 100
 
-    # Weighting: Budget 40%, Goal 25%, Preference 15%, Training 10%, Meal structure 10%
-    budget_part = Decimal(str(budget_score)) * Decimal("0.40")
-    goal_part = Decimal(str(goal_score)) * Decimal("0.25")
-    pref_part = Decimal(str(preference_score)) * Decimal("0.15")
-    train_part = Decimal(str(training_score)) * Decimal("0.10")
-    meal_part = Decimal(str(meal_structure_score)) * Decimal("0.10")
-    total = int(round(budget_part + goal_part + pref_part + train_part + meal_part))
+    # Weighting:
+    if mode == NutritionOptimizationMode.IDEAL_REFERENCE:
+        # Ideal mode: budget weight is 0. Goal 45%, Preference 25%, Training 15%, Meal structure 15%
+        goal_part = Decimal(str(goal_score)) * Decimal("0.45")
+        pref_part = Decimal(str(preference_score)) * Decimal("0.25")
+        train_part = Decimal(str(training_score)) * Decimal("0.15")
+        meal_part = Decimal(str(meal_structure_score)) * Decimal("0.15")
+        total = int(round(goal_part + pref_part + train_part + meal_part))
+    else:
+        # Budget mode: Budget 40%, Goal 25%, Preference 15%, Training 10%, Meal structure 10%
+        budget_part = Decimal(str(budget_score)) * Decimal("0.40")
+        goal_part = Decimal(str(goal_score)) * Decimal("0.25")
+        pref_part = Decimal(str(preference_score)) * Decimal("0.15")
+        train_part = Decimal(str(training_score)) * Decimal("0.10")
+        meal_part = Decimal(str(meal_structure_score)) * Decimal("0.10")
+        total = int(round(budget_part + goal_part + pref_part + train_part + meal_part))
 
     return ProgramScoringResult(
         score=ProgramScore(

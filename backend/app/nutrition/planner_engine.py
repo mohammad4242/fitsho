@@ -7,6 +7,7 @@ from enum import StrEnum
 
 from app.nutrition.budget_optimizer import BudgetRepairAction, optimize_weekly_budget
 from app.nutrition.candidate_selection import quality_for_result
+from app.nutrition.enums import NutritionOptimizationMode
 from app.nutrition.exceptions import ScheduledTemplateUnavailableError
 from app.nutrition.food_constraints import (
     ConstraintSeverity,
@@ -125,16 +126,24 @@ class PlannerInput:
     daily_maximums: dict[str, Decimal]
     main_meals_per_day: int
     snacks_per_day: int
-    weekly_budget_irr: int
-    budget_mode: str
-    excluded_terms: tuple[str, ...]
-    liked_food_ids: tuple[str, ...]
-    disliked_food_ids: tuple[str, ...]
-    dietary_pattern: str
-    maximum_meal_repetition_per_week: int
+    weekly_budget_irr: int | None = None
+    budget_mode: str | None = None
+    excluded_terms: tuple[str, ...] = ()
+    liked_food_ids: tuple[str, ...] = ()
+    disliked_food_ids: tuple[str, ...] = ()
+    dietary_pattern: str = "omnivore"
+    maximum_meal_repetition_per_week: int = 7
     template_schedule: tuple[tuple[tuple[str, str | None, str], ...], ...] | None = None
     preference_snapshot: PreferenceSnapshot | None = None
     food_constraints: tuple[NormalizedFoodConstraint, ...] = ()
+    optimization_mode: NutritionOptimizationMode = NutritionOptimizationMode.BUDGET_CONSTRAINED
+
+    def __post_init__(self) -> None:
+        if self.optimization_mode == NutritionOptimizationMode.BUDGET_CONSTRAINED:
+            if self.weekly_budget_irr is None:
+                raise ValueError("weekly_budget_irr is required for BUDGET_CONSTRAINED mode")
+            if self.budget_mode is None:
+                raise ValueError("budget_mode is required for BUDGET_CONSTRAINED mode")
 
 
 @dataclass(frozen=True)
@@ -210,12 +219,17 @@ class PlannerResult:
     budget_repair_actions: tuple[BudgetRepairAction, ...] = ()
     budget_diagnostics: dict[str, str] | None = None
     portion_adjustment_actions: tuple[PortionAdjustmentAction, ...] = ()
+    minimum_feasible_weekly_cost_irr: Decimal | None = None
 
     def __post_init__(self) -> None:
         if self.nutrient_comparisons is None:
             object.__setattr__(self, "nutrient_comparisons", {})
         if self.budget_diagnostics is None:
             object.__setattr__(self, "budget_diagnostics", {})
+
+    @property
+    def is_successful(self) -> bool:
+        return self.outcome == GenerationOutcome.SUCCESS
 
 
 @dataclass(frozen=True)
@@ -342,7 +356,11 @@ def plan_week(
             successful,
             key=lambda variant: quality_for_result(
                 variant.result,
-                weekly_budget_irr=Decimal(inputs.weekly_budget_irr),
+                weekly_budget_irr=(
+                    Decimal(inputs.weekly_budget_irr)
+                    if inputs.weekly_budget_irr is not None
+                    else Decimal("Infinity")
+                ),
                 stable_variant_key=variant.stable_variant_key,
                 preference_snapshot=inputs.preference_snapshot,
             ).sort_key(),
@@ -383,41 +401,81 @@ def _evaluate_built_days(
     budget_result = None
     validation: tuple[str, ...] = ()
     upper_limit_exceeded = False
-    for _ in range(policy.maximum_combined_repair_passes):
-        days, actions, portion_reasons = _repair_portions(days, inputs, foods_by_id, policy)
-        portion_actions.extend(actions)
-        budget_result = optimize_weekly_budget(
-            days=days,
-            inputs=inputs,
-            eligible_templates=eligible_templates,
-            policy=policy,
-            meal_builder=build_budget_meal,
-        )
-        days = budget_result.days
-        days, actions, post_portion_reasons = _repair_portions(days, inputs, foods_by_id, policy)
-        portion_actions.extend(actions)
-        portion_reasons = tuple(dict.fromkeys((*portion_reasons, *post_portion_reasons)))
-        weekly_totals = _sum_nutrients(day.nutrients for day in days)
-        daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
-        validation = _validate_nutritional_feasibility(inputs, daily_average, policy)
-        upper_limit_exceeded = _upper_limit_exceeded(inputs, daily_average)
-        allowance = Decimal(inputs.weekly_budget_irr)
-        budget_cap = allowance * (
-            Decimal("1")
-            if inputs.budget_mode == "strict"
-            else Decimal("1") + policy.flexible_budget_overage_cap
-        )
-        budget_valid = (
-            budget_result.failure_code is None and budget_result.final_cost_irr <= budget_cap
-        )
-        if not validation and not upper_limit_exceeded and budget_valid:
-            break
 
-    assert budget_result is not None
+    is_ideal = inputs.optimization_mode == NutritionOptimizationMode.IDEAL_REFERENCE
+    if is_ideal:
+        for _ in range(policy.maximum_combined_repair_passes):
+            days, actions, portion_reasons = _repair_portions(days, inputs, foods_by_id, policy)
+            portion_actions.extend(actions)
+            weekly_totals = _sum_nutrients(day.nutrients for day in days)
+            daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
+            validation = _validate_nutritional_feasibility(inputs, daily_average, policy)
+            upper_limit_exceeded = _upper_limit_exceeded(inputs, daily_average)
+            if not validation and not upper_limit_exceeded:
+                break
+        cost = sum((day.cost_irr for day in days), ZERO)
+    else:
+
+        def build_budget_meal(
+            candidate: EligibleMealTemplate,
+            role: str,
+            slot_index: int,
+            target_kcal: Decimal,
+            maximum_cost_irr: Decimal,
+        ) -> PlannedMeal:
+            return _meal_from_template(
+                role,
+                slot_index,
+                candidate,
+                target_kcal,
+                maximum_recipe_cost_irr=maximum_cost_irr,
+                optimization_cache=optimization_cache,
+            )
+
+        for _ in range(policy.maximum_combined_repair_passes):
+            days, actions, portion_reasons = _repair_portions(days, inputs, foods_by_id, policy)
+            portion_actions.extend(actions)
+            budget_result = optimize_weekly_budget(
+                days=days,
+                inputs=inputs,
+                eligible_templates=eligible_templates,
+                policy=policy,
+                meal_builder=build_budget_meal,
+            )
+            days = budget_result.days
+            days, actions, post_portion_reasons = _repair_portions(
+                days, inputs, foods_by_id, policy
+            )
+            portion_actions.extend(actions)
+            portion_reasons = tuple(dict.fromkeys((*portion_reasons, *post_portion_reasons)))
+            weekly_totals = _sum_nutrients(day.nutrients for day in days)
+            daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
+            validation = _validate_nutritional_feasibility(inputs, daily_average, policy)
+            upper_limit_exceeded = _upper_limit_exceeded(inputs, daily_average)
+            allowance = Decimal(inputs.weekly_budget_irr or 0)
+            budget_cap = allowance * (
+                Decimal("1")
+                if inputs.budget_mode == "strict"
+                else Decimal("1") + policy.flexible_budget_overage_cap
+            )
+            budget_valid = (
+                budget_result.failure_code is None and budget_result.final_cost_irr <= budget_cap
+            )
+            if not validation and not upper_limit_exceeded and budget_valid:
+                break
+        cost = (
+            budget_result.final_cost_irr
+            if budget_result is not None
+            else sum((day.cost_irr for day in days), ZERO)
+        )
+
     weekly_totals = _sum_nutrients(day.nutrients for day in days)
     daily_average = {code: value / Decimal("7") for code, value in weekly_totals.items()}
     data_completeness = _nutrient_data_completeness(days, inputs)
     comparisons = _comparisons(inputs, daily_average, data_completeness, policy)
+    min_feasible_cost = (
+        budget_result.minimum_feasible_weekly_cost_irr if budget_result is not None else None
+    )
     if upper_limit_exceeded or validation:
         return PlannerResult(
             outcome=(
@@ -433,54 +491,63 @@ def _evaluate_built_days(
             nutrient_comparisons=comparisons,
             repair_actions=repairs,
             substitution_actions=substitution_actions,
-            budget_repair_actions=budget_result.repair_actions,
-            budget_diagnostics=budget_result.diagnostics,
+            budget_repair_actions=budget_result.repair_actions if budget_result is not None else (),
+            budget_diagnostics=budget_result.diagnostics if budget_result is not None else None,
             portion_adjustment_actions=tuple(portion_actions),
+            minimum_feasible_weekly_cost_irr=min_feasible_cost,
         )
-    cost = budget_result.final_cost_irr
-    if budget_result.failure_code is not None:
-        return PlannerResult(
-            outcome=GenerationOutcome.INFEASIBLE,
-            reason_codes=(budget_result.failure_code,),
-            weekly_cost_irr=cost,
-            budget_status="over_budget",
-            nutrient_comparisons=comparisons,
-            repair_actions=repairs,
-            substitution_actions=substitution_actions,
-            budget_repair_actions=budget_result.repair_actions,
-            budget_diagnostics=budget_result.diagnostics,
-            portion_adjustment_actions=tuple(portion_actions),
-        )
-    allowance = Decimal(inputs.weekly_budget_irr)
-    if inputs.budget_mode == "strict" and cost > allowance:
-        return PlannerResult(
-            outcome=GenerationOutcome.INFEASIBLE,
-            reason_codes=("STRICT_BUDGET_EXCEEDED",),
-            weekly_cost_irr=cost,
-            budget_status="over_budget",
-            nutrient_comparisons=comparisons,
-            repair_actions=repairs,
-            substitution_actions=substitution_actions,
-            budget_repair_actions=budget_result.repair_actions,
-            budget_diagnostics=budget_result.diagnostics,
-            portion_adjustment_actions=tuple(portion_actions),
-        )
-    if inputs.budget_mode == "flexible" and cost > allowance * (
-        Decimal("1") + policy.flexible_budget_overage_cap
-    ):
-        return PlannerResult(
-            outcome=GenerationOutcome.INFEASIBLE,
-            reason_codes=("FLEXIBLE_BUDGET_CAP_EXCEEDED",),
-            weekly_cost_irr=cost,
-            budget_status="over_budget",
-            nutrient_comparisons=comparisons,
-            repair_actions=repairs,
-            substitution_actions=substitution_actions,
-            budget_repair_actions=budget_result.repair_actions,
-            budget_diagnostics=budget_result.diagnostics,
-            portion_adjustment_actions=tuple(portion_actions),
-        )
-    budget_status = "flexible_overage" if cost > allowance else "within_budget"
+
+    if not is_ideal:
+        assert budget_result is not None
+        if budget_result.failure_code is not None:
+            return PlannerResult(
+                outcome=GenerationOutcome.INFEASIBLE,
+                reason_codes=(budget_result.failure_code,),
+                weekly_cost_irr=cost,
+                budget_status="over_budget",
+                nutrient_comparisons=comparisons,
+                repair_actions=repairs,
+                substitution_actions=substitution_actions,
+                budget_repair_actions=budget_result.repair_actions,
+                budget_diagnostics=budget_result.diagnostics,
+                portion_adjustment_actions=tuple(portion_actions),
+                minimum_feasible_weekly_cost_irr=min_feasible_cost,
+            )
+        allowance = Decimal(inputs.weekly_budget_irr or 0)
+        if inputs.budget_mode == "strict" and cost > allowance:
+            return PlannerResult(
+                outcome=GenerationOutcome.INFEASIBLE,
+                reason_codes=("STRICT_BUDGET_EXCEEDED",),
+                weekly_cost_irr=cost,
+                budget_status="over_budget",
+                nutrient_comparisons=comparisons,
+                repair_actions=repairs,
+                substitution_actions=substitution_actions,
+                budget_repair_actions=budget_result.repair_actions,
+                budget_diagnostics=budget_result.diagnostics,
+                portion_adjustment_actions=tuple(portion_actions),
+                minimum_feasible_weekly_cost_irr=min_feasible_cost,
+            )
+        if inputs.budget_mode == "flexible" and cost > allowance * (
+            Decimal("1") + policy.flexible_budget_overage_cap
+        ):
+            return PlannerResult(
+                outcome=GenerationOutcome.INFEASIBLE,
+                reason_codes=("FLEXIBLE_BUDGET_CAP_EXCEEDED",),
+                weekly_cost_irr=cost,
+                budget_status="over_budget",
+                nutrient_comparisons=comparisons,
+                repair_actions=repairs,
+                substitution_actions=substitution_actions,
+                budget_repair_actions=budget_result.repair_actions,
+                budget_diagnostics=budget_result.diagnostics,
+                portion_adjustment_actions=tuple(portion_actions),
+                minimum_feasible_weekly_cost_irr=min_feasible_cost,
+            )
+        budget_status = "flexible_overage" if cost > allowance else "within_budget"
+    else:
+        budget_status = "unconstrained"
+
     warning_codes = _warning_codes(
         inputs,
         daily_average,
@@ -498,9 +565,10 @@ def _evaluate_built_days(
         repair_actions=repairs,
         warning_codes=warning_codes,
         substitution_actions=substitution_actions,
-        budget_repair_actions=budget_result.repair_actions,
-        budget_diagnostics=budget_result.diagnostics,
+        budget_repair_actions=budget_result.repair_actions if budget_result is not None else (),
+        budget_diagnostics=budget_result.diagnostics if budget_result is not None else None,
         portion_adjustment_actions=tuple(portion_actions),
+        minimum_feasible_weekly_cost_irr=min_feasible_cost,
     )
 
 
@@ -524,8 +592,13 @@ def _validate_inputs(inputs: PlannerInput) -> None:
         raise ValueError("Main meal slots must be between 2 and 4")
     if inputs.snacks_per_day not in {0, 1, 2, 3}:
         raise ValueError("Snack slots must be between 0 and 3")
-    if inputs.weekly_budget_irr < 0 or inputs.budget_mode not in {"strict", "flexible"}:
-        raise ValueError("Invalid budget input")
+    if inputs.optimization_mode == NutritionOptimizationMode.BUDGET_CONSTRAINED:
+        if (
+            inputs.weekly_budget_irr is None
+            or inputs.weekly_budget_irr < 0
+            or inputs.budget_mode not in {"strict", "flexible"}
+        ):
+            raise ValueError("Invalid budget input")
     if inputs.dietary_pattern not in {"omnivore", "vegetarian", "vegan"}:
         raise ValueError("Invalid dietary pattern")
     if inputs.maximum_meal_repetition_per_week < 1:
@@ -533,6 +606,11 @@ def _validate_inputs(inputs: PlannerInput) -> None:
 
 
 def _weekly_budget_cap(inputs: PlannerInput, policy: PlannerPolicy) -> Decimal:
+    if (
+        inputs.optimization_mode == NutritionOptimizationMode.IDEAL_REFERENCE
+        or inputs.weekly_budget_irr is None
+    ):
+        return Decimal("Infinity")
     allowance = Decimal(inputs.weekly_budget_irr)
     if inputs.budget_mode == "strict":
         return allowance
@@ -1586,11 +1664,7 @@ def _repair_micronutrients(
                 code: value / Decimal("7") for code, value in candidate_totals.items()
             }
             candidate_cost = sum((item.cost_irr for item in candidate_days), ZERO)
-            budget_cap = Decimal(inputs.weekly_budget_irr) * (
-                Decimal("1")
-                if inputs.budget_mode == "strict"
-                else Decimal("1") + policy.flexible_budget_overage_cap
-            )
+            budget_cap = _weekly_budget_cap(inputs, policy)
             if (
                 _upper_limit_exceeded(inputs, candidate_average)
                 or _validate_nutritional_feasibility(inputs, candidate_average, policy)
@@ -1886,6 +1960,15 @@ def _warning_codes(
         for signature in set(signatures)
     ):
         warnings.append("REPETITION_LIMIT_RELAXED")
+    if inputs.optimization_mode == NutritionOptimizationMode.BUDGET_CONSTRAINED:
+        target_protein = inputs.daily_targets.get("protein", ZERO)
+        if target_protein > ZERO and daily_average.get("protein_g", ZERO) < target_protein:
+            warnings.append("BUDGET_PLAN_BELOW_PREFERRED_PROTEIN")
+        target_kcal = inputs.daily_targets.get("goal_calories", ZERO)
+        if target_kcal > ZERO and daily_average.get("energy_kcal", ZERO) < target_kcal * Decimal(
+            "0.98"
+        ):
+            warnings.append("BUDGET_PLAN_BELOW_PREFERRED_CALORIES")
     return tuple(dict.fromkeys(warnings))
 
 

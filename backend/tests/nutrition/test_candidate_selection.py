@@ -271,3 +271,23 @@ def test_low_confidence_micronutrient_gap_is_conservative() -> None:
     assert high.quality is not None
     assert low.quality is not None
     assert low.quality.micronutrient_gap_penalty > high.quality.micronutrient_gap_penalty
+
+
+def test_ideal_ranking_ignores_budget_and_prefers_lower_cost_as_late_tie_break() -> None:
+    from app.nutrition.enums import NutritionOptimizationMode
+
+    expensive = evaluate_candidate(
+        _proposal("P01", 0),
+        _success(calories="2000", cost="1000"),
+        weekly_budget_irr=Decimal("100"),
+    )
+    cheaper = evaluate_candidate(
+        _proposal("P02", 1),
+        _success(calories="2000", cost="500"),
+        weekly_budget_irr=Decimal("100"),
+    )
+
+    selection = select_best_candidate(
+        (expensive, cheaper), mode=NutritionOptimizationMode.IDEAL_REFERENCE
+    )
+    assert selection.selected is cheaper

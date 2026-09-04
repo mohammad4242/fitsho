@@ -787,3 +787,24 @@ def test_micronutrient_density_influences_initial_candidate_order() -> None:
 
     first_protein = result.days[0].meals[0].foods[0]
     assert first_protein.slug == "calcium-lentils"
+
+
+def test_ideal_reference_mode_ignores_budget_cap_and_succeeds() -> None:
+    from dataclasses import replace
+
+    from app.nutrition.enums import NutritionOptimizationMode
+    from app.nutrition.planner_engine import GenerationOutcome, plan_week
+
+    inputs = _input(weekly_budget_irr=100)
+    ideal_inputs = replace(
+        inputs,
+        optimization_mode=NutritionOptimizationMode.IDEAL_REFERENCE,
+        weekly_budget_irr=None,
+        budget_mode=None,
+    )
+
+    result = plan_week(ideal_inputs, _catalogue(), _meal_templates())
+
+    assert result.outcome is GenerationOutcome.SUCCESS
+    assert result.budget_status == "unconstrained"
+    assert result.weekly_cost_irr > Decimal("1000")

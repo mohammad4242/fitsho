@@ -1,4 +1,6 @@
 # ruff: noqa: E501
+from __future__ import annotations
+
 from datetime import date, datetime, time
 from decimal import Decimal
 from enum import StrEnum
@@ -63,6 +65,7 @@ from app.nutrition.enums import (
     NutritionPlanGenerationOutcome,
     NutritionPlanLifecycleStatus,
     NutritionPlanReviewStatus,
+    NutritionPlanRole,
     NutritionPlanStyle,
     NutritionProgramSlotKind,
     NutritionSupplementOrderStatus,
@@ -324,7 +327,7 @@ class NutritionSafetyDecision(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    reasons: Mapped[list["NutritionSafetyReason"]] = relationship(
+    reasons: Mapped[list[NutritionSafetyReason]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True, order_by="NutritionSafetyReason.code"
     )
 
@@ -543,12 +546,12 @@ class NutritionEstimate(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    targets: Mapped[list["NutritionEstimateTarget"]] = relationship(
+    targets: Mapped[list[NutritionEstimateTarget]] = relationship(
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="NutritionEstimateTarget.metric",
     )
-    micronutrient_targets: Mapped[list["NutritionEstimateMicronutrientTarget"]] = relationship(
+    micronutrient_targets: Mapped[list[NutritionEstimateMicronutrientTarget]] = relationship(
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="NutritionEstimateMicronutrientTarget.nutrient_code",
@@ -675,16 +678,16 @@ class NutritionCatalogueFood(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-    roles: Mapped[list["NutritionCatalogueFoodRole"]] = relationship(
+    roles: Mapped[list[NutritionCatalogueFoodRole]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
-    compositions: Mapped[list["NutritionFoodComposition"]] = relationship(
+    compositions: Mapped[list[NutritionFoodComposition]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
-    aliases: Mapped[list["NutritionCatalogueFoodAlias"]] = relationship(
+    aliases: Mapped[list[NutritionCatalogueFoodAlias]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
-    portions: Mapped[list["NutritionFoodPortion"]] = relationship(
+    portions: Mapped[list[NutritionFoodPortion]] = relationship(
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="NutritionFoodPortion.sort_order",
@@ -792,10 +795,10 @@ class NutritionCatalogueMeal(Base):
         default=MealCalculationMode.SIMPLE,
         server_default=MealCalculationMode.SIMPLE.value,
     )
-    items: Mapped[list["NutritionCatalogueMealItem"]] = relationship(
+    items: Mapped[list[NutritionCatalogueMealItem]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
-    prepared_recipe: Mapped["NutritionPreparedRecipe | None"] = relationship(
+    prepared_recipe: Mapped[NutritionPreparedRecipe | None] = relationship(
         cascade="all, delete-orphan", passive_deletes=True, uselist=False
     )
 
@@ -827,7 +830,7 @@ class NutritionCatalogueMealItem(Base):
             "ck_nutrition_catalogue_meal_item_functional_role_values",
         )
     )
-    food: Mapped["NutritionCatalogueFood"] = relationship()
+    food: Mapped[NutritionCatalogueFood] = relationship()
 
 
 class NutritionPreparedRecipe(Base):
@@ -840,7 +843,7 @@ class NutritionPreparedRecipe(Base):
         unique=True,
         index=True,
     )
-    revisions: Mapped[list["NutritionPreparedRecipeRevision"]] = relationship(
+    revisions: Mapped[list[NutritionPreparedRecipeRevision]] = relationship(
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="NutritionPreparedRecipeRevision.version",
@@ -882,13 +885,13 @@ class NutritionPreparedRecipeRevision(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    ingredients: Mapped[list["NutritionPreparedRecipeIngredient"]] = relationship(
+    ingredients: Mapped[list[NutritionPreparedRecipeIngredient]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
-    ratios: Mapped[list["NutritionPreparedRecipeRatio"]] = relationship(
+    ratios: Mapped[list[NutritionPreparedRecipeRatio]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
-    data_gaps: Mapped[list["NutritionPreparedRecipeDataGap"]] = relationship(
+    data_gaps: Mapped[list[NutritionPreparedRecipeDataGap]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True
     )
 
@@ -920,7 +923,7 @@ class NutritionPreparedRecipeIngredient(Base):
     min_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     max_grams: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     is_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    food: Mapped["NutritionCatalogueFood"] = relationship()
+    food: Mapped[NutritionCatalogueFood] = relationship()
 
 
 class NutritionPreparedRecipeRatio(Base):
@@ -1012,7 +1015,7 @@ class NutritionProgram(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    days: Mapped[list["NutritionProgramDay"]] = relationship(
+    days: Mapped[list[NutritionProgramDay]] = relationship(
         back_populates="program",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -1034,8 +1037,8 @@ class NutritionProgramDay(Base):
     day_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     post_workout_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    program: Mapped["NutritionProgram"] = relationship(back_populates="days")
-    slots: Mapped[list["NutritionProgramSlot"]] = relationship(
+    program: Mapped[NutritionProgram] = relationship(back_populates="days")
+    slots: Mapped[list[NutritionProgramSlot]] = relationship(
         back_populates="day",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -1065,8 +1068,8 @@ class NutritionProgramSlot(Base):
         ForeignKey("nutrition_catalogue_meals.id", ondelete="RESTRICT"), nullable=True, index=True
     )
 
-    day: Mapped["NutritionProgramDay"] = relationship(back_populates="slots")
-    meal: Mapped["NutritionCatalogueMeal | None"] = relationship()
+    day: Mapped[NutritionProgramDay] = relationship(back_populates="slots")
+    meal: Mapped[NutritionCatalogueMeal | None] = relationship()
 
 
 class NutritionPriceProvider(Base):
@@ -1341,11 +1344,50 @@ class NutritionPlannerPolicyVersion(Base):
     )
 
 
-class NutritionPlanGeneration(Base):
-    __tablename__ = "nutrition_plan_generations"
-    __table_args__ = (Index("ix_nutrition_plan_generations_user_created", "user_id", "created_at"),)
+class NutritionPlanBundle(Base):
+    __tablename__ = "nutrition_plan_bundles"
+    __table_args__ = (Index("ix_nutrition_plan_bundles_user_created", "user_id", "created_at"),)
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    estimate_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_estimates.id", ondelete="RESTRICT"), nullable=True
+    )
+    comparison_snapshot: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    generations: Mapped[list[NutritionPlanGeneration]] = relationship(
+        back_populates="bundle", cascade="all, delete-orphan"
+    )
+
+
+class NutritionPlanGeneration(Base):
+    __tablename__ = "nutrition_plan_generations"
+    __table_args__ = (
+        Index("ix_nutrition_plan_generations_user_created", "user_id", "created_at"),
+        Index(
+            "uq_nutrition_plan_generations_bundle_role",
+            "bundle_id",
+            "plan_role",
+            unique=True,
+            postgresql_where=sql_text("bundle_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    bundle_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_plan_bundles.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    plan_role: Mapped[str] = mapped_column(
+        String(32),
+        default=NutritionPlanRole.LEGACY.value,
+        server_default="legacy",
+        nullable=False,
+    )
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
@@ -1375,6 +1417,8 @@ class NutritionPlanGeneration(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    bundle: Mapped[NutritionPlanBundle | None] = relationship(back_populates="generations")
 
 
 class NutritionWeeklyPlan(Base):
@@ -1444,19 +1488,20 @@ class NutritionWeeklyPlan(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    days: Mapped[list["NutritionWeeklyPlanDay"]] = relationship(
+    days: Mapped[list[NutritionWeeklyPlanDay]] = relationship(
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="NutritionWeeklyPlanDay.day_index",
     )
-    nutrients: Mapped[list["NutritionWeeklyPlanNutrient"]] = relationship(
+    nutrients: Mapped[list[NutritionWeeklyPlanNutrient]] = relationship(
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="NutritionWeeklyPlanNutrient.nutrient_code",
     )
-    review: Mapped["NutritionPlanPhysicianReview | None"] = relationship(
+    review: Mapped[NutritionPlanPhysicianReview | None] = relationship(
         cascade="all, delete-orphan", passive_deletes=True, uselist=False
     )
+    generation: Mapped[NutritionPlanGeneration] = relationship()
 
 
 class NutritionWeeklyPlanDay(Base):
@@ -1474,7 +1519,7 @@ class NutritionWeeklyPlanDay(Base):
     plan_date: Mapped[date] = mapped_column(nullable=False)
     cost_irr: Mapped[int] = mapped_column(BigInteger, nullable=False)
     nutrient_totals: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
-    meals: Mapped[list["NutritionWeeklyPlanMeal"]] = relationship(
+    meals: Mapped[list[NutritionWeeklyPlanMeal]] = relationship(
         cascade="all, delete-orphan",
         passive_deletes=True,
         order_by="NutritionWeeklyPlanMeal.slot_role, NutritionWeeklyPlanMeal.slot_index",
@@ -1502,7 +1547,7 @@ class NutritionWeeklyPlanMeal(Base):
         index=True,
     )
     catalogue_meal_category: Mapped[str | None] = mapped_column(String(32))
-    catalogue_meal: Mapped["NutritionCatalogueMeal | None"] = relationship()
+    catalogue_meal: Mapped[NutritionCatalogueMeal | None] = relationship()
     slot_role: Mapped[MealSlotRole] = mapped_column(
         enum_column(MealSlotRole, "ck_nutrition_weekly_plan_meal_role_values"), nullable=False
     )
@@ -1511,7 +1556,7 @@ class NutritionWeeklyPlanMeal(Base):
     nutrient_totals: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     cost_irr: Mapped[int] = mapped_column(BigInteger, nullable=False)
     is_locked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    foods: Mapped[list["NutritionWeeklyPlanFood"]] = relationship(
+    foods: Mapped[list[NutritionWeeklyPlanFood]] = relationship(
         cascade="all, delete-orphan", passive_deletes=True, order_by="NutritionWeeklyPlanFood.id"
     )
 

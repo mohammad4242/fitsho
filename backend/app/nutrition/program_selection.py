@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import NamedTuple
 from uuid import UUID
 
+from app.nutrition.enums import NutritionOptimizationMode
 from app.nutrition.models import NutritionProgram
 from app.nutrition.nutrition_request import NormalizedNutritionRequest
 from app.nutrition.planner_policy import PROGRAM_SELECTION_POLICY_VERSION
@@ -132,6 +133,7 @@ def select_program_candidates(
     *,
     cost_estimates: dict[str, ProgramCostEstimate] | None = None,
     policy_version: str = PROGRAM_SELECTION_POLICY_VERSION,
+    mode: NutritionOptimizationMode = NutritionOptimizationMode.BUDGET_CONSTRAINED,
 ) -> ProgramSelectionResult:
     """Evaluate and rank nutrition programs using eligibility and deterministic scoring."""
     programs_list = list(programs)
@@ -155,7 +157,7 @@ def select_program_candidates(
             eligible_programs.append((program, estimate))
 
     scored: list[tuple[NutritionProgram, ProgramScoringResult]] = [
-        (program, score_program(program, request, cost_estimate=estimate))
+        (program, score_program(program, request, cost_estimate=estimate, mode=mode))
         for program, estimate in eligible_programs
     ]
 
@@ -188,6 +190,38 @@ def select_program_candidates(
         candidates=candidates,
         policy_version=policy_version,
         cost_estimates=recorded_estimates,
+    )
+
+
+def rank_for_budget(
+    programs: Iterable[NutritionProgram],
+    request: NormalizedNutritionRequest,
+    *,
+    cost_estimates: dict[str, ProgramCostEstimate] | None = None,
+    policy_version: str = PROGRAM_SELECTION_POLICY_VERSION,
+) -> ProgramSelectionResult:
+    return select_program_candidates(
+        programs,
+        request,
+        cost_estimates=cost_estimates,
+        policy_version=policy_version,
+        mode=NutritionOptimizationMode.BUDGET_CONSTRAINED,
+    )
+
+
+def rank_for_ideal(
+    programs: Iterable[NutritionProgram],
+    request: NormalizedNutritionRequest,
+    *,
+    cost_estimates: dict[str, ProgramCostEstimate] | None = None,
+    policy_version: str = PROGRAM_SELECTION_POLICY_VERSION,
+) -> ProgramSelectionResult:
+    return select_program_candidates(
+        programs,
+        request,
+        cost_estimates=cost_estimates,
+        policy_version=policy_version,
+        mode=NutritionOptimizationMode.IDEAL_REFERENCE,
     )
 
 

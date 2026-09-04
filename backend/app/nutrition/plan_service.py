@@ -23,10 +23,12 @@ from app.nutrition.enums import (
     FoodItemKind,
     FoodVerificationStatus,
     MealCalculationMode,
+    NutritionOptimizationMode,
     NutritionPlanBudgetStatus,
     NutritionPlanGenerationOutcome,
     NutritionPlanLifecycleStatus,
     NutritionPlanReviewStatus,
+    NutritionPlanRole,
     NutritionTargetMetric,
     SafetyOutcome,
     Weekday,
@@ -46,6 +48,7 @@ from app.nutrition.models import (
     NutritionEstimateMicronutrientTarget,
     NutritionEstimateTarget,
     NutritionFoodItem,
+    NutritionPlanBundle,
     NutritionPlanGeneration,
     NutritionPlanPhysicianReview,
     NutritionPreparedRecipe,
@@ -62,6 +65,7 @@ from app.nutrition.models import (
 from app.nutrition.nutrition_request import (
     build_normalized_nutrition_request,
 )
+from app.nutrition.plan_comparison import compare_plans
 from app.nutrition.planner_engine import (
     GenerationOutcome,
     PlannedFood,
@@ -84,7 +88,10 @@ from app.nutrition.planner_policy import (
     PROGRAM_SELECTION_POLICY_VERSION,
     TEMPLATE_SUBSTITUTION_POLICY_VERSION,
 )
-from app.nutrition.preference_snapshot import load_preference_snapshot
+from app.nutrition.preference_snapshot import (
+    PreferenceSnapshot,
+    load_preference_snapshot,
+)
 from app.nutrition.prepared_recipe import (
     PreparedRecipeDefinition,
     PreparedRecipeIngredient,
@@ -102,9 +109,11 @@ from app.nutrition.program_costing import (
 from app.nutrition.program_selection import (
     ProgramCandidate,
     ProgramSelectionResult,
-    select_program_candidates,
+    rank_for_budget,
+    rank_for_ideal,
 )
 from app.nutrition.schemas import (
+    PlanComparisonResponse,
     WeeklyPlanDayResponse,
     WeeklyPlanFoodResponse,
     WeeklyPlanGenerationResponse,
@@ -264,8 +273,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         select(NutritionFoodItem).where(NutritionFoodItem.user_id == user_id)
     ).all()
     raw_constraints = [
-        {"kind": item.kind.value, "term": item.name, "details": item.details}
-        for item in food_items
+        {"kind": item.kind.value, "term": item.name, "details": item.details} for item in food_items
     ]
     normalized_constraints = normalize_food_constraints(raw_constraints)
     unresolved_hard = tuple(
@@ -300,8 +308,10 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     programs = list_programs(db)
     user_profile = db.get(UserProfile, user_id)
     structured_exercise = db.get(NutritionStructuredExercise, user_id)
-    program_candidates: tuple[ProgramCandidate, ...] = ()
-    selection_result: ProgramSelectionResult | None = None
+    budget_candidates: tuple[ProgramCandidate, ...] = ()
+    ideal_candidates: tuple[ProgramCandidate, ...] = ()
+    budget_selection_result: ProgramSelectionResult | None = None
+    ideal_selection_result: ProgramSelectionResult | None = None
     cost_estimates: dict[str, ProgramCostEstimate] = {}
     if programs and user_profile is not None and user_profile.fitness_goal is not None:
         normalized_request = build_normalized_nutrition_request(
@@ -326,12 +336,18 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             )
             for prog in programs
         }
-        selection_result = select_program_candidates(
+        budget_selection_result = rank_for_budget(
             programs,
             normalized_request,
             cost_estimates=cost_estimates,
         )
-        program_candidates = selection_result.candidates
+        budget_candidates = budget_selection_result.candidates
+        ideal_selection_result = rank_for_ideal(
+            programs,
+            normalized_request,
+            cost_estimates=cost_estimates,
+        )
+        ideal_candidates = ideal_selection_result.candidates
 
     food_manifest["meals"] = meal_manifest
     minimums, maximums = _daily_limits(estimate.targets)
@@ -386,12 +402,14 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "budget_formula_version": "annualized-monthly-times-12-divided-52-v1",
         "meal_catalogue_template_ids": [item.meal_id for item in meal_templates],
         "program_selection_policy_version": (
-            selection_result.policy_version
-            if selection_result is not None
+            budget_selection_result.policy_version
+            if budget_selection_result is not None
             else PROGRAM_SELECTION_POLICY_VERSION
         ),
         "program_selection_trace": (
-            selection_result.decision_trace() if selection_result is not None else None
+            budget_selection_result.decision_trace()
+            if budget_selection_result is not None
+            else None
         ),
         "nutrition_program_id": None,
         "nutrition_program_code": None,
@@ -414,141 +432,240 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         preference_snapshot=preference_snapshot,
         food_constraints=tuple(normalized_constraints),
     )
-    optimization_cache: dict[tuple[object, ...], PlannedFood] = {}
-    evaluations: list[CandidateEvaluation] = []
-    fallback_batches_used = 0
-    if program_candidates:
-        batch_size = INITIAL_PROGRAM_BATCH_SIZE
-        num_candidates = len(program_candidates)
-        selection = CandidateSelection(selected=None, first_valid=None, evaluations=())
-        for batch_start in range(0, num_candidates, batch_size):
-            batch = program_candidates[batch_start : batch_start + batch_size]
-            if batch_start > 0:
-                fallback_batches_used += 1
-            for proposal in batch:
-                adapted = adapt_program(
-                    proposal.program,
-                    profile.main_meal_count_bucket,
-                    profile.snack_count_bucket,
-                )
-                candidate_input = replace(
-                    base_planner_input,
-                    template_schedule=_template_schedule(adapted),
-                )
-                candidate_result = plan_week(
-                    candidate_input,
-                    foods,
-                    meal_templates,
-                    policy=DEFAULT_POLICY,
-                    optimization_cache=optimization_cache,
-                )
-                evaluations.append(
-                    evaluate_candidate(
-                        proposal,
-                        candidate_result,
-                        weekly_budget_irr=Decimal(weekly_budget),
-                        preference_snapshot=preference_snapshot,
-                    )
-                )
-            selection = select_best_candidate(tuple(evaluations))
-            if selection.selected is not None:
-                break
-        result = (
-            selection.selected.result
-            if selection.selected is not None
-            else _aggregate_failure_result(selection)
-        )
-        selected_program: UUID | None = (
-            selection.selected.program_id if selection.selected is not None else None
-        )
-        selected_program_code = (
-            selection.selected.program_code if selection.selected is not None else None
-        )
-    else:
-        selection = CandidateSelection(selected=None, first_valid=None, evaluations=())
-        result = plan_week(
-            base_planner_input,
-            foods,
-            meal_templates,
-            policy=DEFAULT_POLICY,
-            optimization_cache=optimization_cache,
-        )
-        selected_program = None
-        selected_program_code = None
+    (
+        budget_selection,
+        budget_result,
+        budget_program,
+        budget_program_code,
+        budget_fallback_batches,
+    ) = _evaluate_candidates_for_mode(
+        candidates=budget_candidates,
+        mode=NutritionOptimizationMode.BUDGET_CONSTRAINED,
+        base_input=base_planner_input,
+        profile=profile,
+        foods=foods,
+        meal_templates=meal_templates,
+        preference_snapshot=preference_snapshot,
+        weekly_budget=weekly_budget,
+    )
 
-    input_snapshot = {
+    ideal_selection, ideal_result, ideal_program, ideal_program_code, ideal_fallback_batches = (
+        _evaluate_candidates_for_mode(
+            candidates=ideal_candidates,
+            mode=NutritionOptimizationMode.IDEAL_REFERENCE,
+            base_input=base_planner_input,
+            profile=profile,
+            foods=foods,
+            meal_templates=meal_templates,
+            preference_snapshot=preference_snapshot,
+            weekly_budget=weekly_budget,
+        )
+    )
+
+    goal_warning_codes, _ = _estimate_goal_contract_codes(estimate)
+    budget_result = replace(
+        budget_result,
+        warning_codes=tuple(sorted(set(budget_result.warning_codes).union(goal_warning_codes))),
+    )
+    ideal_result = replace(
+        ideal_result,
+        warning_codes=tuple(sorted(set(ideal_result.warning_codes).union(goal_warning_codes))),
+    )
+
+    min_feasible_monthly_cost = None
+    if budget_result.minimum_feasible_weekly_cost_irr is not None:
+        min_feasible_monthly_cost = int(
+            round(budget_result.minimum_feasible_weekly_cost_irr * Decimal("30") / Decimal("7"))
+        )
+
+    comparison_report = compare_plans(
+        user_monthly_budget_irr=profile.individual_monthly_food_budget_irr,
+        budget_plan_result=budget_result
+        if budget_result.outcome is GenerationOutcome.SUCCESS
+        else None,
+        ideal_plan_result=ideal_result
+        if ideal_result.outcome is GenerationOutcome.SUCCESS
+        else None,
+        minimum_feasible_monthly_cost_irr=min_feasible_monthly_cost,
+    )
+
+    bundle = NutritionPlanBundle(
+        user_id=user_id,
+        estimate_id=estimate.id,
+        comparison_snapshot=comparison_report.to_snapshot(),
+    )
+    db.add(bundle)
+    db.flush()
+
+    budget_input_snapshot = {
         **base_input_snapshot,
         "program_selection_trace": (
-            selection_result.decision_trace(
-                programs_constructed=len(evaluations),
-                fallback_batches_used=fallback_batches_used,
+            budget_selection_result.decision_trace(
+                programs_constructed=len(budget_selection.evaluations),
+                fallback_batches_used=budget_fallback_batches,
             )
-            if selection_result is not None
+            if budget_selection_result is not None
             else None
         ),
-        "nutrition_program_id": str(selected_program) if selected_program else None,
-        "nutrition_program_code": selected_program_code,
+        "nutrition_program_id": str(budget_program) if budget_program else None,
+        "nutrition_program_code": budget_program_code,
         "goal_contract_version": estimate.input_snapshot.get("goal_contract_version"),
         "training_alignment_warning_codes": estimate.input_snapshot.get(
             "training_alignment_warning_codes", []
         ),
+        "optimization_mode": NutritionOptimizationMode.BUDGET_CONSTRAINED.value,
     }
 
-    goal_warning_codes, _ = _estimate_goal_contract_codes(estimate)
-    result = replace(
-        result,
-        warning_codes=tuple(sorted(set(result.warning_codes).union(goal_warning_codes))),
-    )
-    outcome = NutritionPlanGenerationOutcome(result.outcome.value)
-
-    generation = _persist_generation(
+    budget_outcome = NutritionPlanGenerationOutcome(budget_result.outcome.value)
+    budget_generation = _persist_generation(
         db,
         user_id=user_id,
+        bundle_id=bundle.id,
+        plan_role=NutritionPlanRole.BUDGET.value,
         safety=safety,
         estimate=estimate,
-        outcome=outcome,
-        reasons=result.reason_codes,
-        warnings=result.warning_codes,
-        input_snapshot=input_snapshot,
+        outcome=budget_outcome,
+        reasons=budget_result.reason_codes,
+        warnings=budget_result.warning_codes,
+        input_snapshot=budget_input_snapshot,
         diagnostics={
             "food_candidate_count": len(foods),
             "meal_template_count": len(meal_templates),
-            "program_candidate_count": len(program_candidates),
-            "evaluated_program_candidate_count": len(selection.evaluations),
+            "program_candidate_count": len(budget_candidates),
+            "evaluated_program_candidate_count": len(budget_selection.evaluations),
             "successful_program_candidate_count": sum(
                 evaluation.result.outcome is GenerationOutcome.SUCCESS
-                for evaluation in selection.evaluations
+                for evaluation in budget_selection.evaluations
             ),
-            "weekly_cost_irr": str(result.weekly_cost_irr),
-            "budget_status": result.budget_status,
-            "selection_trace": _selection_trace(selection),
+            "weekly_cost_irr": str(budget_result.weekly_cost_irr),
+            "budget_status": budget_result.budget_status,
+            "selection_trace": _selection_trace(budget_selection),
         },
         commit=False,
     )
-    if result.outcome is not GenerationOutcome.SUCCESS:
-        db.commit()
-        db.refresh(generation)
-        return _generation_response(generation, None)
 
-    plan = _persist_successful_plan(
-        db,
-        generation=generation,
-        profile=profile,
-        estimate=estimate,
-        safety=safety,
-        result=result,
-        input_snapshot=input_snapshot,
-        price_snapshot=price_snapshot,
-        food_manifest=food_manifest,
-        micro_metadata=micro_metadata,
-        program_id=selected_program,
-    )
+    ideal_generation: NutritionPlanGeneration | None = None
+    ideal_plan_model: NutritionWeeklyPlan | None = None
+    if ideal_result.outcome is GenerationOutcome.SUCCESS:
+        ideal_input_snapshot = {
+            **base_input_snapshot,
+            "weekly_budget_irr": None,
+            "budget_mode": None,
+            "program_selection_trace": (
+                ideal_selection_result.decision_trace(
+                    programs_constructed=len(ideal_selection.evaluations),
+                    fallback_batches_used=ideal_fallback_batches,
+                )
+                if ideal_selection_result is not None
+                else None
+            ),
+            "nutrition_program_id": str(ideal_program) if ideal_program else None,
+            "nutrition_program_code": ideal_program_code,
+            "goal_contract_version": estimate.input_snapshot.get("goal_contract_version"),
+            "training_alignment_warning_codes": estimate.input_snapshot.get(
+                "training_alignment_warning_codes", []
+            ),
+            "optimization_mode": NutritionOptimizationMode.IDEAL_REFERENCE.value,
+        }
+        ideal_generation = _persist_generation(
+            db,
+            user_id=user_id,
+            bundle_id=bundle.id,
+            plan_role=NutritionPlanRole.IDEAL_REFERENCE.value,
+            safety=safety,
+            estimate=estimate,
+            outcome=NutritionPlanGenerationOutcome.SUCCESS,
+            reasons=ideal_result.reason_codes,
+            warnings=ideal_result.warning_codes,
+            input_snapshot=ideal_input_snapshot,
+            diagnostics={
+                "food_candidate_count": len(foods),
+                "meal_template_count": len(meal_templates),
+                "program_candidate_count": len(ideal_candidates),
+                "evaluated_program_candidate_count": len(ideal_selection.evaluations),
+                "successful_program_candidate_count": sum(
+                    evaluation.result.outcome is GenerationOutcome.SUCCESS
+                    for evaluation in ideal_selection.evaluations
+                ),
+                "weekly_cost_irr": str(ideal_result.weekly_cost_irr),
+                "budget_status": ideal_result.budget_status,
+                "selection_trace": _selection_trace(ideal_selection),
+            },
+            commit=False,
+        )
+        ideal_plan_model = _persist_ideal_plan(
+            db,
+            generation=ideal_generation,
+            profile=profile,
+            estimate=estimate,
+            safety=safety,
+            result=ideal_result,
+            input_snapshot=ideal_input_snapshot,
+            price_snapshot=price_snapshot,
+            food_manifest=food_manifest,
+            micro_metadata=micro_metadata,
+            program_id=ideal_program,
+        )
+
+    budget_plan_model: NutritionWeeklyPlan | None = None
+    if budget_result.outcome is GenerationOutcome.SUCCESS:
+        budget_plan_model = _persist_successful_plan(
+            db,
+            generation=budget_generation,
+            profile=profile,
+            estimate=estimate,
+            safety=safety,
+            result=budget_result,
+            input_snapshot=budget_input_snapshot,
+            price_snapshot=price_snapshot,
+            food_manifest=food_manifest,
+            micro_metadata=micro_metadata,
+            program_id=budget_program,
+        )
+
     try:
         db.commit()
     except SQLAlchemyError:
         db.rollback()
         raise
-    return _generation_response(generation, _load_plan(db, plan.id))
+
+    loaded_budget_plan = _load_plan(db, budget_plan_model.id) if budget_plan_model else None
+    loaded_ideal_plan = _load_plan(db, ideal_plan_model.id) if ideal_plan_model else None
+
+    comparison_response = PlanComparisonResponse(
+        user_monthly_budget_irr=comparison_report.user_monthly_budget_irr,
+        budget_plan_monthly_cost_irr=comparison_report.budget_plan_monthly_cost_irr,
+        ideal_plan_monthly_cost_irr=comparison_report.ideal_plan_monthly_cost_irr,
+        minimum_feasible_monthly_cost_irr=comparison_report.minimum_feasible_monthly_cost_irr,
+        monthly_cost_gap_irr=comparison_report.monthly_cost_gap_irr,
+        calorie_gap_kcal_per_day=comparison_report.calorie_gap_kcal_per_day,
+        protein_gap_g_per_day=comparison_report.protein_gap_g_per_day,
+        carbohydrate_gap_g_per_day=comparison_report.carbohydrate_gap_g_per_day,
+        fat_gap_g_per_day=comparison_report.fat_gap_g_per_day,
+        fibre_gap_g_per_day=comparison_report.fibre_gap_g_per_day,
+        micronutrient_gaps_improved=list(comparison_report.micronutrient_gaps_improved),
+        unique_meal_count_budget=comparison_report.unique_meal_count_budget,
+        unique_meal_count_ideal=comparison_report.unique_meal_count_ideal,
+        unique_protein_sources_budget=comparison_report.unique_protein_sources_budget,
+        unique_protein_sources_ideal=comparison_report.unique_protein_sources_ideal,
+        meaningful_quality_improvement=comparison_report.meaningful_quality_improvement,
+        show_ideal_plan=comparison_report.show_ideal_plan,
+        reason_codes=list(comparison_report.reason_codes),
+    )
+
+    budget_plan_resp = weekly_plan_response(loaded_budget_plan) if loaded_budget_plan else None
+    ideal_plan_resp = weekly_plan_response(loaded_ideal_plan) if loaded_ideal_plan else None
+
+    return WeeklyPlanGenerationResponse(
+        generation_id=budget_generation.id,
+        outcome=budget_generation.outcome.value,
+        reason_codes=budget_generation.reason_codes,
+        warning_codes=budget_generation.warning_codes,
+        plan=budget_plan_resp,
+        budget_plan=budget_plan_resp,
+        ideal_plan=ideal_plan_resp,
+        comparison=comparison_response,
+    )
 
 
 def _template_schedule(
@@ -598,6 +715,94 @@ def _aggregate_failure_result(selection: CandidateSelection) -> PlannerResult:
         outcome=outcome,
         reason_codes=reasons or ("CANDIDATE_SEARCH_FAILED",),
     )
+
+
+def _evaluate_candidates_for_mode(
+    *,
+    candidates: tuple[ProgramCandidate, ...],
+    mode: NutritionOptimizationMode,
+    base_input: PlannerInput,
+    profile: NutritionProfile,
+    foods: tuple[PlannerFood, ...],
+    meal_templates: tuple[PlannerMealTemplate, ...],
+    preference_snapshot: PreferenceSnapshot,
+    weekly_budget: int,
+) -> tuple[CandidateSelection, PlannerResult, UUID | None, str | None, int]:
+    planner_input = replace(
+        base_input,
+        optimization_mode=mode,
+        weekly_budget_irr=(
+            weekly_budget if mode is NutritionOptimizationMode.BUDGET_CONSTRAINED else None
+        ),
+        budget_mode=(
+            profile.budget_style.value
+            if mode is NutritionOptimizationMode.BUDGET_CONSTRAINED
+            else None
+        ),
+    )
+    optimization_cache: dict[tuple[object, ...], PlannedFood] = {}
+    evaluations: list[CandidateEvaluation] = []
+    fallback_batches_used = 0
+    if candidates:
+        batch_size = INITIAL_PROGRAM_BATCH_SIZE
+        num_candidates = len(candidates)
+        selection = CandidateSelection(selected=None, first_valid=None, evaluations=())
+        for batch_start in range(0, num_candidates, batch_size):
+            batch = candidates[batch_start : batch_start + batch_size]
+            if batch_start > 0:
+                fallback_batches_used += 1
+            for proposal in batch:
+                adapted = adapt_program(
+                    proposal.program,
+                    profile.main_meal_count_bucket,
+                    profile.snack_count_bucket,
+                )
+                candidate_input = replace(
+                    planner_input,
+                    template_schedule=_template_schedule(adapted),
+                )
+                candidate_result = plan_week(
+                    candidate_input,
+                    foods,
+                    meal_templates,
+                    policy=DEFAULT_POLICY,
+                    optimization_cache=optimization_cache,
+                )
+                evaluations.append(
+                    evaluate_candidate(
+                        proposal,
+                        candidate_result,
+                        weekly_budget_irr=Decimal(weekly_budget),
+                        preference_snapshot=preference_snapshot,
+                    )
+                )
+            selection = select_best_candidate(tuple(evaluations), mode=mode)
+            if selection.selected is not None:
+                break
+        result = (
+            selection.selected.result
+            if selection.selected is not None
+            else _aggregate_failure_result(selection)
+        )
+        selected_program: UUID | None = (
+            selection.selected.program_id if selection.selected is not None else None
+        )
+        selected_program_code = (
+            selection.selected.program_code if selection.selected is not None else None
+        )
+    else:
+        selection = CandidateSelection(selected=None, first_valid=None, evaluations=())
+        result = plan_week(
+            planner_input,
+            foods,
+            meal_templates,
+            policy=DEFAULT_POLICY,
+            optimization_cache=optimization_cache,
+        )
+        selected_program = None
+        selected_program_code = None
+
+    return selection, result, selected_program, selected_program_code, fallback_batches_used
 
 
 def _quality_snapshot(quality: CandidateQuality | None) -> dict[str, object] | None:
@@ -705,9 +910,13 @@ def _selection_trace(selection: CandidateSelection) -> dict[str, object]:
 def latest_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanResponse:
     plan = db.scalar(
         _plan_query()
+        .join(
+            NutritionPlanGeneration, NutritionWeeklyPlan.generation_id == NutritionPlanGeneration.id
+        )
         .where(
             NutritionWeeklyPlan.user_id == user_id,
             NutritionWeeklyPlan.is_user_visible.is_(True),
+            NutritionPlanGeneration.plan_role != NutritionPlanRole.IDEAL_REFERENCE.value,
         )
         .order_by(NutritionWeeklyPlan.revision.desc())
     )
@@ -719,8 +928,12 @@ def latest_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanResponse:
 def active_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanResponse:
     due = db.scalar(
         _plan_query()
+        .join(
+            NutritionPlanGeneration, NutritionWeeklyPlan.generation_id == NutritionPlanGeneration.id
+        )
         .where(
             NutritionWeeklyPlan.user_id == user_id,
+            NutritionPlanGeneration.plan_role != NutritionPlanRole.IDEAL_REFERENCE.value,
             NutritionWeeklyPlan.lifecycle_status == NutritionPlanLifecycleStatus.PHYSICIAN_APPROVED,
             NutritionWeeklyPlan.start_date <= date.today(),
         )
@@ -730,9 +943,15 @@ def active_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanResponse:
     )
     if due is not None and due.review and due.review.status == NutritionPlanReviewStatus.APPROVED:
         for current in db.scalars(
-            select(NutritionWeeklyPlan).where(
+            select(NutritionWeeklyPlan)
+            .join(
+                NutritionPlanGeneration,
+                NutritionWeeklyPlan.generation_id == NutritionPlanGeneration.id,
+            )
+            .where(
                 NutritionWeeklyPlan.user_id == user_id,
                 NutritionWeeklyPlan.id != due.id,
+                NutritionPlanGeneration.plan_role != NutritionPlanRole.IDEAL_REFERENCE.value,
                 NutritionWeeklyPlan.lifecycle_status == NutritionPlanLifecycleStatus.ACTIVE,
             )
         ):
@@ -741,8 +960,12 @@ def active_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanResponse:
         db.commit()
     plan = db.scalar(
         _plan_query()
+        .join(
+            NutritionPlanGeneration, NutritionWeeklyPlan.generation_id == NutritionPlanGeneration.id
+        )
         .where(
             NutritionWeeklyPlan.user_id == user_id,
+            NutritionPlanGeneration.plan_role != NutritionPlanRole.IDEAL_REFERENCE.value,
             NutritionWeeklyPlan.lifecycle_status == NutritionPlanLifecycleStatus.ACTIVE,
         )
         .order_by(NutritionWeeklyPlan.revision.desc())
@@ -768,7 +991,13 @@ def weekly_plan_by_id(db: Session, user_id: UUID, plan_id: UUID) -> WeeklyPlanRe
 def weekly_plan_history(db: Session, user_id: UUID) -> list[WeeklyPlanHistoryItemResponse]:
     plans = db.scalars(
         select(NutritionWeeklyPlan)
-        .where(NutritionWeeklyPlan.user_id == user_id)
+        .join(
+            NutritionPlanGeneration, NutritionWeeklyPlan.generation_id == NutritionPlanGeneration.id
+        )
+        .where(
+            NutritionWeeklyPlan.user_id == user_id,
+            NutritionPlanGeneration.plan_role != NutritionPlanRole.IDEAL_REFERENCE.value,
+        )
         .options(selectinload(NutritionWeeklyPlan.review))
         .order_by(NutritionWeeklyPlan.revision.desc())
     ).all()
@@ -799,6 +1028,8 @@ def _persist_generation(
     input_snapshot: dict[str, object],
     diagnostics: dict[str, object],
     commit: bool = True,
+    bundle_id: UUID | None = None,
+    plan_role: str = NutritionPlanRole.LEGACY.value,
 ) -> NutritionPlanGeneration:
     signature = sha256(
         json.dumps(input_snapshot, sort_keys=True, separators=(",", ":")).encode()
@@ -815,6 +1046,8 @@ def _persist_generation(
         diagnostic_snapshot=diagnostics,
         planner_policy_version=PLANNER_POLICY_VERSION,
         planner_version=PLANNER_VERSION,
+        bundle_id=bundle_id,
+        plan_role=plan_role,
     )
     db.add(generation)
     if commit:
@@ -998,6 +1231,165 @@ def _persist_successful_plan(
             status=NutritionPlanReviewStatus.PENDING,
             expected_plan_revision=plan_revision,
         ),
+    )
+    db.add(plan)
+    db.flush()
+    return plan
+
+
+def _persist_ideal_plan(
+    db: Session,
+    *,
+    generation: NutritionPlanGeneration,
+    profile: NutritionProfile,
+    estimate: NutritionEstimate,
+    safety: NutritionSafetyDecision,
+    result: PlannerResult,
+    input_snapshot: dict[str, object],
+    price_snapshot: dict[str, object],
+    food_manifest: dict[str, object],
+    micro_metadata: dict[str, dict[str, object]],
+    program_id: UUID | None,
+) -> NutritionWeeklyPlan:
+    """Persist an ideal reference plan — GENERATED lifecycle, no physician review."""
+    latest_revision = db.scalar(
+        select(NutritionWeeklyPlan.revision)
+        .where(NutritionWeeklyPlan.user_id == profile.user_id)
+        .order_by(NutritionWeeklyPlan.revision.desc())
+        .limit(1)
+    )
+    start_date = _next_weekday(date.today(), profile.preferred_plan_start_day)
+    plan_revision = (latest_revision or 0) + 1
+    plan = NutritionWeeklyPlan(
+        program_id=program_id,
+        user_id=profile.user_id,
+        generation_id=generation.id,
+        estimate_id=estimate.id,
+        safety_decision_id=safety.id,
+        revision=plan_revision,
+        lifecycle_status=NutritionPlanLifecycleStatus.GENERATED,
+        is_user_visible=False,
+        start_date=start_date,
+        planner_policy_version=PLANNER_POLICY_VERSION,
+        planner_version=PLANNER_VERSION,
+        scientific_policy_version=estimate.policy_version,
+        formula_version=estimate.formula_version,
+        food_data_manifest=food_manifest,
+        input_snapshot=input_snapshot,
+        price_snapshot=price_snapshot,
+        repair_snapshot=[
+            *(
+                {
+                    "action_type": "portion_adjustment",
+                    "day_index": action.day_index,
+                    "role": action.role,
+                    "slot_index": action.slot_index,
+                    "food_id": action.food_id,
+                    "before_grams": str(action.before_grams),
+                    "after_grams": str(action.after_grams),
+                    "reason_code": action.reason_code,
+                }
+                for action in result.portion_adjustment_actions
+            ),
+            *(
+                {
+                    "nutrient_code": action.nutrient_code,
+                    "food_slug": action.food_slug,
+                    "grams_added": str(action.grams_added),
+                    "day_index": action.day_index,
+                    "reason_code": action.reason_code,
+                }
+                for action in result.repair_actions
+            ),
+        ],
+        warning_codes=list(result.warning_codes),
+        explanation_codes=[
+            "DETERMINISTIC_PLAN",
+            "IDEAL_REFERENCE_PLAN",
+            *_estimate_goal_contract_codes(estimate)[1],
+        ],
+        weekly_cost_irr=int(result.weekly_cost_irr),
+        weekly_budget_irr=profile.individual_monthly_food_budget_irr * 12 // 52,
+        budget_status=(
+            NutritionPlanBudgetStatus.OVER_BUDGET
+            if int(result.weekly_cost_irr) > (profile.individual_monthly_food_budget_irr * 12 // 52)
+            else NutritionPlanBudgetStatus.WITHIN_BUDGET
+        ),
+        days=[
+            NutritionWeeklyPlanDay(
+                day_index=day.day_index,
+                plan_date=start_date + timedelta(days=day.day_index),
+                cost_irr=int(day.cost_irr),
+                nutrient_totals=_json_nutrient_pairs(day.nutrients),
+                meals=[
+                    NutritionWeeklyPlanMeal(
+                        catalogue_meal_id=(
+                            UUID(meal.template_id) if meal.template_id is not None else None
+                        ),
+                        catalogue_meal_category=meal.template_category,
+                        slot_role=meal.role,
+                        slot_index=meal.slot_index,
+                        target_distribution=_meal_target_distribution(
+                            input_snapshot, meal.role, profile
+                        ),
+                        nutrient_totals=_json_nutrient_pairs(meal.nutrients),
+                        cost_irr=int(meal.cost_irr),
+                        foods=[
+                            NutritionWeeklyPlanFood(
+                                food_id=(UUID(food.food_id) if food.food_id is not None else None),
+                                item_kind=food.item_kind,
+                                food_slug=food.slug,
+                                food_name_fa=food.name_fa,
+                                food_name_en=food.name_en,
+                                grams=food.grams,
+                                cost_irr=int(food.cost_irr),
+                                nutrient_snapshot=_json_nutrient_pairs(food.nutrients),
+                                price_snapshot=(
+                                    _food_price_snapshot(price_snapshot, food.food_id)
+                                    if food.food_id is not None
+                                    else {
+                                        "kind": "prepared_recipe",
+                                        "price_reference_ids": (food.recipe_snapshot or {}).get(
+                                            "price_reference_ids", []
+                                        ),
+                                    }
+                                ),
+                                recipe_snapshot=food.recipe_snapshot,
+                            )
+                            for food in meal.foods
+                        ],
+                    )
+                    for meal in day.meals
+                ],
+            )
+            for day in result.days
+        ],
+        nutrients=[
+            NutritionWeeklyPlanNutrient(
+                nutrient_code=code,
+                unit=_nutrient_unit(code, micro_metadata),
+                reference_kind=_reference_kind(code, micro_metadata),
+                preferred_value=comparison.preferred,
+                minimum_or_maximum_value=comparison.minimum_or_maximum,
+                planned_value=comparison.planned,
+                difference_from_preferred=comparison.difference_from_preferred,
+                difference_from_limit=comparison.difference_from_limit,
+                status=comparison.status,
+                reason_codes=list(comparison.reason_codes),
+                data_confidence=comparison.data_confidence,
+                explanation_codes=(
+                    ["DIETARY_REFERENCE_GAP"]
+                    if comparison.status
+                    in {
+                        "below_reference_target",
+                        "below_preferred_but_acceptable",
+                    }
+                    else []
+                ),
+            )
+            for code, comparison in sorted((result.nutrient_comparisons or {}).items())
+        ],
+        review=None,
     )
     db.add(plan)
     db.flush()
@@ -1507,14 +1899,25 @@ def _public_prepared_recipe_summary(
 
 
 def _generation_response(
-    generation: NutritionPlanGeneration, plan: NutritionWeeklyPlan | None
+    generation: NutritionPlanGeneration,
+    plan: NutritionWeeklyPlan | None,
+    *,
+    budget_plan: NutritionWeeklyPlan | None = None,
+    ideal_plan: NutritionWeeklyPlan | None = None,
+    comparison: PlanComparisonResponse | None = None,
 ) -> WeeklyPlanGenerationResponse:
+    plan_resp = weekly_plan_response(plan) if plan else None
+    budget_resp = weekly_plan_response(budget_plan) if budget_plan else plan_resp
+    ideal_resp = weekly_plan_response(ideal_plan) if ideal_plan else None
     return WeeklyPlanGenerationResponse(
         generation_id=generation.id,
         outcome=generation.outcome.value,
         reason_codes=generation.reason_codes,
         warning_codes=generation.warning_codes,
-        plan=weekly_plan_response(plan) if plan else None,
+        plan=plan_resp,
+        budget_plan=budget_resp,
+        ideal_plan=ideal_resp,
+        comparison=comparison,
     )
 
 

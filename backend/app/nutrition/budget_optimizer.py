@@ -57,6 +57,8 @@ class BudgetOptimizationResult:
     final_cost_irr: Decimal
     failure_code: str | None = None
     diagnostics: dict[str, str] | None = None
+    minimum_feasible_weekly_cost_irr: Decimal | None = None
+    search_exhaustive: bool = False
 
     def __post_init__(self) -> None:
         if self.diagnostics is None:
@@ -169,6 +171,8 @@ def optimize_weekly_budget(
             days=mutable_days,
             repair_actions=tuple(actions),
             final_cost_irr=final_cost,
+            minimum_feasible_weekly_cost_irr=final_cost,
+            search_exhaustive=False,
             diagnostics={
                 **base_diagnostics,
                 "final_weekly_cost_irr": str(final_cost),
@@ -193,6 +197,8 @@ def optimize_weekly_budget(
             days=search.days,
             repair_actions=tuple(actions) + fallback_actions,
             final_cost_irr=minimum_cost,
+            minimum_feasible_weekly_cost_irr=minimum_cost,
+            search_exhaustive=search.feasibility.search_exhaustive,
             diagnostics={
                 **base_diagnostics,
                 "final_weekly_cost_irr": str(minimum_cost),
@@ -217,6 +223,8 @@ def optimize_weekly_budget(
         + (_actions_between(mutable_days, search.days) if search.days is not None else ()),
         final_cost_irr=final_cost,
         failure_code=failure_code,
+        minimum_feasible_weekly_cost_irr=minimum_cost,
+        search_exhaustive=search.feasibility.search_exhaustive,
         diagnostics={
             **base_diagnostics,
             "final_weekly_cost_irr": str(final_cost),

@@ -108,16 +108,57 @@ _CANONICAL_ALLERGEN_ALIASES: dict[str, CanonicalAllergen] = {
     "tahini": CanonicalAllergen.SESAME,
 }
 
-_KNOWN_FOOD_TERMS: frozenset[str] = frozenset({
-    "chicken", "مرغ", "سینه مرغ", "فیله مرغ", "ران مرغ",
-    "beef", "گوشت گوساله", "گوشت قرمز", "گوشت گوسفند", "lamb", "گوشت چرخ‌کرده",
-    "lentils", "عدس", "chickpeas", "نخود", "beans", "لوبیا",
-    "rice", "برنج", "bread", "نان", "سنگک", "بربری", "لواش", "تافتون",
-    "pasta", "ماکارونی", "پاستا", "oats", "جو دوسر", "اوتمیل",
-    "eggplant", "بادمجان", "mushroom", "قارچ", "tomato", "گوجه",
-    "cucumber", "خیار", "onion", "پیاز", "spinach", "اسفناج",
-    "olive", "زیتون", "oil", "روغن",
-})
+_KNOWN_FOOD_TERMS: frozenset[str] = frozenset(
+    {
+        "chicken",
+        "مرغ",
+        "سینه مرغ",
+        "فیله مرغ",
+        "ران مرغ",
+        "beef",
+        "گوشت گوساله",
+        "گوشت قرمز",
+        "گوشت گوسفند",
+        "lamb",
+        "گوشت چرخ‌کرده",
+        "lentils",
+        "عدس",
+        "chickpeas",
+        "نخود",
+        "beans",
+        "لوبیا",
+        "rice",
+        "برنج",
+        "bread",
+        "نان",
+        "سنگک",
+        "بربری",
+        "لواش",
+        "تافتون",
+        "pasta",
+        "ماکارونی",
+        "پاستا",
+        "oats",
+        "جو دوسر",
+        "اوتمیل",
+        "eggplant",
+        "بادمجان",
+        "mushroom",
+        "قارچ",
+        "tomato",
+        "گوجه",
+        "cucumber",
+        "خیار",
+        "onion",
+        "پیاز",
+        "spinach",
+        "اسفناج",
+        "olive",
+        "زیتون",
+        "oil",
+        "روغن",
+    }
+)
 
 
 def _clean_term(term: str) -> str:
@@ -339,9 +380,7 @@ def evaluate_food_constraints(
             hard_reasons.append("UNRESOLVED_HARD_FOOD_CONSTRAINT")
             continue
 
-        is_allergen_code = any(
-            allergen.value == constraint.code for allergen in CanonicalAllergen
-        )
+        is_allergen_code = any(allergen.value == constraint.code for allergen in CanonicalAllergen)
 
         matched = False
         if is_allergen_code:
@@ -356,16 +395,12 @@ def evaluate_food_constraints(
                 matched = True
             elif not allergen_metadata_verified and not normalized_tags:
                 # Fallback to string matching if unverified & tags unpopulated
-                matched = _matches_term(
-                    constraint.code.casefold(), s, fa
-                ) or _matches_term(
+                matched = _matches_term(constraint.code.casefold(), s, fa) or _matches_term(
                     (constraint.raw_label or "").casefold(), s, fa
                 )
         else:
             # Keyword or slug matching for specific foods or categories
-            matched = _matches_term(
-                constraint.code.casefold(), s, fa
-            ) or _matches_term(
+            matched = _matches_term(constraint.code.casefold(), s, fa) or _matches_term(
                 (constraint.raw_label or "").casefold(), s, fa
             )
 

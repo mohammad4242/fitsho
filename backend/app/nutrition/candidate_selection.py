@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from app.nutrition.enums import NutritionOptimizationMode
 from app.nutrition.preference_snapshot import PreferenceSnapshot
 from app.nutrition.program_selection import ProgramCandidate
 
@@ -35,8 +36,29 @@ class CandidateQuality:
     stable_program_code: str
     stable_variant_key: tuple[str, ...]
     goal_target_penalty: Decimal = ZERO
+    cost_irr: Decimal = ZERO
 
-    def sort_key(self) -> tuple[object, ...]:
+    def sort_key(
+        self, mode: NutritionOptimizationMode = NutritionOptimizationMode.BUDGET_CONSTRAINED
+    ) -> tuple[object, ...]:
+        if mode == NutritionOptimizationMode.IDEAL_REFERENCE:
+            return (
+                self.core_nutrition_max_deviation,
+                self.core_nutrition_total_deviation,
+                self.goal_target_penalty,
+                self.micronutrient_gap_penalty,
+                self.diet_quality_penalty,
+                self.sports_nutrition_distribution_penalty,
+                self.preference_and_feedback_penalty,
+                self.repetition_penalty,
+                self.warning_burden,
+                self.repair_burden,
+                self.substitution_burden,
+                self.preferred_program_style_penalty,
+                self.cost_irr,
+                self.stable_program_code,
+                self.stable_variant_key,
+            )
         return (
             self.core_nutrition_max_deviation,
             self.core_nutrition_total_deviation,
@@ -108,6 +130,7 @@ def evaluate_candidate(
 
 def select_best_candidate(
     evaluations: tuple[CandidateEvaluation, ...],
+    mode: NutritionOptimizationMode = NutritionOptimizationMode.BUDGET_CONSTRAINED,
 ) -> CandidateSelection:
     first_valid = next(
         (
@@ -126,7 +149,7 @@ def select_best_candidate(
         min(
             admitted,
             key=lambda evaluation: (
-                evaluation.quality.sort_key() if evaluation.quality is not None else ()
+                evaluation.quality.sort_key(mode) if evaluation.quality is not None else ()
             ),
         )
         if admitted
@@ -220,6 +243,7 @@ def _quality_for_result(
         preferred_program_style_penalty=0 if preferred_style else 1,
         stable_program_code=stable_program_code,
         stable_variant_key=stable_variant_key,
+        cost_irr=result.weekly_cost_irr,
     )
 
 
@@ -326,6 +350,6 @@ def _repetition_penalty(result: PlannerResult) -> Decimal:
 
 
 def _budget_utilization(cost: Decimal, budget: Decimal) -> Decimal:
-    if budget > ZERO:
+    if budget > ZERO and budget != Decimal("Infinity"):
         return cost / budget
     return ZERO if cost <= ZERO else ONE
