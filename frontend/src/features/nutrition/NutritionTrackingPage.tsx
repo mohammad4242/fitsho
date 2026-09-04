@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import * as api from "./api";
+import type { FoodPhotoEstimate, FoodPhotoEstimateItem } from "./api";
 import type { DailyTrackingSummary } from "./types";
 import type { NutritionAdherence } from "./types";
 import "./nutritionEstimate.css";
@@ -24,7 +25,7 @@ export function NutritionTrackingPage() {
   const [error, setError] = useState<string | null>(null);
   const [calories, setCalories] = useState("");
   const [photoConsent, setPhotoConsent] = useState(false);
-  const [photoEstimate, setPhotoEstimate] = useState<Awaited<ReturnType<typeof api.estimateFoodPhoto>> | null>(null);
+  const [photoEstimate, setPhotoEstimate] = useState<FoodPhotoEstimate | null>(null);
   const [adherence, setAdherence] = useState<NutritionAdherence | null>(null);
   const [rangeStart, setRangeStart] = useState(weekAgo);
   const [foods, setFoods] = useState<api.CatalogueFood[]>([]);
@@ -37,6 +38,8 @@ export function NutritionTrackingPage() {
   const [photoOpen, setPhotoOpen] = useState(freeMealId !== null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [adherenceOpen, setAdherenceOpen] = useState(false);
+  const [itemFoodSelections, setItemFoodSelections] = useState<Record<string, string>>({});
+  const [itemGramInputs, setItemGramInputs] = useState<Record<string, string>>({});
 
   const load = () => api.getDailyTracking(entryDate).then(setSummary).catch(() => setError(l("دریافت اطلاعات ممکن نشد.", "Could not load tracking."))).finally(() => setLoading(false));
   useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,10 +67,14 @@ export function NutritionTrackingPage() {
 
   async function analyzePhoto(file: File | undefined) {
     if (!file || !photoConsent) return;
+    setPhotoEstimate(null);
+    setError(null);
+    setItemFoodSelections({});
+    setItemGramInputs({});
     const reader = new FileReader();
     reader.addEventListener("load", () => setPhotoPreview(typeof reader.result === "string" ? reader.result : null), { once: true });
     reader.readAsDataURL(file);
-    setBusy(true); setError(null);
+    setBusy(true);
     try { setPhotoEstimate(await api.estimateFoodPhoto(file)); }
     catch { setError(l("برآورد عکس فعلاً در دسترس نیست؛ ثبت دستی همچنان کار می‌کند.", "Photo estimation is unavailable; manual tracking still works.")); }
     finally { setBusy(false); }
@@ -100,7 +107,7 @@ export function NutritionTrackingPage() {
         await api.confirmFoodPhoto(photoEstimate.id, entryDate); setPhotoEstimate(null); await load();
       }
     }
-    catch { setError(l("موارد نامشخص را اول ویرایش کن.", "Resolve uncertain items before confirming.")); }
+    catch { setError(l("موارد نامشخص را اول ویرایش یا حذف کن.", "Review or remove the unresolved items before confirming.")); }
     finally { setBusy(false); }
   }
 
@@ -115,8 +122,32 @@ export function NutritionTrackingPage() {
   async function removePhotoItem(itemId: string) {
     if (!photoEstimate) return;
     setBusy(true);
-    try { setPhotoEstimate(await api.correctFoodPhotoItem(photoEstimate.id, itemId, { remove: true })); }
+    try {
+      const updated = await api.correctFoodPhotoItem(photoEstimate.id, itemId, { remove: true });
+      setPhotoEstimate(updated);
+      setItemFoodSelections((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
+      setItemGramInputs((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
+    }
     catch { setError(l("حذف مورد انجام نشد.", "The item could not be removed.")); }
+    finally { setBusy(false); }
+  }
+
+  async function resolvePhotoItem(itemId: string) {
+    if (!photoEstimate) return;
+    const selectedFoodId = itemFoodSelections[itemId];
+    const gramStr = itemGramInputs[itemId];
+    if (!selectedFoodId || !gramStr || Number(gramStr) <= 0) return;
+    setBusy(true);
+    try {
+      const updated = await api.correctFoodPhotoItem(photoEstimate.id, itemId, {
+        food_id: selectedFoodId,
+        estimated_amount: Number(gramStr),
+      });
+      setPhotoEstimate(updated);
+      setItemFoodSelections((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
+      setItemGramInputs((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
+    }
+    catch { setError(l("اصلاح مورد ذخیره نشد.", "Item correction was not saved.")); }
     finally { setBusy(false); }
   }
 
@@ -139,6 +170,9 @@ export function NutritionTrackingPage() {
   const todayAdherence = adherence?.days.find((day) => day.date === today);
   const visibleEntries = summary?.entries.filter((entry) => sourceFilter === "all" || entry.source === sourceFilter) ?? [];
 
+  const isItemReady = (item: FoodPhotoEstimateItem) => Boolean(item.food_id) && item.unit === "g";
+  const fmt = (n: number) => Math.round(n).toLocaleString(fa ? "fa-IR" : "en-US");
+
   return <main className="nutrition-estimate-page nutrition-tracking-page" dir={fa ? "rtl" : "ltr"}>
     <section className="nutrition-estimate-hero nutrition-tracking-header">
       <div><p className="nutrition-eyebrow">{l("امروز", "Today")}</p><h1 className="fitsho-display">{l("ثبت تغذیه", "Nutrition tracking")}</h1></div>
@@ -154,15 +188,167 @@ export function NutritionTrackingPage() {
     </section>
     <section className="nutrition-photo-entry"><button type="button" onClick={() => setPhotoOpen((open) => !open)} aria-expanded={photoOpen}><span className="nutrition-photo-entry__icon" aria-hidden="true">⌾</span><span><strong>{l("عکس وعده", "Food photo")}</strong><small>{l("تخمین از روی عکس غذا", "Estimate from a meal photo")}</small></span><b aria-hidden="true">+</b></button></section>
     {photoOpen && <section className="nutrition-photo-panel">
-      <header><div><p className="eyebrow eyebrow--accent">{l("تخمین تصویری", "Photo estimate")}</p><h2>{l("عکس وعده", "Meal photo")}</h2></div>{photoEstimate && <strong className="nutrition-photo-estimate-badge">{l("نتیجه تخمینی", "Estimated result")} · {Math.round(photoEstimate.overall_confidence * 100).toLocaleString(fa ? "fa-IR" : "en-US")}{fa ? "٪" : "%"}</strong>}</header>
+      <header><div><p className="eyebrow eyebrow--accent">{l("تخمین تصویری", "Photo estimate")}</p><h2>{l("عکس وعده", "Meal photo")}</h2></div></header>
       <div className="nutrition-photo-stage">
         {photoPreview ? <img alt={l("پیش‌نمایش عکس وعده", "Meal photo preview")} src={photoPreview} /> : <div><span aria-hidden="true">⌾</span><strong>{l("عکس غذا را انتخاب کن", "Choose a meal photo")}</strong></div>}
         {busy && <span className="nutrition-photo-stage__busy" role="status">{l("در حال تحلیل…", "Analyzing…")}</span>}
       </div>
-      <p className="nutrition-photo-disclosure">{l("عکس فقط برای شناسایی تقریبی غذا به OpenRouter فرستاده می‌شود؛ اطلاعات حساب یا پزشکی ارسال نمی‌شود.", "The image is sent to OpenRouter only for approximate food identification; account and medical data are not sent.")}</p>
+      <p className="nutrition-photo-disclosure">{l(
+        "عکس فقط برای شناسایی تقریبی غذا از طریق سرویس هوش مصنوعی تنظیم‌شده پردازش می‌شود؛ اطلاعات حساب یا پزشکی همراه آن ارسال نمی‌شود.",
+        "The image is sent only for approximate food recognition through the configured AI service. Account and medical information are not included."
+      )}</p>
       <label className="nutrition-photo-consent"><input type="checkbox" checked={photoConsent} onChange={(event) => setPhotoConsent(event.target.checked)} /> {l("با پردازش عکس توسط سرویس ثالث موافقم", "I consent to third-party image processing")}</label>
       <label className={`nutrition-photo-picker${photoConsent ? " is-enabled" : ""}`}><span>{photoPreview ? l("تغییر عکس", "Change photo") : l("انتخاب عکس", "Choose photo")}</span><input aria-label={l("انتخاب عکس غذا", "Choose food photo")} type="file" accept="image/jpeg,image/png,image/webp" disabled={!photoConsent || busy} onChange={(event) => void analyzePhoto(event.target.files?.[0])} /></label>
-      {photoEstimate && <div className="nutrition-photo-result"><p>{l("این نتیجه تقریبی است و فقط بعد از تأیید تو ثبت می‌شود.", "This is approximate and is saved only after your confirmation.")}</p><ul>{photoEstimate.items.map((item) => <li key={item.item_id}><span><strong>{item.name_guess}</strong><small>{item.mapping_status}</small></span><label>{l("مقدار", "Amount")} <input aria-label={l(`مقدار ${item.name_guess}`, `${item.name_guess} amount`)} type="number" min="1" max="10000" defaultValue={item.estimated_amount} onBlur={(event) => void correctPhotoAmount(item.item_id, Number(event.target.value))} /> {item.unit}</label><button type="button" onClick={() => void removePhotoItem(item.item_id)}>{l("حذف", "Remove")}</button></li>)}</ul><button className="primary-button" disabled={busy} onClick={() => void confirmPhoto()}>{freeMealId ? l("تأیید و بازگشت به وعده آزاد", "Confirm and return to Free Meal") : l("تأیید و ثبت", "Confirm and log")}</button></div>}
+      {photoEstimate && (() => {
+        const macroTotals = photoEstimate.macro_totals ?? { calories: 0, protein_g: 0, carbohydrate_g: 0, fat_g: 0 };
+        return <>
+        <div className="nutrition-photo-summary">
+          <div className="nutrition-photo-calories">
+            <span className="nutrition-photo-calories__label">{l("کالری تخمینی", "Estimated calories")}</span>
+            <strong className="nutrition-photo-calories__value">≈ {fmt(macroTotals.calories)} kcal</strong>
+            <span className="nutrition-photo-summary-note">
+              {l("تخمینی", "Estimated")}
+            </span>
+          </div>
+          <div className="nutrition-photo-macros" role="list" aria-label={l("درشت‌مغذی‌ها", "Macronutrients")}>
+            <div className="nutrition-photo-macro" role="listitem">
+              <span>{l("پروتئین", "Protein")}</span>
+              <strong>≈ {fmt(macroTotals.protein_g)} g</strong>
+            </div>
+            <div className="nutrition-photo-macro" role="listitem">
+              <span>{l("کربوهیدرات", "Carbs")}</span>
+              <strong>≈ {fmt(macroTotals.carbohydrate_g)} g</strong>
+            </div>
+            <div className="nutrition-photo-macro" role="listitem">
+              <span>{l("چربی", "Fat")}</span>
+              <strong>≈ {fmt(macroTotals.fat_g)} g</strong>
+            </div>
+          </div>
+          {!photoEstimate.macro_totals_complete && (
+            <p className="nutrition-photo-partial-note" role="alert">
+              {l(
+                "برآورد فعلاً ناقص است؛ موارد نیازمند بررسی را در جزئیات اصلاح کن.",
+                "Partial estimate — review the items below to complete the result."
+              )}
+            </p>
+          )}
+        </div>
+
+        <details className="nutrition-photo-details">
+          <summary className="nutrition-photo-details__summary">
+            <span>{l("جزئیات تشخیص", "Detection details")} · {photoEstimate.items.length} {l("مورد", "items")}</span>
+            <i className="nutrition-photo-details__chevron" aria-hidden="true" />
+          </summary>
+          <ul className="nutrition-photo-details__list">
+            {photoEstimate.items.map((item) => {
+              const ready = isItemReady(item);
+              const needsReview = !ready;
+              const isNonGramUnit = item.unit !== "g";
+              return <li key={item.item_id} className={`nutrition-photo-item${needsReview ? " nutrition-photo-item--unresolved" : ""}`}>
+                <div className="nutrition-photo-item__identity">
+                  <strong>{item.name_guess}</strong>
+                  {needsReview
+                    ? <span className="nutrition-photo-item__status nutrition-photo-item__status--review">{l("نیاز به بررسی", "Needs review")}</span>
+                    : <span className="nutrition-photo-item__status nutrition-photo-item__status--ok">{l("تطبیق‌یافته", "Matched")}</span>
+                  }
+                </div>
+
+                {ready && (
+                  <div className="nutrition-photo-item__amount">
+                    <label>
+                      <span className="visually-hidden">{l(`مقدار ${item.name_guess}`, `${item.name_guess} amount`)}</span>
+                      <input
+                        aria-label={l(`مقدار ${item.name_guess}`, `${item.name_guess} amount`)}
+                        type="number"
+                        min="1"
+                        max="10000"
+                        defaultValue={item.estimated_amount}
+                        onBlur={(event) => void correctPhotoAmount(item.item_id, Number(event.target.value))}
+                      />
+                      <span>{l("گرم", "g")}</span>
+                    </label>
+                  </div>
+                )}
+
+                {needsReview && (
+                  <div className="nutrition-photo-item__review">
+                    {isNonGramUnit && item.unit !== "unknown" && (
+                      <p className="nutrition-photo-item__ai-hint">
+                        {l(`برآورد هوش مصنوعی: ${item.estimated_amount} ${item.unit}`, `AI estimate: ${item.estimated_amount} ${item.unit}`)}
+                      </p>
+                    )}
+                    <label className="nutrition-photo-item__review-label">
+                      {l("غذای فیتشو", "Fitsho food")}
+                      <span className="nutrition-off-plan-control nutrition-off-plan-control--select">
+                        <select
+                          aria-label={l(`انتخاب غذا برای ${item.name_guess}`, `Choose food for ${item.name_guess}`)}
+                          value={itemFoodSelections[item.item_id] ?? ""}
+                          onChange={(e) => setItemFoodSelections((prev) => ({ ...prev, [item.item_id]: e.target.value }))}
+                        >
+                          <option value="">{l("انتخاب کن…", "Choose…")}</option>
+                          {foods.map((food) => (
+                            <option key={food.id} value={food.id}>{fa ? food.name_fa : food.name_en}</option>
+                          ))}
+                        </select>
+                        <i aria-hidden="true" />
+                      </span>
+                    </label>
+                    <label className="nutrition-photo-item__review-label">
+                      {l("مقدار به گرم", "Amount in grams")}
+                      <input
+                        aria-label={l(`مقدار ${item.name_guess} به گرم`, `${item.name_guess} amount in grams`)}
+                        type="number"
+                        min="1"
+                        max="10000"
+                        value={itemGramInputs[item.item_id] ?? ""}
+                        onChange={(e) => setItemGramInputs((prev) => ({ ...prev, [item.item_id]: e.target.value }))}
+                        placeholder={l("گرم", "grams")}
+                      />
+                    </label>
+                    <div className="nutrition-photo-item__actions">
+                      <button
+                        type="button"
+                        disabled={busy || !itemFoodSelections[item.item_id] || !itemGramInputs[item.item_id] || Number(itemGramInputs[item.item_id]) <= 0}
+                        onClick={() => void resolvePhotoItem(item.item_id)}
+                        className="nutrition-photo-item__apply"
+                      >
+                        {l("اعمال", "Apply")}
+                      </button>
+                      <button type="button" className="nutrition-photo-item__remove" onClick={() => void removePhotoItem(item.item_id)}>
+                        {l("حذف", "Remove")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {ready && (
+                  <div className="nutrition-photo-item__actions">
+                    <button type="button" className="nutrition-photo-item__remove" onClick={() => void removePhotoItem(item.item_id)}>
+                      {l("حذف", "Remove")}
+                    </button>
+                  </div>
+                )}
+              </li>;
+            })}
+          </ul>
+        </details>
+
+        <div className="nutrition-photo-confirm">
+          <button
+            className="primary-button"
+            disabled={busy || !photoEstimate.macro_totals_complete}
+            onClick={() => void confirmPhoto()}
+          >
+            {freeMealId ? l("تأیید و بازگشت به وعده آزاد", "Confirm and return to Free Meal") : l("تأیید و ثبت", "Confirm and log")}
+          </button>
+          {!photoEstimate.macro_totals_complete && (
+            <p className="nutrition-photo-confirm__hint">
+              {l("قبل از تأیید، موارد نیازمند بررسی را اصلاح یا حذف کن.", "Review or remove the unresolved items before confirming.")}
+            </p>
+          )}
+        </div>
+      </>;
+      })()}
     </section>}
     <section className="nutrition-checkin" aria-label={l("ثبت وضعیت امروز", "Today's check-in")}>
       {([ ["on_plan", "طبق برنامه", "On plan"], ["mostly_on_plan", "تقریباً طبق برنامه", "Mostly on plan"], ["off_plan", "خارج از برنامه", "Off plan"], ["not_recorded", "ثبت نمی‌کنم", "Skip"] ] as const).map(([value, persian, english]) => <button className={summary?.check_in_status === value ? "is-active" : undefined} disabled={busy} key={value} onClick={() => void checkIn(value)}>{l(persian, english)}</button>)}

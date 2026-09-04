@@ -106,7 +106,7 @@ def replay_idempotent_photo(
             NutritionFoodPhotoEstimate.idempotency_key_hash == key_hash,
         )
     )
-    return photo_response(previous) if previous is not None else None
+    return photo_response(previous, db=db) if previous is not None else None
 
 
 def food_photo_storage_path(root: Path, key: str) -> Path:
@@ -317,14 +317,94 @@ async def estimate_photo(
     )
     db.commit()
     db.refresh(row)
-    return photo_response(row)
+    return photo_response(row, db=db)
 
 
-def photo_response(row: NutritionFoodPhotoEstimate) -> dict[str, object]:
+def _item_is_nutrition_ready(item: dict[str, object]) -> bool:
+    """Return True iff this item can safely contribute to the nutrition summary."""
+    return bool(item.get("food_id")) and item.get("unit") == "g"
+
+
+def _calculate_photo_macro_totals(
+    db: Session, items: list[dict[str, object]]
+) -> tuple[dict[str, float], bool]:
+    """Pure read-only helper: calculate nutrition totals from mapped_items.
+
+    Returns (totals_dict, complete) where ``complete`` is True only when every
+    remaining item is nutrition-ready (has a verified food_id and unit=="g").
+    Uses a single batched catalogue query to avoid N+1 issues.
+    """
+    nutrient_keys = {
+        "energy_kcal": "calories",
+        "protein_g": "protein_g",
+        "carbohydrate_g": "carbohydrate_g",
+        "total_fat_g": "fat_g",
+    }
+    totals: dict[str, Decimal] = {
+        "calories": Decimal(),
+        "protein_g": Decimal(),
+        "carbohydrate_g": Decimal(),
+        "fat_g": Decimal(),
+    }
+
+    ready_items = [
+        (item, UUID(str(item["food_id"]))) for item in items if _item_is_nutrition_ready(item)
+    ]
+    not_ready_count = len(items) - len(ready_items)
+
+    verified_ready_count = 0
+    if ready_items:
+        food_ids = [fid for _, fid in ready_items]
+        foods_with_compositions = db.scalars(
+            select(NutritionCatalogueFood)
+            .where(
+                NutritionCatalogueFood.id.in_(food_ids),
+                NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
+            )
+            .options(selectinload(NutritionCatalogueFood.compositions))
+        ).all()
+        food_map = {food.id: food for food in foods_with_compositions}
+
+        for item, food_id in ready_items:
+            food = food_map.get(food_id)
+            if food is None:
+                # Food no longer verified — treat as unresolved
+                not_ready_count += 1
+                continue
+            verified_ready_count += 1
+            factor = Decimal(str(item["estimated_amount"])) / Decimal("100")
+            for composition in food.compositions:
+                output_key = nutrient_keys.get(composition.nutrient_code)
+                if output_key is not None:
+                    totals[output_key] += composition.value_per_100g * factor
+
+    # Complete means no unresolvable items remain
+    if not items:
+        complete = True
+    else:
+        complete = not_ready_count == 0 and verified_ready_count == len(ready_items)
+
+    return {key: float(value) for key, value in totals.items()}, complete
+
+
+def photo_response(
+    row: NutritionFoodPhotoEstimate, *, db: Session | None = None
+) -> dict[str, object]:
     items = [
         {**item, "item_id": item.get("item_id") or f"legacy-{index}"}
         for index, item in enumerate(row.mapped_items)
     ]
+    macro_totals: dict[str, float] = {
+        "calories": 0.0,
+        "protein_g": 0.0,
+        "carbohydrate_g": 0.0,
+        "fat_g": 0.0,
+    }
+    macro_totals_complete = False
+    if db is not None:
+        macro_totals, macro_totals_complete = _calculate_photo_macro_totals(
+            db, list(row.mapped_items)
+        )
     return {
         "id": row.id,
         "status": row.status,
@@ -333,6 +413,8 @@ def photo_response(row: NutritionFoodPhotoEstimate) -> dict[str, object]:
         "needs_user_confirmation": True,
         "model_id": row.model_id,
         "expires_at": row.expires_at,
+        "macro_totals": macro_totals,
+        "macro_totals_complete": macro_totals_complete,
     }
 
 
@@ -404,7 +486,7 @@ def correct_photo_item(
     )
     db.commit()
     db.refresh(row)
-    return photo_response(row)
+    return photo_response(row, db=db)
 
 
 def confirm_photo(
@@ -419,21 +501,29 @@ def confirm_photo(
     )
     if row is None:
         raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
+    # Reject if any remaining item is unresolved or cannot safely contribute grams.
+    if not row.mapped_items:
+        raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
+    for item in row.mapped_items:
+        if not _item_is_nutrition_ready(item):
+            raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
+    # All items are nutrition-ready; fetch compositions in one query.
+    food_ids = [UUID(str(item["food_id"])) for item in row.mapped_items]
+    foods_with_compositions = db.scalars(
+        select(NutritionCatalogueFood)
+        .where(
+            NutritionCatalogueFood.id.in_(food_ids),
+            NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
+        )
+        .options(selectinload(NutritionCatalogueFood.compositions))
+    ).all()
+    food_map = {food.id: food for food in foods_with_compositions}
+    if len(food_map) != len(food_ids):
+        # At least one food is no longer verified.
+        raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
     created: list[NutritionConsumptionEntry] = []
     for item in row.mapped_items:
-        food_id = item.get("food_id")
-        if not food_id or item.get("unit") != "g":
-            continue
-        food = db.scalar(
-            select(NutritionCatalogueFood)
-            .where(
-                NutritionCatalogueFood.id == UUID(str(food_id)),
-                NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
-            )
-            .options(selectinload(NutritionCatalogueFood.compositions))
-        )
-        if food is None:
-            continue
+        food = food_map[UUID(str(item["food_id"]))]
         grams = float(str(item["estimated_amount"]))
         nutrients = {
             composition.nutrient_code: str(
@@ -459,8 +549,6 @@ def confirm_photo(
         )
         db.add(entry)
         created.append(entry)
-    if not created:
-        raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
     row.status = "confirmed"
     row.confirmed_at = datetime.now(UTC)
     db.commit()
@@ -477,45 +565,19 @@ def confirm_photo_macro_preview(db: Session, user_id: UUID, estimate_id: UUID) -
     )
     if row is None:
         raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
-    totals = {
-        "calories": Decimal(),
-        "protein_g": Decimal(),
-        "carbohydrate_g": Decimal(),
-        "fat_g": Decimal(),
-    }
-    nutrient_keys = {
-        "energy_kcal": "calories",
-        "protein_g": "protein_g",
-        "carbohydrate_g": "carbohydrate_g",
-        "total_fat_g": "fat_g",
-    }
-    resolved = False
+    # Validate: all items must be nutrition-ready before confirming.
+    if not row.mapped_items:
+        raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
     for item in row.mapped_items:
-        food_id = item.get("food_id")
-        if not food_id or item.get("unit") != "g":
-            continue
-        food = db.scalar(
-            select(NutritionCatalogueFood)
-            .where(
-                NutritionCatalogueFood.id == UUID(str(food_id)),
-                NutritionCatalogueFood.verification_status == FoodVerificationStatus.VERIFIED,
-            )
-            .options(selectinload(NutritionCatalogueFood.compositions))
-        )
-        if food is None:
-            continue
-        resolved = True
-        factor = Decimal(str(item["estimated_amount"])) / Decimal("100")
-        for composition in food.compositions:
-            output_key = nutrient_keys.get(composition.nutrient_code)
-            if output_key is not None:
-                totals[output_key] += composition.value_per_100g * factor
-    if not resolved:
+        if not _item_is_nutrition_ready(item):
+            raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
+    totals, complete = _calculate_photo_macro_totals(db, list(row.mapped_items))
+    if not complete:
         raise FoodPhotoError("UNRESOLVED_ITEMS_REQUIRE_EDIT")
     row.status = "confirmed"
     row.confirmed_at = datetime.now(UTC)
     db.commit()
-    return {key: float(value) for key, value in totals.items()}
+    return totals
 
 
 def delete_photo(db: Session, user_id: UUID, estimate_id: UUID, settings: Settings) -> None:

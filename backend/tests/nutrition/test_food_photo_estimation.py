@@ -443,3 +443,352 @@ def test_agent_photo_provider_failure_deletes_only_stored_photo(
     assert db.scalar(select(NutritionFoodPhotoEstimate)) is None
     assert keep.read_text(encoding="utf-8") == "preserve"
     assert not any(test_settings.food_photo_storage_root.rglob("*.jpg"))
+
+
+# ---------------------------------------------------------------------------
+# New macro-totals tests
+# ---------------------------------------------------------------------------
+
+
+def _setup_estimate(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> dict[str, Any]:
+    """Register a user, seed catalogue, configure a fake provider, and run estimation."""
+    _register(client)
+    _seed_foods_and_prices(db)
+    db.add(
+        AITaskConfig(
+            task_type=AITaskType.FOOD_PHOTO_ESTIMATION,
+            provider=AIProviderName.OPENROUTER,
+            enabled=True,
+            primary_model_id="test/vision",
+        )
+    )
+    db.flush()
+    monkeypatch.setattr(
+        "app.nutrition.food_photo_service.decrypted_key", lambda *_a, **_k: "secret"
+    )
+    monkeypatch.setattr(
+        "app.nutrition.food_photo_service.build_task_provider",
+        lambda *_a, **_k: _configured_provider(
+            FakeVisionProvider(), name="openrouter", model_id="test/vision"
+        ),
+    )
+    response = client.post(
+        "/api/v1/nutrition/tracking/photo-estimates",
+        headers={**ORIGIN, "X-Fitsho-Food-Photo-Consent": "true"},
+        files={"file": ("meal.png", _image(), "image/png")},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_macro_totals_returned_after_estimation(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """A: Macro totals are returned after estimation with correct scaled values."""
+    test_settings.food_photo_rate_limit = 10
+    body = _setup_estimate(client, db, monkeypatch)
+
+    assert "macro_totals" in body
+    assert "macro_totals_complete" in body
+    totals = body["macro_totals"]
+    # task6-chicken: 165 kcal, 31g protein, 0g carbs, 3.6g fat per 100g at 140g
+    assert abs(totals["calories"] - 165 * 1.4) < 0.01
+    assert abs(totals["protein_g"] - 31 * 1.4) < 0.01
+    assert abs(totals["carbohydrate_g"] - 0 * 1.4) < 0.01
+    assert abs(totals["fat_g"] - 3.6 * 1.4) < 0.01
+    assert body["macro_totals_complete"] is True
+
+
+def test_amount_correction_recalculates_macro_totals(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """B: Amount correction recalculates totals."""
+    test_settings.food_photo_rate_limit = 10
+    body = _setup_estimate(client, db, monkeypatch)
+    item_id = body["items"][0]["item_id"]
+    estimate_id = body["id"]
+
+    corrected = client.patch(
+        f"/api/v1/nutrition/tracking/photo-estimates/{estimate_id}/items/{item_id}",
+        headers=ORIGIN,
+        json={"estimated_amount": 90},
+    )
+    assert corrected.status_code == 200, corrected.text
+    totals = corrected.json()["macro_totals"]
+    # 90g instead of 140g
+    assert abs(totals["calories"] - 165 * 0.9) < 0.01
+    assert abs(totals["protein_g"] - 31 * 0.9) < 0.01
+    assert abs(totals["fat_g"] - 3.6 * 0.9) < 0.01
+    assert corrected.json()["macro_totals_complete"] is True
+
+
+def test_unresolved_item_produces_incomplete_summary(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """C: Unresolved items produce an incomplete summary."""
+    test_settings.food_photo_rate_limit = 10
+    body = _setup_estimate(client, db, monkeypatch)
+    estimate_id = body["id"]
+    item_id = body["items"][0]["item_id"]
+
+    # Add an unresolved item by removing the food_id via a patch that sets no food_id,
+    # and also test that mapping_status=unresolved items cause incompleteness.
+    # We simulate this by directly mutating the DB row.
+    row = db.scalar(select(NutritionFoodPhotoEstimate))
+    assert row is not None
+    items = list(row.mapped_items)
+    items.append(
+        {
+            "item_id": "unresolved-sauce",
+            "name_guess": "White sauce",
+            "estimated_amount": 50,
+            "unit": "unknown",
+            "confidence": 0.4,
+            "visible_evidence": [],
+            "uncertainties": [],
+            "food_id": None,
+            "food_slug": None,
+            "mapping_status": "unresolved",
+        }
+    )
+    row.mapped_items = items
+    db.commit()
+
+    # Fetch the estimate via correction (any endpoint that calls photo_response with db)
+    corrected = client.patch(
+        f"/api/v1/nutrition/tracking/photo-estimates/{estimate_id}/items/{item_id}",
+        headers=ORIGIN,
+        json={"estimated_amount": 140},
+    )
+    assert corrected.status_code == 200
+    assert corrected.json()["macro_totals_complete"] is False
+    # Known chicken should still contribute partial totals
+    assert corrected.json()["macro_totals"]["calories"] > 0
+
+
+def test_confirmation_rejects_unresolved_items(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """D: Final confirmation rejects unresolved/non-gram items."""
+    test_settings.food_photo_rate_limit = 10
+    body = _setup_estimate(client, db, monkeypatch)
+    estimate_id = body["id"]
+
+    # Add an unresolved item
+    row = db.scalar(select(NutritionFoodPhotoEstimate))
+    assert row is not None
+    items = list(row.mapped_items)
+    items.append(
+        {
+            "item_id": "unresolved-sauce",
+            "name_guess": "White sauce",
+            "estimated_amount": 50,
+            "unit": "unknown",
+            "confidence": 0.4,
+            "visible_evidence": [],
+            "uncertainties": [],
+            "food_id": None,
+            "food_slug": None,
+            "mapping_status": "unresolved",
+        }
+    )
+    row.mapped_items = items
+    db.commit()
+
+    confirmed = client.post(
+        f"/api/v1/nutrition/tracking/photo-estimates/{estimate_id}/confirm",
+        headers=ORIGIN,
+        json={"entry_date": date.today().isoformat()},
+    )
+    assert confirmed.status_code == 409
+    assert confirmed.json()["detail"]["code"] == "UNRESOLVED_ITEMS_REQUIRE_EDIT"
+    # Estimate must remain in "estimated" status
+    db.expire_all()
+    row = db.scalar(select(NutritionFoodPhotoEstimate))
+    assert row is not None and row.status == "estimated"
+
+
+def test_resolving_unresolved_item_makes_summary_complete(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """E: Resolving an unresolved item makes the summary complete."""
+    test_settings.food_photo_rate_limit = 10
+    body = _setup_estimate(client, db, monkeypatch)
+    estimate_id = body["id"]
+
+    # Add an unresolved item
+    row = db.scalar(select(NutritionFoodPhotoEstimate))
+    assert row is not None
+    items = list(row.mapped_items)
+    items.append(
+        {
+            "item_id": "unresolved-sauce",
+            "name_guess": "White sauce",
+            "estimated_amount": 50,
+            "unit": "unknown",
+            "confidence": 0.4,
+            "visible_evidence": [],
+            "uncertainties": [],
+            "food_id": None,
+            "food_slug": None,
+            "mapping_status": "unresolved",
+        }
+    )
+    row.mapped_items = items
+    db.commit()
+
+    # Resolve by providing food_id and estimated_amount
+    from app.nutrition.enums import FoodVerificationStatus as FVS
+    from app.nutrition.models import NutritionCatalogueFood as NCF
+
+    food = db.scalar(
+        select(NCF).where(NCF.slug == "task6-chicken", NCF.verification_status == FVS.VERIFIED)
+    )
+    assert food is not None
+
+    resolved = client.patch(
+        f"/api/v1/nutrition/tracking/photo-estimates/{estimate_id}/items/unresolved-sauce",
+        headers=ORIGIN,
+        json={"food_id": str(food.id), "estimated_amount": 80},
+    )
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["macro_totals_complete"] is True
+    assert resolved.json()["macro_totals"]["calories"] > 0
+
+
+def test_removing_unresolved_item_makes_summary_complete(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """F: Removing the unresolved item makes summary complete."""
+    test_settings.food_photo_rate_limit = 10
+    body = _setup_estimate(client, db, monkeypatch)
+    estimate_id = body["id"]
+
+    # Add an unresolved item
+    row = db.scalar(select(NutritionFoodPhotoEstimate))
+    assert row is not None
+    items = list(row.mapped_items)
+    items.append(
+        {
+            "item_id": "unresolved-sauce",
+            "name_guess": "White sauce",
+            "estimated_amount": 50,
+            "unit": "unknown",
+            "confidence": 0.4,
+            "visible_evidence": [],
+            "uncertainties": [],
+            "food_id": None,
+            "food_slug": None,
+            "mapping_status": "unresolved",
+        }
+    )
+    row.mapped_items = items
+    db.commit()
+
+    removed = client.patch(
+        f"/api/v1/nutrition/tracking/photo-estimates/{estimate_id}/items/unresolved-sauce",
+        headers=ORIGIN,
+        json={"remove": True},
+    )
+    assert removed.status_code == 200, removed.text
+    data = removed.json()
+    assert data["macro_totals_complete"] is True
+    assert len(data["items"]) == 1
+    assert data["macro_totals"]["calories"] > 0
+
+
+def test_free_meal_macro_preview_uses_same_calculation_and_confirms(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """G: Free Meal confirmation produces same macros as estimate summary then confirms."""
+    test_settings.food_photo_rate_limit = 10
+    body = _setup_estimate(client, db, monkeypatch)
+    estimate_id = body["id"]
+    # The read-only macro_totals from estimation
+    read_only_totals = body["macro_totals"]
+
+    free_meal_response = client.post(
+        f"/api/v1/nutrition/tracking/photo-estimates/{estimate_id}/free-meal-preview",
+        headers=ORIGIN,
+    )
+    assert free_meal_response.status_code == 200, free_meal_response.text
+    confirmed_totals = free_meal_response.json()
+
+    # Same calculation
+    assert abs(confirmed_totals["calories"] - read_only_totals["calories"]) < 0.01
+    assert abs(confirmed_totals["protein_g"] - read_only_totals["protein_g"]) < 0.01
+    assert abs(confirmed_totals["fat_g"] - read_only_totals["fat_g"]) < 0.01
+
+    # State should now be confirmed
+    db.expire_all()
+    row = db.scalar(select(NutritionFoodPhotoEstimate))
+    assert row is not None and row.status == "confirmed"
+
+
+def test_macro_totals_do_not_confirm_estimate(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """H: Receiving macro_totals in estimate response does NOT confirm the estimate."""
+    test_settings.food_photo_rate_limit = 10
+    body = _setup_estimate(client, db, monkeypatch)
+
+    # macro_totals are present in the estimation response
+    assert "macro_totals" in body
+    assert body["macro_totals"]["calories"] > 0
+
+    # Status must remain "estimated"
+    db.expire_all()
+    row = db.scalar(select(NutritionFoodPhotoEstimate))
+    assert row is not None and row.status == "estimated"
+    assert db.scalar(select(NutritionConsumptionEntry)) is None
+
+
+def test_food_photo_ai_contract_unchanged(
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
+) -> None:
+    """I: The canonical AI contract test — prompt must NOT request calories from the model."""
+    request = build_food_photo_request(
+        primary_model="vision-primary",
+        fallback_models=("vision-fallback",),
+        provider_preferences=ProviderRoutingPreferences(zdr=True),
+        temperature=0.2,
+        max_output_tokens=777,
+    )
+    # The system prompt must explicitly forbid calorie calculation (not request it)
+    assert "do not provide calories" in request.system_prompt.lower()
+    # Must instruct the model to identify foods and estimate portions
+    assert "identify" in request.system_prompt.lower()
+    assert "portions" in request.system_prompt.lower()
+    # Must not ask the model to calculate or return calories
+    assert "calculate" not in request.system_prompt.lower()
+    assert "return calories" not in request.system_prompt.lower()
+    assert "return macros" not in request.system_prompt.lower()

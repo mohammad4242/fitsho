@@ -466,26 +466,57 @@ export function listRecentFoods(): Promise<Array<{ food_id: string; display_name
 export function getTrackingHistory(start: string, end: string): Promise<DailyTrackingSummary[]> { return request(`${nutritionPath}/tracking/history?${new URLSearchParams({ start, end })}`); }
 export function adjustPlannedMeal(mealId: string, input: { entry_date: string; status: "consumed" | "adjusted" | "skipped"; portion_ratio: number | null }): Promise<DailyTrackingSummary> { return request(`${nutritionPath}/tracking/planned-meals/${mealId}`, { method: "PUT", body: JSON.stringify(input) }); }
 
-export function estimateFoodPhoto(file: File): Promise<{
+export type FoodPhotoMacroTotals = {
+  calories: number;
+  protein_g: number;
+  carbohydrate_g: number;
+  fat_g: number;
+};
+
+export type FoodPhotoEstimateItem = {
+  item_id: string;
+  food_id: string | null;
+  name_guess: string;
+  estimated_amount: number;
+  unit: string;
+  mapping_status: string;
+  confidence?: number;
+  visible_evidence?: string[];
+  uncertainties?: string[];
+};
+
+export type FoodPhotoEstimate = {
   id: string;
-  items: Array<{ item_id: string; food_id: string | null; name_guess: string; estimated_amount: number; unit: string; mapping_status: string }>;
+  status?: string;
+  items: FoodPhotoEstimateItem[];
   overall_confidence: number;
   needs_user_confirmation: true;
-}> {
+  macro_totals: FoodPhotoMacroTotals;
+  macro_totals_complete: boolean;
+};
+
+export function estimateFoodPhoto(file: File): Promise<FoodPhotoEstimate> {
   const body = new FormData();
   body.append("file", file);
-  return request(`${nutritionPath}/tracking/photo-estimates`, {
+  return request<FoodPhotoEstimate>(`${nutritionPath}/tracking/photo-estimates`, {
     method: "POST",
     headers: { "X-Fitsho-Food-Photo-Consent": "true" },
     body,
   });
 }
 
-export function correctFoodPhotoItem(estimateId: string, itemId: string, input: { food_id?: string; estimated_amount?: number; remove?: boolean }): ReturnType<typeof estimateFoodPhoto> {
-  return request(`${nutritionPath}/tracking/photo-estimates/${estimateId}/items/${itemId}`, {
-    method: "PATCH",
-    body: JSON.stringify(input),
-  });
+export function correctFoodPhotoItem(
+  estimateId: string,
+  itemId: string,
+  input: { food_id?: string; estimated_amount?: number; remove?: boolean },
+): Promise<FoodPhotoEstimate> {
+  return request<FoodPhotoEstimate>(
+    `${nutritionPath}/tracking/photo-estimates/${estimateId}/items/${itemId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function confirmFoodPhoto(estimateId: string, entryDate: string): Promise<unknown> {
@@ -497,7 +528,7 @@ export function confirmFoodPhoto(estimateId: string, entryDate: string): Promise
 
 export type FreeMealMacros = { calories: number; protein_g: number; carbohydrate_g: number; fat_g: number };
 export function confirmFreeMealPhotoPreview(estimateId: string): Promise<FreeMealMacros> {
-  return request(`${nutritionPath}/tracking/photo-estimates/${estimateId}/free-meal-preview`, { method: "POST" });
+  return request<FreeMealMacros>(`${nutritionPath}/tracking/photo-estimates/${estimateId}/free-meal-preview`, { method: "POST" });
 }
 export function saveFreeMeal(mealId: string, input: FreeMealMacros & { entry_date: string }): Promise<DailyTrackingSummary> {
   return request(`${nutritionPath}/tracking/free-meals/${mealId}`, { method: "PUT", body: JSON.stringify(input) });

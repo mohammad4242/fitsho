@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "../../i18n";
 import * as api from "./api";
@@ -102,12 +102,16 @@ it("shows planned versus actual tracking and saves photo corrections before conf
     id: "estimate-1",
     overall_confidence: 0.8,
     needs_user_confirmation: true,
+    macro_totals: { calories: 200, protein_g: 25, carbohydrate_g: 0, fat_g: 5 },
+    macro_totals_complete: true,
     items: [{ item_id: "item-1", food_id: "food-1", name_guess: "Chicken", estimated_amount: 120, unit: "g", mapping_status: "verified" }],
   });
   vi.mocked(api.correctFoodPhotoItem).mockResolvedValue({
     id: "estimate-1",
     overall_confidence: 0.8,
     needs_user_confirmation: true,
+    macro_totals: { calories: 250, protein_g: 30, carbohydrate_g: 0, fat_g: 6 },
+    macro_totals_complete: true,
     items: [{ item_id: "item-1", food_id: "food-1", name_guess: "Chicken", estimated_amount: 150, unit: "g", mapping_status: "verified" }],
   });
   render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
@@ -119,7 +123,7 @@ it("shows planned versus actual tracking and saves photo corrections before conf
   await user.click(screen.getByRole("checkbox", { name: /third-party image processing/i }));
   await user.upload(screen.getByLabelText("Choose food photo"), new File(["image"], "meal.jpg", { type: "image/jpeg" }));
   expect(await screen.findByRole("img", { name: "Meal photo preview" })).toBeInTheDocument();
-  expect(screen.getByText("Estimated result · 80%")).toBeInTheDocument();
+  expect(screen.getByText(/≈ 200/)).toBeInTheDocument();
   const amount = await screen.findByRole("spinbutton", { name: "Chicken amount" });
   await user.clear(amount);
   await user.type(amount, "150");
@@ -287,4 +291,229 @@ it("lays out physician cases in a desk sidebar with clinical workspace tabs", as
   expect(screen.getByRole("tab", { name: "Laboratory review" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Supplements" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Notes" })).toBeInTheDocument();
+});
+
+describe("Food photo nutrition estimation redesigned flow", () => {
+  const completeEstimate: api.FoodPhotoEstimate = {
+    id: "estimate-1",
+    overall_confidence: 0.85,
+    needs_user_confirmation: true,
+    macro_totals: { calories: 350, protein_g: 40, carbohydrate_g: 20, fat_g: 10 },
+    macro_totals_complete: true,
+    items: [
+      {
+        item_id: "item-1",
+        food_id: "food-1",
+        name_guess: "Chicken breast",
+        estimated_amount: 150,
+        unit: "g",
+        mapping_status: "resolved",
+      },
+    ],
+  };
+
+  const incompleteEstimate: api.FoodPhotoEstimate = {
+    id: "estimate-2",
+    overall_confidence: 0.7,
+    needs_user_confirmation: true,
+    macro_totals: { calories: 200, protein_g: 25, carbohydrate_g: 0, fat_g: 5 },
+    macro_totals_complete: false,
+    items: [
+      {
+        item_id: "item-1",
+        food_id: "food-1",
+        name_guess: "Chicken breast",
+        estimated_amount: 100,
+        unit: "g",
+        mapping_status: "resolved",
+      },
+      {
+        item_id: "item-2",
+        food_id: null,
+        name_guess: "Unknown sauce",
+        estimated_amount: 50,
+        unit: "unknown",
+        mapping_status: "unresolved",
+      },
+    ],
+  };
+
+  async function openAndUpload(user: ReturnType<typeof userEvent.setup>) {
+    expect(await screen.findByText("Logged calories")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /Food photo/i }));
+    await user.click(screen.getByRole("checkbox", { name: /third-party image processing/i }));
+    const fileInput = screen.getByLabelText("Choose food photo");
+    await waitFor(() => expect(fileInput).toBeEnabled());
+    await user.upload(
+      fileInput,
+      new File(["image"], "meal.jpg", { type: "image/jpeg" })
+    );
+    expect(await screen.findByRole("img", { name: "Meal photo preview" })).toBeInTheDocument();
+  }
+
+  it("A: renders calories prominently and macros immediately after upload", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(completeEstimate);
+    render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+
+    expect(await screen.findByText("Estimated calories")).toBeInTheDocument();
+    expect(screen.getByText("≈ 350 kcal")).toBeInTheDocument();
+    expect(screen.getByText("≈ 40 g")).toBeInTheDocument();
+    expect(screen.getByText("≈ 20 g")).toBeInTheDocument();
+    expect(screen.getByText("≈ 10 g")).toBeInTheDocument();
+    expect(screen.queryByText(/Partial estimate/i)).not.toBeInTheDocument();
+  });
+
+  it("B: keeps detection details collapsed by default", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(completeEstimate);
+    const { container } = render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+    await screen.findByText("Estimated calories");
+
+    const details = container.querySelector("details.nutrition-photo-details");
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute("open");
+  });
+
+  it("C: allows updating item amount in detection details", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(completeEstimate);
+    vi.mocked(api.correctFoodPhotoItem).mockResolvedValue({
+      ...completeEstimate,
+      macro_totals: { calories: 420, protein_g: 48, carbohydrate_g: 20, fat_g: 12 },
+      items: [{ ...completeEstimate.items[0], estimated_amount: 180 }],
+    });
+    render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+    const amountInput = await screen.findByRole("spinbutton", { name: "Chicken breast amount" });
+    await user.clear(amountInput);
+    await user.type(amountInput, "180");
+    await user.tab();
+
+    await waitFor(() =>
+      expect(api.correctFoodPhotoItem).toHaveBeenCalledWith("estimate-1", "item-1", {
+        estimated_amount: 180,
+      })
+    );
+  });
+
+  it("D: allows removing an item from the estimate", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(completeEstimate);
+    vi.mocked(api.correctFoodPhotoItem).mockResolvedValue({
+      ...completeEstimate,
+      items: [],
+      macro_totals: { calories: 0, protein_g: 0, carbohydrate_g: 0, fat_g: 0 },
+    });
+    render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+    const removeBtn = await screen.findByRole("button", { name: "Remove" });
+    await user.click(removeBtn);
+
+    await waitFor(() =>
+      expect(api.correctFoodPhotoItem).toHaveBeenCalledWith("estimate-1", "item-1", {
+        remove: true,
+      })
+    );
+  });
+
+  it("E: displays Needs review and food catalogue selector for unresolved items", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(incompleteEstimate);
+    vi.mocked(api.correctFoodPhotoItem).mockResolvedValue({
+      ...completeEstimate,
+      id: "estimate-2",
+    });
+    render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+    expect(await screen.findByText("Needs review")).toBeInTheDocument();
+    expect(screen.getByText("Matched")).toBeInTheDocument();
+
+    const select = screen.getByRole("combobox", { name: "Choose food for Unknown sauce" });
+    await user.selectOptions(select, "food-2");
+    const gramInput = screen.getByRole("spinbutton", { name: "Unknown sauce amount in grams" });
+    await user.type(gramInput, "60");
+
+    const applyBtn = screen.getByRole("button", { name: "Apply" });
+    expect(applyBtn).toBeEnabled();
+    await user.click(applyBtn);
+
+    await waitFor(() =>
+      expect(api.correctFoodPhotoItem).toHaveBeenCalledWith("estimate-2", "item-2", {
+        food_id: "food-2",
+        estimated_amount: 60,
+      })
+    );
+  });
+
+  it("F: disables confirm button and displays guidance when estimate is incomplete", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(incompleteEstimate);
+    render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+    expect(await screen.findByText("Partial estimate — review the items below to complete the result.")).toBeInTheDocument();
+
+    const confirmBtn = screen.getByRole("button", { name: "Confirm and log" });
+    expect(confirmBtn).toBeDisabled();
+  });
+
+  it("G: enables confirm button and logs food once estimate is complete", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(completeEstimate);
+    vi.mocked(api.confirmFoodPhoto).mockResolvedValue({});
+    render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+    const confirmBtn = await screen.findByRole("button", { name: "Confirm and log" });
+    expect(confirmBtn).toBeEnabled();
+
+    await user.click(confirmBtn);
+    await waitFor(() =>
+      expect(api.confirmFoodPhoto).toHaveBeenCalledWith("estimate-1", today)
+    );
+  });
+
+  it("H: confirms Free Meal preview and preserves return navigation", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(completeEstimate);
+    vi.mocked(api.confirmFreeMealPhotoPreview).mockResolvedValue({
+      calories: 350,
+      protein_g: 40,
+      carbohydrate_g: 20,
+      fat_g: 10,
+    });
+    render(
+      <MemoryRouter initialEntries={["/tracking?freeMealId=meal-42&return=/nutrition-estimate"]}>
+        <NutritionTrackingPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Logged calories")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /third-party image processing/i }));
+    const fileInput = screen.getByLabelText("Choose food photo");
+    await waitFor(() => expect(fileInput).toBeEnabled());
+    await user.upload(
+      fileInput,
+      new File(["image"], "meal.jpg", { type: "image/jpeg" })
+    );
+    expect(await screen.findByRole("img", { name: "Meal photo preview" })).toBeInTheDocument();
+
+    const confirmBtn = await screen.findByRole("button", {
+      name: "Confirm and return to Free Meal",
+    });
+    expect(confirmBtn).toBeEnabled();
+    await user.click(confirmBtn);
+
+    await waitFor(() =>
+      expect(api.confirmFreeMealPhotoPreview).toHaveBeenCalledWith("estimate-1")
+    );
+  });
 });
