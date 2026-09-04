@@ -100,7 +100,7 @@ def test_compare_plans_calculates_cost_and_macro_gaps() -> None:
         protein_slugs=("egg",),
     )
     ideal_plan = _make_dummy_plan(
-        weekly_cost_irr=1_200_000,
+        weekly_cost_irr=3_500_000,
         daily_calories=Decimal("2000"),
         daily_protein=Decimal("160"),
         daily_carb=Decimal("200"),
@@ -119,9 +119,9 @@ def test_compare_plans_calculates_cost_and_macro_gaps() -> None:
 
     # Weekly to monthly cost conversion: 700_000 * 30 / 7 = 3_000_000
     assert report.budget_plan_monthly_cost_irr == 3_000_000
-    # 1_200_000 * 30 / 7 ≈ 5_142_857
-    assert report.ideal_plan_monthly_cost_irr == 5_142_857
-    assert report.monthly_cost_gap_irr == 5_142_857 - 3_000_000
+    # 3_500_000 * 30 / 7 = 15_000_000
+    assert report.ideal_plan_monthly_cost_irr == 15_000_000
+    assert report.monthly_cost_gap_irr == 15_000_000 - 3_000_000
 
     # Macro gaps: ideal - budget
     assert report.calorie_gap_kcal_per_day == Decimal("100")

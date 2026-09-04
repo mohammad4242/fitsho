@@ -9,6 +9,8 @@ import type { MealFeedbackType, ShoppingList, WeeklyPlan, WeeklyPlanHistoryItem,
 type Props = {
   plan: WeeklyPlan;
   language: "fa" | "en";
+  isReferencePlan?: boolean;
+  title?: string;
 };
 
 const weekdayFa = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
@@ -24,7 +26,7 @@ type ReplacementSelector =
   | { kind: "meal"; mealId: string; options: api.MealReplacementOption[] | null; selectedId: string | null }
   | { kind: "food"; mealId: string; targetFoodId: string | null; options: api.FoodReplacementOption[] | null; selectedId: string | null };
 
-export function WeeklyNutritionPlan({ plan, language }: Props) {
+export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, title }: Props) {
   const [selectedDay, setSelectedDay] = useState(0);
   const [currentPlan, setCurrentPlan] = useState(plan);
   const [shopping, setShopping] = useState<ShoppingList | null>(null);
@@ -36,6 +38,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
   const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => { setCurrentPlan(plan); }, [plan]);
   useEffect(() => {
+    if (isReferencePlan) return;
     void Promise.all([
       api.getShoppingList(currentPlan.id),
       api.listWeeklyNutritionPlans(),
@@ -47,7 +50,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
         setFeedback(savedFeedback?.feedback ?? {});
       })
       .catch((error: unknown) => setActionError(actionErrorMessage(error, language)));
-  }, [currentPlan.id, language]);
+  }, [currentPlan.id, language, isReferencePlan]);
   useEffect(() => {
     if (preview === null && selector === null) return;
     const previousOverflow = document.body.style.overflow;
@@ -179,27 +182,38 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
     <section className="weekly-plan" aria-labelledby="weekly-plan-title">
       <div className="weekly-plan__heading">
         <div>
-          <p className="eyebrow eyebrow--accent">{l("نسخه هفتگی", "Weekly draft")}</p>
-          <h2 id="weekly-plan-title">{l("برنامه غذایی تو", "Your nutrition plan")}</h2>
+          <p className="eyebrow eyebrow--accent">{isReferencePlan ? l("برنامه مرجع", "Reference plan") : l("نسخه هفتگی", "Weekly draft")}</p>
+          <h2 id="weekly-plan-title">{title ?? l("برنامه غذایی تو", "Your nutrition plan")}</h2>
         </div>
-        <div className={`weekly-plan__review ${statusClass}`} role="status">
-          <strong>
-            {currentPlan.physician_approved
-              ? l("تأییدشده توسط پزشک", "Physician approved")
-              : l("در انتظار بررسی پزشک", "Pending physician review")}
-          </strong>
-          {!currentPlan.physician_approved && (
-            <span>
+        {isReferencePlan ? (
+          <div className="weekly-plan__reference-badge" role="status">
+            <strong>
               {l(
-                "این پیش‌نویس قابل مشاهده است اما هنوز برنامه فعال پزشکی نیست.",
-                "This draft is visible, but it is not yet an active approved plan.",
+                "برنامه مرجع برای مقایسه است و برنامه فعال شما نیست.",
+                "Reference plan is for comparison and is not your active plan.",
               )}
-            </span>
-          )}
-          {currentPlan.physician_approved && currentPlan.physician_approved_at && (
-            <span>{l("تاریخ تأیید", "Approved")} {new Intl.DateTimeFormat(language === "en" ? "en-US" : "fa-IR").format(new Date(currentPlan.physician_approved_at))}</span>
-          )}
-        </div>
+            </strong>
+          </div>
+        ) : (
+          <div className={`weekly-plan__review ${statusClass}`} role="status">
+            <strong>
+              {currentPlan.physician_approved
+                ? l("تأییدشده توسط پزشک", "Physician approved")
+                : l("در انتظار بررسی پزشک", "Pending physician review")}
+            </strong>
+            {!currentPlan.physician_approved && (
+              <span>
+                {l(
+                  "این پیش‌نویس قابل مشاهده است اما هنوز برنامه فعال پزشکی نیست.",
+                  "This draft is visible, but it is not yet an active approved plan.",
+                )}
+              </span>
+            )}
+            {currentPlan.physician_approved && currentPlan.physician_approved_at && (
+              <span>{l("تاریخ تأیید", "Approved")} {new Intl.DateTimeFormat(language === "en" ? "en-US" : "fa-IR").format(new Date(currentPlan.physician_approved_at))}</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="weekly-plan__meta">
@@ -251,7 +265,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       </div>
 
       {day && (
-        <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(Math.floor(day.cost_irr / 10))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div><div className="weekly-plan__day-actions"><button disabled={isBusy("regenerate", "regenerate") || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div><div className="weekly-plan__meals" role="tabpanel">
+        <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(Math.floor(day.cost_irr / 10))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div>{!isReferencePlan && <div className="weekly-plan__day-actions"><button disabled={isBusy("regenerate", "regenerate") || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div>}<div className="weekly-plan__meals" role="tabpanel">
           {day.meals.map((meal) => (
             meal.slot_role === "free_meal" ? <FreeMealCard key={meal.id} meal={meal} entryDate={day.plan_date} language={language} /> : <details className="weekly-plan__meal" key={meal.id}>
               <summary className="weekly-plan__meal-summary">
@@ -299,24 +313,28 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
               <dl className="weekly-plan__meal-totals">
                 {mealMetricEntries(meal.nutrient_totals).map(([code, value]) => <div key={code}><dt>{nutrientLabel(code, language)}</dt><dd>{number.format(value)}</dd></div>)}
               </dl>
-              <div className="weekly-plan__meal-actions">
-                <button aria-busy={isBusy(meal.id, "lock")} disabled={isBusy(meal.id, "lock")} type="button" onClick={() => void toggleLock(meal.id, !meal.is_locked)}>{meal.is_locked ? l("بازکردن قفل", "Unlock") : l("قفل وعده", "Lock meal")}</button>
-                <button aria-pressed={feedback[meal.id] === "liked"} className={feedback[meal.id] === "liked" ? "is-selected" : undefined} aria-busy={isBusy(meal.id, "feedback")} disabled={isBusy(meal.id, "feedback")} type="button" onClick={() => void saveFeedback(meal.id, "liked")}>{isBusy(meal.id, "feedback") ? l("در حال ثبت…", "Saving…") : l("پسندیدم", "Liked")}{feedback[meal.id] === "liked" && !isBusy(meal.id, "feedback") ? " ✓" : ""}</button>
-                <button aria-pressed={feedback[meal.id] === "disliked"} className={feedback[meal.id] === "disliked" ? "is-selected" : undefined} aria-busy={isBusy(meal.id, "feedback")} disabled={isBusy(meal.id, "feedback")} type="button" onClick={() => void saveFeedback(meal.id, "disliked")}>{isBusy(meal.id, "feedback") ? l("در حال ثبت…", "Saving…") : l("کمتر پیشنهاد بده", "Suggest less often")}{feedback[meal.id] === "disliked" && !isBusy(meal.id, "feedback") ? " ✓" : ""}</button>
-                <button disabled={meal.is_locked || isBusy(meal.id, "remove-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => void beginRemoval(meal.id)}>{l("حذف وعده", "Remove meal")}</button>
-                <button disabled={meal.is_locked || isBusy(meal.id, "meal-replacement-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => void beginMealReplacement(meal.id)}>{l("تعویض وعده", "Replace meal")}</button>
-                {meal.foods.some((food) => food.food_id !== null) && <button disabled={meal.is_locked || isBusy(meal.id, "food-replacement-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => beginFoodReplacement(meal.id)}>{l("تعویض ماده غذایی", "Replace ingredient")}</button>}
-              </div>
+              {!isReferencePlan && (
+                <div className="weekly-plan__meal-actions">
+                  <button aria-busy={isBusy(meal.id, "lock")} disabled={isBusy(meal.id, "lock")} type="button" onClick={() => void toggleLock(meal.id, !meal.is_locked)}>{meal.is_locked ? l("بازکردن قفل", "Unlock") : l("قفل وعده", "Lock meal")}</button>
+                  <button aria-pressed={feedback[meal.id] === "liked"} className={feedback[meal.id] === "liked" ? "is-selected" : undefined} aria-busy={isBusy(meal.id, "feedback")} disabled={isBusy(meal.id, "feedback")} type="button" onClick={() => void saveFeedback(meal.id, "liked")}>{isBusy(meal.id, "feedback") ? l("در حال ثبت…", "Saving…") : l("پسندیدم", "Liked")}{feedback[meal.id] === "liked" && !isBusy(meal.id, "feedback") ? " ✓" : ""}</button>
+                  <button aria-pressed={feedback[meal.id] === "disliked"} className={feedback[meal.id] === "disliked" ? "is-selected" : undefined} aria-busy={isBusy(meal.id, "feedback")} disabled={isBusy(meal.id, "feedback")} type="button" onClick={() => void saveFeedback(meal.id, "disliked")}>{isBusy(meal.id, "feedback") ? l("در حال ثبت…", "Saving…") : l("کمتر پیشنهاد بده", "Suggest less often")}{feedback[meal.id] === "disliked" && !isBusy(meal.id, "feedback") ? " ✓" : ""}</button>
+                  <button disabled={meal.is_locked || isBusy(meal.id, "remove-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => void beginRemoval(meal.id)}>{l("حذف وعده", "Remove meal")}</button>
+                  <button disabled={meal.is_locked || isBusy(meal.id, "meal-replacement-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => void beginMealReplacement(meal.id)}>{l("تعویض وعده", "Replace meal")}</button>
+                  {meal.foods.some((food) => food.food_id !== null) && <button disabled={meal.is_locked || isBusy(meal.id, "food-replacement-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => beginFoodReplacement(meal.id)}>{l("تعویض ماده غذایی", "Replace ingredient")}</button>}
+                </div>
+              )}
               </div>
             </details>
           ))}
         </div></>
       )}
 
-      <section className="weekly-plan__history">
-        <h3>{l("تاریخچه نسخه‌ها", "Revision history")}</h3>
-        {history.length === 0 ? <p>{l("نسخه دیگری وجود ندارد.", "No other revision exists.")}</p> : <div>{history.map((item) => <button className={item.id === currentPlan.id ? "is-current" : undefined} key={item.id} type="button" onClick={() => void api.getWeeklyNutritionPlan(item.id).then(setCurrentPlan)}>{l("نسخه", "Revision")} {number.format(item.revision)} · {lifecycleLabel(item.lifecycle_status, language)}</button>)}</div>}
-      </section>
+      {!isReferencePlan && (
+        <section className="weekly-plan__history">
+          <h3>{l("تاریخچه نسخه‌ها", "Revision history")}</h3>
+          {history.length === 0 ? <p>{l("نسخه دیگری وجود ندارد.", "No other revision exists.")}</p> : <div>{history.map((item) => <button className={item.id === currentPlan.id ? "is-current" : undefined} key={item.id} type="button" onClick={() => void api.getWeeklyNutritionPlan(item.id).then(setCurrentPlan)}>{l("نسخه", "Revision")} {number.format(item.revision)} · {lifecycleLabel(item.lifecycle_status, language)}</button>)}</div>}
+        </section>
+      )}
 
       </div>
       </details>
@@ -381,16 +399,18 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
         </div>
       </div>}
 
-      <details className="weekly-plan__section weekly-plan__shopping">
-        <summary>
-          <span>{l("لیست خرید دقیق", "Exact shopping list")}</span>
-          <span aria-hidden="true" className="weekly-plan__section-chevron" />
-        </summary>
-        <div className="weekly-plan__section-content">
-          {!currentPlan.physician_approved && <p className="weekly-plan__warning">{l("تا تأیید پزشک، خرید نهایی را انجام نده.", "Wait for physician approval before making final purchases.")}</p>}
-          {shopping === null ? <p role="status">{l("در حال دریافت…", "Loading…")}</p> : <><ul>{shopping.items.map((item) => <li key={item.food_id}><span>{language === "en" ? item.name_en : item.name_fa}</span><strong>{number.format(item.required_quantity)} {item.canonical_unit}</strong><small>{number.format(Math.floor(item.cost_irr / 10))} {l("تومان", "Toman")}</small></li>)}</ul><strong>{l("جمع", "Total")}: {number.format(Math.floor(shopping.total_cost_irr / 10))} {l("تومان", "Toman")}</strong></>}
-        </div>
-      </details>
+      {!isReferencePlan && (
+        <details className="weekly-plan__section weekly-plan__shopping">
+          <summary>
+            <span>{l("لیست خرید دقیق", "Exact shopping list")}</span>
+            <span aria-hidden="true" className="weekly-plan__section-chevron" />
+          </summary>
+          <div className="weekly-plan__section-content">
+            {!currentPlan.physician_approved && <p className="weekly-plan__warning">{l("تا تأیید پزشک، خرید نهایی را انجام نده.", "Wait for physician approval before making final purchases.")}</p>}
+            {shopping === null ? <p role="status">{l("در حال دریافت…", "Loading…")}</p> : <><ul>{shopping.items.map((item) => <li key={item.food_id}><span>{language === "en" ? item.name_en : item.name_fa}</span><strong>{number.format(item.required_quantity)} {item.canonical_unit}</strong><small>{number.format(Math.floor(item.cost_irr / 10))} {l("تومان", "Toman")}</small></li>)}</ul><strong>{l("جمع", "Total")}: {number.format(Math.floor(shopping.total_cost_irr / 10))} {l("تومان", "Toman")}</strong></>}
+          </div>
+        </details>
+      )}
 
     </section>
   );

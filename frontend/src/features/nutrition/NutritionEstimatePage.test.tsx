@@ -650,3 +650,301 @@ it("renders weekly weight rate card with requested, recommended, and applied rat
   expect(screen.getByText("۰٫۸ کیلوگرم/هفته")).toBeInTheDocument();
 });
 
+it("shows only one plan when cost gap is below 1M Toman (< 10M IRR)", async () => {
+  await i18n.changeLanguage("fa");
+  const budgetPlan = { ...weeklyPlan, id: "plan-budget" };
+  const idealPlan = { ...weeklyPlan, id: "plan-ideal" };
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "generation-gap-small",
+    outcome: "success",
+    reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED", "IDEAL_PLAN_HIDDEN_COST_GAP_SMALL"],
+    warning_codes: [],
+    plan: budgetPlan,
+    budget_plan: budgetPlan,
+    ideal_plan: idealPlan,
+    comparison: {
+      user_monthly_budget_irr: 80_000_000,
+      budget_plan_monthly_cost_irr: 79_000_000,
+      ideal_plan_monthly_cost_irr: 84_000_000,
+      minimum_feasible_monthly_cost_irr: null,
+      monthly_cost_gap_irr: 5_000_000,
+      meaningful_quality_improvement: true,
+      show_ideal_plan: false,
+      reason_codes: ["IDEAL_PLAN_HIDDEN_COST_GAP_SMALL"],
+      policy_version: "nutrition-plan-comparison-v1",
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: 14,
+      unique_meal_count_ideal: 18,
+      unique_protein_sources_budget: 4,
+      unique_protein_sources_ideal: 6,
+    },
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByRole("heading", { name: "برنامه پیشنهادی با بودجه شما" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "برنامه مرجع" })).not.toBeInTheDocument();
+  expect(screen.getByText(/بودجه شما به هزینه برنامه مرجع بسیار نزدیک است/)).toBeInTheDocument();
+});
+
+it("shows two plans when cost gap >= 1M Toman and improvement is meaningful", async () => {
+  await i18n.changeLanguage("fa");
+  const budgetPlan = { ...weeklyPlan, id: "plan-budget" };
+  const idealPlan = { ...weeklyPlan, id: "plan-ideal" };
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "generation-two-plans",
+    outcome: "success",
+    reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED", "IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN"],
+    warning_codes: [],
+    plan: budgetPlan,
+    budget_plan: budgetPlan,
+    ideal_plan: idealPlan,
+    comparison: {
+      user_monthly_budget_irr: 80_000_000,
+      budget_plan_monthly_cost_irr: 79_000_000,
+      ideal_plan_monthly_cost_irr: 121_000_000,
+      minimum_feasible_monthly_cost_irr: null,
+      monthly_cost_gap_irr: 42_000_000,
+      meaningful_quality_improvement: true,
+      show_ideal_plan: true,
+      reason_codes: ["IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN", "BUDGET_PLAN_PROTEIN_PREFERRED_GAP"],
+      policy_version: "nutrition-plan-comparison-v1",
+      protein_gap: {
+        budget_value: 112,
+        ideal_value: 130,
+        difference: 18,
+        unit: "g/day",
+      },
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: 12,
+      unique_meal_count_ideal: 17,
+      unique_protein_sources_budget: 3,
+      unique_protein_sources_ideal: 6,
+    },
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByRole("heading", { name: "برنامه پیشنهادی با بودجه شما" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "برنامه مرجع" })).toBeInTheDocument();
+  expect(screen.getByText("برنامه مرجع برای مقایسه است و برنامه فعال شما نیست.")).toBeInTheDocument();
+});
+
+it("shows only one plan when cost gap >= 1M Toman but quality improvement is not meaningful", async () => {
+  await i18n.changeLanguage("fa");
+  const budgetPlan = { ...weeklyPlan, id: "plan-budget" };
+  const idealPlan = { ...weeklyPlan, id: "plan-ideal" };
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "generation-not-meaningful",
+    outcome: "success",
+    reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED", "IDEAL_PLAN_HIDDEN_NO_MEANINGFUL_GAIN"],
+    warning_codes: [],
+    plan: budgetPlan,
+    budget_plan: budgetPlan,
+    ideal_plan: idealPlan,
+    comparison: {
+      user_monthly_budget_irr: 80_000_000,
+      budget_plan_monthly_cost_irr: 79_000_000,
+      ideal_plan_monthly_cost_irr: 95_000_000,
+      minimum_feasible_monthly_cost_irr: null,
+      monthly_cost_gap_irr: 16_000_000,
+      meaningful_quality_improvement: false,
+      show_ideal_plan: false,
+      reason_codes: ["IDEAL_PLAN_HIDDEN_NO_MEANINGFUL_GAIN"],
+      policy_version: "nutrition-plan-comparison-v1",
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: 14,
+      unique_meal_count_ideal: 14,
+      unique_protein_sources_budget: 4,
+      unique_protein_sources_ideal: 4,
+    },
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByRole("heading", { name: "برنامه پیشنهادی با بودجه شما" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "برنامه مرجع" })).not.toBeInTheDocument();
+  expect(screen.getByText(/اختلاف کیفیت برنامه مرجع با برنامه بودجه‌ای چشمگیر نبود/)).toBeInTheDocument();
+});
+
+it("renders protein gap correctly in the plan comparison summary", async () => {
+  await i18n.changeLanguage("fa");
+  const budgetPlan = { ...weeklyPlan, id: "plan-budget" };
+  const idealPlan = { ...weeklyPlan, id: "plan-ideal" };
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "generation-protein-gap",
+    outcome: "success",
+    reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED", "IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN"],
+    warning_codes: [],
+    plan: budgetPlan,
+    budget_plan: budgetPlan,
+    ideal_plan: idealPlan,
+    comparison: {
+      user_monthly_budget_irr: 80_000_000,
+      budget_plan_monthly_cost_irr: 79_000_000,
+      ideal_plan_monthly_cost_irr: 121_000_000,
+      minimum_feasible_monthly_cost_irr: null,
+      monthly_cost_gap_irr: 42_000_000,
+      meaningful_quality_improvement: true,
+      show_ideal_plan: true,
+      reason_codes: ["IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN", "BUDGET_PLAN_PROTEIN_PREFERRED_GAP"],
+      policy_version: "nutrition-plan-comparison-v1",
+      protein_gap: {
+        budget_value: 112,
+        ideal_value: 130,
+        difference: 18,
+        unit: "g/day",
+      },
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: 12,
+      unique_meal_count_ideal: 17,
+      unique_protein_sources_budget: 3,
+      unique_protein_sources_ideal: 6,
+    },
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByText("پروتئین روزانه")).toBeInTheDocument();
+  expect(screen.getByText(/۱۱۲ g → ۱۳۰ g/)).toBeInTheDocument();
+  expect(screen.getByText(/اختلاف با هدف ترجیحی: ۱۸ g\/day/)).toBeInTheDocument();
+});
+
+it("renders budget-insufficient message with known minimum feasible cost", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "generation-budget-infeasible-known",
+    outcome: "infeasible",
+    reason_codes: ["USER_BUDGET_BELOW_MINIMUM_FEASIBLE"],
+    warning_codes: [],
+    plan: null,
+    budget_plan: null,
+    ideal_plan: null,
+    comparison: {
+      user_monthly_budget_irr: 60_000_000,
+      budget_plan_monthly_cost_irr: null,
+      ideal_plan_monthly_cost_irr: 84_000_000,
+      minimum_feasible_monthly_cost_irr: 84_000_000,
+      monthly_cost_gap_irr: null,
+      meaningful_quality_improvement: false,
+      show_ideal_plan: false,
+      reason_codes: ["USER_BUDGET_BELOW_MINIMUM_FEASIBLE"],
+      policy_version: "nutrition-plan-comparison-v1",
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: null,
+      unique_meal_count_ideal: null,
+      unique_protein_sources_budget: null,
+      unique_protein_sources_ideal: null,
+    },
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByText(/با بودجه فعلی، ساخت برنامه‌ای که حداقل‌های تعیین‌شده برای هدف شما را رعایت کند ممکن نشد/)).toBeInTheDocument();
+  expect(screen.getByText(/بودجه شما:/)).toBeInTheDocument();
+  expect(screen.getByText("۶ میلیون تومان")).toBeInTheDocument();
+  expect(screen.getByText(/حداقل هزینه تخمینی برنامه قابل‌اجرا: حدود/)).toBeInTheDocument();
+  expect(screen.getByText("۸٫۴ میلیون تومان")).toBeInTheDocument();
+});
+
+it("renders budget-insufficient message without inventing minimum when unknown", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "generation-budget-infeasible-unknown",
+    outcome: "infeasible",
+    reason_codes: ["NO_BUDGET_FEASIBLE_PLAN_FOUND"],
+    warning_codes: [],
+    plan: null,
+    budget_plan: null,
+    ideal_plan: null,
+    comparison: {
+      user_monthly_budget_irr: 40_000_000,
+      budget_plan_monthly_cost_irr: null,
+      ideal_plan_monthly_cost_irr: null,
+      minimum_feasible_monthly_cost_irr: null,
+      monthly_cost_gap_irr: null,
+      meaningful_quality_improvement: false,
+      show_ideal_plan: false,
+      reason_codes: ["NO_BUDGET_FEASIBLE_PLAN_FOUND"],
+      policy_version: "nutrition-plan-comparison-v1",
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: null,
+      unique_meal_count_ideal: null,
+      unique_protein_sources_budget: null,
+      unique_protein_sources_ideal: null,
+    },
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByText(/با قیمت‌ها و کاتالوگ فعلی، برنامه سازگار در این بودجه پیدا نشد/)).toBeInTheDocument();
+  expect(screen.queryByText(/حداقل هزینه تخمینی برنامه قابل‌اجرا/)).not.toBeInTheDocument();
+});
+
+it("ensures ideal reference plan displays reference badge and disables edit controls", async () => {
+  await i18n.changeLanguage("fa");
+  const budgetPlan = { ...weeklyPlan, id: "plan-budget" };
+  const idealPlan = { ...weeklyPlan, id: "plan-ideal" };
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "generation-reference-only",
+    outcome: "success",
+    reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED", "IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN"],
+    warning_codes: [],
+    plan: budgetPlan,
+    budget_plan: budgetPlan,
+    ideal_plan: idealPlan,
+    comparison: {
+      user_monthly_budget_irr: 80_000_000,
+      budget_plan_monthly_cost_irr: 79_000_000,
+      ideal_plan_monthly_cost_irr: 120_000_000,
+      minimum_feasible_monthly_cost_irr: null,
+      monthly_cost_gap_irr: 41_000_000,
+      meaningful_quality_improvement: true,
+      show_ideal_plan: true,
+      reason_codes: ["IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN"],
+      policy_version: "nutrition-plan-comparison-v1",
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: 12,
+      unique_meal_count_ideal: 16,
+      unique_protein_sources_budget: 3,
+      unique_protein_sources_ideal: 5,
+    },
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByText("برنامه مرجع برای مقایسه است و برنامه فعال شما نیست.")).toBeInTheDocument();
+});
+
+it("keeps full backward compatibility when plan is generated without comparison object", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "generation-legacy",
+    outcome: "success",
+    reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED"],
+    warning_codes: [],
+    plan: weeklyPlan,
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByRole("heading", { name: "برنامه غذایی تو" })).toBeInTheDocument();
+  expect(screen.queryByLabelText("مقایسه برنامه‌ها")).not.toBeInTheDocument();
+});
+

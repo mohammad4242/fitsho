@@ -113,6 +113,7 @@ from app.nutrition.program_selection import (
     rank_for_ideal,
 )
 from app.nutrition.schemas import (
+    PlanComparisonMetricResponse,
     PlanComparisonResponse,
     WeeklyPlanDayResponse,
     WeeklyPlanFoodResponse,
@@ -373,10 +374,9 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         "micronutrient_reference_rows": micro_metadata,
         "food_constraints": [
             {
-                "kind": c.kind,
-                "term": c.raw_term,
-                "severity": c.severity.value,
-                "allergen": c.canonical_allergen.value if c.canonical_allergen else None,
+                "kind": getattr(c, "source", None) or getattr(c, "kind", None),
+                "term": getattr(c, "raw_label", None) or getattr(c, "raw_term", None),
+                "severity": c.severity.value if hasattr(c.severity, "value") else str(c.severity),
                 "code": c.code,
             }
             for c in normalized_constraints
@@ -632,12 +632,27 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     loaded_budget_plan = _load_plan(db, budget_plan_model.id) if budget_plan_model else None
     loaded_ideal_plan = _load_plan(db, ideal_plan_model.id) if ideal_plan_model else None
 
+    def _to_metric_response(m: object) -> PlanComparisonMetricResponse | None:
+        if m is None:
+            return None
+        return PlanComparisonMetricResponse(
+            budget_value=getattr(m, "budget_value", None),
+            ideal_value=getattr(m, "ideal_value", None),
+            difference=getattr(m, "difference", None),
+            unit=getattr(m, "unit", ""),
+        )
+
     comparison_response = PlanComparisonResponse(
         user_monthly_budget_irr=comparison_report.user_monthly_budget_irr,
         budget_plan_monthly_cost_irr=comparison_report.budget_plan_monthly_cost_irr,
         ideal_plan_monthly_cost_irr=comparison_report.ideal_plan_monthly_cost_irr,
         minimum_feasible_monthly_cost_irr=comparison_report.minimum_feasible_monthly_cost_irr,
         monthly_cost_gap_irr=comparison_report.monthly_cost_gap_irr,
+        calorie_gap=_to_metric_response(comparison_report.calorie_gap),
+        protein_gap=_to_metric_response(comparison_report.protein_gap),
+        carbohydrate_gap=_to_metric_response(comparison_report.carbohydrate_gap),
+        fat_gap=_to_metric_response(comparison_report.fat_gap),
+        fibre_gap=_to_metric_response(comparison_report.fibre_gap),
         calorie_gap_kcal_per_day=comparison_report.calorie_gap_kcal_per_day,
         protein_gap_g_per_day=comparison_report.protein_gap_g_per_day,
         carbohydrate_gap_g_per_day=comparison_report.carbohydrate_gap_g_per_day,
@@ -651,6 +666,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
         meaningful_quality_improvement=comparison_report.meaningful_quality_improvement,
         show_ideal_plan=comparison_report.show_ideal_plan,
         reason_codes=list(comparison_report.reason_codes),
+        policy_version=comparison_report.policy_version,
     )
 
     budget_plan_resp = weekly_plan_response(loaded_budget_plan) if loaded_budget_plan else None

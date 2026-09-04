@@ -217,6 +217,44 @@ export type ShoppingList = {
   }>;
 };
 
+export type PlanComparisonMetric = {
+  budget_value: number | null;
+  ideal_value: number | null;
+  difference: number | null;
+  unit: string;
+};
+
+export type PlanComparison = {
+  user_monthly_budget_irr: number;
+  budget_plan_monthly_cost_irr: number | null;
+  ideal_plan_monthly_cost_irr: number | null;
+  minimum_feasible_monthly_cost_irr: number | null;
+  monthly_cost_gap_irr: number | null;
+
+  calorie_gap?: PlanComparisonMetric | null;
+  protein_gap?: PlanComparisonMetric | null;
+  carbohydrate_gap?: PlanComparisonMetric | null;
+  fat_gap?: PlanComparisonMetric | null;
+  fibre_gap?: PlanComparisonMetric | null;
+
+  calorie_gap_kcal_per_day?: number | null;
+  protein_gap_g_per_day?: number | null;
+  carbohydrate_gap_g_per_day?: number | null;
+  fat_gap_g_per_day?: number | null;
+  fibre_gap_g_per_day?: number | null;
+
+  micronutrient_gaps_improved: string[];
+  unique_meal_count_budget: number | null;
+  unique_meal_count_ideal: number | null;
+  unique_protein_sources_budget: number | null;
+  unique_protein_sources_ideal: number | null;
+
+  meaningful_quality_improvement: boolean;
+  show_ideal_plan: boolean;
+  reason_codes: string[];
+  policy_version: string;
+};
+
 export type WeeklyPlanGeneration = {
   generation_id: string;
   outcome:
@@ -229,6 +267,9 @@ export type WeeklyPlanGeneration = {
   reason_codes: string[];
   warning_codes: string[];
   plan: WeeklyPlan | null;
+  budget_plan?: WeeklyPlan | null;
+  ideal_plan?: WeeklyPlan | null;
+  comparison?: PlanComparison | null;
 };
 
 export type DailyTrackingSummary = {

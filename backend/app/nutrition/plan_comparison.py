@@ -6,6 +6,30 @@ from typing import Any
 
 from app.nutrition.planner_engine import PlannedDay, PlannerResult
 
+PLAN_COMPARISON_POLICY_VERSION = "nutrition-plan-comparison-v1"
+MIN_IDEAL_DISPLAY_COST_GAP_IRR = 10_000_000
+MIN_PROTEIN_IMPROVEMENT_G = Decimal("10")
+MIN_CORE_DEVIATION_IMPROVEMENT = Decimal("0.05")
+MIN_UNIQUE_MEAL_IMPROVEMENT = 3
+MIN_PROTEIN_SOURCE_IMPROVEMENT = 2
+MIN_GOAL_QUALITY_IMPROVEMENT = Decimal("0.05")
+
+
+@dataclass(frozen=True)
+class PlanComparisonMetric:
+    budget_value: float | int | None
+    ideal_value: float | int | None
+    difference: float | int | None
+    unit: str
+
+    def to_snapshot(self) -> dict[str, Any]:
+        return {
+            "budget_value": self.budget_value,
+            "ideal_value": self.ideal_value,
+            "difference": self.difference,
+            "unit": self.unit,
+        }
+
 
 @dataclass(frozen=True)
 class PlanComparisonReport:
@@ -21,6 +45,12 @@ class PlanComparisonReport:
     fat_gap_g_per_day: Decimal | None
     fibre_gap_g_per_day: Decimal | None
 
+    calorie_gap: PlanComparisonMetric | None
+    protein_gap: PlanComparisonMetric | None
+    carbohydrate_gap: PlanComparisonMetric | None
+    fat_gap: PlanComparisonMetric | None
+    fibre_gap: PlanComparisonMetric | None
+
     micronutrient_gaps_improved: tuple[str, ...]
     unique_meal_count_budget: int | None
     unique_meal_count_ideal: int | None
@@ -30,6 +60,7 @@ class PlanComparisonReport:
     meaningful_quality_improvement: bool
     show_ideal_plan: bool
     reason_codes: tuple[str, ...]
+    policy_version: str = PLAN_COMPARISON_POLICY_VERSION
 
     def to_snapshot(self) -> dict[str, Any]:
         return {
@@ -57,6 +88,13 @@ class PlanComparisonReport:
             "fibre_gap_g_per_day": (
                 str(self.fibre_gap_g_per_day) if self.fibre_gap_g_per_day is not None else None
             ),
+            "calorie_gap": self.calorie_gap.to_snapshot() if self.calorie_gap else None,
+            "protein_gap": self.protein_gap.to_snapshot() if self.protein_gap else None,
+            "carbohydrate_gap": (
+                self.carbohydrate_gap.to_snapshot() if self.carbohydrate_gap else None
+            ),
+            "fat_gap": self.fat_gap.to_snapshot() if self.fat_gap else None,
+            "fibre_gap": self.fibre_gap.to_snapshot() if self.fibre_gap else None,
             "micronutrient_gaps_improved": list(self.micronutrient_gaps_improved),
             "unique_meal_count_budget": self.unique_meal_count_budget,
             "unique_meal_count_ideal": self.unique_meal_count_ideal,
@@ -65,6 +103,7 @@ class PlanComparisonReport:
             "meaningful_quality_improvement": self.meaningful_quality_improvement,
             "show_ideal_plan": self.show_ideal_plan,
             "reason_codes": list(self.reason_codes),
+            "policy_version": self.policy_version,
         }
 
 
@@ -142,9 +181,20 @@ def compare_plans(
     meaningful_improvement = False
     show_ideal_plan = False
 
+    budget_nutrients: dict[str, Decimal] = {}
+    ideal_nutrients: dict[str, Decimal] = {}
+
     if budget_plan_result is None or not budget_plan_result.is_successful:
+        reason_codes.append("NO_BUDGET_FEASIBLE_PLAN_FOUND")
         reason_codes.append("BUDGET_INSUFFICIENT_FOR_FEASIBLE_PLAN")
+        if (
+            minimum_feasible_monthly_cost_irr is not None
+            and user_monthly_budget_irr < minimum_feasible_monthly_cost_irr
+        ):
+            reason_codes.append("USER_BUDGET_BELOW_MINIMUM_FEASIBLE")
+
         if ideal_plan_result is not None and ideal_plan_result.is_successful:
+            ideal_nutrients = _average_daily_nutrients(ideal_plan_result.days)
             unique_meals_ideal = _count_unique_meals(ideal_plan_result.days)
             unique_proteins_ideal = _count_unique_protein_sources(ideal_plan_result.days)
             meaningful_improvement = True
@@ -175,15 +225,105 @@ def compare_plans(
                 "fibre_g", Decimal("0")
             )
 
-            # Check meaningful quality improvements
-            if protein_gap >= Decimal("10"):
-                meaningful_improvement = True
-            if (unique_proteins_ideal or 0) > (unique_proteins_budget or 0):
-                meaningful_improvement = True
-            if (unique_meals_ideal or 0) > (unique_meals_budget or 0) + 1:
+            # Rule A: preferred protein gap improves by >= 10 g/day
+            if protein_gap >= MIN_PROTEIN_IMPROVEMENT_G:
                 meaningful_improvement = True
 
-            show_ideal_plan = meaningful_improvement
+            # Rule B: core target max deviation improves by >= 0.05
+            core_keys = ("goal_calories", "protein", "carbohydrate", "total_fat")
+            b_comps = budget_plan_result.nutrient_comparisons or {}
+            i_comps = ideal_plan_result.nutrient_comparisons or {}
+            b_devs = [
+                abs(b_comps[k].planned - b_comps[k].preferred) / b_comps[k].preferred
+                for k in core_keys
+                if k in b_comps and b_comps[k].preferred and b_comps[k].preferred > Decimal("0")
+            ]
+            i_devs = [
+                abs(i_comps[k].planned - i_comps[k].preferred) / i_comps[k].preferred
+                for k in core_keys
+                if k in i_comps and i_comps[k].preferred and i_comps[k].preferred > Decimal("0")
+            ]
+            if b_devs and i_devs:
+                max_b = max(b_devs)
+                max_i = max(i_devs)
+                if (max_b - max_i) >= MIN_CORE_DEVIATION_IMPROVEMENT:
+                    meaningful_improvement = True
+
+            # Rule C: at least 2 micronutrient preferred gaps resolved in Ideal
+            for nutrient_code, b_comp in b_comps.items():
+                if nutrient_code in core_keys:
+                    continue
+                if b_comp.status in ("below_reference_target", "below_preferred_but_acceptable"):
+                    i_comp = i_comps.get(nutrient_code)
+                    if i_comp and i_comp.status == "within_target":
+                        micronutrient_gaps_improved.append(nutrient_code)
+
+            if len(micronutrient_gaps_improved) >= 2:
+                meaningful_improvement = True
+
+            # Rule D: unique meal templates improve by >= 3
+            meal_diff = (unique_meals_ideal or 0) - (unique_meals_budget or 0)
+            if meal_diff >= MIN_UNIQUE_MEAL_IMPROVEMENT:
+                meaningful_improvement = True
+
+            # Rule E: unique protein-source foods improve by >= 2
+            protein_diff = (unique_proteins_ideal or 0) - (unique_proteins_budget or 0)
+            if protein_diff >= MIN_PROTEIN_SOURCE_IMPROVEMENT:
+                meaningful_improvement = True
+
+            # Threshold and display decision
+            show_ideal_plan = (
+                monthly_cost_gap is not None
+                and monthly_cost_gap >= MIN_IDEAL_DISPLAY_COST_GAP_IRR
+                and meaningful_improvement
+            )
+
+            if monthly_cost_gap is not None and monthly_cost_gap < MIN_IDEAL_DISPLAY_COST_GAP_IRR:
+                reason_codes.append("IDEAL_PLAN_HIDDEN_COST_GAP_SMALL")
+            elif not meaningful_improvement:
+                reason_codes.append("IDEAL_PLAN_HIDDEN_NO_MEANINGFUL_GAIN")
+            else:
+                reason_codes.append("IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN")
+
+            if protein_gap >= MIN_PROTEIN_IMPROVEMENT_G:
+                reason_codes.append("BUDGET_PLAN_PROTEIN_PREFERRED_GAP")
+            if calorie_gap is not None and calorie_gap >= Decimal("100"):
+                reason_codes.append("BUDGET_PLAN_CALORIE_PREFERRED_GAP")
+            if meal_diff >= 2 or protein_diff >= 1:
+                reason_codes.append("BUDGET_PLAN_VARIETY_GAP")
+            if len(micronutrient_gaps_improved) >= 1:
+                reason_codes.append("BUDGET_PLAN_MICRONUTRIENT_GAP")
+
+    def _make_metric(
+        b_key: str,
+        gap_val: Decimal | None,
+        unit: str,
+    ) -> PlanComparisonMetric | None:
+        if gap_val is None and not budget_nutrients and not ideal_nutrients:
+            return None
+        b_val = (
+            round(float(budget_nutrients.get(b_key, 0)), 1)
+            if budget_nutrients
+            else None
+        )
+        i_val = (
+            round(float(ideal_nutrients.get(b_key, 0)), 1)
+            if ideal_nutrients
+            else None
+        )
+        d_val = round(float(gap_val), 1) if gap_val is not None else None
+        return PlanComparisonMetric(
+            budget_value=b_val,
+            ideal_value=i_val,
+            difference=d_val,
+            unit=unit,
+        )
+
+    metric_calorie = _make_metric("energy_kcal", calorie_gap, "kcal/day")
+    metric_protein = _make_metric("protein_g", protein_gap, "g/day")
+    metric_carb = _make_metric("carbohydrate_g", carb_gap, "g/day")
+    metric_fat = _make_metric("total_fat_g", fat_gap, "g/day")
+    metric_fibre = _make_metric("fibre_g", fibre_gap, "g/day")
 
     return PlanComparisonReport(
         user_monthly_budget_irr=user_monthly_budget_irr,
@@ -196,7 +336,12 @@ def compare_plans(
         carbohydrate_gap_g_per_day=carb_gap,
         fat_gap_g_per_day=fat_gap,
         fibre_gap_g_per_day=fibre_gap,
-        micronutrient_gaps_improved=tuple(micronutrient_gaps_improved),
+        calorie_gap=metric_calorie,
+        protein_gap=metric_protein,
+        carbohydrate_gap=metric_carb,
+        fat_gap=metric_fat,
+        fibre_gap=metric_fibre,
+        micronutrient_gaps_improved=tuple(sorted(set(micronutrient_gaps_improved))),
         unique_meal_count_budget=unique_meals_budget,
         unique_meal_count_ideal=unique_meals_ideal,
         unique_protein_sources_budget=unique_proteins_budget,
@@ -204,4 +349,5 @@ def compare_plans(
         meaningful_quality_improvement=meaningful_improvement,
         show_ideal_plan=show_ideal_plan,
         reason_codes=tuple(reason_codes),
+        policy_version=PLAN_COMPARISON_POLICY_VERSION,
     )

@@ -931,12 +931,25 @@ class WeeklyPlanResponse(BaseModel):
     created_at: datetime
 
 
+class PlanComparisonMetricResponse(BaseModel):
+    budget_value: float | int | None = None
+    ideal_value: float | int | None = None
+    difference: float | int | None = None
+    unit: str
+
+
 class PlanComparisonResponse(BaseModel):
     user_monthly_budget_irr: int
     budget_plan_monthly_cost_irr: int | None = None
     ideal_plan_monthly_cost_irr: int | None = None
     minimum_feasible_monthly_cost_irr: int | None = None
     monthly_cost_gap_irr: int | None = None
+
+    calorie_gap: PlanComparisonMetricResponse | None = None
+    protein_gap: PlanComparisonMetricResponse | None = None
+    carbohydrate_gap: PlanComparisonMetricResponse | None = None
+    fat_gap: PlanComparisonMetricResponse | None = None
+    fibre_gap: PlanComparisonMetricResponse | None = None
 
     calorie_gap_kcal_per_day: Decimal | None = None
     protein_gap_g_per_day: Decimal | None = None
@@ -953,6 +966,7 @@ class PlanComparisonResponse(BaseModel):
     meaningful_quality_improvement: bool = False
     show_ideal_plan: bool = False
     reason_codes: list[str] = Field(default_factory=list)
+    policy_version: str = "nutrition-plan-comparison-v1"
 
 
 class WeeklyPlanGenerationResponse(BaseModel):

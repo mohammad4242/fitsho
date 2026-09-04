@@ -260,6 +260,36 @@ class AuditRecord:
     generation_latency_ms: float = 0.0
     safety_invariant_violations: list[str] = field(default_factory=list)
 
+    budget_tier: str | None = None
+    requested_weight_change_kg_per_week: float | None = None
+    recommended_weight_change_kg_per_week: float | None = None
+    applied_weight_change_kg_per_week: float | None = None
+    goal_strategy: str | None = None
+    goal_strategy_version: str | None = None
+
+    programs_considered: int | None = None
+    programs_hard_rejected: int | None = None
+    programs_constructed: int | None = None
+    fallback_batches_used: int | None = None
+
+    budget_plan_success: bool = False
+    budget_plan_monthly_cost_irr: int | None = None
+    ideal_plan_success: bool = False
+    ideal_plan_monthly_cost_irr: int | None = None
+    monthly_cost_gap_irr: int | None = None
+
+    protein_preferred_gap_g_per_day: float | None = None
+    calorie_preferred_gap_kcal_per_day: float | None = None
+    unique_meal_gap: int | None = None
+    unique_protein_source_gap: int | None = None
+
+    show_ideal_plan: bool = False
+    comparison_reason_codes: list[str] = field(default_factory=list)
+
+    hard_allergen_violations: int = 0
+    hard_exclusion_violations: int = 0
+    medical_safety_violations: int = 0
+
 
 def generate_100_profiles(seed: int = 20260903, count: int = 100) -> list[ProfileSpec]:
     rng = random.Random(seed)
@@ -877,6 +907,67 @@ def run_audit(profiles: list[ProfileSpec], profile_seed: int = 20260903) -> list
 
             rc_text, sol_text = analyze_failure(spec, outcome, reason_codes, diag, target_kcal, target_protein, weekly_cost_irr)
 
+            comp = getattr(gen_resp, "comparison", None) if "gen_resp" in locals() else None
+            budget_plan_success = getattr(gen_resp, "budget_plan", None) is not None or (outcome == "success" and plan_obj is not None) if "gen_resp" in locals() else False
+            ideal_plan_success = getattr(gen_resp, "ideal_plan", None) is not None if "gen_resp" in locals() else False
+
+            budget_plan_monthly_cost_irr = comp.budget_plan_monthly_cost_irr if comp else None
+            ideal_plan_monthly_cost_irr = comp.ideal_plan_monthly_cost_irr if comp else None
+            monthly_cost_gap_irr = comp.monthly_cost_gap_irr if comp else None
+
+            prot_diff = None
+            if comp and comp.protein_gap and comp.protein_gap.difference is not None:
+                prot_diff = float(comp.protein_gap.difference)
+            elif comp and comp.protein_gap_g_per_day is not None:
+                prot_diff = float(comp.protein_gap_g_per_day)
+
+            cal_diff = None
+            if comp and comp.calorie_gap and comp.calorie_gap.difference is not None:
+                cal_diff = float(comp.calorie_gap.difference)
+            elif comp and comp.calorie_gap_kcal_per_day is not None:
+                cal_diff = float(comp.calorie_gap_kcal_per_day)
+
+            meal_gap = None
+            if comp and comp.unique_meal_count_ideal is not None and comp.unique_meal_count_budget is not None:
+                meal_gap = comp.unique_meal_count_ideal - comp.unique_meal_count_budget
+
+            prot_src_gap = None
+            if comp and comp.unique_protein_sources_ideal is not None and comp.unique_protein_sources_budget is not None:
+                prot_src_gap = comp.unique_protein_sources_ideal - comp.unique_protein_sources_budget
+
+            show_ideal = comp.show_ideal_plan if comp else False
+            comp_reasons = list(comp.reason_codes) if comp else []
+
+            est_snap = (est_row.input_snapshot or {}) if est_row else {}
+            gen_snap = (gen_row.input_snapshot or {}) if gen_row else {}
+            combo_snap = {**est_snap, **gen_snap}
+
+            def _to_f(v: Any) -> float | None:
+                if v is None:
+                    return None
+                try:
+                    return float(v)
+                except Exception:
+                    return None
+
+            req_wc = _to_f(combo_snap.get("requested_weight_change_kg_per_week"))
+            rec_wc = _to_f(combo_snap.get("recommended_weight_change_kg_per_week"))
+            app_wc = _to_f(combo_snap.get("applied_weight_change_kg_per_week"))
+            goal_strat = combo_snap.get("goal_strategy") or diag.get("goal_strategy")
+            goal_strat_v = combo_snap.get("goal_strategy_version") or diag.get("goal_strategy_version")
+            b_tier = diag.get("budget_tier")
+
+            prog_cons = diag.get("programs_considered") or diag.get("candidates_count")
+            if prog_cons is None and "program_evaluations" in diag:
+                prog_cons = len(diag["program_evaluations"])
+            prog_rej = diag.get("programs_hard_rejected")
+            prog_const = diag.get("programs_constructed")
+            fallback_b = diag.get("fallback_batches_used")
+
+            hard_allergen_viols = diag.get("hard_allergen_violations", 0)
+            hard_excl_viols = diag.get("hard_exclusion_violations", 0)
+            med_safety_viols = diag.get("medical_safety_violations", 0)
+
             record = AuditRecord(
                 spec=spec,
                 outcome=outcome,
@@ -897,6 +988,30 @@ def run_audit(profiles: list[ProfileSpec], profile_seed: int = 20260903) -> list
                 solution=sol_text,
                 generation_latency_ms=generation_latency_ms,
                 safety_invariant_violations=invariant_violations,
+                budget_tier=b_tier,
+                requested_weight_change_kg_per_week=req_wc,
+                recommended_weight_change_kg_per_week=rec_wc,
+                applied_weight_change_kg_per_week=app_wc,
+                goal_strategy=goal_strat,
+                goal_strategy_version=goal_strat_v,
+                programs_considered=prog_cons,
+                programs_hard_rejected=prog_rej,
+                programs_constructed=prog_const,
+                fallback_batches_used=fallback_b,
+                budget_plan_success=budget_plan_success,
+                budget_plan_monthly_cost_irr=budget_plan_monthly_cost_irr,
+                ideal_plan_success=ideal_plan_success,
+                ideal_plan_monthly_cost_irr=ideal_plan_monthly_cost_irr,
+                monthly_cost_gap_irr=monthly_cost_gap_irr,
+                protein_preferred_gap_g_per_day=prot_diff,
+                calorie_preferred_gap_kcal_per_day=cal_diff,
+                unique_meal_gap=meal_gap,
+                unique_protein_source_gap=prot_src_gap,
+                show_ideal_plan=show_ideal,
+                comparison_reason_codes=comp_reasons,
+                hard_allergen_violations=hard_allergen_viols,
+                hard_exclusion_violations=hard_excl_viols,
+                medical_safety_violations=med_safety_viols,
             )
             records.append(record)
 

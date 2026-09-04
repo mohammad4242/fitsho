@@ -8,6 +8,7 @@ import type {
   DailyTrackingSummary,
   NutritionEstimate,
   NutritionTarget,
+  PlanComparison,
   WeeklyPlan,
   WeeklyPlanGeneration,
 } from "./types";
@@ -23,6 +24,8 @@ export function NutritionEstimatePage() {
   const [state, setState] = useState<ViewState>("loading");
   const [estimate, setEstimate] = useState<NutritionEstimate | null>(null);
   const [plan, setPlan] = useState<WeeklyPlan | null>(null);
+  const [idealPlan, setIdealPlan] = useState<WeeklyPlan | null>(null);
+  const [comparison, setComparison] = useState<PlanComparison | null>(null);
   const [tracking, setTracking] = useState<DailyTrackingSummary | null>(null);
   const [planOutcome, setPlanOutcome] = useState<WeeklyPlanGeneration | null>(null);
   const [calculating, setCalculating] = useState(false);
@@ -67,7 +70,10 @@ export function NutritionEstimatePage() {
     void nutritionApi.createWeeklyNutritionPlan()
       .then((result) => {
         setPlanOutcome(result);
-        if (result.plan !== null) setPlan(result.plan);
+        const resolvedBudgetPlan = result.budget_plan ?? result.plan ?? null;
+        if (resolvedBudgetPlan !== null) setPlan(resolvedBudgetPlan);
+        setIdealPlan(result.ideal_plan ?? null);
+        setComparison(result.comparison ?? null);
       })
       .catch(() => {
         setPlanOutcome({
@@ -99,7 +105,9 @@ export function NutritionEstimatePage() {
           <EstimateContent estimate={estimate} language={language} onRefresh={calculate} plan={plan} tracking={tracking} />
           <DoctorSupervision language={language} plan={plan} />
           <PlanArea
+            comparison={comparison}
             generating={generatingPlan}
+            idealPlan={idealPlan}
             language={language}
             onGenerate={generatePlan}
             outcome={planOutcome}
@@ -112,20 +120,67 @@ export function NutritionEstimatePage() {
 }
 
 function PlanArea({
+  comparison,
   generating,
+  idealPlan,
   language,
   onGenerate,
   outcome,
   plan,
 }: {
+  comparison: PlanComparison | null;
   generating: boolean;
+  idealPlan: WeeklyPlan | null;
   language: "fa" | "en";
   onGenerate: () => void;
   outcome: WeeklyPlanGeneration | null;
   plan: WeeklyPlan | null;
 }) {
   const l = (fa: string, en: string) => language === "en" ? en : fa;
-  if (plan !== null) return <WeeklyNutritionPlan language={language} plan={plan} />;
+  const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
+    maximumFractionDigits: 1,
+  });
+
+  if (plan !== null) {
+    const isTwoPlan = comparison?.show_ideal_plan && idealPlan !== null;
+    return (
+      <div className="weekly-plan-area-container">
+        {comparison && <PlanComparisonSection comparison={comparison} language={language} />}
+        {isTwoPlan ? (
+          <div className="weekly-plans-dual-container">
+            <details className="weekly-plan-accordion" open>
+              <summary className="weekly-plan-accordion__summary">
+                <span>{l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}</span>
+              </summary>
+              <WeeklyNutritionPlan
+                language={language}
+                plan={plan}
+                title={l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}
+              />
+            </details>
+            <details className="weekly-plan-accordion" open>
+              <summary className="weekly-plan-accordion__summary">
+                <span>{l("برنامه مرجع", "Reference Plan")}</span>
+              </summary>
+              <WeeklyNutritionPlan
+                isReferencePlan={true}
+                language={language}
+                plan={idealPlan}
+                title={l("برنامه مرجع", "Reference Plan")}
+              />
+            </details>
+          </div>
+        ) : (
+          <WeeklyNutritionPlan
+            language={language}
+            plan={plan}
+            title={comparison ? l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget") : undefined}
+          />
+        )}
+      </div>
+    );
+  }
+
   const generation = outcome === null
     ? null
     : generationMessage(outcome.outcome, outcome.reason_codes, language);
@@ -137,9 +192,159 @@ function PlanArea({
           {generation.reasons.map((reason) => <li key={reason}>{reason}</li>)}
         </ul>
       )}
+      {outcome?.comparison?.minimum_feasible_monthly_cost_irr != null && (
+        <div className="weekly-plan-budget-infeasible-details">
+          <p>
+            {l("بودجه شما: ", "Your budget: ")}
+            <strong>{formatTomanOrMillion(outcome.comparison.user_monthly_budget_irr, language, number)}</strong>
+          </p>
+          <p>
+            {l("حداقل هزینه تخمینی برنامه قابل‌اجرا: حدود ", "Estimated minimum feasible plan cost: approximately ")}
+            <strong>{formatTomanOrMillion(outcome.comparison.minimum_feasible_monthly_cost_irr, language, number)}</strong>
+          </p>
+        </div>
+      )}
       <button className="primary-button" disabled={generating} onClick={onGenerate} type="button">
         {generating ? l("در حال ساخت برنامه…", "Building plan…") : l("ساخت برنامه تغذیه هفتگی", "Build weekly nutrition plan")}
       </button>
+    </section>
+  );
+}
+
+function formatTomanOrMillion(
+  irr: number,
+  language: "fa" | "en",
+  numberFormatter: Intl.NumberFormat,
+): string {
+  const toman = irr / 10;
+  if (toman >= 1_000_000) {
+    const millions = toman / 1_000_000;
+    const formatted = numberFormatter.format(millions);
+    return language === "en" ? `${formatted} million Toman` : `${formatted} میلیون تومان`;
+  }
+  return language === "en" ? `${numberFormatter.format(toman)} Toman` : `${numberFormatter.format(toman)} تومان`;
+}
+
+function PlanComparisonSection({
+  comparison,
+  language,
+}: {
+  comparison: PlanComparison;
+  language: "fa" | "en";
+}) {
+  const l = (fa: string, en: string) => language === "en" ? en : fa;
+  const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
+    maximumFractionDigits: 1,
+  });
+
+  const proteinDifference = comparison.protein_gap?.difference
+    ?? (comparison.protein_gap_g_per_day != null ? Number(comparison.protein_gap_g_per_day) : null);
+  const proteinBudgetVal = comparison.protein_gap?.budget_value;
+  const proteinIdealVal = comparison.protein_gap?.ideal_value;
+
+  return (
+    <section className="nutrition-plan-comparison-card" aria-label={l("مقایسه برنامه‌ها", "Plan comparison")}>
+      <header>
+        <h3>{l("خلاصه بودجه و مقایسه", "Budget summary and comparison")}</h3>
+      </header>
+
+      <div className="nutrition-plan-comparison-grid">
+        <div className="nutrition-plan-comparison-item">
+          <span className="comparison-item-label">{l("بودجه ماهانه شما", "Your monthly budget")}</span>
+          <strong className="comparison-item-val">{formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}</strong>
+        </div>
+        <div className="nutrition-plan-comparison-item">
+          <span className="comparison-item-label">{l("هزینه تقریبی برنامه", "Estimated plan cost")}</span>
+          <strong className="comparison-item-val">
+            {comparison.budget_plan_monthly_cost_irr != null
+              ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
+              : "—"}
+          </strong>
+        </div>
+        {comparison.show_ideal_plan && (
+          <>
+            <div className="nutrition-plan-comparison-item">
+              <span className="comparison-item-label">{l("برنامه مرجع", "Reference plan")}</span>
+              <strong className="comparison-item-val">
+                {comparison.ideal_plan_monthly_cost_irr != null
+                  ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
+                  : "—"}
+              </strong>
+            </div>
+            <div className="nutrition-plan-comparison-item">
+              <span className="comparison-item-label">{l("اختلاف هزینه ماهانه", "Monthly cost gap")}</span>
+              <strong className="comparison-item-val">
+                {comparison.monthly_cost_gap_irr != null
+                  ? formatTomanOrMillion(comparison.monthly_cost_gap_irr, language, number)
+                  : "—"}
+              </strong>
+            </div>
+          </>
+        )}
+      </div>
+
+      {comparison.show_ideal_plan && (
+        <div className="nutrition-plan-comparison-metrics">
+          <div className="nutrition-plan-comparison-grid">
+            <div className="nutrition-plan-comparison-item">
+              <span className="comparison-item-label">{l("پروتئین روزانه", "Daily protein")}</span>
+              <strong className="comparison-item-val">
+                {proteinBudgetVal != null ? `${number.format(proteinBudgetVal)} g` : "—"}
+                {" → "}
+                {proteinIdealVal != null ? `${number.format(proteinIdealVal)} g` : "—"}
+              </strong>
+              {proteinDifference != null && (
+                <small>
+                  {l("اختلاف با هدف ترجیحی", "Difference from preferred")}:{" "}
+                  {number.format(proteinDifference)} {comparison.protein_gap?.unit || "g/day"}
+                </small>
+              )}
+            </div>
+            <div className="nutrition-plan-comparison-item">
+              <span className="comparison-item-label">{l("تنوع وعده‌ها", "Meal variety")}</span>
+              <strong className="comparison-item-val">
+                {comparison.unique_meal_count_budget != null ? number.format(comparison.unique_meal_count_budget) : "—"}
+                {" → "}
+                {comparison.unique_meal_count_ideal != null ? number.format(comparison.unique_meal_count_ideal) : "—"}
+              </strong>
+            </div>
+            <div className="nutrition-plan-comparison-item">
+              <span className="comparison-item-label">{l("تنوع منابع پروتئینی", "Protein source variety")}</span>
+              <strong className="comparison-item-val">
+                {comparison.unique_protein_sources_budget != null ? number.format(comparison.unique_protein_sources_budget) : "—"}
+                {" → "}
+                {comparison.unique_protein_sources_ideal != null ? number.format(comparison.unique_protein_sources_ideal) : "—"}
+              </strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="plan-comparison-explanation">
+        <h4>{l("چرا این دو برنامه متفاوتند؟", "Why they differ")}</h4>
+        {comparison.show_ideal_plan ? (
+          <p>
+            {l(
+              `بودجه ماهانه شما ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} است. برنامه پیشنهادی با بودجه شما حدود ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. برنامه مرجع متناسب با هدف شما حدود ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. نسخه بودجه‌ای حداقل‌های تعیین‌شده را رعایت می‌کند، اما نسبت به هدف ترجیحی حدود ${number.format(Math.abs(proteinDifference ?? 0))} گرم پروتئین در روز کمتر دارد و تنوع منابع پروتئینی پایین‌تر است.`,
+              `Your monthly budget is ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}. The recommended budget plan costs about ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)}. The reference plan costs about ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)}. The budget version satisfies required minimums, but has about ${number.format(Math.abs(proteinDifference ?? 0))} g less protein per day than your preferred target and lower protein source variety.`,
+            )}
+          </p>
+        ) : comparison.monthly_cost_gap_irr != null && comparison.monthly_cost_gap_irr < 10_000_000 ? (
+          <p>
+            {l(
+              "بودجه شما به هزینه برنامه مرجع بسیار نزدیک است؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
+              "Your budget is very close to the cost of the reference plan; therefore, only the recommended budget plan is displayed.",
+            )}
+          </p>
+        ) : (
+          <p>
+            {l(
+              "اختلاف کیفیت برنامه مرجع با برنامه بودجه‌ای چشمگیر نبود؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
+              "The reference plan did not offer a meaningful quality improvement; therefore, only the recommended budget plan is displayed.",
+            )}
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -257,6 +462,14 @@ const generationReasonMessages: Record<string, LocalizedGenerationMessage> = {
   UNSUPPORTED_OR_HARD_BLOCKED: [
     "با شرایط فعلی، ساخت خودکار برنامه تغذیه مجاز نیست.",
     "Automatic nutrition planning is unavailable under the current safety conditions.",
+  ],
+  USER_BUDGET_BELOW_MINIMUM_FEASIBLE: [
+    "با بودجه فعلی، ساخت برنامه‌ای که حداقل‌های تعیین‌شده برای هدف شما را رعایت کند ممکن نشد.",
+    "With your current budget, generating a plan that satisfies the required minimums for your goal was not possible.",
+  ],
+  NO_BUDGET_FEASIBLE_PLAN_FOUND: [
+    "با قیمت‌ها و کاتالوگ فعلی، برنامه سازگار در این بودجه پیدا نشد.",
+    "With current prices and catalogue, no compatible plan was found in this budget.",
   ],
   REQUEST_FAILED: [
     "درخواست ساخت برنامه انجام نشد. اتصال یا سرویس را بررسی کن و دوباره تلاش کن.",
