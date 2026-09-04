@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ApiError } from "../../shared/apiClient";
 import { MealThumbnail } from "../../shared/MealThumbnail";
 import * as api from "./api";
-import type { ShoppingList, WeeklyPlan, WeeklyPlanHistoryItem } from "./types";
+import type { MealFeedbackType, ShoppingList, WeeklyPlan, WeeklyPlanHistoryItem, WeeklyPlanFood } from "./types";
 
 type Props = {
   plan: WeeklyPlan;
@@ -12,21 +13,57 @@ type Props = {
 
 const weekdayFa = ["شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"];
 const weekdayEn = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
+type PlanMeal = WeeklyPlan["days"][number]["meals"][number];
+type ActionKind = "lock" | "feedback" | "remove-preview" | "meal-replacement-preview" | "food-replacement-preview" | "confirm" | "regenerate";
+type BusyAction = { mealId: string; action: ActionKind };
+type PreviewState =
+  | { kind: "remove"; data: Awaited<ReturnType<typeof api.previewMealRemoval>>; meal: PlanMeal }
+  | { kind: "meal"; data: api.PlanEditPreview; meal: PlanMeal; replacement: api.MealReplacementOption }
+  | { kind: "food"; data: api.PlanEditPreview; meal: PlanMeal; food: WeeklyPlanFood; replacement: api.FoodReplacementOption };
+type ReplacementSelector =
+  | { kind: "meal"; mealId: string; options: api.MealReplacementOption[] | null; selectedId: string | null }
+  | { kind: "food"; mealId: string; targetFoodId: string | null; options: api.FoodReplacementOption[] | null; selectedId: string | null };
 
 export function WeeklyNutritionPlan({ plan, language }: Props) {
   const [selectedDay, setSelectedDay] = useState(0);
   const [currentPlan, setCurrentPlan] = useState(plan);
   const [shopping, setShopping] = useState<ShoppingList | null>(null);
   const [history, setHistory] = useState<WeeklyPlanHistoryItem[]>([]);
-  const [busyMeal, setBusyMeal] = useState<string | null>(null);
-  const [preview, setPreview] = useState<({ kind: "remove"; data: Awaited<ReturnType<typeof api.previewMealRemoval>> } | { kind: "meal"; data: api.PlanEditPreview; replacementMealId: string } | { kind: "food"; data: api.PlanEditPreview; foodId: string; replacementFoodId: string }) | null>(null);
-  const [actionError, setActionError] = useState(false);
+  const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, MealFeedbackType>>({});
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+  const [selector, setSelector] = useState<ReplacementSelector | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => { setCurrentPlan(plan); }, [plan]);
   useEffect(() => {
-    void Promise.all([api.getShoppingList(currentPlan.id), api.listWeeklyNutritionPlans()])
-      .then(([list, revisions]) => { setShopping(list); setHistory(revisions); })
-      .catch(() => setActionError(true));
-  }, [currentPlan.id]);
+    void Promise.all([
+      api.getShoppingList(currentPlan.id),
+      api.listWeeklyNutritionPlans(),
+      api.getMealFeedback(currentPlan.id),
+    ])
+      .then(([list, revisions, savedFeedback]) => {
+        setShopping(list);
+        setHistory(revisions);
+        setFeedback(savedFeedback?.feedback ?? {});
+      })
+      .catch((error: unknown) => setActionError(actionErrorMessage(error, language)));
+  }, [currentPlan.id, language]);
+  useEffect(() => {
+    if (preview === null && selector === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && busyAction?.action !== "confirm") {
+        setPreview(null);
+        setSelector(null);
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [busyAction?.action, preview, selector]);
   const l = (fa: string, en: string) => language === "en" ? en : fa;
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
     maximumFractionDigits: 1,
@@ -34,51 +71,108 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
   const day = currentPlan.days[selectedDay] ?? currentPlan.days[0];
   const statusClass = currentPlan.physician_approved ? "is-approved" : "is-pending";
 
+  const isBusy = (mealId: string, action?: ActionKind) => busyAction?.mealId === mealId && (action === undefined || busyAction.action === action);
+  const runError = (error: unknown) => setActionError(actionErrorMessage(error, language));
+
   async function toggleLock(mealId: string, locked: boolean) {
-    setBusyMeal(mealId); setActionError(false);
+    setBusyAction({ mealId, action: "lock" }); setActionError(null);
     try {
-      await api.setMealLock(currentPlan.id, mealId, locked);
-      setCurrentPlan({ ...currentPlan, days: currentPlan.days.map((item) => ({ ...item, meals: item.meals.map((meal) => meal.id === mealId ? { ...meal, is_locked: locked } : meal) })) });
-    } catch { setActionError(true); } finally { setBusyMeal(null); }
+      const result = await api.setMealLock(currentPlan.id, mealId, locked);
+      setCurrentPlan({ ...currentPlan, days: currentPlan.days.map((item) => ({ ...item, meals: item.meals.map((meal) => meal.id === mealId ? { ...meal, is_locked: result.is_locked } : meal) })) });
+    } catch (error: unknown) { runError(error); } finally { setBusyAction(null); }
   }
 
   async function beginRemoval(mealId: string) {
-    setBusyMeal(mealId); setActionError(false);
-    try { setPreview({ kind: "remove", data: await api.previewMealRemoval(currentPlan.id, mealId) }); }
-    catch { setActionError(true); }
-    finally { setBusyMeal(null); }
+    const meal = findMeal(currentPlan, mealId);
+    if (!meal || meal.is_locked) return;
+    setBusyAction({ mealId, action: "remove-preview" }); setActionError(null);
+    try { setPreview({ kind: "remove", data: await api.previewMealRemoval(currentPlan.id, mealId), meal }); }
+    catch (error: unknown) { runError(error); }
+    finally { setBusyAction(null); }
   }
 
-  async function confirmRemoval() {
+  async function saveFeedback(mealId: string, feedbackType: "liked" | "disliked") {
+    if (isBusy(mealId, "feedback")) return;
+    setBusyAction({ mealId, action: "feedback" }); setActionError(null);
+    try {
+      const saved = await api.saveMealFeedback(currentPlan.id, mealId, feedbackType);
+      setFeedback((current) => ({ ...current, [mealId]: saved.feedback_type }));
+    } catch (error: unknown) { runError(error); }
+    finally { setBusyAction(null); }
+  }
+
+  async function confirmPlanEdit() {
     if (!preview) return;
-    setBusyMeal(String(preview.data.expected_plan_revision_id)); setActionError(false);
+    setBusyAction({ mealId: preview.data.meal_id, action: "confirm" }); setActionError(null);
     try {
       const next = preview.kind === "remove"
         ? await api.confirmMealRemoval(currentPlan.id, preview.data.meal_id, preview.data.expected_plan_revision_id)
         : preview.kind === "meal"
-          ? await api.confirmMealReplacement(currentPlan.id, preview.data.meal_id, preview.replacementMealId)
-          : await api.confirmFoodReplacement(currentPlan.id, preview.data.meal_id, preview.foodId, preview.replacementFoodId);
-      setCurrentPlan(next); setPreview(null); setSelectedDay(0);
-    } catch { setActionError(true); }
-    finally { setBusyMeal(null); }
+          ? await api.confirmMealReplacement(currentPlan.id, preview.data.meal_id, preview.replacement.id)
+          : await api.confirmFoodReplacement(currentPlan.id, preview.data.meal_id, preview.food.food_id!, preview.replacement.food_id);
+      setCurrentPlan(next); setPreview(null); setSelector(null); setSelectedDay(0);
+    } catch (error: unknown) { runError(error); }
+    finally { setBusyAction(null); }
   }
 
-  async function beginMealReplacement(mealId: string, replacementMealId: string) {
-    setBusyMeal(mealId); setActionError(false);
-    try { setPreview({ kind: "meal", data: await api.previewMealReplacement(currentPlan.id, mealId, replacementMealId), replacementMealId }); }
-    catch { setActionError(true); } finally { setBusyMeal(null); }
+  async function beginMealReplacement(mealId: string) {
+    setSelector({ kind: "meal", mealId, options: null, selectedId: null });
+    setBusyAction({ mealId, action: "meal-replacement-preview" }); setActionError(null);
+    try {
+      const result = await api.getMealReplacementOptions(currentPlan.id, mealId);
+      setSelector({ kind: "meal", mealId, options: result.options, selectedId: null });
+    } catch (error: unknown) { setSelector(null); runError(error); }
+    finally { setBusyAction(null); }
   }
 
-  async function beginFoodReplacement(mealId: string, foodId: string, replacementFoodId: string) {
-    setBusyMeal(mealId); setActionError(false);
-    try { setPreview({ kind: "food", data: await api.previewFoodReplacement(currentPlan.id, mealId, foodId, replacementFoodId), foodId, replacementFoodId }); }
-    catch { setActionError(true); } finally { setBusyMeal(null); }
+  async function chooseMealReplacement() {
+    if (!selector || selector.kind !== "meal" || !selector.selectedId) return;
+    const meal = findMeal(currentPlan, selector.mealId);
+    const replacement = selector.options?.find((option) => option.id === selector.selectedId);
+    if (!meal || !replacement) return;
+    setBusyAction({ mealId: meal.id, action: "meal-replacement-preview" }); setActionError(null);
+    try {
+      const data = await api.previewMealReplacement(currentPlan.id, meal.id, replacement.id);
+      setPreview({ kind: "meal", data, meal, replacement }); setSelector(null);
+    } catch (error: unknown) { runError(error); }
+    finally { setBusyAction(null); }
+  }
+
+  function beginFoodReplacement(mealId: string) {
+    setSelector({ kind: "food", mealId, targetFoodId: null, options: null, selectedId: null });
+    setActionError(null);
+  }
+
+  async function chooseFoodTarget(foodId: string) {
+    if (!selector || selector.kind !== "food") return;
+    const meal = findMeal(currentPlan, selector.mealId);
+    if (!meal) return;
+    setBusyAction({ mealId: meal.id, action: "food-replacement-preview" }); setActionError(null);
+    try {
+      const result = await api.getFoodReplacementOptions(currentPlan.id, meal.id, foodId);
+      setSelector({ ...selector, targetFoodId: foodId, options: result.options, selectedId: null });
+    } catch (error: unknown) { runError(error); }
+    finally { setBusyAction(null); }
+  }
+
+  async function chooseFoodReplacement() {
+    if (!selector || selector.kind !== "food" || !selector.targetFoodId || !selector.selectedId) return;
+    const meal = findMeal(currentPlan, selector.mealId);
+    const food = meal?.foods.find((item) => item.food_id === selector.targetFoodId);
+    const replacement = selector.options?.find((option) => option.food_id === selector.selectedId);
+    if (!meal || !food || !replacement || !food.food_id) return;
+    setBusyAction({ mealId: meal.id, action: "food-replacement-preview" }); setActionError(null);
+    try {
+      const data = await api.previewFoodReplacement(currentPlan.id, meal.id, food.food_id, replacement.food_id);
+      setPreview({ kind: "food", data, meal, food, replacement }); setSelector(null);
+    } catch (error: unknown) { runError(error); }
+    finally { setBusyAction(null); }
   }
 
   async function regenerateDay() {
-    setBusyMeal("regenerate"); setActionError(false);
+    setBusyAction({ mealId: "regenerate", action: "regenerate" }); setActionError(null);
     try { setCurrentPlan(await api.partialRegeneratePlan(currentPlan.id, [selectedDay])); setSelectedDay(0); }
-    catch { setActionError(true); } finally { setBusyMeal(null); }
+    catch (error: unknown) { runError(error); } finally { setBusyAction(null); }
   }
 
   return (
@@ -117,7 +211,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       </div>
       {currentPlan.physician_user_visible_notes && <aside className="weekly-plan__notice"><strong>{l("یادداشت پزشک", "Physician note")}</strong><p>{currentPlan.physician_user_visible_notes}</p></aside>}
       {currentPlan.physician_change_summary.length > 0 && <aside className="weekly-plan__notice"><strong>{l("خلاصه تغییرات پزشک", "Physician change summary")}</strong><ul>{currentPlan.physician_change_summary.map((change, index) => <li key={index}>{String(change.operation ?? change.action ?? l("تغییر برنامه", "Plan change"))}</li>)}</ul></aside>}
-      {actionError && <p className="weekly-plan__error" role="alert">{l("عملیات انجام نشد؛ دوباره تلاش کن.", "The action failed. Please try again.")}</p>}
+      {actionError && <p className="weekly-plan__error" role="alert">{actionError}</p>}
 
       <details className="weekly-plan__section">
         <summary>
@@ -157,7 +251,7 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
       </div>
 
       {day && (
-        <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(Math.floor(day.cost_irr / 10))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div><div className="weekly-plan__day-actions"><button disabled={busyMeal === "regenerate" || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div><div className="weekly-plan__meals" role="tabpanel">
+        <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(Math.floor(day.cost_irr / 10))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div><div className="weekly-plan__day-actions"><button disabled={isBusy("regenerate", "regenerate") || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div><div className="weekly-plan__meals" role="tabpanel">
           {day.meals.map((meal) => (
             meal.slot_role === "free_meal" ? <FreeMealCard key={meal.id} meal={meal} entryDate={day.plan_date} language={language} /> : <details className="weekly-plan__meal" key={meal.id}>
               <summary className="weekly-plan__meal-summary">
@@ -206,12 +300,12 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
                 {mealMetricEntries(meal.nutrient_totals).map(([code, value]) => <div key={code}><dt>{nutrientLabel(code, language)}</dt><dd>{number.format(value)}</dd></div>)}
               </dl>
               <div className="weekly-plan__meal-actions">
-                <button disabled={busyMeal === meal.id} type="button" onClick={() => void toggleLock(meal.id, !meal.is_locked)}>{meal.is_locked ? l("بازکردن قفل", "Unlock") : l("قفل وعده", "Lock meal")}</button>
-                <button type="button" onClick={() => void api.saveMealFeedback(currentPlan.id, meal.id, "liked")}>{l("پسندیدم", "Liked")}</button>
-                <button type="button" onClick={() => void api.saveMealFeedback(currentPlan.id, meal.id, "disliked")}>{l("کمتر پیشنهاد بده", "Suggest less often")}</button>
-                <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginRemoval(meal.id)}>{l("پیش‌نمایش حذف", "Preview removal")}</button>
-                {findMealAlternative(currentPlan, meal.id, meal.slot_role) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginMealReplacement(meal.id, findMealAlternative(currentPlan, meal.id, meal.slot_role)!.id)}>{l("پیش‌نمایش تعویض وعده", "Preview meal replacement")}</button>}
-                {meal.foods[0]?.food_id && findFoodAlternative(currentPlan, meal.foods[0].food_id) && <button disabled={meal.is_locked || busyMeal === meal.id} type="button" onClick={() => void beginFoodReplacement(meal.id, meal.foods[0]!.food_id!, findFoodAlternative(currentPlan, meal.foods[0]!.food_id!)!.food_id!)}>{l("پیش‌نمایش تعویض ماده", "Preview food replacement")}</button>}
+                <button aria-busy={isBusy(meal.id, "lock")} disabled={isBusy(meal.id, "lock")} type="button" onClick={() => void toggleLock(meal.id, !meal.is_locked)}>{meal.is_locked ? l("بازکردن قفل", "Unlock") : l("قفل وعده", "Lock meal")}</button>
+                <button aria-pressed={feedback[meal.id] === "liked"} className={feedback[meal.id] === "liked" ? "is-selected" : undefined} aria-busy={isBusy(meal.id, "feedback")} disabled={isBusy(meal.id, "feedback")} type="button" onClick={() => void saveFeedback(meal.id, "liked")}>{isBusy(meal.id, "feedback") ? l("در حال ثبت…", "Saving…") : l("پسندیدم", "Liked")}{feedback[meal.id] === "liked" && !isBusy(meal.id, "feedback") ? " ✓" : ""}</button>
+                <button aria-pressed={feedback[meal.id] === "disliked"} className={feedback[meal.id] === "disliked" ? "is-selected" : undefined} aria-busy={isBusy(meal.id, "feedback")} disabled={isBusy(meal.id, "feedback")} type="button" onClick={() => void saveFeedback(meal.id, "disliked")}>{isBusy(meal.id, "feedback") ? l("در حال ثبت…", "Saving…") : l("کمتر پیشنهاد بده", "Suggest less often")}{feedback[meal.id] === "disliked" && !isBusy(meal.id, "feedback") ? " ✓" : ""}</button>
+                <button disabled={meal.is_locked || isBusy(meal.id, "remove-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => void beginRemoval(meal.id)}>{l("حذف وعده", "Remove meal")}</button>
+                <button disabled={meal.is_locked || isBusy(meal.id, "meal-replacement-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => void beginMealReplacement(meal.id)}>{l("تعویض وعده", "Replace meal")}</button>
+                {meal.foods.some((food) => food.food_id !== null) && <button disabled={meal.is_locked || isBusy(meal.id, "food-replacement-preview") || isBusy(meal.id, "confirm")} type="button" onClick={() => beginFoodReplacement(meal.id)}>{l("تعویض ماده غذایی", "Replace ingredient")}</button>}
               </div>
               </div>
             </details>
@@ -247,7 +341,45 @@ export function WeeklyNutritionPlan({ plan, language }: Props) {
         </div>
       </details>
 
-      {preview && <section className="weekly-plan__confirm" role="dialog" aria-modal="true" aria-labelledby="edit-preview-title"><h3 id="edit-preview-title">{preview.kind === "remove" ? l("تأیید حذف وعده", "Confirm meal removal") : preview.kind === "meal" ? l("تأیید تعویض وعده", "Confirm meal replacement") : l("تأیید تعویض ماده غذایی", "Confirm food replacement")}</h3><p>{l("این تغییر یک نسخه جدید می‌سازد و باید دوباره توسط پزشک بررسی شود.", "This creates a new revision that requires physician review again.")}</p><p>{l("تغییر هزینه", "Cost change")}: {number.format(Math.floor(editPreviewCost(preview.data) / 10))} {l("تومان", "Toman")}</p><button className="primary-button" type="button" onClick={() => void confirmRemoval()}>{l("ساخت نسخه جدید", "Create new revision")}</button><button type="button" onClick={() => setPreview(null)}>{l("انصراف", "Cancel")}</button></section>}
+      {selector && <div className="weekly-plan__modal-backdrop">
+        <div className="weekly-plan__modal" role="dialog" aria-modal="true" aria-labelledby="replacement-selector-title">
+          <button className="weekly-plan__modal-close" type="button" onClick={() => setSelector(null)}>{l("بستن", "Close")}</button>
+          {selector.kind === "meal" ? <>
+            <h3 id="replacement-selector-title">{l("انتخاب وعده جایگزین", "Choose a replacement meal")}</h3>
+            {actionError && <p className="weekly-plan__error" role="alert">{actionError}</p>}
+            {selector.options === null ? <p role="status">{l("در حال دریافت گزینه‌ها…", "Loading options…")}</p> : selector.options.length === 0 ? <p>{l("گزینه سازگار دیگری در این نسخه وجود ندارد.", "No other compatible meal exists in this revision.")}</p> : <div className="weekly-plan__replacement-options">
+              {selector.options.map((option) => <button aria-pressed={selector.selectedId === option.id} className={selector.selectedId === option.id ? "is-selected" : undefined} key={option.id} type="button" onClick={() => setSelector({ ...selector, selectedId: option.id })}>
+                <MealThumbnail alt={language === "en" ? option.name_en : option.name_fa} className="weekly-plan__replacement-image" fallbackLabel={l("تصویر وعده جایگزین", "Replacement meal placeholder")} imageUrl={option.image_url} />
+                <span><strong>{option.meal_code ? `${option.meal_code} — ` : ""}{language === "en" ? option.name_en : option.name_fa}</strong><small>{number.format(option.nutrient_totals.energy_kcal ?? 0)} kcal · {l("پروتئین", "Protein")} {number.format(option.nutrient_totals.protein_g ?? 0)} g · {number.format(Math.floor(option.cost_irr / 10))} {l("تومان", "Toman")}</small></span>
+              </button>)}
+            </div>}
+            <div className="weekly-plan__modal-actions"><button className="primary-button" disabled={!selector.selectedId || isBusy(selector.mealId, "meal-replacement-preview")} type="button" onClick={() => void chooseMealReplacement()}>{l("پیش‌نمایش تعویض وعده", "Preview meal replacement")}</button><button type="button" onClick={() => setSelector(null)}>{l("انصراف", "Cancel")}</button></div>
+          </> : <>
+            <h3 id="replacement-selector-title">{l("انتخاب ماده غذایی برای تعویض", "Choose an ingredient to replace")}</h3>
+            {(() => { const targetMeal = findMeal(currentPlan, selector.mealId); return targetMeal ? <>
+              <p>{l("ابتدا ماده غذایی موردنظر را انتخاب کن.", "First choose the ingredient you want to replace.")}</p>
+              <div className="weekly-plan__food-targets">{targetMeal.foods.filter((food) => food.food_id !== null).map((food) => <button aria-pressed={selector.targetFoodId === food.food_id} className={selector.targetFoodId === food.food_id ? "is-selected" : undefined} key={food.food_id} type="button" onClick={() => void chooseFoodTarget(food.food_id!)}>{language === "en" ? food.name_en : food.name_fa} — {number.format(food.grams)} {l("گرم", "g")}</button>)}</div>
+              {selector.targetFoodId && <><h4>{l("جایگزین‌های قابل انتخاب", "Eligible replacements")}</h4>{selector.options === null ? <p role="status">{l("در حال دریافت گزینه‌ها…", "Loading options…")}</p> : selector.options.length === 0 ? <p>{l("گزینه سازگار دیگری در این نسخه وجود ندارد.", "No other compatible ingredient exists in this revision.")}</p> : <div className="weekly-plan__replacement-options">{selector.options.map((option) => <button aria-pressed={selector.selectedId === option.food_id} className={selector.selectedId === option.food_id ? "is-selected" : undefined} key={option.food_id} type="button" onClick={() => setSelector({ ...selector, selectedId: option.food_id })}><MealThumbnail alt={language === "en" ? option.name_en : option.name_fa} className="weekly-plan__replacement-image" fallbackLabel={l("تصویر ماده غذایی جایگزین", "Replacement ingredient placeholder")} imageUrl={option.image_url} /><span><strong>{language === "en" ? option.name_en : option.name_fa}</strong><small>{number.format(option.grams)} {l("گرم", "g")} · {number.format(option.nutrients.energy_kcal ?? 0)} kcal · {l("پروتئین", "Protein")} {number.format(option.nutrients.protein_g ?? 0)} g · {number.format(Math.floor(option.cost_irr / 10))} {l("تومان", "Toman")}</small></span></button>)}</div>}</>}
+              <div className="weekly-plan__modal-actions"><button className="primary-button" disabled={!selector.targetFoodId || !selector.selectedId || isBusy(selector.mealId, "food-replacement-preview")} type="button" onClick={() => void chooseFoodReplacement()}>{l("پیش‌نمایش تعویض ماده غذایی", "Preview ingredient replacement")}</button><button type="button" onClick={() => setSelector(null)}>{l("انصراف", "Cancel")}</button></div>
+            </> : null; })()}
+          </>}
+        </div>
+      </div>}
+
+      {preview && <div className="weekly-plan__modal-backdrop">
+        <div className="weekly-plan__modal" role="dialog" aria-modal="true" aria-labelledby="edit-preview-title">
+          <button className="weekly-plan__modal-close" type="button" onClick={() => setPreview(null)}>{l("بستن", "Close")}</button>
+          <h3 id="edit-preview-title">{preview.kind === "remove" ? l("پیش‌نمایش حذف وعده", "Preview meal removal") : preview.kind === "meal" ? l("پیش‌نمایش تعویض وعده", "Preview meal replacement") : l("پیش‌نمایش تعویض ماده غذایی", "Preview ingredient replacement")}</h3>
+          {actionError && <p className="weekly-plan__error" role="alert">{actionError}</p>}
+          <p><strong>{l("وعده هدف", "Target meal")}: </strong>{mealTitle(preview.meal, language)}</p>
+          {preview.kind === "meal" && <p><strong>{l("وعده جدید", "New meal")}: </strong>{preview.replacement.meal_code ? `${preview.replacement.meal_code} — ` : ""}{language === "en" ? preview.replacement.name_en : preview.replacement.name_fa}</p>}
+          {preview.kind === "food" && <><p><strong>{l("ماده قدیمی", "Old ingredient")}: </strong>{language === "en" ? preview.food.name_en : preview.food.name_fa} — {number.format(preview.food.grams)} {l("گرم", "g")}</p><p><strong>{l("ماده جدید", "New ingredient")}: </strong>{language === "en" ? preview.replacement.name_en : preview.replacement.name_fa} — {number.format(preview.replacement.grams)} {l("گرم", "g")}</p></>}
+          {previewImpact(preview.data, language, number).length > 0 && <ul className="weekly-plan__preview-impact">{previewImpact(preview.data, language, number).map((item) => <li key={item.label}>{item.label}: {item.value}</li>)}</ul>}
+          <p>{l("تغییر هزینه", "Cost change")}: {number.format(Math.floor(editPreviewCost(preview.data) / 10))} {l("تومان", "Toman")}</p>
+          <p className="weekly-plan__warning">{l("این عملیات هنوز اعمال نشده است. تأیید آن یک نسخه جدید می‌سازد و بررسی پزشک دوباره لازم خواهد بود.", "This operation has not been applied. Confirming creates a new revision and requires physician review again.")}</p>
+          <div className="weekly-plan__modal-actions"><button className="primary-button" disabled={isBusy(preview.data.meal_id, "confirm")} type="button" onClick={() => void confirmPlanEdit()}>{l("ساخت نسخه جدید", "Create new revision")}</button><button type="button" onClick={() => setPreview(null)}>{l("انصراف", "Cancel")}</button></div>
+        </div>
+      </div>}
 
       <details className="weekly-plan__section weekly-plan__shopping">
         <summary>
@@ -328,17 +460,35 @@ function FreeMealCard({ meal, entryDate, language }: { meal: WeeklyPlan["days"][
   </details>;
 }
 
-function findMealAlternative(plan: WeeklyPlan, mealId: string, role: "main_meal" | "snack" | "free_meal" | "post_workout") {
-  return plan.days.flatMap((day) => day.meals).find((meal) => meal.id !== mealId && meal.slot_role === role);
+function findMeal(plan: WeeklyPlan, mealId: string): PlanMeal | undefined {
+  return plan.days.flatMap((day) => day.meals).find((meal) => meal.id === mealId);
 }
 
-function findFoodAlternative(plan: WeeklyPlan, foodId: string) {
-  return plan.days.flatMap((day) => day.meals).flatMap((meal) => meal.foods).find((food) => food.food_id !== null && food.food_id !== foodId);
+function actionErrorMessage(error: unknown, language: "fa" | "en"): string {
+  const code = error instanceof ApiError ? error.code : null;
+  const messages: Record<string, [string, string]> = {
+    PLAN_REVIEW_IN_PROGRESS: ["این نسخه در حال بررسی پزشک است و تا پایان بررسی نمی‌توان وعده‌های آن را تغییر داد.", "This revision is under physician review and cannot be changed until the review is complete."],
+    STALE_PLAN_REVISION: ["نسخه برنامه تغییر کرده است. صفحه را به‌روزرسانی کن و دوباره تلاش کن.", "The plan revision changed. Refresh the page and try again."],
+    MEAL_NOT_FOUND: ["وعده موردنظر دیگر در این نسخه وجود ندارد.", "This meal is no longer available in this revision."],
+    MEAL_LOCKED: ["این وعده قفل است و ابتدا باید قفل آن را باز کنی.", "This meal is locked. Unlock it before editing."],
+    INCOMPATIBLE_MEAL_REPLACEMENT: ["این وعده جایگزین با نقش وعده سازگار نیست.", "That meal is not compatible with this meal slot."],
+    FOOD_REPLACEMENT_NOT_FOUND: ["ماده غذایی انتخاب‌شده دیگر برای این جایگزینی در دسترس نیست.", "That ingredient replacement is no longer available."],
+  };
+  return code && messages[code] ? messages[code][language === "en" ? 1 : 0] : l10n("عملیات انجام نشد؛ دوباره تلاش کن.", "The action failed. Please try again.", language);
+}
+
+function l10n(fa: string, en: string, language: "fa" | "en") {
+  return language === "en" ? en : fa;
 }
 
 function editPreviewCost(data: api.PlanEditPreview | Awaited<ReturnType<typeof api.previewMealRemoval>>) {
   if ("weekly_cost_delta_irr" in data && typeof data.weekly_cost_delta_irr === "number") return data.weekly_cost_delta_irr;
   return "cost_delta_irr" in data && typeof data.cost_delta_irr === "number" ? data.cost_delta_irr : 0;
+}
+
+function previewImpact(data: api.PlanEditPreview | Awaited<ReturnType<typeof api.previewMealRemoval>>, language: "fa" | "en", number: Intl.NumberFormat): Array<{ label: string; value: string }> {
+  const delta = "daily_delta" in data && data.daily_delta ? data.daily_delta : "meal_delta" in data && data.meal_delta ? data.meal_delta : {};
+  return Object.entries(delta).map(([code, value]) => ({ label: nutrientLabel(code, language), value: `${value > 0 ? "+" : ""}${number.format(value)}` }));
 }
 
 function mealMetricEntries(values: Record<string, number>): Array<[string, number]> {

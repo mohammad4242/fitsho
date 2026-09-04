@@ -14,6 +14,7 @@ import type {
   NutritionAdherence,
   ShoppingList,
   WeeklyPlanHistoryItem,
+  MealFeedbackType,
 } from "./types";
 
 const nutritionPath = "/api/v1/nutrition";
@@ -337,11 +338,65 @@ export function setMealLock(planId: string, mealId: string, isLocked: boolean): 
   });
 }
 
-export function saveMealFeedback(planId: string, mealId: string, feedbackType: "liked" | "disliked" | "do_not_suggest_again" | "prefer_more_often" | "too_large" | "too_small"): Promise<unknown> {
+export type MealFeedbackResponse = {
+  meal_id: string;
+  feedback_type: MealFeedbackType;
+  change_kind: "plan_control_metadata";
+};
+
+export type MealFeedbackMapResponse = { feedback: Record<string, MealFeedbackType> };
+
+export function getMealFeedback(planId: string): Promise<MealFeedbackMapResponse> {
+  return request(`${nutritionPath}/plans/${planId}/feedback`);
+}
+
+export function saveMealFeedback(planId: string, mealId: string, feedbackType: MealFeedbackType): Promise<MealFeedbackResponse> {
   return request(`${nutritionPath}/plans/${planId}/meals/${mealId}/feedback`, {
     method: "PUT",
     body: JSON.stringify({ feedback_type: feedbackType, notes: null }),
   });
+}
+
+export type MealReplacementOption = {
+  id: string;
+  name_fa: string;
+  name_en: string;
+  meal_code: string;
+  image_url: string | null;
+  slot_role: string;
+  nutrient_totals: Record<string, number>;
+  cost_irr: number;
+  is_locked: boolean;
+};
+
+export type MealReplacementOptionsResponse = {
+  target_meal_id: string;
+  options: MealReplacementOption[];
+};
+
+export type FoodReplacementOption = {
+  food_id: string;
+  slug: string;
+  name_fa: string;
+  name_en: string;
+  image_url: string | null;
+  grams: number;
+  cost_irr: number;
+  nutrients: Record<string, number>;
+};
+
+export type FoodReplacementOptionsResponse = {
+  target_meal_id: string;
+  target_food_id: string;
+  options: FoodReplacementOption[];
+};
+
+export function getMealReplacementOptions(planId: string, mealId: string): Promise<MealReplacementOptionsResponse> {
+  return request(`${nutritionPath}/plans/${planId}/meal-replacement-options?meal_id=${mealId}`);
+}
+
+export function getFoodReplacementOptions(planId: string, mealId: string, foodId: string): Promise<FoodReplacementOptionsResponse> {
+  return request(`${nutritionPath}/plans/${planId}/food-replacement-options?meal_id=${mealId}&food_id=${foodId}`);
 }
 
 export function previewMealRemoval(planId: string, mealId: string): Promise<{ expected_plan_revision_id: string; meal_id: string; daily_delta: Record<string, number>; weekly_cost_delta_irr: number; new_warning_codes: string[] }> {
@@ -355,7 +410,19 @@ export function confirmMealRemoval(planId: string, mealId: string, expectedPlanR
   });
 }
 
-export type PlanEditPreview = { expected_plan_revision_id: string; meal_id: string; weekly_cost_delta_irr?: number; cost_delta_irr?: number };
+export type PlanEditPreview = {
+  expected_plan_revision_id: string;
+  meal_id: string;
+  replacement_meal_id?: string;
+  food_id?: string;
+  replacement_food_id?: string;
+  daily_delta?: Record<string, number>;
+  meal_delta?: Record<string, number>;
+  weekly_cost_delta_irr?: number;
+  cost_delta_irr?: number;
+  requires_physician_review?: boolean;
+  new_warning_codes?: string[];
+};
 export function previewMealReplacement(planId: string, mealId: string, replacementMealId: string): Promise<PlanEditPreview> { return request(`${nutritionPath}/plans/${planId}/edits/replace-meal/preview`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, replacement_meal_id: replacementMealId }) }); }
 export function confirmMealReplacement(planId: string, mealId: string, replacementMealId: string): Promise<WeeklyPlan> { return request(`${nutritionPath}/plans/${planId}/edits/replace-meal/confirm`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, replacement_meal_id: replacementMealId }) }); }
 export function previewFoodReplacement(planId: string, mealId: string, foodId: string, replacementFoodId: string): Promise<PlanEditPreview> { return request(`${nutritionPath}/plans/${planId}/edits/replace-food/preview`, { method: "POST", body: JSON.stringify({ expected_plan_revision_id: planId, meal_id: mealId, food_id: foodId, replacement_food_id: replacementFoodId }) }); }

@@ -600,8 +600,8 @@ it("uses complete English copy and left-to-right layout", async () => {
 it("supports locking, feedback, and a confirmed revision-safe meal removal", async () => {
   await i18n.changeLanguage("en");
   vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
-  vi.mocked(nutritionApi.setMealLock).mockResolvedValue({ is_locked: true });
-  vi.mocked(nutritionApi.saveMealFeedback).mockResolvedValue({});
+  vi.mocked(nutritionApi.setMealLock).mockResolvedValueOnce({ is_locked: true }).mockResolvedValueOnce({ is_locked: false });
+  vi.mocked(nutritionApi.saveMealFeedback).mockResolvedValue({ meal_id: "meal-0", feedback_type: "liked", change_kind: "plan_control_metadata" });
   vi.mocked(nutritionApi.previewMealRemoval).mockResolvedValue({ expected_plan_revision_id: "plan-1", meal_id: "meal-0", daily_delta: { energy_kcal: -700 }, weekly_cost_delta_irr: -300_000, new_warning_codes: ["MEAL_REMOVAL_MAY_REDUCE_ADEQUACY"] });
   vi.mocked(nutritionApi.confirmMealRemoval).mockResolvedValue({ ...weeklyPlan, id: "plan-2", revision: 2, supersedes_plan_id: "plan-1" });
   render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
@@ -612,11 +612,12 @@ it("supports locking, feedback, and a confirmed revision-safe meal removal", asy
   await openFirstMeal(user);
   await user.click(await screen.findByRole("button", { name: "Lock meal" }));
   expect(nutritionApi.setMealLock).toHaveBeenCalledWith("plan-1", "meal-0", true);
-  await user.click(screen.getByRole("button", { name: "Unlock" }));
+  await user.click(await screen.findByRole("button", { name: "Unlock" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Remove meal" })).not.toBeDisabled());
   await user.click(screen.getByRole("button", { name: "Liked" }));
   expect(nutritionApi.saveMealFeedback).toHaveBeenCalledWith("plan-1", "meal-0", "liked");
-  await user.click(screen.getByRole("button", { name: "Preview removal" }));
-  expect(await screen.findByRole("dialog", { name: "Confirm meal removal" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Remove meal" }));
+  expect(await screen.findByRole("dialog", { name: "Preview meal removal" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Create new revision" }));
   expect(nutritionApi.confirmMealRemoval).toHaveBeenCalledWith("plan-1", "meal-0", "plan-1");
   expect(await screen.findByText("Revision 2")).toBeInTheDocument();

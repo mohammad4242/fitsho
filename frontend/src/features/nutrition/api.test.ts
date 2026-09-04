@@ -6,6 +6,9 @@ import {
   deleteCatalogueFood,
   getCurrentNutritionEstimate,
   getLatestWeeklyNutritionPlan,
+  getMealFeedback,
+  getMealReplacementOptions,
+  getFoodReplacementOptions,
   getMealCatalogue,
   getSafetyDecision,
   getStructuredExercise,
@@ -132,4 +135,19 @@ it("fetches the member meal catalogue with category query parameter", async () =
     "/api/v1/nutrition/meal-catalogue?category=breakfast",
     expect.objectContaining({ credentials: "include" }),
   );
+});
+
+it("fetches persisted feedback and explicit replacement candidates", async () => {
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(Response.json({ feedback: { "meal-1": "liked" } }))
+    .mockResolvedValueOnce(Response.json({ target_meal_id: "meal-1", options: [] }))
+    .mockResolvedValueOnce(Response.json({ target_meal_id: "meal-1", target_food_id: "food-1", options: [] }));
+
+  await getMealFeedback("plan-1");
+  await getMealReplacementOptions("plan-1", "meal-1");
+  await getFoodReplacementOptions("plan-1", "meal-1", "food-1");
+
+  expect(fetch).toHaveBeenNthCalledWith(1, "/api/v1/nutrition/plans/plan-1/feedback", expect.objectContaining({ credentials: "include" }));
+  expect(fetch).toHaveBeenNthCalledWith(2, "/api/v1/nutrition/plans/plan-1/meal-replacement-options?meal_id=meal-1", expect.objectContaining({ credentials: "include" }));
+  expect(fetch).toHaveBeenNthCalledWith(3, "/api/v1/nutrition/plans/plan-1/food-replacement-options?meal_id=meal-1&food_id=food-1", expect.objectContaining({ credentials: "include" }));
 });

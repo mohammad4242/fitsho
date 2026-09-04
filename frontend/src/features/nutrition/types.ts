@@ -137,6 +137,14 @@ export type WeeklyPlanFood = {
   } | null;
 };
 
+export type MealFeedbackType =
+  | "liked"
+  | "disliked"
+  | "do_not_suggest_again"
+  | "prefer_more_often"
+  | "too_large"
+  | "too_small";
+
 export type WeeklyPlan = {
   id: string;
   revision: number;
