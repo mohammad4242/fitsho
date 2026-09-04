@@ -18,6 +18,7 @@ from app.nutrition.enums import (
     NutritionPlanReviewStatus,
 )
 from app.nutrition.models import (
+    NutritionCatalogueFood,
     NutritionMealFeedback,
     NutritionPlanGeneration,
     NutritionPlanPhysicianReview,
@@ -189,6 +190,105 @@ def save_feedback(
     return {"meal_id": meal_id, "feedback_type": kind.value, "change_kind": "plan_control_metadata"}
 
 
+def meal_feedback(db: Session, user_id: UUID, plan_id: UUID) -> dict[str, object]:
+    plan = owned_plan(db, user_id, plan_id)
+    meal_ids = [meal.id for day in plan.days for meal in day.meals]
+    rows = db.scalars(
+        select(NutritionMealFeedback).where(
+            NutritionMealFeedback.user_id == user_id,
+            NutritionMealFeedback.meal_id.in_(meal_ids),
+        )
+    ).all()
+    return {"feedback": {str(row.meal_id): row.feedback_type.value for row in rows}}
+
+
+def meal_replacement_options(
+    db: Session, user_id: UUID, plan_id: UUID, meal_id: UUID
+) -> dict[str, object]:
+    plan = owned_plan(db, user_id, plan_id)
+    target = next((meal for day in plan.days for meal in day.meals if meal.id == meal_id), None)
+    if target is None:
+        raise PlanEditError("MEAL_NOT_FOUND")
+    if target.is_locked:
+        raise PlanEditError("MEAL_LOCKED")
+    options = [
+        meal
+        for day in plan.days
+        for meal in day.meals
+        if meal.id != target.id
+        and meal.slot_role == target.slot_role
+        and not meal.is_locked
+        and meal.catalogue_meal_id != target.catalogue_meal_id
+    ]
+    return {
+        "target_meal_id": target.id,
+        "options": [
+            {
+                "id": meal.id,
+                "name_fa": meal.catalogue_meal.name_fa if meal.catalogue_meal else "وعده غذایی",
+                "name_en": meal.catalogue_meal.name_en if meal.catalogue_meal else "Meal",
+                "meal_code": meal.catalogue_meal.code if meal.catalogue_meal else "",
+                "image_url": meal.catalogue_meal.image_path if meal.catalogue_meal else None,
+                "slot_role": meal.slot_role.value,
+                "nutrient_totals": _float_map(meal.nutrient_totals),
+                "cost_irr": meal.cost_irr,
+                "is_locked": meal.is_locked,
+            }
+            for meal in options
+        ],
+    }
+
+
+def food_replacement_options(
+    db: Session, user_id: UUID, plan_id: UUID, meal_id: UUID, food_id: UUID
+) -> dict[str, object]:
+    plan = owned_plan(db, user_id, plan_id)
+    target_meal = next(
+        (meal for day in plan.days for meal in day.meals if meal.id == meal_id), None
+    )
+    if target_meal is None:
+        raise PlanEditError("MEAL_NOT_FOUND")
+    if target_meal.is_locked:
+        raise PlanEditError("MEAL_LOCKED")
+    target = next((food for food in target_meal.foods if food.food_id == food_id), None)
+    if target is None:
+        raise PlanEditError("FOOD_REPLACEMENT_NOT_FOUND")
+    assert target.food_id is not None
+    source_by_food_id: dict[UUID, NutritionWeeklyPlanFood] = {}
+    for day in plan.days:
+        for meal in day.meals:
+            if meal.is_locked:
+                continue
+            for food in meal.foods:
+                if food.food_id is not None and food.food_id != target.food_id:
+                    source_by_food_id.setdefault(food.food_id, food)
+    catalogue_foods = {
+        food.id: food
+        for food in db.scalars(
+            select(NutritionCatalogueFood).where(
+                NutritionCatalogueFood.id.in_(source_by_food_id)
+            )
+        )
+    }
+    options = []
+    for source_food_id, source in sorted(source_by_food_id.items(), key=lambda item: str(item[0])):
+        scaled = _scaled_food(source, target.grams)
+        catalogue_food = catalogue_foods.get(source_food_id)
+        options.append(
+            {
+                "food_id": source_food_id,
+                "slug": source.food_slug,
+                "name_fa": source.food_name_fa,
+                "name_en": source.food_name_en,
+                "image_url": catalogue_food.image_path if catalogue_food else None,
+                "grams": float(scaled.grams),
+                "cost_irr": scaled.cost_irr,
+                "nutrients": _float_map(scaled.nutrient_snapshot),
+            }
+        )
+    return {"target_meal_id": target_meal.id, "target_food_id": target.food_id, "options": options}
+
+
 def preview_remove_meal(
     db: Session, user_id: UUID, plan_id: UUID, meal_id: UUID
 ) -> dict[str, object]:
@@ -196,6 +296,8 @@ def preview_remove_meal(
     meal = next((meal for day in plan.days for meal in day.meals if meal.id == meal_id), None)
     if meal is None:
         raise PlanEditError("MEAL_NOT_FOUND")
+    if meal.is_locked:
+        raise PlanEditError("MEAL_LOCKED")
     return {
         "plan_id": plan.id,
         "expected_plan_revision_id": plan.id,
@@ -438,6 +540,9 @@ def confirm_remove_meal(
         raise PlanEditError("PLAN_REVIEW_IN_PROGRESS")
     if not any(meal.id == meal_id for day in plan.days for meal in day.meals):
         raise PlanEditError("MEAL_NOT_FOUND")
+    meal = next(meal for day in plan.days for meal in day.meals if meal.id == meal_id)
+    if meal.is_locked:
+        raise PlanEditError("MEAL_LOCKED")
     days: list[NutritionWeeklyPlanDay] = []
     for day in plan.days:
         meals = [_copy_meal(meal) for meal in day.meals if meal.id != meal_id]
@@ -461,6 +566,8 @@ def preview_replace_meal(
     target, replacement = meals.get(meal_id), meals.get(replacement_meal_id)
     if target is None or replacement is None:
         raise PlanEditError("MEAL_NOT_FOUND")
+    if target.is_locked or replacement.is_locked:
+        raise PlanEditError("MEAL_LOCKED")
     if target.slot_role != replacement.slot_role or target.id == replacement.id:
         raise PlanEditError("INCOMPATIBLE_MEAL_REPLACEMENT")
     return {
@@ -489,8 +596,10 @@ def confirm_replace_meal(
     target, replacement = meals.get(meal_id), meals.get(replacement_meal_id)
     if target is None or replacement is None:
         raise PlanEditError("MEAL_NOT_FOUND")
-    if target.slot_role != replacement.slot_role or target.id == replacement.id or target.is_locked:
+    if target.slot_role != replacement.slot_role or target.id == replacement.id:
         raise PlanEditError("INCOMPATIBLE_MEAL_REPLACEMENT")
+    if target.is_locked or replacement.is_locked:
+        raise PlanEditError("MEAL_LOCKED")
     days = [
         _copy_day(
             day,
@@ -517,6 +626,8 @@ def preview_replace_food(
     meal = next((meal for day in plan.days for meal in day.meals if meal.id == meal_id), None)
     if meal is None:
         raise PlanEditError("MEAL_NOT_FOUND")
+    if meal.is_locked:
+        raise PlanEditError("MEAL_LOCKED")
     target = next((food for food in meal.foods if food.food_id == food_id), None)
     replacement = next(
         (
@@ -579,8 +690,17 @@ def confirm_replace_food(
         ),
         None,
     )
-    if target_meal is None or replacement is None or target_meal.is_locked:
+    if target_meal is None or replacement is None:
         raise PlanEditError("FOOD_REPLACEMENT_NOT_FOUND")
+    if target_meal.is_locked:
+        raise PlanEditError("MEAL_LOCKED")
+    if replacement is not None:
+        source_meal = next(
+            (meal for day in plan.days for meal in day.meals if replacement in meal.foods),
+            None,
+        )
+        if source_meal is not None and source_meal.is_locked:
+            raise PlanEditError("MEAL_LOCKED")
     target = next((food for food in target_meal.foods if food.food_id == food_id), None)
     if target is None or target.food_id == replacement.food_id:
         raise PlanEditError("FOOD_REPLACEMENT_NOT_FOUND")
@@ -677,6 +797,10 @@ def _delta(before: dict[str, object], after: dict[str, object]) -> dict[str, flo
         key: float(Decimal(str(after.get(key, 0))) - Decimal(str(before.get(key, 0))))
         for key in keys
     }
+
+
+def _float_map(values: dict[str, object]) -> dict[str, float]:
+    return {key: float(str(value)) for key, value in values.items()}
 
 
 def _scaled_food(food: NutritionWeeklyPlanFood, grams: Decimal) -> NutritionWeeklyPlanFood:

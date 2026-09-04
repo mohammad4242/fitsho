@@ -825,6 +825,44 @@ class WeeklyPlanMealResponse(BaseModel):
     foods: list[WeeklyPlanFoodResponse]
 
 
+class WeeklyPlanFeedbackResponse(BaseModel):
+    feedback: dict[UUID, NutritionMealFeedbackType]
+
+
+class MealReplacementOptionResponse(BaseModel):
+    id: UUID
+    name_fa: str
+    name_en: str
+    meal_code: str
+    image_url: str | None
+    slot_role: str
+    nutrient_totals: dict[str, float]
+    cost_irr: int
+    is_locked: bool
+
+
+class MealReplacementOptionsResponse(BaseModel):
+    target_meal_id: UUID
+    options: list[MealReplacementOptionResponse]
+
+
+class FoodReplacementOptionResponse(BaseModel):
+    food_id: UUID
+    slug: str
+    name_fa: str
+    name_en: str
+    image_url: str | None
+    grams: float
+    cost_irr: int
+    nutrients: dict[str, float]
+
+
+class FoodReplacementOptionsResponse(BaseModel):
+    target_meal_id: UUID
+    target_food_id: UUID
+    options: list[FoodReplacementOptionResponse]
+
+
 class WeeklyPlanDayResponse(BaseModel):
     day_index: int
     plan_date: date

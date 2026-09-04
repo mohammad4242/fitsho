@@ -2,8 +2,20 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.nutrition.candidate_selection import quality_for_result
 from app.nutrition.enums import NutritionPlanReviewStatus
-from app.nutrition.models import NutritionPlanPhysicianReview, NutritionWeeklyPlan
+from app.nutrition.models import (
+    NutritionMealFeedback,
+    NutritionPlanPhysicianReview,
+    NutritionWeeklyPlan,
+)
+from app.nutrition.planner_engine import (
+    GenerationOutcome,
+    PlannedDay,
+    PlannedMeal,
+    PlannerResult,
+)
+from app.nutrition.preference_snapshot import load_preference_snapshot
 from tests.nutrition.test_clinical_review_api import _login_physician
 from tests.nutrition.test_weekly_plan_api import (
     ORIGIN,
@@ -59,6 +71,131 @@ def test_metadata_changes_do_not_invalidate_review(client: TestClient, db: Sessi
     assert persisted is not None
     assert persisted.review is not None
     assert persisted.review.status == NutritionPlanReviewStatus.PENDING
+
+
+def test_feedback_read_is_persisted_and_changes_future_candidate_scoring(
+    client: TestClient, db: Session
+) -> None:
+    plan = _generated_plan(client, db)
+    meal = plan["days"][0]["meals"][0]
+
+    saved = client.put(
+        f"/api/v1/nutrition/plans/{plan['id']}/meals/{meal['id']}/feedback",
+        headers=ORIGIN,
+        json={"feedback_type": "liked"},
+    )
+    assert saved.status_code == 200
+    assert saved.json()["feedback_type"] == "liked"
+
+    persisted_plan = db.scalar(
+        select(NutritionWeeklyPlan).where(NutritionWeeklyPlan.id == plan["id"])
+    )
+    assert persisted_plan is not None
+    row = db.scalar(
+        select(NutritionMealFeedback).where(NutritionMealFeedback.meal_id == meal["id"])
+    )
+    assert row is not None
+    snapshot = load_preference_snapshot(db, persisted_plan.user_id, ())
+    assert snapshot.liked_meal_ids == (meal["catalogue_meal_id"],)
+
+    result = PlannerResult(
+        outcome=GenerationOutcome.SUCCESS,
+        reason_codes=("SAFE_FEASIBLE_DRAFT_GENERATED",),
+        days=(
+            PlannedDay(
+                day_index=0,
+                meals=(
+                    PlannedMeal(
+                        role="main",
+                        slot_index=0,
+                        template_id=meal["catalogue_meal_id"],
+                        template_category="main",
+                        foods=(),
+                        cost_irr=1,
+                        nutrients=(),
+                    ),
+                ),
+                cost_irr=1,
+                nutrients=(),
+            ),
+        ),
+        weekly_cost_irr=1,
+    )
+    neutral = quality_for_result(result, weekly_budget_irr=1)
+    liked = quality_for_result(result, weekly_budget_irr=1, preference_snapshot=snapshot)
+    assert liked.preference_and_feedback_penalty < neutral.preference_and_feedback_penalty
+
+    read = client.get(f"/api/v1/nutrition/plans/{plan['id']}/feedback")
+    assert read.status_code == 200
+    assert read.json()["feedback"][meal["id"]] == "liked"
+
+    switched = client.put(
+        f"/api/v1/nutrition/plans/{plan['id']}/meals/{meal['id']}/feedback",
+        headers=ORIGIN,
+        json={"feedback_type": "disliked"},
+    )
+    assert switched.status_code == 200
+    assert switched.json()["feedback_type"] == "disliked"
+    updated_row = db.scalar(
+        select(NutritionMealFeedback).where(NutritionMealFeedback.meal_id == meal["id"])
+    )
+    assert updated_row is not None and updated_row.feedback_type.value == "disliked"
+
+
+def test_replacement_options_are_explicit_and_exclude_locked_meals(
+    client: TestClient, db: Session
+) -> None:
+    plan = _generated_plan(client, db)
+    target = plan["days"][0]["meals"][0]
+    response = client.get(
+        f"/api/v1/nutrition/plans/{plan['id']}/meal-replacement-options",
+        params={"meal_id": target["id"]},
+    )
+    assert response.status_code == 200
+    options = response.json()["options"]
+    assert options
+    assert all(option["id"] != target["id"] for option in options)
+    assert all(option["slot_role"] == target["slot_role"] for option in options)
+    assert all(not option["is_locked"] for option in options)
+
+    food = target["foods"][0]
+    food_options = client.get(
+        f"/api/v1/nutrition/plans/{plan['id']}/food-replacement-options",
+        params={"meal_id": target["id"], "food_id": food["food_id"]},
+    )
+    assert food_options.status_code == 200
+    assert all(option["food_id"] != food["food_id"] for option in food_options.json()["options"])
+
+
+def test_plan_defining_edits_reject_locked_meals_and_in_review_plans(
+    client: TestClient, db: Session
+) -> None:
+    plan = _generated_plan(client, db)
+    meal = plan["days"][0]["meals"][0]
+    locked = client.put(
+        f"/api/v1/nutrition/plans/{plan['id']}/meals/{meal['id']}/lock",
+        headers=ORIGIN,
+        json={"is_locked": True},
+    )
+    assert locked.status_code == 200
+    locked_preview = client.post(
+        f"/api/v1/nutrition/plans/{plan['id']}/edits/remove-meal/preview",
+        params={"meal_id": meal["id"]},
+    )
+    assert locked_preview.status_code == 409
+    assert locked_preview.json()["detail"]["code"] == "MEAL_LOCKED"
+
+    persisted = db.scalar(select(NutritionWeeklyPlan).where(NutritionWeeklyPlan.id == plan["id"]))
+    assert persisted is not None and persisted.review is not None
+    persisted.review.status = NutritionPlanReviewStatus.IN_REVIEW
+    db.commit()
+    blocked = client.post(
+        f"/api/v1/nutrition/plans/{plan['id']}/edits/remove-meal/confirm",
+        headers=ORIGIN,
+        json={"expected_plan_revision_id": plan["id"], "meal_id": meal["id"]},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "PLAN_REVIEW_IN_PROGRESS"
 
 
 def test_plan_defining_edit_creates_immutable_revision_and_rejects_stale_confirmation(

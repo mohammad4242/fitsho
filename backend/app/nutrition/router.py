@@ -134,6 +134,9 @@ from app.nutrition.plan_editing import (
     confirm_remove_meal,
     confirm_replace_food,
     confirm_replace_meal,
+    food_replacement_options,
+    meal_feedback,
+    meal_replacement_options,
     partial_regenerate,
     physician_action,
     physician_adjust_food_quantity,
@@ -192,9 +195,11 @@ from app.nutrition.schemas import (
     FoodPhotoItemCorrectionInput,
     FoodPriceOverrideInput,
     FoodPriceOverrideResponse,
+    FoodReplacementOptionsResponse,
     FreeMealTrackingInput,
     MealFeedbackInput,
     MealLockInput,
+    MealReplacementOptionsResponse,
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
@@ -1396,7 +1401,61 @@ def _plan_edit_error(error: PlanEditError) -> HTTPException:
     )
     if error.code == "PHYSICIAN_ROLE_REQUIRED":
         status_code = status.HTTP_403_FORBIDDEN
-    return HTTPException(status_code=status_code, detail={"code": error.code})
+    messages = {
+        "PLAN_REVIEW_IN_PROGRESS": (
+            "این نسخه در حال بررسی پزشک است و تا پایان بررسی نمی‌توان وعده‌های آن را تغییر داد."
+        ),
+        "STALE_PLAN_REVISION": (
+            "نسخه برنامه تغییر کرده است. صفحه را به‌روزرسانی کن و دوباره تلاش کن."
+        ),
+        "MEAL_NOT_FOUND": "وعده موردنظر دیگر در این نسخه وجود ندارد.",
+        "MEAL_LOCKED": "این وعده قفل است و ابتدا باید قفل آن را باز کنی.",
+        "INCOMPATIBLE_MEAL_REPLACEMENT": "این وعده جایگزین با نقش وعده سازگار نیست.",
+        "FOOD_REPLACEMENT_NOT_FOUND": "ماده غذایی انتخاب‌شده دیگر برای این جایگزینی در دسترس نیست.",
+    }
+    return HTTPException(
+        status_code=status_code,
+        detail={
+            "code": error.code,
+            "message": messages.get(error.code, "عملیات برنامه غذایی انجام نشد."),
+        },
+    )
+
+
+@router.get("/plans/{plan_id}/feedback")
+def read_meal_feedback(
+    plan_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return meal_feedback(db, user.id, plan_id)
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.get(
+    "/plans/{plan_id}/meal-replacement-options",
+    response_model=MealReplacementOptionsResponse,
+)
+def read_meal_replacement_options(
+    plan_id: UUID, meal_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return meal_replacement_options(db, user.id, plan_id, meal_id)
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
+
+
+@router.get(
+    "/plans/{plan_id}/food-replacement-options",
+    response_model=FoodReplacementOptionsResponse,
+)
+def read_food_replacement_options(
+    plan_id: UUID, meal_id: UUID, food_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> dict[str, object]:
+    try:
+        return food_replacement_options(db, user.id, plan_id, meal_id, food_id)
+    except PlanEditError as error:
+        raise _plan_edit_error(error) from None
 
 
 @router.get("/plans/{plan_id}/shopping-list")
