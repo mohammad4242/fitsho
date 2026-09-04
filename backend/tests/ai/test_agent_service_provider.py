@@ -139,9 +139,7 @@ def test_analyze_images_decodes_base64_and_sends_only_multipart_bytes() -> None:
         seen["body"] = request.content
         return httpx.Response(200, json=_output())
 
-    response = _run(
-        _provider(handler).analyze_images(_request(), images=(image,))
-    )
+    response = _run(_provider(handler).analyze_images(_request(), images=(image,)))
 
     assert response.payload == {"score": 0.82}
     body = seen["body"]
@@ -174,9 +172,7 @@ def test_analyze_stored_images_sends_only_json_storage_references() -> None:
         seen["body"] = request.content
         return httpx.Response(200, json=_output())
 
-    response = _run(
-        _provider(handler).analyze_images(_request(), images=(_stored_image(),))
-    )
+    response = _run(_provider(handler).analyze_images(_request(), images=(_stored_image(),)))
 
     assert response.payload == {"score": 0.82}
     assert seen["method"] == "POST"
@@ -214,9 +210,11 @@ def test_analyze_images_rejects_mixed_inline_and_stored_sources() -> None:
     inline = ImageInput(label="side", mime_type="image/jpeg", base64_data="c2lkZQ==")
 
     with pytest.raises(AIProviderError) as error:
-        _run(_provider(lambda _: httpx.Response(500)).analyze_images(
-            _request(), images=(inline, _stored_image())
-        ))
+        _run(
+            _provider(lambda _: httpx.Response(500)).analyze_images(
+                _request(), images=(inline, _stored_image())
+            )
+        )
 
     assert error.value.code is ProviderErrorCode.INVALID_REQUEST
 
@@ -364,3 +362,41 @@ def test_timeout_and_connection_errors_normalize_without_raw_exception_text() ->
     assert connection.code is ProviderErrorCode.CONNECTION_FAILURE
     assert "socket timed out" not in timeout.safe_message
     assert "private host details" not in connection.safe_message
+
+
+def test_agent_service_provider_falls_back_when_primary_model_fails() -> None:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        model_id = body["model_id"]
+        calls.append(model_id)
+        if model_id == "primary-failing-model":
+            return httpx.Response(
+                503,
+                json={
+                    "error": {
+                        "code": "provider_unavailable",
+                        "message": "capacity exceeded",
+                        "request_id": "req-fail",
+                    }
+                },
+            )
+        return httpx.Response(
+            200,
+            json=_output(model_id="fallback-working-model", request_id="req-fallback"),
+        )
+
+    req = _request().model_copy(
+        update={
+            "route": ModelRoute(
+                primary_model="primary-failing-model",
+                fallback_models=("fallback-working-model",),
+            )
+        }
+    )
+    result = _run(_provider(handler).generate_structured_text(req))
+
+    assert calls == ["primary-failing-model", "fallback-working-model"]
+    assert result.model_id == "fallback-working-model"
+    assert result.attempted_models == ("primary-failing-model", "fallback-working-model")

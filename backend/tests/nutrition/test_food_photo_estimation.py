@@ -854,6 +854,25 @@ def test_estimated_photo_item_calculates_atwater_calories_when_zero() -> None:
     assert item.calories == expected
 
 
+def test_estimated_photo_item_coerces_string_evidence_to_list() -> None:
+    item = EstimatedPhotoItem.model_validate(
+        {
+            "name_guess": "کباب کوبیده",
+            "estimated_amount": 200,
+            "unit": "g",
+            "confidence": 0.95,
+            "visible_evidence": "شواهد دیداری کباب",
+            "uncertainties": "عدم قطعیت در وزن",
+            "calories": 300,
+            "protein_g": 30,
+            "carbohydrate_g": 2,
+            "fat_g": 18,
+        }
+    )
+    assert item.visible_evidence == ["شواهد دیداری کباب"]
+    assert item.uncertainties == ["عدم قطعیت در وزن"]
+
+
 def test_unmapped_food_with_direct_ai_macros_is_complete_and_confirms(
     client: TestClient,
     db: Session,

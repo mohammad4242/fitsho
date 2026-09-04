@@ -298,6 +298,15 @@ class AntigravityRunner(AgentRunner):
         environment["PLAYWRIGHT_DRIVER_PATH"] = _AGY_PLAYWRIGHT_DRIVER_PATH
         return self.proxy_runtime.apply(environment)
 
+    _BENIGN_CLI_LOG_PATTERNS = re.compile(
+        r"error getting token source: you are not logged into antigravity"
+        r"|skipping telemetry propagation because user is not logged in"
+        r"|print mode: not authenticated, trying silent auth"
+        r"|singleflight refresh failed:.*you are not logged into antigravity"
+        r"|failed to get load code assist response:.*you are not logged into antigravity",
+        re.IGNORECASE,
+    )
+
     def _cli_log_snapshot(self) -> dict[Path, tuple[int, int]]:
         try:
             return {
@@ -326,7 +335,13 @@ class AntigravityRunner(AgentRunner):
         diagnostics: list[str] = []
         for _, path in sorted(changed_logs, key=lambda item: item[0], reverse=True)[:3]:
             try:
-                diagnostics.append(path.read_bytes()[-65_536:].decode(errors="replace"))
+                raw = path.read_bytes()[-65_536:].decode(errors="replace")
+                filtered = "\n".join(
+                    line
+                    for line in raw.splitlines()
+                    if not self._BENIGN_CLI_LOG_PATTERNS.search(line)
+                )
+                diagnostics.append(filtered)
             except OSError:
                 continue
         return "\n".join(diagnostics)
@@ -406,6 +421,13 @@ class AntigravityRunner(AgentRunner):
                 "location_unsupported",
                 "this provider does not support the current location",
             )
+        if re.search(
+            r"no capacity available|service unavailable|unavailable \(code 503\)|"
+            r"capacity.*(?:server|model)|temporar.*unavailable|overloaded|"
+            r"stream reading error|unexpected eof|upstream connect error",
+            text,
+        ):
+            return RunnerError("provider_unavailable", "provider is unavailable")
         if re.search(
             r"unauthori[sz]ed|authentication failed|authentication required|"
             r"not authenticated|not logged in|login required|permission denied|"

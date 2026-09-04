@@ -233,27 +233,43 @@ class AgentServiceProvider:
                 "Too many images were supplied for analysis.",
             )
         self._validate_schema(request.response_schema)
-        model_id = request.route.primary_model
-        body = self._generation_body(request, model_id=model_id)
-        if images:
-            source = self._image_source(images)
-            payload = (
-                await self._request_stored_images(body, images)
-                if source == "stored"
-                else await self._request_multipart(body, images)
-            )
-        else:
-            payload = await self._request_json("POST", "/v1/generate", json_body=body)
-        completion = self._parse_completion(payload, expected_model_id=model_id)
-        self._validate_output(completion.payload, request.response_schema)
-        return StructuredGenerationResponse(
-            payload=completion.payload,
-            model_id=model_id,
-            attempted_models=(model_id,),
-            provider_request_id=completion.provider_request_id,
-            input_tokens=completion.input_tokens,
-            output_tokens=completion.output_tokens,
-            cost=None,
+        model_ids = dict.fromkeys((request.route.primary_model, *request.route.fallback_models))
+        attempted_models: list[str] = []
+        last_error: AIProviderError | None = None
+
+        for model_id in model_ids:
+            attempted_models.append(model_id)
+            body = self._generation_body(request, model_id=model_id)
+            try:
+                if images:
+                    source = self._image_source(images)
+                    payload = (
+                        await self._request_stored_images(body, images)
+                        if source == "stored"
+                        else await self._request_multipart(body, images)
+                    )
+                else:
+                    payload = await self._request_json("POST", "/v1/generate", json_body=body)
+                completion = self._parse_completion(payload, expected_model_id=model_id)
+                self._validate_output(completion.payload, request.response_schema)
+                return StructuredGenerationResponse(
+                    payload=completion.payload,
+                    model_id=model_id,
+                    attempted_models=tuple(attempted_models),
+                    provider_request_id=completion.provider_request_id,
+                    input_tokens=completion.input_tokens,
+                    output_tokens=completion.output_tokens,
+                    cost=None,
+                )
+            except AIProviderError as error:
+                last_error = error
+                continue
+
+        if last_error is not None:
+            raise last_error
+        raise AIProviderError(
+            ProviderErrorCode.MODEL_NOT_FOUND,
+            _SAFE_MESSAGES[ProviderErrorCode.MODEL_NOT_FOUND],
         )
 
     def _generation_body(

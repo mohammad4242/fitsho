@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import logging
 import os
 import tempfile
 from datetime import UTC, date, datetime, timedelta
@@ -43,6 +44,8 @@ from app.nutrition.models import (
 from app.nutrition.security import audit_security_event, record_operational_event
 from app.nutrition.tracking_service import actual_intake_warnings
 
+logger = logging.getLogger(__name__)
+
 
 class FoodPhotoError(Exception):
     def __init__(self, code: str) -> None:
@@ -55,8 +58,8 @@ class EstimatedPhotoItem(BaseModel):
     estimated_amount: float = Field(gt=0, le=10000)
     unit: str = Field(pattern="^(g|ml|item|unknown)$")
     confidence: float = Field(ge=0, le=1)
-    visible_evidence: list[str] = Field(max_length=10)
-    uncertainties: list[str] = Field(max_length=10)
+    visible_evidence: list[str] = Field(default_factory=list, max_length=10)
+    uncertainties: list[str] = Field(default_factory=list, max_length=10)
     calories: float = Field(ge=0, le=10000)
     protein_g: float = Field(ge=0, le=1000)
     carbohydrate_g: float = Field(ge=0, le=1000)
@@ -66,6 +69,20 @@ class EstimatedPhotoItem(BaseModel):
     @classmethod
     def _fill_and_calculate_macros(cls, data: object) -> object:
         if isinstance(data, dict):
+            # Coerce visible_evidence from string to list if provided as a single string
+            ve = data.get("visible_evidence")
+            if isinstance(ve, str):
+                data["visible_evidence"] = [ve.strip()] if ve.strip() else []
+            elif ve is None:
+                data["visible_evidence"] = []
+
+            # Coerce uncertainties from string to list if provided as a single string
+            unc = data.get("uncertainties")
+            if isinstance(unc, str):
+                data["uncertainties"] = [unc.strip()] if unc.strip() else []
+            elif unc is None:
+                data["uncertainties"] = []
+
             p = float(data.get("protein_g") or 0.0)
             c = float(data.get("carbohydrate_g") or 0.0)
             f = float(data.get("fat_g") or 0.0)
@@ -124,7 +141,31 @@ def build_food_photo_request(
             "calories = (protein_g × 4) + (carbohydrate_g × 4) + (fat_g × 9). "
             "فیلد calories برای هر غذایی که کالری دارد باید حتماً بیشتر از صفر باشد "
             "و هرگز نباید ۰ ثبت شود.\n"
-            "۴. شواهد دیداری و عدم قطعیت‌ها را بنویس. ادعای پزشکی یا آلرژی ارائه نده."
+            "۴. شواهد دیداری و عدم قطعیت‌ها: فیلدهای visible_evidence و uncertainties باید آرایه‌ای "
+            "از رشته‌ها (لیست) باشند.\n"
+            "۵. عدم اجرای ابزارهای متفرقه: تمام اجزا را مستقیماً از روی تصویر تشخیص بده "
+            "و بلافاصله خروجی نهایی را با ابزار پایان تحویل بده. "
+            "هرگز ابزارهای ترمینال، جستجوی فایل یا خط فرمان را اجرا نکن.\n\n"
+            "ساختار دقیق خروجی JSON مورد انتظار:\n"
+            "{\n"
+            '  "meal_name_guess": "نام روان وعده به فارسی (مانند: چلو کباب کوبیده مرغ)",\n'
+            '  "overall_confidence": 0.95,\n'
+            '  "needs_user_confirmation": false,\n'
+            '  "items": [\n'
+            "    {\n"
+            '      "name_guess": "نام جزء به فارسی روان (مانند: کباب کوبیده مرغ)",\n'
+            '      "estimated_amount": 200.0,\n'
+            '      "unit": "g",\n'
+            '      "confidence": 0.95,\n'
+            '      "visible_evidence": ["شواهد دیداری روی غذا"],\n'
+            '      "uncertainties": ["عدم قطعیت‌های موجود در تخمین"],\n'
+            '      "calories": 336.0,\n'
+            '      "protein_g": 44.0,\n'
+            '      "carbohydrate_g": 4.0,\n'
+            '      "fat_g": 16.0\n'
+            "    }\n"
+            "  ]\n"
+            "}"
         )
         instruction = (
             "این تصویر غذا را بدون اطلاعات شخصی تحلیل کن و خروجی را با نام‌های فارسی روان "
@@ -146,8 +187,31 @@ def build_food_photo_request(
             "protein_g, carbohydrate_g, and fat_g based on the estimated portion. "
             "Standard Atwater formula: "
             "calories = (4 * protein_g) + (4 * carbohydrate_g) + (9 * fat_g). "
-            "4. Note visible evidence and uncertainties. "
-            "Do not provide medical advice or allergy claims."
+            "4. Visible evidence and uncertainties: 'visible_evidence' and 'uncertainties' must be "
+            "arrays of strings. Do not provide medical advice or allergy claims.\n"
+            "5. Direct response: Extract all information directly from the image and return the "
+            "structured result immediately. Never execute shell commands, terminal tools, "
+            "or file searches.\n\n"
+            "Expected JSON output structure:\n"
+            "{\n"
+            '  "meal_name_guess": "Everyday meal name in English",\n'
+            '  "overall_confidence": 0.95,\n'
+            '  "needs_user_confirmation": false,\n'
+            '  "items": [\n'
+            "    {\n"
+            '      "name_guess": "Item name in English",\n'
+            '      "estimated_amount": 200.0,\n'
+            '      "unit": "g",\n'
+            '      "confidence": 0.95,\n'
+            '      "visible_evidence": ["Visual evidence"],\n'
+            '      "uncertainties": ["Uncertainties if any"],\n'
+            '      "calories": 336.0,\n'
+            '      "protein_g": 44.0,\n'
+            '      "carbohydrate_g": 4.0,\n'
+            '      "fat_g": 16.0\n'
+            "    }\n"
+            "  ]\n"
+            "}"
         )
         instruction = (
             "Analyze this food image without personal data and provide nutritional estimates."
@@ -305,6 +369,7 @@ async def estimate_photo(
             api_key=key,
         )
     except (AIConfigError, ValueError) as error:
+        logger.warning("Food photo provider build failed: %s", error, exc_info=True)
         raise FoodPhotoError("FOOD_PHOTO_PROVIDER_UNAVAILABLE") from error
     content = await file.read(settings.food_photo_max_bytes + 1)
     if len(content) > settings.food_photo_max_bytes:
@@ -333,6 +398,7 @@ async def estimate_photo(
         )
         output = FoodPhotoOutput.model_validate(result.payload)
     except (AIProviderError, ValueError) as error:
+        logger.warning("Food photo estimation failed: %s", error, exc_info=True)
         food_photo_storage_path(settings.food_photo_storage_root, key).unlink(missing_ok=True)
         record_operational_event(
             db,

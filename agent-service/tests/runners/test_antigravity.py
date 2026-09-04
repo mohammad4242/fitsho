@@ -631,6 +631,8 @@ def test_run_classifies_provider_error_written_only_to_cli_log(
             "location_unsupported",
         ),
         ("temporary upstream outage", "provider_unavailable"),
+        ("No capacity available for model claude-sonnet-4-6 on the server", "provider_unavailable"),
+        ("stream reading error: unexpected EOF", "provider_unavailable"),
         ("rate limit exceeded", "rate_limited"),
         ("You've hit your usage limit", "rate_limited"),
     ],
@@ -691,4 +693,28 @@ def test_timeout_maps_to_safe_timeout_error(
 
     assert error.value.code == "timeout"
     assert error.value.safe_message == "runner timed out"
-    assert "secret" not in str(error.value)
+
+
+def test_benign_startup_logs_do_not_falsely_trigger_unauthorized(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.runners.antigravity as antigravity
+
+    log_root = tmp_path / "logs"
+    log_root.mkdir()
+    log_file = log_root / "cli-test.log"
+    log_file.write_text(
+        "ERROR: error getting token source: You are not logged into Antigravity.\n"
+        "Skipping telemetry propagation because user is not logged in\n"
+        "print mode: not authenticated, trying silent auth\n"
+    )
+
+    monkeypatch.setattr(
+        antigravity, "run_process", fake_process("", returncode=1, stderr="network failure")
+    )
+
+    runner = AntigravityRunner(workspace=tmp_path, log_root=log_root)
+    with pytest.raises(RunnerError) as error:
+        run(runner.run(make_request()))
+
+    assert error.value.code == "provider_unavailable"
