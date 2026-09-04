@@ -194,7 +194,7 @@ it("keeps exact catalogue and quick estimate submissions unchanged", async () =>
 
 it("uploads laboratory metadata and can delete an owned document", async () => {
   const user = userEvent.setup();
-  const document = { id: "lab-1", original_filename: "cbc.pdf", content_type: "application/pdf", byte_size: 10, test_date: today, laboratory_name: "Lab", user_note: null, category: "CBC", review_status: "uploaded", review_notes: null, uploaded_at: `${today}T12:00:00Z` };
+  const document = { id: "lab-1", original_filename: "cbc.pdf", content_type: "application/pdf", byte_size: 10, test_date: today, laboratory_name: "Lab", user_note: "Annual panel", category: "CBC", review_status: "uploaded", review_notes: null, uploaded_at: `${today}T12:00:00Z` };
   vi.mocked(api.listLabDocuments)
     .mockResolvedValueOnce([document])
     .mockResolvedValueOnce([document])
@@ -206,7 +206,16 @@ it("uploads laboratory metadata and can delete an owned document", async () => {
   expect(await screen.findByText("cbc.pdf")).toBeInTheDocument();
   await user.type(screen.getByLabelText("Laboratory name"), "Fitsho Lab");
   await user.type(screen.getByLabelText("Category"), "Blood panel");
+  await user.type(screen.getByLabelText("Note"), "Annual panel");
   await user.upload(screen.getByLabelText("Choose lab file"), new File(["pdf"], "result.pdf", { type: "application/pdf" }));
+  expect(screen.getByText("result.pdf")).toBeInTheDocument();
+  const labCard = screen.getByText("cbc.pdf").closest("article");
+  expect(labCard).not.toBeNull();
+  if (labCard) {
+    expect(within(labCard).getByText("CBC")).toBeInTheDocument();
+    expect(within(labCard).getByText("Annual panel")).toBeInTheDocument();
+    expect(within(labCard).getByText("Uploaded")).toBeInTheDocument();
+  }
   await waitFor(() => expect(api.uploadLabDocument).toHaveBeenCalledWith(expect.any(File), expect.objectContaining({ laboratoryName: "Fitsho Lab", category: "Blood panel" })));
   await user.click(screen.getByRole("button", { name: "Delete" }));
   await waitFor(() => expect(api.deleteLabDocument).toHaveBeenCalledWith("lab-1"));
