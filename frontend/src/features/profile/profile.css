@@ -204,6 +204,17 @@
   height: 1.05rem;
 }
 
+.profile-field-wrapped-label {
+  display: grid !important;
+  gap: 0.45rem;
+}
+
+.profile-field__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .profile-field input,
 .profile-field select,
 .profile-checkboxes {

@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { AppIcon } from "../../shared/AppIcon";
+import { AppIcon, type IconName } from "../../shared/AppIcon";
 import * as profileApi from "../profile/api";
 import {
   toProfileInput,
@@ -592,19 +592,29 @@ function PostAccountNutritionDetails(props: {
       <h2 className="fitsho-display">{l("اطلاعات تغذیه‌ای", "Nutrition information")}</h2>
       <form className="profile-form nutrition-details-form" onSubmit={(event) => { event.preventDefault(); props.onSave(); }}>
         <fieldset className="profile-fieldset" disabled={props.busy}>
-          <legend>{l("نیاز روزانه و وعده‌ها", "Daily needs and meals")}</legend>
-          <SelectField label={l("میزان فعالیت روزانه", "Daily activity level")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Sedentary")], ["light", l("فعالیت سبک", "Light")], ["moderate", l("فعالیت متوسط", "Moderate")], ["very_active", l("بسیار فعال", "Very active")]]} />
-          <LabeledInput label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />
-          <SelectField label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as NutritionProfileInput["budget_style"])} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />
-          <SelectField label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />
-          <SelectField label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />
-          <SelectField label={l("الگوی غذایی", "Dietary pattern")} value={props.foods.dietaryPattern} onChange={(value) => props.onFoods({ ...props.foods, dietaryPattern: value as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />
+          <legend>
+            <span className="profile-field__icon-badge" aria-hidden="true">
+              <AppIcon name="flame" />
+            </span>
+            <span>{l("نیاز روزانه و وعده‌ها", "Daily needs and meals")}</span>
+          </legend>
+          <SelectField icon="flame" label={l("میزان فعالیت روزانه", "Daily activity level")} value={props.dailyActivityLevel} onChange={(value) => props.onDailyActivityLevel(value as NutritionProfileInput["daily_activity_level"])} options={[["sedentary", l("کم‌تحرک", "Sedentary")], ["light", l("فعالیت سبک", "Light")], ["moderate", l("فعالیت متوسط", "Moderate")], ["very_active", l("بسیار فعال", "Very active")]]} />
+          <LabeledInput icon="wallet" label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />
+          <SelectField icon="target" label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as NutritionProfileInput["budget_style"])} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />
+          <SelectField icon="utensils" label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />
+          <SelectField icon="nutrition" label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />
+          <SelectField icon="catalogue" label={l("الگوی غذایی", "Dietary pattern")} value={props.foods.dietaryPattern} onChange={(value) => props.onFoods({ ...props.foods, dietaryPattern: value as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />
         </fieldset>
         <fieldset className="profile-fieldset" disabled={props.busy}>
-          <legend>{l("ترجیحات غذایی", "Food preferences")}</legend>
-          <TextArea label={l("غذاهایی که دوست داری (اختیاری)", "Foods you like (optional)")} value={props.foods.favourites} onChange={(favourites) => props.onFoods({ ...props.foods, favourites })} />
-          <TextArea label={l("غذاهایی که دوست نداری (اختیاری)", "Foods you dislike (optional)")} value={props.foods.disliked} onChange={(disliked) => props.onFoods({ ...props.foods, disliked })} />
-          <TextArea label={l("محدودیت مذهبی یا فرهنگی (اختیاری)", "Religious or cultural exclusions (optional)")} value={props.foods.cultural} onChange={(cultural) => props.onFoods({ ...props.foods, cultural })} />
+          <legend>
+            <span className="profile-field__icon-badge" aria-hidden="true">
+              <AppIcon name="heart" />
+            </span>
+            <span>{l("ترجیحات غذایی", "Food preferences")}</span>
+          </legend>
+          <TextArea icon="heart" label={l("غذاهایی که دوست داری (اختیاری)", "Foods you like (optional)")} value={props.foods.favourites} onChange={(favourites) => props.onFoods({ ...props.foods, favourites })} />
+          <TextArea icon="shield" label={l("غذاهایی که دوست نداری (اختیاری)", "Foods you dislike (optional)")} value={props.foods.disliked} onChange={(disliked) => props.onFoods({ ...props.foods, disliked })} />
+          <TextArea icon="document" label={l("محدودیت مذهبی یا فرهنگی (اختیاری)", "Religious or cultural exclusions (optional)")} value={props.foods.cultural} onChange={(cultural) => props.onFoods({ ...props.foods, cultural })} />
         </fieldset>
         {props.saveError && <p className="form-error" role="alert">{l("تغییرات ذخیره نشد.", "Changes were not saved.")}</p>}
         {props.saved && <p className="profile-save-message profile-save-message--success" role="status">{l("اطلاعات تغذیه‌ای ذخیره شد.", "Nutrition information was saved.")}</p>}
@@ -923,16 +933,101 @@ type FoodsState = {
   checkIn: boolean; checkInTime: string;
 };
 
-function LabeledInput(props: { label: string; value: string; onChange: (value: string) => void; type?: string; min?: string; max?: string; required?: boolean; inputMode?: "numeric" | "decimal" | "text" }) {
-  return <div className="profile-field"><label>{props.label}<input type={props.type ?? "text"} inputMode={props.inputMode} min={props.min} max={props.max} required={props.required} value={props.value} onChange={(event) => props.onChange(event.target.value)} /></label></div>;
+function LabeledInput(props: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  min?: string;
+  max?: string;
+  required?: boolean;
+  inputMode?: "numeric" | "decimal" | "text";
+  icon?: IconName;
+}) {
+  return (
+    <div className="profile-field">
+      <label className="profile-field-wrapped-label">
+        <span className="profile-field__title">
+          {props.icon && (
+            <span className="profile-field__icon-badge" aria-hidden="true">
+              <AppIcon name={props.icon} />
+            </span>
+          )}
+          <span>{props.label}</span>
+        </span>
+        <input
+          type={props.type ?? "text"}
+          inputMode={props.inputMode}
+          min={props.min}
+          max={props.max}
+          required={props.required}
+          value={props.value}
+          onChange={(event) => props.onChange(event.target.value)}
+        />
+      </label>
+    </div>
+  );
 }
 
-function TextArea(props: { label: string; value: string; onChange: (value: string) => void }) {
-  return <div className="profile-field nutrition-question__field"><label>{props.label}<textarea className="nutrition-question__textarea" dir="auto" value={props.value} onChange={(event) => props.onChange(event.target.value)} /></label></div>;
+function TextArea(props: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  icon?: IconName;
+}) {
+  return (
+    <div className="profile-field nutrition-question__field">
+      <label className="profile-field-wrapped-label">
+        <span className="profile-field__title">
+          {props.icon && (
+            <span className="profile-field__icon-badge" aria-hidden="true">
+              <AppIcon name={props.icon} />
+            </span>
+          )}
+          <span>{props.label}</span>
+        </span>
+        <textarea
+          className="nutrition-question__textarea"
+          dir="auto"
+          value={props.value}
+          onChange={(event) => props.onChange(event.target.value)}
+        />
+      </label>
+    </div>
+  );
 }
 
-function SelectField(props: { label: string; value: string; options: Array<[string, string]>; onChange: (value: string) => void }) {
-  return <div className="profile-field"><label>{props.label}<select value={props.value} onChange={(event) => props.onChange(event.target.value)}>{props.options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>;
+function SelectField(props: {
+  label: string;
+  value: string;
+  options: Array<[string, string]>;
+  onChange: (value: string) => void;
+  icon?: IconName;
+}) {
+  return (
+    <div className="profile-field">
+      <label className="profile-field-wrapped-label">
+        <span className="profile-field__title">
+          {props.icon && (
+            <span className="profile-field__icon-badge" aria-hidden="true">
+              <AppIcon name={props.icon} />
+            </span>
+          )}
+          <span>{props.label}</span>
+        </span>
+        <select
+          value={props.value}
+          onChange={(event) => props.onChange(event.target.value)}
+        >
+          {props.options.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
 }
 
 function Actions({

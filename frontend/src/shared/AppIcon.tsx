@@ -6,7 +6,8 @@ export type IconName =
   | "body" | "target" | "language" | "logout" | "chevron"
   | "document" | "feedback" | "lock"
   | "calendar" | "scale" | "ruler" | "gender" | "flame"
-  | "award" | "clock" | "zap" | "shield" | "sparkles";
+  | "award" | "clock" | "zap" | "shield" | "sparkles"
+  | "wallet" | "utensils" | "heart";
 
 type Props = {
   name: IconName;
@@ -43,6 +44,9 @@ export function AppIcon({ name, className }: Props) {
     zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
     shield: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></>,
     sparkles: <><path d="m12 3-1.9 4.1L6 9l4.1 1.9L12 15l1.9-4.1L18 9l-4.1-1.9zM19 16l-.9 1.9L16 19l2.1.9.9 2.1.9-2.1L22 19l-2.1-.9z"/></>,
+    wallet: <><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><circle cx="16.5" cy="14.5" r="1"/></>,
+    utensils: <><path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2M15 2v20M5 2v7a3 3 0 0 0 3 3v10M2 2h6"/></>,
+    heart: <><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></>,
   };
 
   return (
