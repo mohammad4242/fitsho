@@ -327,6 +327,29 @@ describe("BrowserBodyPhotoProcessor", () => {
     );
     expect(decoded.dispose).toHaveBeenCalledOnce();
   });
+
+  it("passes custom ghostScale and sideProfile options to validator", async () => {
+    const { processor } = setup({ viewShape: "side" });
+    const result = await processor.process(inputFile(), "side", {
+      ghostScale: 0.9,
+      sideProfile: "left",
+    });
+
+    expect(result.validation.expectedView).toBe("side");
+    expect(result.validation.score).toBeGreaterThan(0.7);
+  });
+
+  it("includes warnings in validation output for borderline-but-acceptable images", async () => {
+    const { processor } = setup({
+      mutate: (value) => {
+        // borderline foot landmark near edge
+        value[31]!.y = 1.001;
+      },
+    });
+
+    const result = await processor.process(inputFile(), "front");
+    expect(result.validation.warnings).toContain("near_boundary_landmarks");
+  });
 });
 
 describe("compositeBodyOnNeutralBackground", () => {

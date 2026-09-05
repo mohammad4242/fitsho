@@ -85,7 +85,6 @@ const LANDMARK_INDICES = {
   rightFoot: 32,
 } as const;
 
-const SEVERE_FRAME_LIMIT = 0.12;
 const MIN_LANDMARK_VISIBILITY = 0.35;
 const HIGH_LANDMARK_VISIBILITY = 0.60;
 
@@ -141,12 +140,8 @@ export function validatePoseWithGhost(
     return failResult("torso_not_visible", ["body_out_of_frame"], geometry, primaryPose);
   }
 
-  // Lower body completion
-  const lowerBodyPresent = (maxKneeVis >= MIN_LANDMARK_VISIBILITY ? 1 : 0)
-    + (maxAnkleVis >= MIN_LANDMARK_VISIBILITY ? 1 : 0)
-    + (maxFootVis >= MIN_LANDMARK_VISIBILITY ? 1 : 0);
-
-  if (lowerBodyPresent === 0) {
+  // Both knees missing or both feet missing means legs/feet not visible
+  if (maxKneeVis < MIN_LANDMARK_VISIBILITY || maxFootVis < MIN_LANDMARK_VISIBILITY) {
     return failResult("legs_or_feet_not_visible", ["body_out_of_frame"], geometry, primaryPose);
   }
 
@@ -176,7 +171,14 @@ export function validatePoseWithGhost(
       maxOverflow = overflow;
     }
 
-    if (overflow > SEVERE_FRAME_LIMIT) {
+    // Upper body (torso/shoulders) has tighter edge tolerance than feet/ankles
+    const isCoreLandmark = idx === LANDMARK_INDICES.leftShoulder
+      || idx === LANDMARK_INDICES.rightShoulder
+      || idx === LANDMARK_INDICES.leftHip
+      || idx === LANDMARK_INDICES.rightHip;
+    const overflowLimit = isCoreLandmark ? 0.015 : 0.035;
+
+    if (overflow > overflowLimit) {
       severeOutOfFrame = true;
     } else if (overflow > 0) {
       // Within epsilon tolerance margin (e.g. 1.001)
@@ -213,19 +215,34 @@ export function validatePoseWithGhost(
   }
 
   // View consistency
-  const shoulderSpan = Math.abs(
-    (primaryPose[LANDMARK_INDICES.leftShoulder]?.x ?? 0) - (primaryPose[LANDMARK_INDICES.rightShoulder]?.x ?? 0),
-  );
-  const hipSpan = Math.abs(
-    (primaryPose[LANDMARK_INDICES.leftHip]?.x ?? 0) - (primaryPose[LANDMARK_INDICES.rightHip]?.x ?? 0),
-  );
+  const leftShoulderVis = primaryPose[LANDMARK_INDICES.leftShoulder]?.visibility ?? 0;
+  const rightShoulderVis = primaryPose[LANDMARK_INDICES.rightShoulder]?.visibility ?? 0;
+  const leftHipVis = primaryPose[LANDMARK_INDICES.leftHip]?.visibility ?? 0;
+  const rightHipVis = primaryPose[LANDMARK_INDICES.rightHip]?.visibility ?? 0;
 
-  let viewAssessment: "matched" | "ambiguous" = "matched";
+  const bothShouldersVisible = leftShoulderVis >= MIN_LANDMARK_VISIBILITY && rightShoulderVis >= MIN_LANDMARK_VISIBILITY;
+  const bothHipsVisible = leftHipVis >= MIN_LANDMARK_VISIBILITY && rightHipVis >= MIN_LANDMARK_VISIBILITY;
+
+  const shoulderSpan = bothShouldersVisible
+    ? Math.abs(
+        (primaryPose[LANDMARK_INDICES.leftShoulder]?.x ?? 0) - (primaryPose[LANDMARK_INDICES.rightShoulder]?.x ?? 0),
+      )
+    : 0.04;
+  const hipSpan = bothHipsVisible
+    ? Math.abs(
+        (primaryPose[LANDMARK_INDICES.leftHip]?.x ?? 0) - (primaryPose[LANDMARK_INDICES.rightHip]?.x ?? 0),
+      )
+    : 0.04;
+
+  let viewAssessment: "matched" | "ambiguous" = view === "side" ? "matched" : "ambiguous";
   let viewConsistencyScore = 1.0;
 
   if (view === "side") {
-    // If requested side view, reject only if user is clearly standing front-on
-    const isObviousFront = shoulderSpan >= 0.20 * ghostScale && hipSpan >= 0.12 * ghostScale;
+    // If requested side view, reject only if user is clearly standing front-on with both sides visible
+    const isObviousFront = bothShouldersVisible
+      && bothHipsVisible
+      && shoulderSpan >= 0.20 * ghostScale
+      && hipSpan >= 0.12 * ghostScale;
     if (isObviousFront) {
       warnings.push("wrong_view");
       return failResult("unexpected_body_view", warnings, geometry, primaryPose);
@@ -238,13 +255,13 @@ export function validatePoseWithGhost(
   } else {
     // Requested front or back view
     // Reject only if user is clearly standing completely sideways
-    const isObviousSide = shoulderSpan < 0.06 * ghostScale && hipSpan < 0.06 * ghostScale;
+    const isObviousSide = (!bothShouldersVisible || shoulderSpan < 0.06 * ghostScale)
+      && (!bothHipsVisible || hipSpan < 0.06 * ghostScale);
     if (isObviousSide) {
       warnings.push("wrong_view");
       return failResult("unexpected_body_view", warnings, geometry, primaryPose);
     }
     if (shoulderSpan < 0.12 * ghostScale) {
-      viewAssessment = "ambiguous";
       viewConsistencyScore = 0.8;
       warnings.push("view_ambiguous");
     }

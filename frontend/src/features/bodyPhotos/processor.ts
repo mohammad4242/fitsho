@@ -1,6 +1,10 @@
+import {
+  validatePoseWithGhost,
+  type GhostValidationWarning,
+} from "./ghostPoseValidator";
 import { MediaPipeBodySegmenter } from "./mediaPipeBodySegmenter";
 import { MediaPipePoseLandmarkDetector } from "./mediaPipePoseDetector";
-import type { BodyPhotoView } from "./types";
+import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 export type NormalizedBodyLandmark = {
   x: number;
@@ -33,12 +37,19 @@ export type BodyPhotoQuality = {
   minimumLandmarkVisibility: number;
 };
 
+export type ProcessBodyPhotoOptions = {
+  ghostScale?: number;
+  sideProfile?: BodyPhotoSide;
+};
+
 export type BodyPhotoValidation = {
   isValid: true;
   expectedView: BodyPhotoView;
   viewAssessment: "matched" | "ambiguous";
   quality: BodyPhotoQuality;
   visibleLandmarks: Array<"shoulders" | "arms" | "hips" | "knees" | "ankles" | "feet">;
+  warnings?: GhostValidationWarning[];
+  score?: number;
 };
 
 export type ProcessedBodyPhoto = {
@@ -48,7 +59,11 @@ export type ProcessedBodyPhoto = {
 };
 
 export interface BodyPhotoProcessor {
-  process(file: File, view: BodyPhotoView): Promise<ProcessedBodyPhoto>;
+  process(
+    file: File,
+    view: BodyPhotoView,
+    options?: ProcessBodyPhotoOptions,
+  ): Promise<ProcessedBodyPhoto>;
 }
 
 export type DecodedBodyPhoto = {
@@ -151,15 +166,6 @@ const bodyProtectionMinConfidence = 0.20;
 const bodyProtectionMaxConfidence = 0.70;
 const backgroundFeatherRatio = 0.0675;
 
-const landmarkGroups = {
-  shoulders: [11, 12],
-  elbows: [13, 14],
-  wrists: [15, 16],
-  hips: [23, 24],
-  knees: [25, 26],
-  ankles: [27, 28],
-  feet: [31, 32],
-} as const;
 
 export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
   private readonly detector: BodyLandmarkDetector;
@@ -176,7 +182,11 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     this.runtime = options.runtime ?? browserBodyPhotoRuntime;
   }
 
-  async process(file: File, view: BodyPhotoView): Promise<ProcessedBodyPhoto> {
+  async process(
+    file: File,
+    view: BodyPhotoView,
+    options?: ProcessBodyPhotoOptions,
+  ): Promise<ProcessedBodyPhoto> {
     if (!acceptedMimeTypes.has(file.type as AcceptedImageMimeType)) {
       throw new BodyPhotoProcessingError("unsupported_format");
     }
@@ -190,7 +200,7 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
       const quality = this.runtime.measureQuality(image);
       validateQuality(quality);
       const detection = await this.detect(image);
-      const pose = validateLandmarks(detection, view);
+      const pose = validateLandmarks(detection, view, options);
       const mask = await this.segment(image);
       const encoded = await this.runtime.normalizeBackground(image, mask, {
         targetWidth: Math.min(limits.targetWidth, image.width),
@@ -218,6 +228,8 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
             minimumLandmarkVisibility: pose.minimumVisibility,
           },
           visibleLandmarks: pose.visibleLandmarks,
+          warnings: pose.warnings,
+          score: pose.score,
         },
       };
     } finally {
@@ -256,240 +268,33 @@ type ValidatedPose = {
   viewAssessment: "matched" | "ambiguous";
   minimumVisibility: number;
   visibleLandmarks: BodyPhotoValidation["visibleLandmarks"];
+  warnings: GhostValidationWarning[];
+  score: number;
 };
 
 function validateLandmarks(
   detection: BodyLandmarkDetection,
   expectedView: BodyPhotoView,
+  options?: ProcessBodyPhotoOptions,
 ): ValidatedPose {
-  const landmarks = selectPrimaryPose(detection.poses);
-  const required = requiredLandmarksForView(landmarks, expectedView);
-  if (required.some((landmark) => !insideFrame(landmark))) {
-    throw new BodyPhotoProcessingError("body_out_of_frame");
-  }
-
-  const projection = projectedView(landmarks);
-  if (
-    (expectedView === "side" && projection === "non_side")
-    || (expectedView !== "side" && projection === "side")
-  ) {
-    throw new BodyPhotoProcessingError("unexpected_body_view");
-  }
-  return {
-    viewAssessment: (
-      expectedView === "side" && projection === "side" ? "matched" : "ambiguous"
-    ),
-    minimumVisibility: clampScore(Math.min(...required.map((landmark) => landmark.visibility))),
-    visibleLandmarks: visibleLandmarksForPose(landmarks),
-  };
-}
-
-function requiredLandmarksForView(
-  landmarks: NormalizedBodyLandmark[],
-  view: BodyPhotoView,
-): NormalizedBodyLandmark[] {
-  if (view === "side") {
-    return [
-      mostVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible"),
-      mostVisible(landmarks, landmarkGroups.hips, "torso_not_visible"),
-      mostVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible"),
-      mostVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible"),
-      mostVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible"),
-    ];
-  }
-
-  if (view === "back") {
-    requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
-    requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
-    requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
-    requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
-    requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
-    return [
-      ...landmarkGroups.shoulders.map((index) => landmarks[index]!),
-      ...landmarkGroups.hips.map((index) => landmarks[index]!),
-      ...landmarkGroups.knees.map((index) => landmarks[index]!),
-      ...landmarkGroups.ankles.map((index) => landmarks[index]!),
-      ...landmarkGroups.feet.map((index) => landmarks[index]!),
-    ];
-  }
-
-  requireVisible(landmarks, landmarkGroups.shoulders, "shoulders_not_visible");
-  requireVisible(landmarks, landmarkGroups.hips, "torso_not_visible");
-  requireVisible(landmarks, landmarkGroups.knees, "legs_or_feet_not_visible");
-  requireVisible(landmarks, landmarkGroups.ankles, "legs_or_feet_not_visible");
-  requireVisible(landmarks, landmarkGroups.feet, "legs_or_feet_not_visible");
-  return [
-    ...landmarkGroups.shoulders,
-    ...landmarkGroups.hips,
-    ...landmarkGroups.knees,
-    ...landmarkGroups.ankles,
-    ...landmarkGroups.feet,
-  ].map((index) => landmarks[index]!);
-}
-
-function mostVisible(
-  landmarks: NormalizedBodyLandmark[],
-  indices: readonly number[],
-  code: BodyPhotoProcessingErrorCode,
-): NormalizedBodyLandmark {
-  const selected = indices
-    .map((index) => landmarks[index])
-    .filter((landmark): landmark is NormalizedBodyLandmark => landmark !== undefined)
-    .sort((left, right) => right.visibility - left.visibility)[0];
-  if (selected === undefined || selected.visibility < limits.minimumLandmarkVisibility) {
-    throw new BodyPhotoProcessingError(code);
-  }
-  return selected;
-}
-
-type PoseBox = {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-};
-
-type PoseCandidate = {
-  landmarks: NormalizedBodyLandmark[];
-  box: PoseBox;
-  area: number;
-  reliability: number;
-};
-
-const poseBoxIndices = [
-  ...landmarkGroups.shoulders,
-  ...landmarkGroups.elbows,
-  ...landmarkGroups.hips,
-  ...landmarkGroups.knees,
-  ...landmarkGroups.ankles,
-  ...landmarkGroups.feet,
-] as const;
-
-function selectPrimaryPose(poses: NormalizedBodyLandmark[][]): NormalizedBodyLandmark[] {
-  const candidates = poses
-    .filter((pose) => pose.length >= 33)
-    .map(toPoseCandidate)
-    .sort((left, right) => (
-      right.reliability - left.reliability || right.area - left.area
-    ));
-  const primary = candidates[0];
-  if (primary === undefined) throw new BodyPhotoProcessingError("body_not_detected");
-
-  const hasDistinctSecondary = candidates.slice(1).some((candidate) => (
-    isCrediblePose(candidate.landmarks)
-    && candidate.area >= primary.area * 0.25
-    && intersectionOverUnion(primary.box, candidate.box) < 0.6
-  ));
-  if (hasDistinctSecondary) {
-    throw new BodyPhotoProcessingError("multiple_people_detected");
-  }
-  return primary.landmarks;
-}
-
-function toPoseCandidate(landmarks: NormalizedBodyLandmark[]): PoseCandidate {
-  const box = poseBox(landmarks);
-  return {
-    landmarks,
-    box,
-    area: boxArea(box),
-    reliability: Object.values(landmarkGroups)
-      .reduce((score, indices) => score + maximumVisibility(landmarks, indices), 0),
-  };
-}
-
-function isCrediblePose(landmarks: NormalizedBodyLandmark[]): boolean {
-  const visible = (indices: readonly number[]) => (
-    maximumVisibility(landmarks, indices) >= limits.minimumLandmarkVisibility
-  );
-  const visibleLowerGroups = [landmarkGroups.knees, landmarkGroups.ankles, landmarkGroups.feet]
-    .filter(visible).length;
-  return visible(landmarkGroups.shoulders)
-    && visible(landmarkGroups.hips)
-    && visibleLowerGroups >= 2;
-}
-
-function maximumVisibility(
-  landmarks: NormalizedBodyLandmark[],
-  indices: readonly number[],
-): number {
-  return Math.max(...indices.map((index) => landmarks[index]?.visibility ?? 0));
-}
-
-function poseBox(landmarks: NormalizedBodyLandmark[]): PoseBox {
-  const visible = poseBoxIndices
-    .map((index) => landmarks[index])
-    .filter((landmark): landmark is NormalizedBodyLandmark => (
-      landmark !== undefined && landmark.visibility >= 0.2
-    ));
-  if (visible.length === 0) return { left: 0, top: 0, right: 0, bottom: 0 };
-  return {
-    left: Math.min(...visible.map((landmark) => landmark.x)),
-    top: Math.min(...visible.map((landmark) => landmark.y)),
-    right: Math.max(...visible.map((landmark) => landmark.x)),
-    bottom: Math.max(...visible.map((landmark) => landmark.y)),
-  };
-}
-
-function boxArea(box: PoseBox): number {
-  return Math.max(0, box.right - box.left) * Math.max(0, box.bottom - box.top);
-}
-
-function intersectionOverUnion(left: PoseBox, right: PoseBox): number {
-  const intersection = boxArea({
-    left: Math.max(left.left, right.left),
-    top: Math.max(left.top, right.top),
-    right: Math.min(left.right, right.right),
-    bottom: Math.min(left.bottom, right.bottom),
+  const result = validatePoseWithGhost({
+    view: expectedView,
+    sideProfile: options?.sideProfile,
+    ghostScale: options?.ghostScale,
+    poses: detection.poses,
   });
-  const union = boxArea(left) + boxArea(right) - intersection;
-  return union <= 0 ? 0 : intersection / union;
-}
 
-function requireVisible(
-  landmarks: NormalizedBodyLandmark[],
-  indices: readonly number[],
-  code: BodyPhotoProcessingErrorCode,
-) {
-  if (indices.some((index) => (landmarks[index]?.visibility ?? 0) < limits.minimumLandmarkVisibility)) {
-    throw new BodyPhotoProcessingError(code);
+  if (result.status === "fail" && result.hardRejectCode) {
+    throw new BodyPhotoProcessingError(result.hardRejectCode);
   }
-}
 
-function insideFrame(landmark: NormalizedBodyLandmark): boolean {
-  return landmark.x >= limits.frameMargin
-    && landmark.x <= 1 - limits.frameMargin
-    && landmark.y >= limits.frameMargin
-    && landmark.y <= 1 - limits.frameMargin;
-}
-
-function visibleLandmarksForPose(
-  landmarks: NormalizedBodyLandmark[],
-): BodyPhotoValidation["visibleLandmarks"] {
-  const groups = [
-    ["shoulders", landmarkGroups.shoulders],
-    ["arms", [...landmarkGroups.elbows, ...landmarkGroups.wrists]],
-    ["hips", landmarkGroups.hips],
-    ["knees", landmarkGroups.knees],
-    ["ankles", landmarkGroups.ankles],
-    ["feet", landmarkGroups.feet],
-  ] as const;
-  return groups
-    .filter(([, indices]) => maximumVisibility(landmarks, indices) >= limits.minimumLandmarkVisibility)
-    .map(([name]) => name);
-}
-
-function projectedView(landmarks: NormalizedBodyLandmark[]): "side" | "non_side" | "ambiguous" {
-  if (
-    [...landmarkGroups.shoulders, ...landmarkGroups.hips]
-      .some((index) => (landmarks[index]?.visibility ?? 0) < limits.minimumLandmarkVisibility)
-  ) {
-    return "ambiguous";
-  }
-  const shoulderSpan = Math.abs(landmarks[11]!.x - landmarks[12]!.x);
-  const hipSpan = Math.abs(landmarks[23]!.x - landmarks[24]!.x);
-  if (shoulderSpan <= 0.08 && hipSpan <= 0.08) return "side";
-  if (shoulderSpan >= 0.16 && hipSpan >= 0.12) return "non_side";
-  return "ambiguous";
+  return {
+    viewAssessment: result.viewAssessment,
+    minimumVisibility: result.minimumVisibility,
+    visibleLandmarks: result.visibleLandmarks,
+    warnings: result.warnings,
+    score: result.overallScore,
+  };
 }
 
 function validateDecodedImage(image: DecodedBodyPhoto, declaredMimeType: AcceptedImageMimeType) {
