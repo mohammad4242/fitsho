@@ -349,3 +349,57 @@ it("shows warning when target weight change rate is above 1.0 kg/week", async ()
   expect(screen.getByText("نرخ بالای ۱.۰ کیلوگرم در هفته پیشنهاد نمی‌شود.")).toBeInTheDocument();
 });
 
+it("advances to account creation when selecting omnivore on the last pre-account question", async () => {
+  const user = userEvent.setup();
+  const onDraftComplete = vi.fn();
+  render(
+    <NutritionOnboardingFlow
+      productMode="nutrition"
+      draftMode
+      onCreateTrainingProfile={vi.fn()}
+      onComplete={vi.fn()}
+      onDraftComplete={onDraftComplete}
+    />,
+  );
+
+  await screen.findByRole("heading", { name: "دوست داری چه صدایت کنیم؟" });
+  await completeSharedQuestions(user);
+
+  expect(await screen.findByRole("heading", { name: "در حال حاضر تمرین منظم داری؟" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "تمرین نمی‌کنم" }));
+
+  // Q0: Medical conditions
+  expect(await screen.findByRole("heading", { name: "آیا شرایط پزشکی مشخصی داری؟" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  // Q1: Daily activity level
+  expect(await screen.findByRole("heading", { name: "میزان فعالیت روزانه‌ات چقدر است؟" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /کم‌تحرک/ }));
+
+  // Q2: Monthly food budget
+  expect(await screen.findByRole("heading", { name: "بودجه ماهانه غذای تو چقدر است؟" })).toBeInTheDocument();
+  await user.type(screen.getByLabelText("بودجه ماهانه غذا (تومان)"), "5000000");
+  await user.click(screen.getByRole("button", { name: "ادامه" }));
+
+  // Q3: Food style / dietary pattern
+  expect(await screen.findByRole("heading", { name: "چه سبک غذایی را ترجیح می‌دهی؟" })).toBeInTheDocument();
+  const omnivoreButton = screen.getByRole("button", { name: /همه‌چیزخوار/ });
+  expect(omnivoreButton).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "ادامه و ساخت حساب" })).toBeInTheDocument();
+
+  // Click omnivore choice card to advance
+  await user.click(omnivoreButton);
+
+  await waitFor(() => {
+    expect(onDraftComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nutritionBasics: expect.objectContaining({
+          dietary_pattern: "omnivore",
+          individual_monthly_food_budget_irr: 50_000_000,
+          daily_activity_level: "sedentary",
+        }),
+      }),
+    );
+  });
+});
+

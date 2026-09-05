@@ -978,7 +978,7 @@ function PreAccountNutritionQuestions(props: {
     else setQuestion((current) => current - 1);
   };
 
-  const showContinue = question === 0 || question === 2;
+  const showContinue = question === 0 || question === 2 || question === 3;
 
   return (
     <NutritionQuestionFrame
@@ -1051,24 +1051,38 @@ function PreAccountNutritionQuestions(props: {
         />
       )}
       {question === 3 && (
-        <SelectField
-          label={l("سبک غذا", "Food style")}
-          value={props.foods.dietaryPattern}
-          onChange={(dietaryPattern) => {
-            selectAndAdvance(
-              () => props.onFoods({
-                ...props.foods,
-                dietaryPattern: dietaryPattern as FoodsState["dietaryPattern"],
-              }),
-              () => advance(),
-            );
-          }}
-          options={[
-            ["omnivore", l("همه‌چیزخوار", "Omnivore")],
-            ["vegetarian", l("گیاه‌خوار (به‌زودی)", "Vegetarian (Coming soon)"), true],
-            ["vegan", l("وگان (به‌زودی)", "Vegan (Coming soon)"), true],
-          ]}
-        />
+        <div className="guided-choice-grid guided-choice-grid--dietary">
+          {([
+            ["omnivore", l("همه‌چیزخوار", "Omnivore"), l("انواع مواد غذایی شامل گوشت، مرغ، ماهی، لبنیات و گیاهی", "All food types including meat, poultry, fish, dairy, and plants"), "utensils", false],
+            ["vegetarian", l("گیاه‌خوار (به‌زودی)", "Vegetarian (Coming soon)"), l("بدون گوشت، شامل لبنیات و تخم‌مرغ", "No meat, includes dairy and eggs"), "sparkles", true],
+            ["vegan", l("وگان (به‌زودی)", "Vegan (Coming soon)"), l("کاملاً گیاهی، بدون فرآورده‌های حیوانی", "Completely plant-based, no animal products"), "sparkles", true],
+          ] as const).map(([value, label, desc, icon, disabled]) => (
+            <button
+              key={value}
+              type="button"
+              disabled={disabled}
+              className={`guided-choice-card ${props.foods.dietaryPattern === value ? "is-selected" : ""} ${disabled ? "is-disabled" : ""}`}
+              onClick={() => {
+                if (disabled) return;
+                selectAndAdvance(
+                  () => props.onFoods({
+                    ...props.foods,
+                    dietaryPattern: value as FoodsState["dietaryPattern"],
+                  }),
+                  () => advance(),
+                );
+              }}
+            >
+              <span className="guided-choice-card__icon" aria-hidden="true">
+                <AppIcon name={icon as IconName} />
+              </span>
+              <span className="guided-choice-card__content">
+                <strong className="guided-choice-card__label">{label}</strong>
+                <small className="guided-choice-card__hint">{desc}</small>
+              </span>
+            </button>
+          ))}
+        </div>
       )}
     </NutritionQuestionFrame>
   );

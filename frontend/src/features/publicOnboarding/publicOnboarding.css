@@ -167,6 +167,15 @@
   color: #ffffff;
 }
 
+.guided-choice-grid button:disabled,
+.guided-choice-card:disabled,
+.guided-choice-card.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  filter: grayscale(0.6);
+}
+
 /* Sex Grid Choice Cards */
 .guided-choice-grid--sex {
   width: min(100%, 36rem);
