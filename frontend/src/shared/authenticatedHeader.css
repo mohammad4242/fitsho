@@ -43,6 +43,11 @@
   font: inherit;
   font-size: 1.2rem;
   cursor: pointer;
+  transition: border-color var(--fitsho-duration-fast) var(--fitsho-ease), transform var(--fitsho-duration-fast) var(--fitsho-ease);
+}
+
+.member-menu-button:hover {
+  transform: translateY(-1px);
 }
 
 .member-menu {
@@ -54,11 +59,12 @@
   display: grid;
   gap: 0.8rem;
   padding: 0.8rem;
-  border: 1px solid rgb(255 255 255 / 28%);
-  border-radius: 1rem;
-  background: rgb(7 34 33 / 94%);
-  box-shadow: 0 1.25rem 3rem rgb(0 0 0 / 30%);
-  backdrop-filter: blur(18px);
+  border: 1px solid var(--fitsho-line-strong);
+  border-radius: var(--fitsho-radius-lg);
+  background: rgb(6 22 21 / 96%);
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%), 0 0 0 1px rgb(255 255 255 / 5%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .member-menu__group {
@@ -69,7 +75,7 @@
 
 .member-menu__group + .member-menu__group {
   padding-block-start: 0.8rem;
-  border-block-start: 1px solid rgb(255 255 255 / 14%);
+  border-block-start: 1px solid rgb(255 255 255 / 8%);
 }
 
 .member-menu a,
@@ -82,14 +88,15 @@
   gap: 0.75rem;
   padding: 0.6rem 0.8rem;
   border: 1px solid transparent;
-  border-radius: 0.65rem;
+  border-radius: var(--fitsho-radius-md);
   color: var(--paper);
   background: rgb(255 255 255 / 4%);
   font: inherit;
-  font-size: 0.9rem;
-  font-weight: 750;
+  font-size: 0.88rem;
+  font-weight: 700;
   text-align: start;
   text-decoration: none;
+  transition: background var(--fitsho-duration-fast) var(--fitsho-ease), color var(--fitsho-duration-fast) var(--fitsho-ease), border-color var(--fitsho-duration-fast) var(--fitsho-ease);
 }
 
 .member-menu a:hover,
@@ -97,11 +104,13 @@
 .member-menu button:not(:disabled):hover,
 .member-menu button:not(:disabled):focus-visible {
   outline: none;
-  background: rgb(255 255 255 / 12%);
+  border-color: rgb(80 223 206 / 20%);
+  background: rgb(80 223 206 / 10%);
+  color: var(--fitsho-aqua);
 }
 
 .member-menu button:disabled {
-  color: rgb(255 255 255 / 50%);
+  color: rgb(255 255 255 / 45%);
   cursor: not-allowed;
 }
 

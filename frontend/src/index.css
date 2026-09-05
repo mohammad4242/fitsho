@@ -1213,24 +1213,52 @@ html[dir="ltr"] .primary-button span:last-child {
   width: min(100% - 2rem, var(--fitsho-content-max));
   max-width: none;
   margin-inline: auto;
-  padding-block: 1rem;
+  padding-block: 0.9rem;
   border-bottom: 1px solid var(--fitsho-line);
 }
 
 .fitsho-page .dashboard-header .brand-mark--dark { color: var(--fitsho-ink); }
-.fitsho-page .authenticated-nav a { color: var(--fitsho-muted); }
-.fitsho-page .authenticated-nav a[aria-current="page"] { color: var(--fitsho-aqua); }
+.fitsho-page .authenticated-nav {
+  border: 1px solid var(--fitsho-line);
+  background: rgb(255 255 255 / 3%);
+  backdrop-filter: blur(12px);
+}
+.fitsho-page .authenticated-nav a {
+  color: var(--fitsho-muted);
+  transition: color var(--fitsho-duration-fast) var(--fitsho-ease), background var(--fitsho-duration-fast) var(--fitsho-ease);
+}
+.fitsho-page .authenticated-nav a:hover {
+  color: var(--fitsho-ink);
+  background: rgb(255 255 255 / 6%);
+}
+.fitsho-page .authenticated-nav a[aria-current="page"] {
+  color: var(--fitsho-canvas);
+  background: var(--fitsho-aqua);
+  box-shadow: 0 2px 8px rgb(80 223 206 / 25%);
+}
 .fitsho-page .dashboard-header .language-switcher,
 .fitsho-page .dashboard-header .logout-button {
   border-color: var(--fitsho-line);
   color: var(--fitsho-ink);
   background: var(--fitsho-surface);
+  transition: border-color var(--fitsho-duration-fast) var(--fitsho-ease), background var(--fitsho-duration-fast) var(--fitsho-ease), transform var(--fitsho-duration-fast) var(--fitsho-ease);
+}
+.fitsho-page .dashboard-header .language-switcher:hover,
+.fitsho-page .dashboard-header .logout-button:hover {
+  border-color: var(--fitsho-line-strong);
+  background: var(--fitsho-surface-raised);
+  transform: translateY(-1px);
 }
 
 .fitsho-page .member-menu-button {
   border-color: var(--fitsho-line);
   color: var(--fitsho-ink);
   background: var(--fitsho-surface);
+  transition: border-color var(--fitsho-duration-fast) var(--fitsho-ease), transform var(--fitsho-duration-fast) var(--fitsho-ease);
+}
+.fitsho-page .member-menu-button:hover {
+  border-color: var(--fitsho-line-strong);
+  transform: translateY(-1px);
 }
 
 .fitsho-page .member-menu {
@@ -1360,19 +1388,21 @@ html[dir="ltr"] .primary-button span:last-child {
     height: auto;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(3.5rem, 1fr));
-    gap: 0.15rem;
-    padding: 0.45rem max(0.35rem, env(safe-area-inset-right)) calc(0.45rem + env(safe-area-inset-bottom)) max(0.35rem, env(safe-area-inset-left));
+    gap: 0.2rem;
+    padding: 0.45rem max(0.4rem, env(safe-area-inset-right)) calc(0.5rem + env(safe-area-inset-bottom)) max(0.4rem, env(safe-area-inset-left));
     border: 0;
-    border-block-start: 1px solid var(--fitsho-line-strong);
-    background: rgb(2 11 12 / 96%);
-    box-shadow: 0 -0.8rem 2.4rem rgb(0 0 0 / 28%);
-    backdrop-filter: blur(18px);
+    border-block-start: 1px solid rgb(255 255 255 / 8%);
+    background: rgb(2 11 12 / 92%);
+    box-shadow: 0 -0.8rem 2.4rem rgb(0 0 0 / 36%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
 
   .app-shell__nav-link {
     min-height: 3.55rem;
     gap: 0.2rem;
-    border-radius: 0.7rem;
+    border-radius: var(--fitsho-radius-md);
+    transition: color var(--fitsho-duration-fast) var(--fitsho-ease), background var(--fitsho-duration-fast) var(--fitsho-ease), transform var(--fitsho-duration-fast) var(--fitsho-ease);
   }
 
   .app-shell__nav-link--active::before {
@@ -1380,6 +1410,7 @@ html[dir="ltr"] .primary-button span:last-child {
     width: 1.8rem;
     height: 0.18rem;
     transform: translateX(-50%);
+    box-shadow: 0 0 8px rgb(80 223 206 / 50%);
   }
 }
 
