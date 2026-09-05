@@ -33,10 +33,11 @@
 .workout-schedule__heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
 .workout-schedule__heading .eyebrow { margin: 0; color: var(--fitsho-aqua); font-size: .68rem; font-weight: 850; }
 .workout-schedule__heading h2 { margin: .15rem 0 0; font-size: 1.25rem; }
-.workout-days { display: grid; gap: .42rem; }
-.workout-day { overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-md); background: var(--fitsho-surface); }
+.workout-days { display: grid; gap: .55rem; }
+.workout-day { overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-card); }
 .workout-day--focus { border-color: var(--fitsho-line-strong); box-shadow: var(--fitsho-shadow-focus); }
-.workout-day > summary { min-height: 3.75rem; display: flex; align-items: center; gap: .65rem; padding: .55rem .7rem; cursor: pointer; list-style: none; }
+.workout-day > summary { min-height: 3.75rem; display: flex; align-items: center; gap: .65rem; padding: .65rem .85rem; cursor: pointer; list-style: none; transition: background var(--fitsho-duration-fast) var(--fitsho-ease); }
+.workout-day > summary:hover { background: var(--fitsho-surface-interactive); }
 .workout-day > summary::-webkit-details-marker { display: none; }
 .workout-day > summary::after { margin-inline-start: auto; color: var(--fitsho-muted); content: "+"; font-size: 1.2rem; }
 .workout-day[open] > summary::after { content: "−"; }
