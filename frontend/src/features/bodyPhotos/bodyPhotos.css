@@ -48,15 +48,15 @@
 .ghost-overlay__privacy-cut span { display: inline-block; margin-top: .35rem; padding: .2rem .45rem; border-radius: 999px; background: rgb(8 18 17 / 72%); font-size: .7rem; font-weight: 850; }
 .ghost-overlay__asset-frame { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; transform-origin: center; pointer-events: none; }
 .ghost-overlay__asset { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; opacity: .38; mix-blend-mode: screen; }
-.ghost-overlay__asset-frame--female.ghost-overlay__asset-frame--front .ghost-overlay__asset { transform: scale(.78) translateY(2.8%); }
-.ghost-overlay__asset-frame--female.ghost-overlay__asset-frame--side .ghost-overlay__asset { transform: scale(.83) translateY(3%); }
-.ghost-overlay__asset-frame--female.ghost-overlay__asset-frame--back .ghost-overlay__asset { transform: scale(.94) translateY(-5.5%); }
+.ghost-overlay__asset-frame--female.ghost-overlay__asset-frame--front .ghost-overlay__asset { transform: scale(.78) translateY(-2.7%); }
+.ghost-overlay__asset-frame--female.ghost-overlay__asset-frame--side .ghost-overlay__asset { transform: scale(.83) translateY(-2.5%); }
+.ghost-overlay__asset-frame--female.ghost-overlay__asset-frame--back .ghost-overlay__asset { transform: scale(.94) translateY(-11%); }
 .ghost-overlay__asset-frame--male.ghost-overlay__asset-frame--front .ghost-overlay__asset,
-.ghost-overlay__asset-frame--neutral.ghost-overlay__asset-frame--front .ghost-overlay__asset { transform: scale(.87) translateY(-1.6%); }
+.ghost-overlay__asset-frame--neutral.ghost-overlay__asset-frame--front .ghost-overlay__asset { transform: scale(.87) translateY(-7.1%); }
 .ghost-overlay__asset-frame--male.ghost-overlay__asset-frame--side .ghost-overlay__asset,
-.ghost-overlay__asset-frame--neutral.ghost-overlay__asset-frame--side .ghost-overlay__asset { transform: scale(.88) translateY(-.8%); }
+.ghost-overlay__asset-frame--neutral.ghost-overlay__asset-frame--side .ghost-overlay__asset { transform: scale(.88) translateY(-6.3%); }
 .ghost-overlay__asset-frame--male.ghost-overlay__asset-frame--back .ghost-overlay__asset,
-.ghost-overlay__asset-frame--neutral.ghost-overlay__asset-frame--back .ghost-overlay__asset { transform: scale(.91) translateY(-4.8%); }
+.ghost-overlay__asset-frame--neutral.ghost-overlay__asset-frame--back .ghost-overlay__asset { transform: scale(.91) translateY(-10.3%); }
 .body-photo-wizard__heading { display: grid; gap: .65rem; }
 .body-photo-wizard h1, .body-photo-wizard h2, .body-progress-page h1 { margin: 0; }
 .body-photo-wizard p, .body-progress-page p { margin: 0; line-height: 1.7; }
