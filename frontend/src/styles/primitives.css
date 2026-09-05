@@ -13,8 +13,8 @@
 .fitsho-card {
   border: 1px solid var(--fitsho-line);
   border-radius: var(--fitsho-radius-card);
-  background: var(--fitsho-surface);
-  box-shadow: var(--fitsho-shadow-soft);
+  background: linear-gradient(180deg, rgb(255 255 255 / 2.5%) 0%, transparent 100%), var(--fitsho-surface);
+  box-shadow: var(--fitsho-shadow-card);
 }
 
 .fitsho-data-panel {
@@ -22,7 +22,8 @@
   padding: clamp(0.9rem, 2.5vw, 1.25rem);
   border: 1px solid var(--fitsho-line);
   border-radius: var(--fitsho-radius-lg);
-  background: var(--fitsho-surface-subtle);
+  background: linear-gradient(180deg, rgb(255 255 255 / 2%) 0%, transparent 100%), var(--fitsho-surface-subtle);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 15%);
 }
 
 .fitsho-metric-strip {
@@ -68,13 +69,19 @@
   transition:
     border-color var(--fitsho-duration-fast) var(--fitsho-ease),
     background var(--fitsho-duration-fast) var(--fitsho-ease),
+    box-shadow var(--fitsho-duration-fast) var(--fitsho-ease),
     transform var(--fitsho-duration-fast) var(--fitsho-ease);
 }
 
 .fitsho-card--interactive:hover {
   border-color: var(--fitsho-line-strong);
   background: var(--fitsho-surface-interactive);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+  transform: translateY(-2px);
+}
+
+.fitsho-card--interactive:active {
+  transform: translateY(0);
 }
 
 .fitsho-section-heading {
@@ -96,67 +103,93 @@
   margin: 0;
   color: var(--fitsho-aqua);
   font-size: 0.74rem;
-  font-weight: 850;
+  font-weight: 800;
   letter-spacing: 0.07em;
 }
 
 .fitsho-button,
 .fitsho-button-secondary {
-  min-height: 3.25rem;
+  min-height: 3.125rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--fitsho-space-2);
-  padding: 0.75rem 1.2rem;
+  padding: 0.7rem 1.25rem;
   border-radius: var(--fitsho-radius-pill);
   font: inherit;
-  font-weight: 850;
+  font-weight: 800;
   text-decoration: none;
   cursor: pointer;
   transition:
-    color var(--fitsho-duration-fast) ease,
-    background var(--fitsho-duration-fast) ease,
-    border-color var(--fitsho-duration-fast) ease,
-    transform var(--fitsho-duration-fast) ease;
+    color var(--fitsho-duration-fast) var(--fitsho-ease),
+    background var(--fitsho-duration-fast) var(--fitsho-ease),
+    border-color var(--fitsho-duration-fast) var(--fitsho-ease),
+    box-shadow var(--fitsho-duration-fast) var(--fitsho-ease),
+    transform var(--fitsho-duration-fast) var(--fitsho-ease);
 }
 
 .fitsho-button {
   border: 1px solid var(--fitsho-aqua);
   color: var(--fitsho-canvas);
   background: var(--fitsho-aqua);
+  box-shadow: 0 2px 10px rgb(80 223 206 / 20%);
 }
 
 .fitsho-button-secondary {
   border: 1px solid var(--fitsho-line-strong);
   color: var(--fitsho-mist);
-  background: transparent;
+  background: rgb(255 255 255 / 2%);
 }
 
-.fitsho-button:hover:not(:disabled),
-.fitsho-button-secondary:hover:not(:disabled) {
+.fitsho-button:hover:not(:disabled) {
+  background: #61e5d5;
+  border-color: #61e5d5;
+  box-shadow: 0 4px 18px rgb(80 223 206 / 32%);
   transform: translateY(-1px);
+}
+
+.fitsho-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+  box-shadow: 0 2px 6px rgb(80 223 206 / 20%);
 }
 
 .fitsho-button-secondary:hover:not(:disabled) {
   border-color: var(--fitsho-aqua);
   color: var(--fitsho-aqua);
+  background: rgb(80 223 206 / 8%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 20%);
+}
+
+.fitsho-button-secondary:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
 }
 
 .fitsho-button:disabled,
 .fitsho-button-secondary:disabled {
-  cursor: wait;
-  opacity: 0.58;
+  cursor: not-allowed;
+  opacity: 0.52;
+  transform: none;
+  box-shadow: none;
 }
 
 .fitsho-input {
   width: 100%;
-  min-height: 3.25rem;
-  padding: 0.75rem 0.9rem;
+  min-height: 3.125rem;
+  padding: 0.7rem 0.95rem;
   border: 1px solid var(--fitsho-line);
   border-radius: var(--fitsho-radius-md);
   color: var(--fitsho-mist);
-  background: var(--fitsho-surface);
+  background: linear-gradient(180deg, rgb(255 255 255 / 2.5%) 0%, transparent 100%), var(--fitsho-surface);
   font: inherit;
+  transition:
+    border-color var(--fitsho-duration-fast) var(--fitsho-ease),
+    box-shadow var(--fitsho-duration-fast) var(--fitsho-ease),
+    background var(--fitsho-duration-fast) var(--fitsho-ease);
+}
+
+.fitsho-input::placeholder {
+  color: rgb(148 171 165 / 60%);
 }
 
 .fitsho-input:hover {
@@ -165,7 +198,7 @@
 
 .fitsho-input:focus {
   border-color: var(--fitsho-aqua);
-  box-shadow: 0 0 0 4px rgb(80 223 206 / 12%);
+  box-shadow: 0 0 0 3px rgb(80 223 206 / 16%);
   outline: 0;
 }
 
@@ -174,13 +207,13 @@
   display: inline-flex;
   align-items: center;
   gap: var(--fitsho-space-2);
-  padding: 0.35rem 0.65rem;
+  padding: 0.3rem 0.65rem;
   border: 1px solid var(--fitsho-line);
   border-radius: var(--fitsho-radius-pill);
   color: var(--fitsho-muted);
-  background: rgb(255 255 255 / 3%);
+  background: rgb(255 255 255 / 4%);
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: 750;
 }
 
 .fitsho-status {

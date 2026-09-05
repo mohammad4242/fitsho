@@ -32,13 +32,14 @@ html[lang="en"] {
   font-family: Lalezar, "Vazirmatn Variable", sans-serif;
   font-weight: 400;
   letter-spacing: 0;
-  line-height: 1;
+  line-height: 1.25;
 }
 
 html[lang="en"] .fitsho-display {
   font-family: "Sora Variable", system-ui, sans-serif;
   font-weight: 800;
   letter-spacing: -0.055em;
+  line-height: 1.05;
 }
 
 * {
@@ -83,8 +84,8 @@ a {
 button:focus-visible,
 input:focus-visible,
 a:focus-visible {
-  outline: 3px solid var(--saffron);
-  outline-offset: 3px;
+  outline: 2px solid var(--fitsho-aqua);
+  outline-offset: 2px;
 }
 
 .auth-shell {
@@ -539,13 +540,19 @@ html[dir="rtl"] .next-step-card h2 {
 .primary-button:hover:not(:disabled) {
   background: var(--petrol-800);
   box-shadow: 0 1rem 2.4rem rgb(18 51 50 / 22%);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
+}
+
+.primary-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
 }
 
 .primary-button:disabled,
 .logout-button:disabled {
-  cursor: wait;
-  opacity: 0.62;
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
 }
 
 html[dir="ltr"] .primary-button span:last-child {
@@ -1182,10 +1189,18 @@ html[dir="ltr"] .primary-button span:last-child {
 .auth-shell .primary-button {
   color: var(--fitsho-canvas);
   background: var(--fitsho-aqua);
-  box-shadow: none;
+  box-shadow: 0 2px 10px rgb(80 223 206 / 20%);
 }
 
-.auth-shell .primary-button:hover:not(:disabled) { background: #68eadb; }
+.auth-shell .primary-button:hover:not(:disabled) {
+  background: #61e5d5;
+  box-shadow: 0 4px 18px rgb(80 223 206 / 32%);
+  transform: translateY(-1px);
+}
+
+.auth-shell .primary-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
 .auth-shell .form-alternative a { color: var(--fitsho-aqua); }
 .auth-shell .brand-mark--dark { color: var(--fitsho-ink); }
 

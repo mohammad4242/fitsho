@@ -13,7 +13,7 @@
   --fitsho-danger: #f67859;
   --fitsho-mist: #e8f4f1;
   --fitsho-ink: #e8f4f1;
-  --fitsho-muted: #8ca39e;
+  --fitsho-muted: #94aba5;
   --fitsho-line: rgb(232 244 241 / 12%);
   --fitsho-line-strong: rgb(80 223 206 / 28%);
   --fitsho-space-1: 0.25rem;
@@ -31,11 +31,13 @@
   --fitsho-radius-card: 1.125rem;
   --fitsho-radius-pill: 999px;
   --fitsho-shadow: 0 1.25rem 3.5rem rgb(0 0 0 / 32%);
-  --fitsho-shadow-soft: 0 0.75rem 2.5rem rgb(0 0 0 / 22%);
-  --fitsho-shadow-focus: 0 1.25rem 3.75rem rgb(0 0 0 / 24%), 0 0 0 1px rgb(80 223 206 / 5%);
+  --fitsho-shadow-soft: 0 0.5rem 2rem rgb(0 0 0 / 22%);
+  --fitsho-shadow-card: 0 4px 20px rgb(0 0 0 / 25%), 0 1px 2px rgb(0 0 0 / 18%);
+  --fitsho-shadow-focus: 0 1.25rem 3.75rem rgb(0 0 0 / 24%), 0 0 0 1px rgb(80 223 206 / 12%);
+  --fitsho-shadow-glow: 0 4px 18px rgb(80 223 206 / 24%);
   --fitsho-duration-fast: 160ms;
-  --fitsho-duration-medium: 280ms;
-  --fitsho-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fitsho-duration-medium: 260ms;
+  --fitsho-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --fitsho-content: 82rem;
   --fitsho-content-max: 82rem;
   --fitsho-reading: 68rem;
