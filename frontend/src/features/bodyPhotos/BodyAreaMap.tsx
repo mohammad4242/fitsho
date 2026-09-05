@@ -131,6 +131,16 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
               viewBox={BODY_MAP_VIEWBOX}
             >
               <defs>
+                <filter id={`${selectedVisualMaskId}-tint`} colorInterpolationFilters="sRGB" x="0" y="0" width="100%" height="100%">
+                  {/* Convert grayscale image to turquoise (#50DFC E ≈ r=80 g=223 b=206, normalized: 0.31 0.87 0.81) */}
+                  <feColorMatrix
+                    type="matrix"
+                    values="0 0 0 0 0.31
+                            0 0 0 0 0.87
+                            0 0 0 0 0.81
+                            0 0 0 0.78 0"
+                  />
+                </filter>
                 <clipPath clipPathUnits="userSpaceOnUse" id={selectedVisualMaskId}>
                   {selectedVisualMask.paths.map((path, index) => (
                     <path
@@ -144,6 +154,7 @@ export function BodyAreaMap({ sex, regions }: { sex: BodyMapSex; regions: BodyAn
               <image
                 className="body-area-map__visual-artwork"
                 clipPath={`url(#${selectedVisualMaskId})`}
+                filter={`url(#${selectedVisualMaskId}-tint)`}
                 href={bodyMapArtwork(sex, view)}
                 height={BODY_MAP_HEIGHT}
                 preserveAspectRatio="none"
