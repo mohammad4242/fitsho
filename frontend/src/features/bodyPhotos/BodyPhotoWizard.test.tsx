@@ -491,3 +491,22 @@ it("releases a late preview when processing resolves after the wizard unmounts",
 
   await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:late-preview"));
 });
+
+it("shows non-blocking soft warnings when validation passes with warnings", async () => {
+  const user = userEvent.setup();
+  const photoWithWarnings: ProcessedBodyPhoto = {
+    ...processed("front"),
+    validation: {
+      ...processed("front").validation,
+      warnings: ["near_boundary_landmarks", "minor_landmark_weakness"],
+    },
+  };
+  renderWizard({ process: vi.fn().mockResolvedValue(photoWithWarnings) });
+  await uploadPhoto(user, "front");
+
+  expect(await screen.findByRole("complementary", { name: /photo suggestions/i })).toBeInTheDocument();
+  expect(screen.getByText(/feet or hands are close to the frame boundary/i)).toBeInTheDocument();
+  expect(screen.getByText(/some joints were partly obscured, but the photo is usable/i)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /retake front/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /confirm and upload front/i })).toBeInTheDocument();
+});

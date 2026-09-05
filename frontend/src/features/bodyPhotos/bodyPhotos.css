@@ -84,6 +84,9 @@
 .body-photo-quality dl div { display: flex; justify-content: space-between; gap: .5rem; }
 .body-photo-quality dt { color: var(--muted); }
 .body-photo-quality dd { margin: 0; font-weight: 800; }
+.body-photo-quality__warnings { margin-top: .4rem; padding: .5rem .75rem; border: 1px solid #e0c878; border-radius: .5rem; background: #fffbe8; color: #6b5200; font-size: .88rem; }
+.body-photo-quality__warnings-title { font-weight: 700; display: block; margin-bottom: .25rem; }
+.body-photo-quality__warnings ul { margin: 0; padding-inline-start: 1.2rem; }
 .body-photo-consent { display: flex; align-items: flex-start; gap: .6rem; line-height: 1.55; }
 .body-photo-consent input { width: 1.1rem; min-height: 1.1rem; margin-top: .2rem; }
 .body-photo-muted { color: var(--muted); font-size: .86rem; }

@@ -497,7 +497,7 @@ function HeadlessPhotoGuide() {
 
 function PhotoQualityFeedback({ photo }: { photo: ProcessedBodyPhoto }) {
   const { t } = useTranslation();
-  const { quality } = photo.validation;
+  const { quality, warnings } = photo.validation;
   return (
     <section className="body-photo-quality" aria-label={t("bodyPhotos.quality.title")}>
       <strong>{t("bodyPhotos.quality.title")}</strong>
@@ -506,6 +506,16 @@ function PhotoQualityFeedback({ photo }: { photo: ProcessedBodyPhoto }) {
         <div><dt>{t("bodyPhotos.quality.sharpness")}</dt><dd>{formatScore(quality.sharpnessScore)}</dd></div>
         <div><dt>{t("bodyPhotos.quality.landmarks")}</dt><dd>{formatScore(quality.minimumLandmarkVisibility)}</dd></div>
       </dl>
+      {warnings && warnings.length > 0 && (
+        <aside className="body-photo-quality__warnings" aria-label={t("bodyPhotos.validationWarnings.title")}>
+          <strong className="body-photo-quality__warnings-title">{t("bodyPhotos.validationWarnings.title")}</strong>
+          <ul>
+            {warnings.map((warning) => (
+              <li key={warning}>{t(`bodyPhotos.validationWarnings.${warning}`)}</li>
+            ))}
+          </ul>
+        </aside>
+      )}
     </section>
   );
 }

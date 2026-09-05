@@ -1342,6 +1342,18 @@ const en = {
         sharpness: "Sharpness",
         landmarks: "Landmark visibility",
       },
+      validationWarnings: {
+        title: "Photo suggestions",
+        near_boundary_landmarks: "Feet or hands are close to the frame boundary.",
+        minor_landmark_weakness: "Some joints were partly obscured, but the photo is usable.",
+        view_ambiguous: "Angle is slightly off a pure requested view.",
+        too_close: "Body is close to the frame edge.",
+        too_far: "Body is positioned further back in the frame.",
+        body_out_of_frame: "Part of the body is close to the edge of the guide.",
+        wrong_view: "Body angle could match the requested view more closely.",
+        person_missing: "No full body detected.",
+        multiple_people: "Keep only one person in frame.",
+      },
       status: { draft: "Draft", awaiting_consent: "Awaiting consent", uploading: "Uploading", uploaded: "Uploaded", queued: "Queued for analysis", validating: "Checking photos", analyzing: "Analyzing visible body development", review_pending: "Waiting for specialist review", completed: "Analysis completed", failed: "Analysis failed — retry available", deleted: "Deleted" },
       results: {
         title: "Body analysis",
