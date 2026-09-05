@@ -965,33 +965,60 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 .body-analysis-requirements .profile-field--paired,
 .body-analysis-requirements .profile-field--measurements {
   display: grid;
-  gap: .75rem;
+  gap: .55rem;
 }
 
 .body-analysis-requirements .profile-field--paired { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .body-analysis-requirements .profile-field--measurements { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.body-analysis-requirements .profile-field label { color: var(--fitsho-muted); font-size: .76rem; font-weight: 800; line-height: 1.4; }
+.body-analysis-requirements .profile-field label {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  color: var(--fitsho-muted);
+  font-size: .75rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.body-analysis-requirements .profile-field__icon-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 1px solid rgb(80 223 206 / 28%);
+  border-radius: .45rem;
+  color: var(--fitsho-aqua);
+  background: linear-gradient(135deg, rgb(80 223 206 / 15%), rgb(80 223 206 / 4%));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+  flex-shrink: 0;
+}
+
+.body-analysis-requirements .profile-field__icon-badge svg {
+  width: .85rem;
+  height: .85rem;
+  display: block;
+}
 
 .body-analysis-requirements .profile-field input {
   display: block;
   width: 100%;
-  min-height: 4.15rem;
-  padding: .75rem .9rem;
+  min-height: 2.85rem;
+  padding: .5rem .75rem;
   border: 1px solid var(--fitsho-line);
   border-radius: var(--fitsho-radius-md);
   color: var(--fitsho-ink);
   background: var(--fitsho-canvas);
-  font: 850 1.35rem/1.2 inherit;
+  font: 850 1.15rem/1.2 inherit;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
   color-scheme: dark;
 }
 
 .body-analysis-requirements .measurement-input { position: relative; }
-.body-analysis-requirements .measurement-input input { padding-inline-end: 3.2rem; }
+.body-analysis-requirements .measurement-input input { padding-inline-end: 2.5rem; }
 .body-analysis-requirements .measurement-input > span {
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-end: .85rem;
+  inset-inline-end: .75rem;
   color: var(--fitsho-aqua);
   font-size: .72rem;
   font-weight: 850;
@@ -1059,11 +1086,11 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   .body-analysis-requirements { width: min(calc(100% - 1.5rem), 52rem); padding: 1rem; }
   .body-analysis-requirements__header { grid-template-columns: 1fr; align-items: start; }
   .body-analysis-requirements__status { width: 100%; }
-  .body-analysis-measurement-panel { padding: 1rem .85rem; }
+  .body-analysis-measurement-panel { padding: .85rem .75rem; gap: 1rem; }
   .body-analysis-measurement-panel__rail { inset-inline-start: .65rem; }
-  .body-analysis-requirements__group { padding-inline-start: 1.2rem; }
-  .body-analysis-requirements .profile-field--paired,
-  .body-analysis-requirements .profile-field--measurements,
+  .body-analysis-requirements__group { padding-inline-start: 1.1rem; gap: .6rem; }
+  .body-analysis-requirements .profile-field--paired { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+  .body-analysis-requirements .profile-field--measurements { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .45rem; }
   .body-analysis-requirements__actions { grid-template-columns: 1fr; }
   .body-analysis-requirements__actions > button { width: 100%; }
 }
