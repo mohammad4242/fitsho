@@ -8,7 +8,7 @@ export type IconName =
   | "calendar" | "scale" | "ruler" | "gender" | "flame"
   | "award" | "clock" | "zap" | "shield" | "sparkles"
   | "wallet" | "utensils" | "heart"
-  | "male" | "female";
+  | "male" | "female" | "refresh";
 
 type Props = {
   name: IconName;
@@ -50,6 +50,7 @@ export function AppIcon({ name, className }: Props) {
     heart: <><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></>,
     male: <><circle cx="10" cy="14" r="5"/><path d="M19 5h-5M19 5v5M19 5l-5.5 5.5"/></>,
     female: <><circle cx="12" cy="9" r="5"/><path d="M12 14v7M9 18h6"/></>,
+    refresh: <><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></>,
   };
 
   return (
