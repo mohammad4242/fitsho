@@ -422,20 +422,8 @@ def test_generation_evaluates_every_program_and_persists_only_the_best_result(
     calls = []
     results = (
         PlannerResult(
-            outcome=GenerationOutcome.SUCCESS,
-            reason_codes=("SAFE_FEASIBLE_DRAFT_GENERATED",),
-            weekly_cost_irr=Decimal("100"),
-            budget_status="within_budget",
-            nutrient_comparisons={
-                "goal_calories": NutrientComparison(
-                    preferred=Decimal("2000"),
-                    minimum_or_maximum=None,
-                    planned=Decimal("1500"),
-                    difference_from_preferred=Decimal("-500"),
-                    difference_from_limit=None,
-                    status="within_target",
-                )
-            },
+            outcome=GenerationOutcome.INFEASIBLE,
+            reason_codes=("PROGRAM_STRUCTURE_INCOMPATIBLE",),
         ),
         PlannerResult(
             outcome=GenerationOutcome.SUCCESS,
@@ -454,8 +442,20 @@ def test_generation_evaluates_every_program_and_persists_only_the_best_result(
             },
         ),
         PlannerResult(
-            outcome=GenerationOutcome.INFEASIBLE,
-            reason_codes=("STRICT_BUDGET_EXCEEDED",),
+            outcome=GenerationOutcome.SUCCESS,
+            reason_codes=("SAFE_FEASIBLE_DRAFT_GENERATED",),
+            weekly_cost_irr=Decimal("120"),
+            budget_status="within_budget",
+            nutrient_comparisons={
+                "goal_calories": NutrientComparison(
+                    preferred=Decimal("2000"),
+                    minimum_or_maximum=None,
+                    planned=Decimal("2000"),
+                    difference_from_preferred=Decimal("0"),
+                    difference_from_limit=None,
+                    status="within_target",
+                )
+            },
         ),
     )
 
@@ -472,21 +472,22 @@ def test_generation_evaluates_every_program_and_persists_only_the_best_result(
     assert response.json()["plan"]["input_snapshot"]["nutrition_program_code"] == "TEST-B"
     assert response.json()["budget_plan"]["input_snapshot"]["nutrition_program_code"] == "TEST-B"
     assert response.json()["ideal_plan"] is not None
+    assert response.json()["ideal_plan"]["input_snapshot"]["nutrition_program_code"] == "TEST-B"
     assert response.json()["comparison"] is not None
-    assert len(calls) == 6
+    assert len(calls) == 3
     assert len(db.scalars(select(NutritionWeeklyPlan)).all()) == 2
     generation = db.scalar(
         select(NutritionPlanGeneration).where(NutritionPlanGeneration.plan_role == "budget")
     )
     assert generation is not None
     trace = generation.diagnostic_snapshot["selection_trace"]
-    assert trace["proposed_candidate_count"] == 3
-    assert trace["evaluated_candidate_count"] == 3
-    assert trace["successful_candidate_count"] == 2
-    assert trace["first_valid_program_code"] == "TEST-A"
+    assert trace["proposed_candidate_count"] == 2
+    assert trace["evaluated_candidate_count"] == 2
+    assert trace["successful_candidate_count"] == 1
+    assert trace["first_valid_program_code"] == "TEST-B"
     assert trace["selected_program_code"] == "TEST-B"
-    assert trace["selected_differs_from_first_valid"] is True
-    assert len(trace["candidates"]) == 3
+    assert trace["selected_differs_from_first_valid"] is False
+    assert len(trace["candidates"]) == 2
     assert "preference_and_feedback_penalty" in trace["selected_quality"]
     assert "repetition_penalty" in trace["selected_quality"]
     assert trace["selected_quality_not_worse_than_first_valid"] is True

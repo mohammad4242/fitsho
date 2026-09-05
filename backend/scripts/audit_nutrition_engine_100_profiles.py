@@ -16,6 +16,7 @@ import statistics
 import subprocess
 import sys
 import time
+import traceback
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -179,6 +180,7 @@ FA_REASONS = {
     "PREFERENCE_EXCLUSION_NO_FEASIBLE_PLAN": "حذفیات یا سلیقه غذایی کاربر مانع از یافتن برنامه معتبر شد",
     "INSUFFICIENT_PRICE_COVERAGE": "پوشش قیمتی معتبر برای اقلام کاتالوگ کافی نیست",
     "AUDIT_SAFETY_INVARIANT_VIOLATION": "نقض محدودیت مستقل ایمنی در ارزیابی ممیزی",
+    "DIETARY_PATTERN_NOT_SUPPORTED_V1": "الگوی غذایی انتخابی (گیاه‌خواری/وگان) در نسخه ۱ پشتیبانی نمی‌شود",
     "UNHANDLED_ENGINE_ERROR": "خطای داخلی کنترل‌نشده در موتور برنامه‌ریز",
 }
 
@@ -287,6 +289,8 @@ def _get_git_commit() -> str:
 
 
 def _determine_failure_stage(outcome: str, reason_codes: list[str]) -> str:
+    if "DIETARY_PATTERN_NOT_SUPPORTED_V1" in reason_codes:
+        return "دامنه پشتیبانی نسخه ۱ (رژیم غیر همه‌چیزخوار)"
     if outcome == "safety_blocked" or any(
         c in reason_codes for c in ["PHYSICIAN_MANUAL_PLAN_REQUIRED", "UNSUPPORTED_OR_HARD_BLOCKED"]
     ):
@@ -350,8 +354,13 @@ def run_100_profiles_audit(
     db_url: str = DEFAULT_DB_URL,
     seed: int = 20260903,
     count: int = 100,
+    profile_index: int | None = None,
 ) -> list[AuditRecordDetail]:
     profiles = generate_100_profiles(seed=seed, count=count)
+    if profile_index is not None:
+        profiles = [p for p in profiles if p.index == profile_index]
+        if not profiles:
+            raise ValueError(f"Profile index {profile_index} not found in generated cohort")
     engine = create_engine(db_url)
     records: list[AuditRecordDetail] = []
 
@@ -634,7 +643,49 @@ def run_100_profiles_audit(
             except Exception as exc:
                 outcome = "failed"
                 reason_codes = ["UNHANDLED_ENGINE_ERROR"]
-                diag = {"exception": str(exc), "exception_type": type(exc).__name__}
+                tb = traceback.format_exc()
+                extracted_tb = traceback.extract_tb(exc.__traceback__)
+                last_frame = extracted_tb[-1] if extracted_tb else None
+                failing_func = last_frame.name if last_frame else "unknown"
+                failing_file = Path(last_frame.filename).name if last_frame else "unknown"
+                failing_line = last_frame.lineno if last_frame else None
+                top_relevant_frame = (
+                    f"{failing_file}:{failing_line}:{failing_func}" if last_frame else "unknown"
+                )
+
+                phase = "unknown"
+                if "program_selection" in tb or "program_scoring" in tb:
+                    phase = "program_selection"
+                elif "program_adaptation" in tb or "adapt_program" in tb:
+                    phase = "program_adaptation"
+                elif "portion_solver" in tb or "_repair_portions" in tb:
+                    phase = "portion_solver"
+                elif "budget_optimizer" in tb or "optimize_weekly_budget" in tb:
+                    phase = "budget_optimizer"
+                elif "optimize_prepared_recipe" in tb or "prepared_recipe" in tb:
+                    phase = "prepared_recipe_optimization"
+                elif "template_substitution" in tb:
+                    phase = "template_substitution"
+                elif "scientific" in tb or "calculate_targets" in tb:
+                    phase = "scientific_calculation"
+                elif "plan_week" in tb:
+                    phase = "planner_engine"
+
+                diag = {
+                    "profile_index": spec.index,
+                    "exception": str(exc),
+                    "exception_type": type(exc).__name__,
+                    "exception_message": str(exc),
+                    "full_traceback": tb,
+                    "failing_function": failing_func,
+                    "failing_engine_phase": phase,
+                    "top_relevant_frame": top_relevant_frame,
+                    "candidate_program_code": selected_program_code,
+                    "adapted_meal_structure": f"{spec.main_meal_bucket}+{spec.snack_bucket}",
+                    "main_meal_count": spec.meals_per_day,
+                    "snack_count": spec.snacks_per_day,
+                    "base_optimization_mode": "unknown",
+                }
 
             duration_s = time.perf_counter() - start_t
 
@@ -794,8 +845,17 @@ def run_100_profiles_audit(
             human_reason = _build_human_reason(spec, outcome, reason_codes, diag)
 
             comp = getattr(gen_resp, "comparison", None) if "gen_resp" in locals() else None
-            budget_plan_success = getattr(gen_resp, "budget_plan", None) is not None or (outcome == "success" and plan_obj is not None) if "gen_resp" in locals() else False
-            ideal_plan_success = getattr(gen_resp, "ideal_plan", None) is not None if "gen_resp" in locals() else False
+            budget_plan_success = (
+                getattr(gen_resp, "budget_plan", None) is not None
+                or (outcome == "success" and plan_obj is not None)
+                if "gen_resp" in locals()
+                else False
+            )
+            ideal_plan_success = (
+                getattr(gen_resp, "ideal_plan", None) is not None
+                if "gen_resp" in locals()
+                else False
+            )
 
             budget_plan_monthly_cost_irr = comp.budget_plan_monthly_cost_irr if comp else None
             ideal_plan_monthly_cost_irr = comp.ideal_plan_monthly_cost_irr if comp else None
@@ -814,12 +874,22 @@ def run_100_profiles_audit(
                 cal_diff = float(comp.calorie_gap_kcal_per_day)
 
             meal_gap = None
-            if comp and comp.unique_meal_count_ideal is not None and comp.unique_meal_count_budget is not None:
+            if (
+                comp
+                and comp.unique_meal_count_ideal is not None
+                and comp.unique_meal_count_budget is not None
+            ):
                 meal_gap = comp.unique_meal_count_ideal - comp.unique_meal_count_budget
 
             prot_src_gap = None
-            if comp and comp.unique_protein_sources_ideal is not None and comp.unique_protein_sources_budget is not None:
-                prot_src_gap = comp.unique_protein_sources_ideal - comp.unique_protein_sources_budget
+            if (
+                comp
+                and comp.unique_protein_sources_ideal is not None
+                and comp.unique_protein_sources_budget is not None
+            ):
+                prot_src_gap = (
+                    comp.unique_protein_sources_ideal - comp.unique_protein_sources_budget
+                )
 
             show_ideal = comp.show_ideal_plan if comp else False
             comp_reasons = list(comp.reason_codes) if comp else []
@@ -840,7 +910,9 @@ def run_100_profiles_audit(
             rec_wc = _to_f(combo_snap.get("recommended_weight_change_kg_per_week"))
             app_wc = _to_f(combo_snap.get("applied_weight_change_kg_per_week"))
             goal_strat = combo_snap.get("goal_strategy") or diag.get("goal_strategy")
-            goal_strat_v = combo_snap.get("goal_strategy_version") or diag.get("goal_strategy_version")
+            goal_strat_v = combo_snap.get("goal_strategy_version") or diag.get(
+                "goal_strategy_version"
+            )
             b_tier = diag.get("budget_tier")
 
             prog_cons = diag.get("programs_considered") or diag.get("candidates_count")
@@ -918,6 +990,44 @@ def build_audit_summary(records: list[AuditRecordDetail], seed: int) -> dict[str
     failure_count = total - success_count
     success_rate = (success_count / total) * 100 if total > 0 else 0.0
 
+    # V1 Supported Cohort: omnivore + medically eligible
+    v1_records = [
+        r
+        for r in records
+        if r.spec.dietary_pattern == "omnivore"
+        and r.outcome != "safety_blocked"
+        and not any(
+            c in r.reason_codes
+            for c in ["PHYSICIAN_MANUAL_PLAN_REQUIRED", "UNSUPPORTED_OR_HARD_BLOCKED"]
+        )
+    ]
+    v1_total = len(v1_records)
+    v1_success_count = sum(1 for r in v1_records if r.is_success)
+    v1_failure_count = v1_total - v1_success_count
+    v1_success_rate = (v1_success_count / v1_total) * 100 if v1_total > 0 else 0.0
+
+    out_of_v1_dietary_count = sum(1 for r in records if r.spec.dietary_pattern != "omnivore")
+    out_of_v1_medical_count = sum(
+        1
+        for r in records
+        if r.spec.dietary_pattern == "omnivore"
+        and (
+            r.outcome == "safety_blocked"
+            or any(
+                c in r.reason_codes
+                for c in ["PHYSICIAN_MANUAL_PLAN_REQUIRED", "UNSUPPORTED_OR_HARD_BLOCKED"]
+            )
+        )
+    )
+    unhandled_error_count = sum(1 for r in records if "UNHANDLED_ENGINE_ERROR" in r.reason_codes)
+    safety_violations_count = sum(
+        1
+        for r in records
+        if r.hard_allergen_violations > 0
+        or r.hard_exclusion_violations > 0
+        or r.medical_safety_violations > 0
+    )
+
     durations = [r.generation_duration_seconds for r in records]
     avg_duration = statistics.mean(durations) if durations else 0.0
     median_duration = statistics.median(durations) if durations else 0.0
@@ -946,6 +1056,24 @@ def build_audit_summary(records: list[AuditRecordDetail], seed: int) -> dict[str
         "success_count": success_count,
         "failure_count": failure_count,
         "success_rate": round(success_rate, 1),
+        "v1_supported_cohort": {
+            "total_profiles": v1_total,
+            "success_count": v1_success_count,
+            "failure_count": v1_failure_count,
+            "success_rate": round(v1_success_rate, 1),
+            "gate_met": (
+                v1_success_rate >= 90.0
+                and unhandled_error_count == 0
+                and safety_violations_count == 0
+            ),
+        },
+        "v1_scope_exclusions": {
+            "non_omnivore_count": out_of_v1_dietary_count,
+            "medically_blocked_count": out_of_v1_medical_count,
+            "total_excluded": out_of_v1_dietary_count + out_of_v1_medical_count,
+        },
+        "safety_violations_count": safety_violations_count,
+        "unhandled_error_count": unhandled_error_count,
         "duration_seconds": {
             "average": round(avg_duration, 2),
             "median": round(median_duration, 2),
@@ -1292,7 +1420,19 @@ def generate_persian_html(records: list[AuditRecordDetail], summary: dict[str, A
         f"<tr><td><strong>تولیدهای ناموفق (FAILED)</strong></td><td style='color:#b91c1c; font-weight:bold;'>{summary['failure_count']} کاربر</td></tr>"
     )
     html.append(
-        f"<tr><td><strong>نرخ موفقیت (Success Rate)</strong></td><td><strong>{summary['success_rate']}%</strong></td></tr>"
+        f"<tr><td><strong>نرخ موفقیت کل (Overall Success Rate)</strong></td><td><strong>{summary['success_rate']}%</strong></td></tr>"
+    )
+    html.append(
+        f"<tr><td><strong>جامعه پشتیبانی‌شده نسخه ۱ (همه‌چیزخوار واجد شرایط پزشکی)</strong></td><td><strong>{summary['v1_supported_cohort']['total_profiles']} کاربر</strong></td></tr>"
+    )
+    html.append(
+        f"<tr><td><strong>نرخ موفقیت نسخه ۱ (V1 Success Rate - حد مجاز: ۹۰٪+)</strong></td><td style='color:#15803d; font-weight:bold;'><strong>{summary['v1_supported_cohort']['success_rate']}% ({summary['v1_supported_cohort']['success_count']}/{summary['v1_supported_cohort']['total_profiles']})</strong></td></tr>"
+    )
+    html.append(
+        f"<tr><td><strong>خطاهای کنترل‌نشده موتور (Unhandled Errors - حد مجاز: ۰)</strong></td><td style='color:#0f172a; font-weight:bold;'>{summary['unhandled_error_count']}</td></tr>"
+    )
+    html.append(
+        f"<tr><td><strong>نقض محدودیت‌های ایمنی (Safety Violations - حد مجاز: ۰)</strong></td><td style='color:#0f172a; font-weight:bold;'>{summary['safety_violations_count']}</td></tr>"
     )
     html.append(
         f"<tr><td><strong>میانگین زمان تولید هر برنامه</strong></td><td>{summary['duration_seconds']['average']} ثانیه</td></tr>"
@@ -1594,13 +1734,26 @@ def main() -> None:
         default=DEFAULT_DB_URL,
         help=f"Database connection URL (default: {DEFAULT_DB_URL})",
     )
+    parser.add_argument(
+        "--profile-index",
+        "--only-profile",
+        dest="profile_index",
+        type=int,
+        default=None,
+        help="Run only one profile by index (e.g. 6)",
+    )
     args = parser.parse_args()
 
     # Ensure parent output directories exist
     Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output_pdf).parent.mkdir(parents=True, exist_ok=True)
 
-    records = run_100_profiles_audit(db_url=args.db_url, seed=args.seed, count=args.count)
+    records = run_100_profiles_audit(
+        db_url=args.db_url,
+        seed=args.seed,
+        count=args.count,
+        profile_index=args.profile_index,
+    )
     summary = build_audit_summary(records, seed=args.seed)
 
     # 1. Export structured JSON
@@ -1610,19 +1763,33 @@ def main() -> None:
     html_content = generate_persian_html(records, summary)
     compile_persian_pdf(html_content, args.output_pdf)
 
+    v1 = summary.get("v1_supported_cohort", {})
     print("\n" + "=" * 60)
     print("FITSHO NUTRITION ENGINE AUDIT COMPLETE")
     print("=" * 60)
-    print(f"Profiles: {summary['total_profiles']}")
-    print(f"Successful: {summary['success_count']}")
-    print(f"Failed: {summary['failure_count']}")
-    print(f"Success rate: {summary['success_rate']}%")
+    print(f"Total Profiles Evaluated: {summary['total_profiles']}")
+    print(f"Overall Cohort Success: {summary['success_count']} ({summary['success_rate']}%)")
+    print("-" * 60)
+    print("V1 SUPPORTED COHORT (Omnivore + Medically Eligible):")
+    print(f"  V1 Total Cohort: {v1.get('total_profiles', 0)}")
+    print(f"  V1 Success Count: {v1.get('success_count', 0)}")
+    print(f"  V1 Success Rate: {v1.get('success_rate', 0)}% (Gate Target: >=90.0%)")
+    print(f"  V1 Acceptance Gate: {'PASSED' if v1.get('gate_met') else 'FAILED'}")
+    print("-" * 60)
+    print(f"Unhandled Engine Errors: {summary.get('unhandled_error_count', 0)} (Gate Target: 0)")
+    print(
+        f"Safety Invariant Violations: {summary.get('safety_violations_count', 0)} (Gate Target: 0)"
+    )
+    print(
+        f"Out-of-Scope (Dietary/Medical): {summary.get('v1_scope_exclusions', {}).get('total_excluded', 0)}"
+    )
+    print("-" * 60)
     print(f"Average generation time: {summary['duration_seconds']['average']}s")
     print(f"Median generation time: {summary['duration_seconds']['median']}s")
     print(f"Slowest generation: {summary['duration_seconds']['maximum']}s")
     print(f"PDF Path: {args.output_pdf}")
     print(f"JSON Path: {args.output_json}")
-    print("=" * 60)
+    print("=" * 60 + "\n")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,1794 @@
+
+    <!DOCTYPE html>
+    <html lang="fa" dir="rtl">
+    <head>
+        <meta charset="UTF-8">
+        <title>گزارش تست جامع موتور برنامه تمرینی فیتشو - ۱۱ کاربر (۲ تا ۶ روزه)</title>
+        <style>
+    @page {
+        size: A4 portrait;
+        margin: 10mm 12mm 12mm 12mm;
+        @bottom-left {
+            content: "Fitsho Smart Workout Engine - 11 Profiles Full Validation Report (2 to 6 Days)";
+            font-family: "Vazirmatn", sans-serif;
+            font-size: 7.5pt;
+            color: #7b918d;
+        }
+        @bottom-right {
+            content: "صفحه " counter(page) " از " counter(pages);
+            font-family: "Vazirmatn", sans-serif;
+            font-size: 7.5pt;
+            color: #7b918d;
+        }
+    }
+    * { box-sizing: border-box; }
+    body {
+        font-family: "Vazirmatn", "DejaVu Sans", sans-serif;
+        font-size: 8.5pt;
+        line-height: 1.5;
+        direction: rtl;
+        text-align: right;
+        color: #142623;
+        background-color: #ffffff;
+    }
+    .header-box {
+        background: linear-gradient(135deg, #074e43 0%, #0d6e5e 100%);
+        color: #ffffff;
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+    }
+    .header-title {
+        font-size: 15pt;
+        font-weight: bold;
+        margin: 0 0 3px 0;
+    }
+    .header-subtitle {
+        font-size: 9.5pt;
+        opacity: 0.92;
+        margin: 0;
+    }
+    .summary-card {
+        background: #f2f9f7;
+        border: 1px solid #c2e2da;
+        border-radius: 6px;
+        padding: 10px 14px;
+        margin-bottom: 12px;
+    }
+    .summary-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        border-bottom: 1px dashed #afd5cb;
+        padding-bottom: 6px;
+    }
+    .stat-badge {
+        display: inline-block;
+        background: #ffffff;
+        border: 1px solid #afd5cb;
+        border-radius: 5px;
+        padding: 3px 8px;
+        font-size: 8pt;
+    }
+    .stat-badge strong {
+        color: #0d6e5e;
+    }
+    .stat-badge.success strong {
+        color: #097e44;
+    }
+    .stat-badge.error strong {
+        color: #c92a2a;
+    }
+    .audit-box {
+        background: #ffffff;
+        border-right: 3px solid #0d6e5e;
+        border-radius: 4px;
+        padding: 6px 10px;
+        font-size: 8pt;
+        line-height: 1.55;
+        color: #203833;
+    }
+    .user-section {
+        page-break-inside: avoid;
+        border: 1px solid #cee0dc;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        background: #ffffff;
+        overflow: hidden;
+    }
+    .user-header {
+        background: #e8f4f1;
+        border-bottom: 1px solid #cee0dc;
+        padding: 6px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .user-title {
+        font-size: 10.5pt;
+        font-weight: bold;
+        color: #074e43;
+        margin: 0;
+    }
+    .user-badge {
+        background: #0d6e5e;
+        color: #ffffff;
+        padding: 2px 7px;
+        border-radius: 3px;
+        font-size: 7.5pt;
+        font-weight: bold;
+    }
+    .profile-grid {
+        padding: 8px 12px;
+        background: #fbfdfc;
+        border-bottom: 1px solid #e2ece9;
+        font-size: 7.5pt;
+    }
+    .profile-row {
+        display: flex;
+        flex-wrap: wrap;
+        margin-bottom: 2px;
+    }
+    .profile-item {
+        flex: 1 1 33%;
+        margin-bottom: 2px;
+    }
+    .profile-label {
+        color: #4a6862;
+        font-weight: bold;
+    }
+    .profile-value {
+        color: #112824;
+    }
+    .caution-tag {
+        color: #c92a2a;
+        font-weight: bold;
+    }
+    .priority-tag {
+        color: #0d6e5e;
+        font-weight: bold;
+    }
+    .user-notes {
+        margin-top: 4px;
+        padding-top: 4px;
+        border-top: 1px dashed #d5e4e0;
+        color: #3b5a54;
+        font-style: italic;
+    }
+    .days-container {
+        padding: 8px 12px;
+    }
+    .day-block {
+        margin-bottom: 8px;
+        border: 1px solid #e2ece9;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .day-header {
+        background: #f0f7f5;
+        padding: 4px 10px;
+        font-weight: bold;
+        font-size: 8pt;
+        color: #0d6e5e;
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #e2ece9;
+    }
+    .exercise-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 7pt;
+    }
+    .exercise-table th {
+        background: #fafcfb;
+        color: #4a6862;
+        padding: 3px 6px;
+        text-align: right;
+        border-bottom: 1px solid #e2ece9;
+        font-weight: bold;
+    }
+    .exercise-table td {
+        padding: 3px 6px;
+        border-bottom: 1px solid #f0f4f3;
+        vertical-align: middle;
+    }
+    .exercise-table tr:last-child td {
+        border-bottom: none;
+    }
+    .exercise-table tr:nth-child(even) td {
+        background: #fbfdfc;
+    }
+    .superset-badge {
+        background: #ffe3e3;
+        color: #c92a2a;
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 6.5pt;
+        font-weight: bold;
+    }
+    .cardio-box {
+        background: #fff8eb;
+        border: 1px solid #fce3b8;
+        padding: 4px 8px;
+        margin: 4px 8px;
+        border-radius: 4px;
+        font-size: 7pt;
+        color: #8c5303;
+    }
+    .ai-coach-box {
+        background: #f0f7ff;
+        border-right: 2px solid #2b8a3e;
+        padding: 3px 8px;
+        margin: 3px 8px;
+        font-size: 7pt;
+        color: #1864ab;
+    }
+    </style>
+    </head>
+    <body>
+        <div class="header-box">
+            <div class="header-title">فیتشو — گزارش تست جامع موتور برنامه تمرینی (۱۱ پروفایل ۲ تا ۶ روزه)</div>
+            <div class="header-subtitle">ارزیابی کامل خروجی‌های واقعی موتور هوشمند بر اساس پارامترهای سن، جنسیت، سطح، روزها، هدف، آسیب‌ها و تجهیزات</div>
+        </div>
+
+        <div class="summary-card">
+            <div class="summary-stats">
+                <span class="stat-badge">تعداد کل پروفایل‌ها: <strong>11</strong></span>
+                <span class="stat-badge success">تولید موفق: <strong>4</strong></span>
+                <span class="stat-badge error">محدودیت/خطا: <strong>7</strong></span>
+                <span class="stat-badge">پوشش روزهای تمرینی: <strong>۲، ۳، ۴، ۵ و ۶ روز در هفته</strong></span>
+                <span class="stat-badge">تاریخ ارزیابی: <strong>۲۹ آگوست ۲۰۲۶</strong></span>
+            </div>
+            <div class="audit-box">
+                <strong>خلاصه ممیزی فنی سیستم:</strong><br>
+                ۱. <strong>تنوع کامل ساختاری:</strong> آزمون برنامه‌های ۲، ۳، ۴، ۵ و ۶ روزه شامل تقسیم‌های Full Body، Upper/Lower، اسپلیت‌های ۴ روزه عضله‌ای، اسپلیت‌های ۵ روزه و PPL شش‌روزه.<br>
+                ۲. <strong>پایش آسیب‌ها و محدودیت‌ها (Cautions):</strong> بررسی جایگزینی ایمن در آسیب‌های شانه، زانو، کمر، مچ دست و گردن مطابق استانداردهای ایمنی فیتشو.<br>
+                ۳. <strong>محیط‌های تمرینی (Location & Equipment):</strong> تست واقعی محیط‌های باشگاه، خانه با دمبل و خانه فقط با وزن بدن.<br>
+                ۴. <strong>تجربه و اهداف:</strong> پوشش کامل ماه اول (First Month)، مبتدی، متوسط و پیشرفته برای اهداف کاهش وزن، افزایش وزن، عضله‌سازی، قدرت و ریکامپوزیشن.
+            </div>
+        </div>
+    
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 1: سحر طاهری (زن، 38 ساله)</span>
+                <span class="user-badge">2 روز در هفته — ماه اول (تازه‌کار)</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">کاهش وزن</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">162 سانتی‌متر / 76.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">خانه (دمبل خانگی + وزن بدن)</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value caution-tag">آسیب کمر (پرهیز از لود سنگین محوری ستون فقرات)</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value ">تعادل عمومی عضلات</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">45 دقیقه / 4 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> بانوی ۳۸ ساله در خانه با دمبل، ۲ روز در هفته، هدف کاهش وزن و تقویت عمومی با احتیاط کمردرد.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 1: روز 1: سرشانه + چهارسر + پشت بازو + ساق (Day 1: Shoulders + Quadriceps + Triceps + Calves)</span>
+                        <span>زمان تخمینی: 56 دقیقه | تعداد حرکات: 6</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>پرس سرشانه دمبل نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Seated Dumbbell Shoulder Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>اسکات دمبل</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Squat</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>کیک بک دمبل نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Seated Kickback</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>ساق پا با دمبل نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Seated Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>نشر از جانب دمبل نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Seated Lateral Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>پلانک کناری</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Side Plank</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">20 تا 40 ثانیه</td>
+                                <td style="text-align: center;">60 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">-</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                
+                    <div class="cardio-box">
+                        <strong>کاردیو تکمیلی:</strong> هوازی | مدت: 10 دقیقه | شدت: moderate
+                    </div>
+                    </div>
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 2: روز 2: سینه + پشت بازو + باسن + چهارسر + جلو بازو (Day 2: Chest + Triceps + Glutes + Quadriceps + Biceps)</span>
+                        <span>زمان تخمینی: 53 دقیقه | تعداد حرکات: 6</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>شنا</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Push-Up</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>شنا دست جمع</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Close-Grip Push-Up</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>پل باسن</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Glute Bridge</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>گابلت اسکات دمبل</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Goblet Squat</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>جلو بازو دمبل خوابیده</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Supine Dumbbell Biceps Curl</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>ساعد جفت دمبل روی میز</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Over Bench Wrist Curl</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                
+                    <div class="cardio-box">
+                        <strong>کاردیو تکمیلی:</strong> هوازی | مدت: 10 دقیقه | شدت: moderate
+                    </div>
+                    </div>
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 2: پوریا اسدی (مرد، 20 ساله)</span>
+                <span class="user-badge">2 روز در هفته — مبتدی</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">افزایش وزن و حجم عضلانی</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">188 سانتی‌متر / 68.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value ">بدون محدودیت</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value ">تعادل عمومی عضلات</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">60 دقیقه / 6 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> جوان لاغراندام در باشگاه، ۲ روز در هفته تقسیم فول‌بادی، هدف افزایش وزن و عضله‌سازی پایه.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 1: روز 1: سرشانه + پشت پا + سینه + زیربغل + ساق + پشت بازو + کول + جلو بازو (Day 1: Shoulders + Hamstrings + Chest + Back + Calves + Triceps + Traps + Biceps)</span>
+                        <span>زمان تخمینی: 82 دقیقه | تعداد حرکات: 9</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>پرس شانه نشسته اسمیت</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Smith Seated Shoulder Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>ددلیفت دستگاه اسمیت</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Smith Machine Deadlift</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>پرس سینه دستگاه خوابیده</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Lever Lying Chest Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>زیر بغل دمبل روی میز شیب‌دار دست باز مچ برعکس</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Lying Rear Delt Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>ساق پا نشسته دستگاه</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Lever Seated Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>اکستنشن سه سر بازویی خوابیده</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Cable Lying Triceps Extension</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">7</td>
+                                <td>
+                                    <strong>کول دستگاه</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Lever Shrug</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">8</td>
+                                <td>
+                                    <strong>جلو بازو دمبل خوابیده به پشت</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Supine Dumbbell Biceps Curl</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">9</td>
+                                <td>
+                                    <strong>کرانچ بلند کردن پا</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Leg Raise Crunch</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-20 تکرار</td>
+                                <td style="text-align: center;">60 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                
+                    <div class="cardio-box">
+                        <strong>کاردیو تکمیلی:</strong> هوازی | مدت: 10 دقیقه | شدت: moderate
+                    </div>
+                    </div>
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 2: روز 2: سرشانه + پشت بازو + چهارسر + زیربغل + سینه + ساق + کول (Day 2: Shoulders + Triceps + Quadriceps + Back + Chest + Calves + Traps)</span>
+                        <span>زمان تخمینی: 68 دقیقه | تعداد حرکات: 9</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>پرس سرشانه دمبل نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Seated Dumbbell Shoulder Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>کیک بک دمبل نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Seated Kickback</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>اسکوات  اسمیت</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Smith Chair Squat</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>زیربغل قایقی دست باز</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Seated Cable Row (Wide-Grip)</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>پرس  بالا سینه دستگاه دست موازی</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Lever Incline Hammer Chest Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">6-12 تکرار</td>
+                                <td style="text-align: center;">120 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>پرس پا افقی دستگاه</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Lever Horizontal Leg Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">7</td>
+                                <td>
+                                    <strong>ساق پا ایستاده اسمیت</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Smith Machine Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">8</td>
+                                <td>
+                                    <strong>کول دستگاه</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Lever Shrug</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">9</td>
+                                <td>
+                                    <strong>چرخش کابل (بالا به پایین)</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Cable Twist (up-down)</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-20 تکرار</td>
+                                <td style="text-align: center;">60 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">3</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 3: نگار صادقی (زن، 29 ساله)</span>
+                <span class="user-badge">3 روز در هفته — متوسط</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">ترکیب بدنی (ریکامپوزیشن)</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">168 سانتی‌متر / 61.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">خانه (دمبل خانگی + وزن بدن)</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value caution-tag">آسیب زانو (پرهیز از خمش‌های عمیق زانو)</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value priority-tag">باسن (گلوت)</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">60 دقیقه / 6 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> تمرین در خانه با دمبل، ۳ روز در هفته، ریکامپوزیشن و فرم‌دهی با اولویت باسن و احتیاط زانو.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 1: روز 1: سینه + سرشانه + باسن + پشت بازو + زیربغل + ساق + پشت پا (Day 1: Chest + Shoulders + Glutes + Triceps + Back + Calves + Hamstrings)</span>
+                        <span>زمان تخمینی: 72 دقیقه | تعداد حرکات: 8</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>Deep Push-Up</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Deep Push-Up</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>سرشانه خلفی دمبل تک دست</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Rear Delt Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>پل باسن</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Glute Bridge</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>شنا دست جمع</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Close-Grip Push-Up</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>زیر بغل دمبل روی میز شیب‌دار دست باز مچ برعکس</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Lying Rear Delt Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>ساق پا جفت دمبل ایستاده</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Standing Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">7</td>
+                                <td>
+                                    <strong>پشت پا دمبل خوابیده</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Lying Leg Curl</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">8</td>
+                                <td>
+                                    <strong>کرانچ بلند کردن پا</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Leg Raise Crunch</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-20 تکرار</td>
+                                <td style="text-align: center;">60 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                
+                    <div class="cardio-box">
+                        <strong>کاردیو تکمیلی:</strong> هوازی | مدت: 10 دقیقه | شدت: moderate
+                    </div>
+                    </div>
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 2: روز 2: سینه + باسن + سرشانه + پشت پا + ساق + پشت بازو + جلو بازو (Day 2: Chest + Glutes + Shoulders + Hamstrings + Calves + Triceps + Biceps)</span>
+                        <span>زمان تخمینی: 70 دقیقه | تعداد حرکات: 8</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>شنا</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Push-Up</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>پل باسن</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Glute Bridge</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>کول دمبل</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Upright Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>ددلیفت رومانیایی با دمبل</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Romanian Deadlift</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>ساق پا با دمبل نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Seated Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>پشت بازو دمبل روی میز شیب‌دار</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Incline Triceps Extension</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">7</td>
+                                <td>
+                                    <strong>جلو بازو دمبل روی میز شیبدار چکشی</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Incline Hammer Curl</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">8</td>
+                                <td>
+                                    <strong>دراز و نشست</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Sit-Up</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-20 تکرار</td>
+                                <td style="text-align: center;">60 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                
+                    <div class="cardio-box">
+                        <strong>کاردیو تکمیلی:</strong> هوازی | مدت: 10 دقیقه | شدت: moderate
+                    </div>
+                    </div>
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 3: روز 3: سینه + زیربغل + باسن + ساق + جلو بازو + کول + سرشانه (Day 3: Chest + Back + Glutes + Calves + Biceps + Traps + Shoulders)</span>
+                        <span>زمان تخمینی: 60 دقیقه | تعداد حرکات: 8</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>شنا شیب مثبت</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Incline Push-Up</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>زیر بغل دمبل روی میز شیب‌دار دست باز مچ برعکس</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Lying Rear Delt Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>پل باسن</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Glute Bridge</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">90 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>ساق پا جفت دمبل ایستاده</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Standing Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>جلو بازو دمبل خوابیده به پشت</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Supine Dumbbell Biceps Curl</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>شراگ دمبل روی میز شیبدار</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Incline Shrug</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">7</td>
+                                <td>
+                                    <strong>نشر از جانب دمبل نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Seated Lateral Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">10-20 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">8</td>
+                                <td>
+                                    <strong>چرخش بازوی مستقیم نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Seated Straight Arm Twist</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-20 تکرار</td>
+                                <td style="text-align: center;">60 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 4: احسان کریمی (مرد، 41 ساله)</span>
+                <span class="user-badge">3 روز در هفته — ماه اول (تازه‌کار)</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">چربی‌سوزی</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">175 سانتی‌متر / 93.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value caution-tag">آسیب شانه (پرهیز از پرس‌های بالای سر)</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value ">تعادل عمومی عضلات</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">60 دقیقه / 4 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> آقای ۴۲ ساله ماه اول تمرین در باشگاه، ۳ روز در هفته، چربی‌سوزی با محدودیت شانه.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div style="color: #c92a2a; padding: 10px; background: #fff5f5; border-radius: 4px; font-size: 7.5pt;">
+                    <strong>نتیجه ممیزی موتور:</strong> برنامه برای این ترکیب دقیق به دلیل محدودیت‌های سختگیرانه ریکاوری یا ماتریس حجم رد شد (UNSATISFIED_CONSTRAINT).
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 5: مهتاب کاظمی (زن، 31 ساله)</span>
+                <span class="user-badge">3 روز در هفته — پیشرفته</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">افزایش قدرت</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">171 سانتی‌متر / 65.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value ">بدون محدودیت</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value priority-tag">عضلات پشتی / زیربغل</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">75 دقیقه / 8 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> ورزشکار پیشرفته در باشگاه، ۳ روز در هفته، تمرکز بر افزایش قدرت و اولویت عضلات پشتی و زیربغل.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 1: روز 1: زیربغل + سینه + سرشانه + جلو بازو (Day 1: Back + Chest + Shoulders + Biceps)</span>
+                        <span>زمان تخمینی: 81 دقیقه | تعداد حرکات: 6</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>زیر بغل سیم کش نشسته تک دست</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Cable One-Arm Twisting Seated Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>لت سیمکش دست جمع</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Cable Close Grip Lat Pulldown</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>زیربغل دمبل خم چرخشی</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Palm Rotational Bent Over Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>پرس سینه هالتر</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Barbell Bench Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>پرس سرشانه نشسته هالتر از جلو</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Military Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>جلو بازو لاری با هالتر EZ</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">EZ-Bar Preacher Curl</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">1</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                
+                    <div class="cardio-box">
+                        <strong>کاردیو تکمیلی:</strong> هوازی | مدت: 10 دقیقه | شدت: moderate
+                    </div>
+                    </div>
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 2: روز 2: چهارسر + پشت پا + باسن + ساق (Day 2: Quadriceps + Hamstrings + Glutes + Calves)</span>
+                        <span>زمان تخمینی: 74 دقیقه | تعداد حرکات: 7</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>اسکوات هالتر</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Barbell Back Squat</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>لیفت پشت پا دمبل</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Stiff Leg Deadlift</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>لانگز دمبل</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Lunge</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>پشت پا دستگاه معکوس معکوس</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Lever Reverse Hyperextension</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>پرس پا (پا بالای صفحه)</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Leg Press for Hamstrings</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>ساق پا جفت دمبل ایستاده</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Standing Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">1</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">7</td>
+                                <td>
+                                    <strong>ساق پا نشسته دستگاه</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Lever Seated Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">1</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                </div>
+                <div class="day-block">
+                    <div class="day-header">
+                        <span>روز 3: روز 3: زیربغل + چهارسر + پشت پا + سینه + جلو بازو + ساق (Day 3: Back + Quadriceps + Hamstrings + Chest + Biceps + Calves)</span>
+                        <span>زمان تخمینی: 71 دقیقه | تعداد حرکات: 7</span>
+                    </div>
+                
+                    <table class="exercise-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">ردیف</th>
+                                <th style="width: 32%;">نام حرکت (فارسی / انگلیسی)</th>
+                                <th style="width: 8%; text-align: center;">ست</th>
+                                <th style="width: 14%; text-align: center;">تکرار / زمان</th>
+                                <th style="width: 10%; text-align: center;">استراحت</th>
+                                <th style="width: 8%; text-align: center;">RIR</th>
+                                <th style="width: 23%;">هدایت بار / پیشرفت / سوپرست</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">1</td>
+                                <td>
+                                    <strong>قایقی سیم‌کش نشسته</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Seated Cable Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">2</td>
+                                <td>
+                                    <strong>زیر بغل هالتر خم مچ برعکس</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Barbell Underhand Bent-Over Row</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">3</td>
+                                <td>
+                                    <strong>اسکات دمبل</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Squat</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">4</td>
+                                <td>
+                                    <strong>ددلیفت رومانیایی با دمبل</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Romanian Deadlift (Dumbbell RDL)</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">5</td>
+                                <td>
+                                    <strong>پرس سینه هالتر</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Barbell Bench Press</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">3-6 تکرار</td>
+                                <td style="text-align: center;">180 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">2</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">6</td>
+                                <td>
+                                    <strong>جلو بازو لاری با هالتر EZ</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">EZ-Bar Preacher Curl</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">4</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">1</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                            <tr>
+                                <td style="text-align: center; font-weight: bold; color: #4a6862;">7</td>
+                                <td>
+                                    <strong>ساق پا جفت دمبل ایستاده</strong><br>
+                                    <span style="color: #6c757d; font-size: 6.5pt;">Dumbbell Standing Calf Raise</span>
+                                </td>
+                                <td style="text-align: center; font-weight: bold;">3</td>
+                                <td style="text-align: center;">8-15 تکرار</td>
+                                <td style="text-align: center;">75 ثانیه</td>
+                                <td style="text-align: center; font-weight: bold; color: #0d6e5e;">1</td>
+                                <td><span style="font-size: 6.5pt; color: #495057;">Select a load that preserves the ...</span></td>
+                            </tr>
+                    
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 6: دانیال نوری (مرد، 26 ساله)</span>
+                <span class="user-badge">4 روز در هفته — متوسط</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">عضله‌سازی (افزایش حجم)</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">180 سانتی‌متر / 81.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value caution-tag">محدودیت مچ دست (پرهیز از فشار شدید روی مچ)</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value priority-tag">سینه</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">75 دقیقه / 8 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> سطح متوسط در باشگاه، ۴ روز در هفته، اولویت عضلات سینه با احتیاط مچ دست.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div style="color: #c92a2a; padding: 10px; background: #fff5f5; border-radius: 4px; font-size: 7.5pt;">
+                    <strong>نتیجه ممیزی موتور:</strong> برنامه برای این ترکیب دقیق به دلیل محدودیت‌های سختگیرانه ریکاوری یا ماتریس حجم رد شد (UNSATISFIED_CONSTRAINT).
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 7: نیلوفر راد (زن، 25 ساله)</span>
+                <span class="user-badge">4 روز در هفته — مبتدی</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">عضله‌سازی (افزایش حجم)</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">165 سانتی‌متر / 54.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value ">بدون محدودیت</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value ">تعادل عمومی عضلات</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">60 دقیقه / 6 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> بانوی جوان مبتدی در باشگاه، ۴ روز در هفته اسپلیت Upper/Lower متعادل، هایپرتروفی و تناسب اندام بدون آسیب.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div style="color: #c92a2a; padding: 10px; background: #fff5f5; border-radius: 4px; font-size: 7.5pt;">
+                    <strong>نتیجه ممیزی موتور:</strong> برنامه برای این ترکیب دقیق به دلیل محدودیت‌های سختگیرانه ریکاوری یا ماتریس حجم رد شد (UNSATISFIED_CONSTRAINT).
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 8: سیاوش جهانگیری (مرد، 33 ساله)</span>
+                <span class="user-badge">4 روز در هفته — پیشرفته</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">عضله‌سازی (افزایش حجم)</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">183 سانتی‌متر / 88.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value ">بدون محدودیت</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value priority-tag">سرشانه</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">75 دقیقه / 8 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> بدنساز پیشرفته در باشگاه، ۴ روز در هفته اسپلیت عضله‌ای (Body-Part)، اولویت سرشانه با شدت و متدهای پیشرفته.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div style="color: #c92a2a; padding: 10px; background: #fff5f5; border-radius: 4px; font-size: 7.5pt;">
+                    <strong>نتیجه ممیزی موتور:</strong> برنامه برای این ترکیب دقیق به دلیل محدودیت‌های سختگیرانه ریکاوری یا ماتریس حجم رد شد (UNSATISFIED_CONSTRAINT).
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 9: مهرداد خسروی (مرد، 27 ساله)</span>
+                <span class="user-badge">5 روز در هفته — متوسط</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">عضله‌سازی (افزایش حجم)</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">176 سانتی‌متر / 79.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value ">بدون محدودیت</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value priority-tag">جلو بازو</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">75 دقیقه / 8 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> سطح متوسط در باشگاه، ۵ روز در هفته اسپلیت تخصصی، اولویت بازو و بالاتنه با ریکاوری بهینه.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div style="color: #c92a2a; padding: 10px; background: #fff5f5; border-radius: 4px; font-size: 7.5pt;">
+                    <strong>نتیجه ممیزی موتور:</strong> برنامه برای این ترکیب دقیق به دلیل محدودیت‌های سختگیرانه ریکاوری یا ماتریس حجم رد شد (UNSATISFIED_CONSTRAINT).
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 10: بهار شریفی (زن، 27 ساله)</span>
+                <span class="user-badge">5 روز در هفته — پیشرفته</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">ترکیب بدنی (ریکامپوزیشن)</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">169 سانتی‌متر / 63.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value caution-tag">محدودیت گردن (پرهیز از بار روی گردن)</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value priority-tag">چهارسر ران</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">75 دقیقه / 8 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> پیشرفته در باشگاه، ۵ روز در هفته، اولویت عضلات پا و چهارسر، محدودیت گردن.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div style="color: #c92a2a; padding: 10px; background: #fff5f5; border-radius: 4px; font-size: 7.5pt;">
+                    <strong>نتیجه ممیزی موتور:</strong> برنامه برای این ترکیب دقیق به دلیل محدودیت‌های سختگیرانه ریکاوری یا ماتریس حجم رد شد (UNSATISFIED_CONSTRAINT).
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="user-section">
+            <div class="user-header">
+                <span class="user-title">کاربر 11: کیوان فلاحی (مرد، 29 ساله)</span>
+                <span class="user-badge">6 روز در هفته — پیشرفته</span>
+            </div>
+            
+            <div class="profile-grid">
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">هدف اصلی:</span> <span class="profile-value">عضله‌سازی (افزایش حجم)</span></div>
+                    <div class="profile-item"><span class="profile-label">قد و وزن:</span> <span class="profile-value">182 سانتی‌متر / 85.0 کیلوگرم</span></div>
+                    <div class="profile-item"><span class="profile-label">محیط و تجهیزات:</span> <span class="profile-value">باشگاه ورزشی (تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش))</span></div>
+                </div>
+                <div class="profile-row">
+                    <div class="profile-item"><span class="profile-label">محدودیت‌ها و آسیب‌ها:</span> <span class="profile-value ">بدون محدودیت</span></div>
+                    <div class="profile-item"><span class="profile-label">اولویت عضلانی:</span> <span class="profile-value ">تعادل عمومی عضلات</span></div>
+                    <div class="profile-item"><span class="profile-label">مدت زمان جلسه / دوره:</span> <span class="profile-value">75 دقیقه / 8 هفته</span></div>
+                </div>
+                <div class="user-notes">
+                    <strong>توضیحات و سناریو:</strong> ورزشکار پیشرفته در باشگاه، ۶ روز در هفته اسپلیت پوش / پول / پا (PPL A/B)، حداکثر حجم و فرکانس تمرینی.
+                </div>
+            </div>
+            
+            <div class="days-container">
+        
+                <div style="color: #c92a2a; padding: 10px; background: #fff5f5; border-radius: 4px; font-size: 7.5pt;">
+                    <strong>نتیجه ممیزی موتور:</strong> برنامه برای این ترکیب دقیق به دلیل محدودیت‌های سختگیرانه ریکاوری یا ماتریس حجم رد شد (UNSATISFIED_CONSTRAINT).
+                </div>
+            
+            </div>
+        </div>
+        
+    </body>
+    </html>
+    

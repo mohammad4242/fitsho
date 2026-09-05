@@ -152,9 +152,22 @@ def nutrient_targets_for_calories(calories: Decimal) -> NutrientTargets:
     )
 
 
+PRODUCT_GOAL_STRATEGIES: frozenset[FitnessGoal] = frozenset(
+    {
+        "lose_weight",
+        "fat_loss",
+        "gain_weight",
+        "build_muscle",
+        "body_recomposition",
+    }
+)
+
+
 def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
+    calculation_weight = _protein_calculation_weight(inputs.height_cm, inputs.weight_kg)
     female_bmr = _mifflin(inputs, coefficient=Decimal("-161"))
     male_bmr = _mifflin(inputs, coefficient=Decimal("5"))
+
     if inputs.metabolic_basis == "female_coefficient":
         bmr = _point_band(female_bmr, "kcal/day")
     elif inputs.metabolic_basis == "male_coefficient":
@@ -173,7 +186,6 @@ def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
     exercise = _point_band(daily_exercise, "kcal/day")
     tdee = _map_band(non_exercise, lambda value: value + daily_exercise)
     training_alignment = assess_training_stimulus_alignment(inputs)
-    calculation_weight = _protein_calculation_weight(inputs.height_cm, inputs.weight_kg)
 
     strategy_inputs = GoalStrategyInputs(
         fitness_goal=inputs.fitness_goal,
@@ -198,7 +210,10 @@ def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
         protein_calculation_weight_kg=calculation_weight,
     )
 
-    if inputs.requested_weight_change_kg_per_week is not None:
+    if (
+        inputs.fitness_goal in PRODUCT_GOAL_STRATEGIES
+        or inputs.requested_weight_change_kg_per_week is not None
+    ):
         goal_calories = strategy.goal_calories
         protein = strategy.protein
         base_nutrients = nutrient_targets_for_calories(goal_calories.preferred or Decimal("2000"))

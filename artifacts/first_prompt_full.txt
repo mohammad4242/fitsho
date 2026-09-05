@@ -1,0 +1,1021 @@
+<USER_REQUEST>
+You are working on the Fitsho repository:
+
+mohammad4242/fitsho
+
+This is an architectural correction of the nutrition engine, not a cosmetic refactor.
+
+Read the CURRENT repository state first. Do not rely only on old roadmap assumptions because the product requirements below supersede parts of Phase 4 and Phase 5.
+
+Also read the existing nutrition roadmap and the latest 100-profile nutrition audit artifacts if they are present in the repository/workspace.
+
+IMPORTANT EXECUTION RULE:
+Continue through the entire task until implementation, migrations, tests, lint, frontend build, and the final deterministic 100-profile audit are complete.
+
+Do not stop after analysis or planning.
+Only ask me a question if there is a genuine ambiguity that cannot be resolved from the repository.
+
+Do not reset, clean, discard, or overwrite unrelated local changes.
+
+==================================================
+PRODUCT INTENT — SOURCE OF TRUTH
+==================================================
+
+The final nutrition engine must behave conceptually like this:
+
+Profile + Safety
+    ↓
+Scientific calculation
+    ↓
+EXACTLY ONE goal strategy
+    ↓
+Program cost preflight
+    ↓
+Hard eligibility
+    ↓
+ONE complete unified ranking across programs
+    ↓
+Top candidates are actually constructed/evaluated in batches
+    ↓
+ONE final Base Nutrition Program is selected
+    ↓
+Meal-count adaptation
+    ↓
+Hard food constraints / allergy substitution
+    ↓
+Freeze ONE safe BasePlanBlueprint
+    ↓
+         ┌─────────────────┐
+         │                 │
+         ↓                 ↓
+   Budget Variant      Ideal Variant
+         │                 │
+         └────────┬────────┘
+                  ↓
+             Comparison
+                  ↓
+          USER CHOOSES ONE
+                  ↓
+ Existing physician-review / activation / tracking flow
+
+The two variants MUST NOT originate from two independently selected NutritionPrograms.
+
+There must be ONE selected base program and ONE safe adapted weekly blueprint.
+
+Budget and Ideal are two optimizations of that SAME blueprint.
+
+==================================================
+1. FIRST: DIAGNOSE AND ELIMINATE THE 19
+UNHANDLED ENGINE ERRORS
+==================================================
+
+The existing 100-profile audit reported exactly:
+
+19 × ERROR_ENGINE_UNHANDLED / UNHANDLED_ENGINE_ERROR
+
+Do NOT “fix” this by wrapping the planner in:
+
+    except Exception:
+        return infeasible
+
+That is forbidden.
+
+Reclassifying a crash as an infeasible plan is NOT a fix.
+
+Before changing behavior:
+
+1. Record:
+   git status --short
+   git rev-parse HEAD
+
+2. Run the deterministic nutrition audit using the existing seed:
+   seed = 20260903
+   count = 100
+
+Use the existing audit script/CLI after inspecting its current arguments.
+
+3. Ensure JSON diagnostics contain for every unhandled exception:
+
+   profile_index
+   exception_type
+   exception_message
+   full traceback
+   failing function
+   failing engine phase
+   candidate program code/id if known
+   adapted meal structure
+   main meal count
+   snack count
+   base/optimization mode if applicable
+
+If full traceback is not currently stored, add it to the audit JSON
+diagnostics. PDF may remain concise.
+
+4. Extract ALL baseline profiles that produce
+   UNHANDLED_ENGINE_ERROR.
+
+There should be 19 in the baseline artifact. If current HEAD produces a
+different number because newer commits changed behavior, preserve the
+known baseline profile IDs from the existing audit artifact and test
+those as regression cases too.
+
+5. Re-run every failing profile individually.
+If the audit script cannot run one profile by index, add a small
+--profile-index / --only-profile option.
+
+6. Build a table before implementation:
+
+   profile index
+   exception type
+   exception message
+   top relevant traceback frame
+   root-cause group
+
+Do NOT assume all 19 failures share one root cause.
+
+7. Write a regression test for every UNIQUE root cause and also a
+parameterized regression test covering all baseline unhandled profile
+indexes.
+
+8. Fix the root causes.
+
+At minimum inspect these known fragile areas carefully:
+
+backend/app/nutrition/program_adaptation.py
+backend/app/nutrition/planner_engine.py
+backend/app/nutrition/budget_optimizer.py
+backend/app/nutrition/portion_solver.py
+backend/app/nutrition/template_substitution.py
+backend/app/nutrition/program_costing.py
+backend/app/nutrition/candidate_selection.py
+backend/app/nutrition/plan_service.py
+
+Pay special attention to program_adaptation.py.
+
+The current code contains unsafe assumptions such as:
+
+- day_slots[BREAKFAST]
+- day_slots[LUNCH]
+- day_slots[DINNER]
+- day_slots[SNACK]
+
+without proving that the category exists.
+
+It also has possible empty-list failures around:
+
+    choices[day_index % len(choices)]
+
+and:
+
+    additional[(day_index + offset) % len(additional)]
+
+These can produce KeyError / ZeroDivisionError / IndexError when a
+program or meal pool has insufficient structural coverage.
+
+Fix these as domain behavior, not blanket exception catches.
+
+Expected impossible states must result in precise domain outcomes such
+as:
+
+PROGRAM_STRUCTURE_INCOMPATIBLE
+INSUFFICIENT_SAFE_SLOT_COVERAGE
+NO_FEASIBLE_BASE_PROGRAM
+
+or another well-named existing equivalent.
+
+But do not convert actually solvable profiles into failures just to
+remove exceptions.
+
+FINAL REQUIREMENT:
+
+UNHANDLED_ENGINE_ERROR count = 0
+
+for the deterministic 100-profile audit.
+
+==================================================
+2. FIVE PRODUCT GOALS MUST USE ONLY THEIR OWN
+ALGORITHM — NO LEGACY FALLBACK
+==================================================
+
+Inspect:
+
+backend/app/nutrition/scientific.py
+backend/app/nutrition/goal_strategy.py
+backend/app/nutrition/weight_rate_policy.py
+backend/app/nutrition/nutrition_targets.py
+backend/app/nutrition/estimate_service.py
+
+There is currently an important architectural bug:
+
+resolve_goal_strategy() is calculated, but scientific.calculate_targets()
+still has a branch where, when
+requested_weight_change_kg_per_week is None, it falls back to the old
+logic such as:
+
+calculate_safe_nutrition_target(...)
+_preferred_protein_multiplier(...)
+nutrient_targets_for_calories(...)
+
+For the five product goals below this is forbidden:
+
+LOSE_WEIGHT
+FAT_LOSS
+GAIN_WEIGHT
+BUILD_MUSCLE
+BODY_RECOMPOSITION
+
+For each of these five goals:
+
+fitness_goal
+    ↓
+exact strategy resolver
+    ↓
+strategy.goal_calories
+strategy.protein
+strategy.carbohydrate
+strategy.total_fat
+strategy.fibre
+
+MUST be the authoritative targets regardless of whether
+requested_weight_change_kg_per_week is null or non-null.
+
+Especially:
+
+BODY_RECOMPOSITION intentionally has no weight-rate selector and rate
+is normally null.
+
+BODY_RECOMPOSITION must STILL use the BODY_RECOMPOSITION strategy.
+It must never accidentally enter legacy target logic because its rate
+is null.
+
+Implement an explicit deterministic goal-strategy dispatch if useful,
+for example conceptually:
+
+PRODUCT_GOAL_STRATEGIES = {
+    "lose_weight": ...,
+    "fat_loss": ...,
+    "gain_weight": ...,
+    "build_muscle": ...,
+    "body_recomposition": ...,
+}
+
+Do not allow cross-goal fallback.
+
+Legacy goals such as maintain_weight / improve_fitness / strength may
+retain a clearly separated legacy/general strategy if existing product
+behavior requires it.
+
+But the five product goals above must NEVER call the legacy target
+path.
+
+Add tests for ALL FIVE goals with:
+
+- requested rate present
+- requested rate absent where allowed
+- deterministic result
+- energy-consistent macros
+- correct goal_strategy code/version
+- correct protein priority
+- no legacy target helper invoked
+
+Explicitly test:
+
+BODY_RECOMPOSITION + requested_rate=None
+    -> BODY_RECOMPOSITION strategy
+    -> never legacy fallback
+
+FAT_LOSS + resistance training
+    -> FAT_LOSS strategy
+    -> its own high-protein target
+
+BUILD_MUSCLE
+    -> BUILD_MUSCLE strategy only
+
+LOSE_WEIGHT
+    -> LOSE_WEIGHT strategy only
+
+GAIN_WEIGHT
+    -> GAIN_WEIGHT strategy only
+
+==================================================
+3. REPLACE DUAL PROGRAM RANKING WITH ONE COMPLETE
+BASE-PROGRAM RANKING
+==================================================
+
+Inspect:
+
+backend/app/nutrition/program_selection.py
+backend/app/nutrition/program_scoring.py
+backend/app/nutrition/program_eligibility.py
+backend/app/nutrition/program_costing.py
+backend/app/nutrition/candidate_selection.py
+backend/app/nutrition/plan_service.py
+
+Current architecture performs:
+
+rank_for_budget(...)
+rank_for_ideal(...)
+
+and therefore Budget and Ideal may start from two different programs.
+
+Remove this behavior from the production generation path.
+
+There must be ONE ranking for selecting the Base Nutrition Program.
+
+Conceptually:
+
+rank_base_programs(...)
+
+or reuse/refactor the existing selection API with one explicit
+BASE_SELECTION mode.
+
+The unified base ranking must happen BEFORE final program selection.
+
+Use all relevant signals:
+
+1. budget realism / live cost preflight
+2. resolved GoalStrategy compatibility
+3. training compatibility
+4. meal-count/structure compatibility
+5. allergies/hard restrictions feasibility
+6. user preferences / disliked foods
+7. cooking / plan-style constraints that are still product-supported
+8. repetition / variety feasibility
+9. portion headroom / ability to achieve the scientific target
+
+Keep budget an important component.
+
+The current roadmap weighting can remain a useful starting point:
+
+Budget fit          40%
+Goal affinity       25%
+Training fit        10%
+Meal structure      10%
+Preference/variety  15%
+
+BUT goal scoring must be made materially smarter.
+
+Do not score goals only using coarse labels such as:
+
+HIGH_PROTEIN_GYM
+BALANCED_IRANIAN
+ECONOMY
+
+Derive actual preconstruction program features where available:
+
+protein target capacity
+protein density
+protein distribution potential
+energy density
+carbohydrate scaling capacity
+fat scaling capacity
+portion headroom
+meal-slot compatibility
+training-slot compatibility
+micronutrient coverage
+current cost
+minimum realistic adapted cost
+
+Then score those features against the RESOLVED GoalStrategy.
+
+Example:
+
+FAT_LOSS should rank programs that can realistically achieve its
+protein/energy target higher.
+
+BUILD_MUSCLE should rank programs with enough protein capacity,
+carbohydrate scaling and portion headroom higher.
+
+GAIN_WEIGHT should value calorie scalability.
+
+RECOMPOSITION should value protein capacity and resistance-training
+support.
+
+LOSE_WEIGHT should value protein/fibre/adherence and manageable energy
+density.
+
+==================================================
+4. RANK FIRST, THEN ACTUALLY TEST CANDIDATES,
+THEN SELECT ONE BASE PROGRAM
+==================================================
+
+Do not blindly select rank #1 without constructing it.
+
+Use bounded batching:
+
+rank all eligible programs
+    ↓
+construct/evaluate top 5
+    ↓
+if no safe usable base program:
+    try next 5
+    ↓
+continue until a base program is found or candidates are exhausted
+
+The final Base Program should be selected using fully-built candidate
+quality after hard safety feasibility.
+
+Prefer a base program capable of producing BOTH:
+
+Budget Variant
+and
+Ideal Variant
+
+when possible.
+
+If the highest preconstruction-ranked program cannot produce a valid
+Budget Variant but another highly ranked safe program can produce both,
+the final selection should consider that before freezing the base.
+
+Do not choose one base and then jump to another program after the
+Budget/Ideal split.
+
+==================================================
+5. APPLY HARD FOOD CONSTRAINTS BEFORE THE
+BUDGET/IDEAL SPLIT
+==================================================
+
+For the selected candidate:
+
+adapt program to meal counts
+    ↓
+normalize hard food constraints
+    ↓
+perform safe meal substitution
+    ↓
+produce one safe BasePlanBlueprint
+    ↓
+freeze it
+
+Allergy, clinically hard intolerance, religious/cultural hard
+exclusion, never_suggest and refused food remain HARD.
+
+Disliked remains SOFT.
+
+One incompatible meal must attempt safe replacement before rejecting
+the whole candidate.
+
+Do not weaken allergen or medical safety to raise success rate.
+
+The resulting frozen base blueprint must contain:
+
+base_program_id
+base_program_code
+adapted meal schedule
+resolved hard substitutions
+template IDs for every slot
+constraint snapshot
+scientific target snapshot
+goal strategy/version
+stable blueprint signature
+
+==================================================
+6. BUDGET AND IDEAL MUST BE TWO VARIANTS OF
+THE EXACT SAME FROZEN BASE BLUEPRINT
+==================================================
+
+After BasePlanBlueprint is frozen, fork it.
+
+NOT before.
+
+Invariant:
+
+budget.base_program_id == ideal.base_program_id
+budget.base_program_code == ideal.base_program_code
+
+budget.base_blueprint_signature ==
+ideal.base_blueprint_signature
+
+budget.scientific_target_snapshot ==
+ideal.scientific_target_snapshot
+
+budget.goal_strategy ==
+ideal.goal_strategy
+
+budget.hard_constraint_snapshot ==
+ideal.hard_constraint_snapshot
+
+The weekly slot/template structure after mandatory safety substitutions
+must also remain the same.
+
+Do not let Budget choose ECO03 while Ideal chooses GYM04.
+
+Do not run rank_for_ideal() again after the base program is selected.
+
+--------------------------------------------------
+Budget Variant
+--------------------------------------------------
+
+Optimize the frozen blueprint under the user's budget.
+
+It may adjust:
+
+- portions
+- ingredient quantities
+- safe cost-efficient variants that do not change the frozen base
+  schedule identity
+
+It must preserve:
+
+- hard minimums
+- allergies
+- medical safety
+- same base program
+- same scientific goal strategy
+
+For strict budget:
+never exceed the strict cap and call it successful.
+
+For flexible budget:
+respect the existing flexible policy.
+
+If preferred protein cannot be completely reached due to budget but the
+goal-specific HARD protein minimum is met:
+
+Budget Variant may succeed with a structured warning:
+
+BUDGET_PLAN_PROTEIN_PREFERRED_GAP
+
+Do not silently lower the scientific preferred target.
+
+--------------------------------------------------
+Ideal Variant
+--------------------------------------------------
+
+Start from the SAME BasePlanBlueprint.
+
+Ignore the user's budget cap.
+
+Optimize nutrition-first toward the SAME scientific target.
+
+Especially prioritize reaching the selected GoalStrategy's preferred
+protein target when safely feasible.
+
+Ideal does NOT mean:
+“choose expensive foods”.
+
+Ideal means:
+best nutrition quality from the same base program without user budget
+constraint.
+
+Cost is not a positive quality signal.
+
+--------------------------------------------------
+If Budget is genuinely impossible
+--------------------------------------------------
+
+Do not fake success.
+
+If no Budget Variant from the chosen safe base can meet hard minimums:
+
+budget_plan = null
+
+Ideal may still exist.
+
+Only report minimum feasible cost if a valid lower bound was actually
+established.
+
+Do not treat bounded-search exhaustion as mathematical proof of
+infeasibility.
+
+==================================================
+7. USER MUST BE ABLE TO CHOOSE BUDGET OR IDEAL
+==================================================
+
+This requirement supersedes the old roadmap rule that Ideal is
+reference-only.
+
+Current behavior where IDEAL_REFERENCE can never become active must be
+changed.
+
+However user selection MUST NOT bypass medical/physician safety.
+
+Recommended persistence design:
+
+Extend NutritionPlanBundle with a source-of-truth selection, e.g.:
+
+selected_plan_id UUID nullable
+selected_plan_role nullable
+selected_at timestamp nullable
+
+Use the repository's normal migration conventions.
+
+Do NOT delete the existing budget / ideal_reference role values merely
+for naming reasons if backward compatibility is easier.
+
+Their role should describe how the variant was optimized, NOT whether
+the user may select it.
+
+A bundle contains:
+
+one Budget Variant
+one Ideal Variant
+zero or one selected variant
+
+Add an authenticated user endpoint following existing router patterns,
+conceptually:
+
+POST /api/v1/nutrition/plan-bundles/{bundle_id}/select
+
+payload:
+
+{
+    "plan_id": "..."
+}
+
+or a role enum if cleaner.
+
+Validate:
+
+- bundle belongs to current user
+- plan belongs to that bundle
+- plan is Budget or Ideal child of that bundle
+- plan is not stale/superseded
+- both variants originated from the same base blueprint
+- safety decision/signature is still valid
+- user cannot select another user's plan
+
+Make selection idempotent.
+
+The SELECTED variant becomes the branch that enters the existing
+physician-review / approval / activation workflow.
+
+The unselected variant:
+
+- must never become active
+- must never be used by tracking
+- must never be returned as current active diet
+- must never drive adherence
+- must remain available for comparison/history as appropriate
+
+Do NOT activate an Ideal plan merely because the user selected it if
+the existing safety decision requires physician review.
+
+Selection means:
+“this is the plan I want to proceed with”
+
+not:
+“skip physician approval”.
+
+Update all relevant readers:
+
+backend/app/nutrition/plan_service.py
+backend/app/nutrition/tracking_service.py
+backend/app/nutrition/adherence_service.py
+backend/app/nutrition/plan_editing.py
+
+Search for all logic that assumes:
+
+plan_role != IDEAL_REFERENCE
+
+means active/selectable.
+
+Replace that assumption with explicit bundle selection semantics.
+
+For old historical bundles with no selected_plan_id, preserve backward
+compatibility by treating their Budget plan as the legacy selected
+branch.
+
+==================================================
+8. FRONTEND: LET THE USER CHOOSE
+==================================================
+
+Inspect:
+
+frontend/src/features/nutrition/NutritionEstimatePage.tsx
+frontend/src/features/nutrition/WeeklyNutritionPlan.tsx
+frontend/src/features/nutrition/api.ts
+frontend/src/features/nutrition/types.ts
+their tests/styles
+
+When two materially different variants exist, display clearly:
+
+برنامه نزدیک به بودجه من
+and
+برنامه ایدهآل
+
+Show structured differences such as:
+
+monthly cost
+daily protein
+calories if meaningfully different
+meal variety
+protein-source variety
+meaningful micronutrient differences
+
+Add clear buttons:
+
+«انتخاب برنامه نزدیک بودجه»
+«انتخاب برنامه ایدهآل»
+
+After selection show:
+
+«انتخاب شما»
+
+and transition that plan into the existing review/activation state.
+
+Do not call Ideal “reference-only” anymore.
+
+If the two generated variants are effectively identical, avoid
+duplicated visual noise; one-plan UX is acceptable, but the underlying
+bundle/selection model must remain correct.
+
+==================================================
+9. V1 DIETARY SCOPE: DISABLE VEGETARIAN AND VEGAN
+==================================================
+
+For Version 1:
+
+Only:
+
+omnivore
+
+is supported internally.
+
+User-facing Persian label should remain the preferred product wording
+for mixed plant + animal eating rather than an ugly literal
+“همهچیزخوار”, following the current product copy.
+
+vegetarian and vegan must NOT be selectable by new users in V1.
+
+Do NOT delete the enum/database values because existing historical data
+may contain them.
+
+Frontend:
+
+Inspect NutritionOnboardingFlow.tsx and related types/tests.
+
+For new onboarding:
+
+- omnivore/mixed = enabled
+- vegetarian = disabled or unavailable
+- vegan = disabled or unavailable
+
+If the options remain visible, show a small “بهزودی” / “Coming soon”
+label and prevent interaction.
+
+Backend:
+
+Do not rely only on UI disabling.
+
+At save_nutrition_profile/service boundary reject new attempts to set:
+
+vegetarian
+vegan
+
+with an explicit domain error such as:
+
+DIETARY_PATTERN_NOT_SUPPORTED_V1
+
+Do not create a 500 error.
+
+Existing legacy vegetarian/vegan profiles:
+
+- must remain readable
+- must not be silently deleted or rewritten
+- should produce a clear unsupported-V1 state if automatic generation
+  is requested
+- may be changed by the user back to the supported mixed/omnivore
+  option
+
+Update tests accordingly.
+
+==================================================
+10. UPDATE AUDIT COHORT SEMANTICS HONESTLY
+==================================================
+
+Because vegetarian/vegan are intentionally outside V1 supported scope,
+update audit reporting.
+
+Do NOT simply delete them from the generated dataset.
+
+Report separately:
+
+total_profiles
+v1_supported_profiles
+unsupported_legacy_dietary_profiles
+medical_safety_blocks
+
+For the V1 automatic-success KPI, denominator is:
+
+dietary_pattern == omnivore
+AND medically eligible for automatic planning
+AND otherwise within supported product scope
+
+But still run vegetarian/vegan rows and confirm they return the explicit:
+
+DIETARY_PATTERN_NOT_SUPPORTED_V1
+
+rather than crashing.
+
+Do not game the denominator.
+
+==================================================
+11. REQUIRED TESTS
+==================================================
+
+Add or update focused tests covering at least:
+
+A. Goal strategy isolation
+
+- lose_weight rate present
+- lose_weight rate null/default
+- fat_loss rate present
+- fat_loss rate null/default
+- gain_weight rate present
+- gain_weight rate null/default
+- build_muscle rate present
+- build_muscle rate null/default
+- body_recomposition rate null
+
+For all five:
+assert their own strategy is authoritative.
+assert old fallback does not execute.
+
+B. Unified base ranking
+
+- one ranking call, not separate Budget/Ideal rankings
+- deterministic ordering
+- goal strategy affects ranking
+- budget affects ranking
+- fallback batch works
+- selected base is fully evaluated
+
+C. Same-base dual variants
+
+assert:
+
+budget.base_program_id == ideal.base_program_id
+
+budget.base_blueprint_signature ==
+ideal.base_blueprint_signature
+
+budget and ideal share scientific target snapshot
+
+budget and ideal share hard constraints
+
+budget and ideal do not independently choose different program codes
+
+D. Budget behavior
+
+- strict budget cap
+- flexible budget behavior
+- preferred protein gap may warn
+- hard minimum shortfall cannot be called success
+- search exhaustion is not proof of minimum feasible cost
+
+E. User selection
+
+- select Budget
+- select Ideal
+- selected plan belongs to user
+- cross-user selection rejected
+- idempotent selection
+- only selected branch is used by latest/active/tracking/adherence
+- unselected branch never becomes active
+- physician review is still honored
+- legacy bundle with no explicit selection falls back safely to Budget
+
+F. V1 dietary scope
+
+- new omnivore/mixed profile accepted
+- vegetarian disabled in frontend
+- vegan disabled in frontend
+- backend vegetarian write rejected explicitly
+- backend vegan write rejected explicitly
+- legacy vegetarian/vegan profile remains readable
+- generation gives explicit unsupported-V1 result, never 500
+
+G. Regression for the 19 unhandled profiles
+
+Parameterize every baseline profile index that previously produced
+UNHANDLED_ENGINE_ERROR.
+
+Each must now produce:
+
+SUCCESS
+
+or a precise EXPECTED domain outcome.
+
+None may produce an uncaught exception.
+
+==================================================
+12. FINAL ACCEPTANCE GATES
+==================================================
+
+Do not declare completion until ALL are true:
+
+1. UNHANDLED_ENGINE_ERROR = 0
+
+2. Hard allergen violations = 0
+
+3. Hard exclusion violations = 0
+
+4. Medical safety violations = 0
+
+5. All five product goals use only their own GoalStrategy.
+
+6. BODY_RECOMPOSITION with null weight rate never uses legacy target
+   calculation.
+
+7. Only ONE Base Program is selected.
+
+8. Budget and Ideal share the exact same base program and frozen
+   blueprint.
+
+9. No second Ideal program ranking exists in production generation
+   flow.
+
+10. User can explicitly select Budget or Ideal.
+
+11. Only the selected variant can enter active/tracking behavior.
+
+12. Vegetarian and Vegan are unavailable to new V1 users.
+
+13. Supported V1 automatically eligible cohort has:
+
+    safe plan-generation success >= 90%
+
+Do not reach 90% by weakening:
+
+- allergy safety
+- medical safety
+- hard food exclusions
+- nutrient upper limits
+- goal-specific hard macro minimums
+
+Do not count legitimate medical safety blocks as fake successes.
+
+==================================================
+13. RUN VERIFICATION
+==================================================
+
+Backend:
+
+cd backend
+
+Run focused tests first.
+
+Then:
+
+uv run pytest tests/nutrition -q
+uv run ruff check app/nutrition scripts tests/nutrition
+
+Run the final deterministic 100-profile audit with:
+
+count = 100
+seed = 20260903
+
+using the current script CLI and generate JSON + PDF artifacts.
+
+Frontend:
+
+cd frontend
+
+npm test
+npm run lint
+npm run build
+
+==================================================
+14. FINAL REPORT
+==================================================
+
+At the end report:
+
+1. current HEAD used
+2. exact files changed
+3. migrations added
+4. the 19 baseline unhandled profile IDs
+5. unique root causes found for those 19
+6. exact fix for each root-cause group
+7. before/after UNHANDLED_ENGINE_ERROR count
+8. before/after V1 supported success rate
+9. final failure histogram
+10. hard safety violation counts
+11. proof that all five goals bypass legacy fallback
+12. proof Budget/Ideal share one base program + blueprint
+13. proof user can select either variant
+14. backend test result
+15. frontend test/lint/build result
+16. final audit artifact paths
+
+Important:
+
+Do not stop at scaffolding.
+Do not hide crashes with broad exception handling.
+Do not loosen safety to improve the percentage.
+Do not create independent Budget and Ideal program selections.
+Do not preserve the old “Ideal is never selectable” rule.
+Do not allow the five product goals to enter the old scientific fallback.
+Do not enable vegetarian/vegan in V1.
+
+Continue until all feasible acceptance gates are green.
+If a gate still fails, diagnose the root cause and continue fixing it.
+Only ask me if there is a genuine unresolved product ambiguity.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-05T01:17:10+03:30.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.8 Flash (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

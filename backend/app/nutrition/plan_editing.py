@@ -774,7 +774,8 @@ def _assert_editable(plan: NutritionWeeklyPlan, expected: UUID) -> None:
     if plan.id != expected:
         raise PlanEditError("STALE_PLAN_REVISION")
     if plan.generation and plan.generation.plan_role == NutritionPlanRole.IDEAL_REFERENCE.value:
-        raise PlanEditError("IDEAL_REFERENCE_PLAN_CANNOT_BE_EDITED")
+        if not (plan.generation.bundle and plan.generation.bundle.selected_plan_id == plan.id):
+            raise PlanEditError("IDEAL_REFERENCE_PLAN_CANNOT_BE_EDITED")
     if plan.review and plan.review.status == NutritionPlanReviewStatus.IN_REVIEW:
         raise PlanEditError("PLAN_REVIEW_IN_PROGRESS")
 

@@ -1,0 +1,475 @@
+تو داخل repository پروژه Fitsho با آدرس:
+
+"mohammad4242/fitsho"
+
+کار می‌کنی.
+
+هدف این کار ساخت ۱۰ پروفایل کاربری مصنوعی جدید و کاملاً متفاوت و اجرای واقعی Fitsho Program Engine / Fitsho Coach برای هرکدام است، تا خروجی موتور را بعداً از نظر ایمنی، شخصی‌سازی، حجم، انتخاب حرکت، تعداد روز، تجهیزات و کیفیت برنامه بررسی کنیم.
+
+اصل بسیار مهم
+
+هیچ فیلد، گزینه، هدف، آسیب، وسیله، سطح تمرینی یا مقدار جدیدی خارج از آنچه واقعاً در Fitsho پشتیبانی می‌شود اختراع نکن.
+
+قبل از ساخت کاربران، حتماً کد فعلی branch مورد استفاده را بخوان و source of truth را از خود repository استخراج کن.
+
+حداقل این فایل‌ها و هر dependency مرتبط را بررسی کن:
+
+- "backend/app/profile/schemas.py"
+- "backend/app/profile/enums.py"
+- "backend/app/exercises/enums.py"
+- مدل‌های profile
+- frontend onboarding مربوط به Training Profile
+- "backend/app/workouts/"
+- "backend/app/workouts/program_engine/"
+- training templates و rulesetهای مورد استفاده موتور
+- هر mapper/normalizer که Profile را به ورودی Program Engine تبدیل می‌کند
+
+اگر enum یا schema فعلی repository با چیزی که در این prompt نوشته شده متفاوت بود، کد فعلی repository مقدم است.
+
+---
+
+مرحله ۱ — استخراج دقیق فضای پروفایل Fitsho
+
+ابتدا مشخص کن که یک Training Profile واقعی Fitsho دقیقاً چه فیلدهایی دارد و برای هر فیلد چه مقادیری مجاز است.
+
+از هیچ فیلدی خارج از Profile واقعی Fitsho استفاده نکن.
+
+برای مثال مواردی از جنس زیر را فقط در صورتی استفاده کن که در schema فعلی واقعاً وجود داشته باشند:
+
+- "display_name"
+- "birth_date"
+- "sex"
+- "height_cm"
+- "current_weight_kg"
+- اندازه‌های بدنی اختیاری
+- "fitness_goal"
+- "experience_level"
+- "training_age_months"
+- "training_days_per_week"
+- "preferred_weekdays"
+- "priority_muscles"
+- "training_location"
+- "home_training_setup"
+- "training_cautions"
+- "physical_limitations"
+- "plan_duration_weeks"
+- "session_duration_minutes"
+- "training_intensity"
+- "workout_generation_method"
+
+برای تست Program Engine، همه کاربران باید از روش تولید برنامه واقعی Fitsho Coach استفاده کنند، نه یک مدل AI که خودش برنامه بنویسد:
+
+"workout_generation_method = fitsho_coach"
+
+اگر بعضی fitness goalها فقط برای backward compatibility در backend باقی مانده‌اند ولی در onboarding فعلی به کاربر جدید نمایش داده نمی‌شوند، از آنها برای پروفایل جدید استفاده نکن.
+
+مثلاً "improve_fitness" یا "maintain_weight" را فقط اگر onboarding فعلی واقعاً اجازه انتخابشان را می‌دهد استفاده کن.
+
+---
+
+مرحله ۲ — ساخت ۱۰ کاربر جدید
+
+۱۰ کاربر مصنوعی جدید بساز.
+
+این ۱۰ نفر نباید کپی یا تغییر جزئی کاربران گزارش قبلی باشند.
+
+هدف، افزایش coverage موتور است.
+
+بین کاربران تا حد ممکن تنوع کنترل‌شده ایجاد کن در:
+
+- جنسیت
+- سن
+- قد
+- وزن
+- BMI مشتق‌شده
+- fitness goal
+- experience level
+- training age
+- ۲ تا ۶ روز تمرین
+- مدت جلسه
+- شدت تمرین
+- باشگاه / خانه
+- Bodyweight-only / Dumbbells در صورت تمرین در خانه
+- priority muscles
+- cautionها
+- physical limitations
+- تعداد و ترکیب injury/caution
+- preferred weekdays
+- plan duration
+
+مهم
+
+قد، وزن، سن، تعداد روزها و بقیه داده‌ها باید همگی داخل validation واقعی Fitsho باشند.
+
+BMI فقط یک مقدار محاسبه‌شده برای گزارش است؛ آن را به‌عنوان فیلد Profile جدید اختراع نکن.
+
+برای سن نیز Profile واقعی را با "birth_date" معتبر بساز و سن را فقط در گزارش محاسبه کن.
+
+---
+
+مرحله ۳ — طراحی هوشمند ۱۰ سناریو
+
+پروفایل‌ها را تصادفی محض نساز.
+
+۱۰ سناریو را طوری انتخاب کن که بخش‌های مختلف موتور تحت فشار قرار بگیرند و احتمال کشف bug بالا برود.
+
+در مجموعه ۱۰ نفر حتماً این نوع edge caseها را تا جایی که Profile فعلی Fitsho اجازه می‌دهد پوشش بده:
+
+A. تفاوت سطح تجربه
+
+نمونه‌هایی از:
+
+- first month
+- beginner
+- intermediate
+- advanced
+
+B. تفاوت تعداد روز
+
+در مجموع کاربران، حالت‌های مختلف بین:
+
+- ۲ روز
+- ۳ روز
+- ۴ روز
+- ۵ روز
+- ۶ روز
+
+را پوشش بده.
+
+C. Home Training
+
+حداقل دو یا سه کاربر Home داشته باش:
+
+- حداقل یک "bodyweight_only"
+- حداقل یک "dumbbells_available"
+
+به هیچ کاربر Home وسیله‌ای خارج از چیزی که Profile Fitsho برایش ثبت کرده نسبت نده.
+
+D. Caution / Physical limitation
+
+چند سناریوی متفاوت از cautionهای واقعی Fitsho بساز.
+
+در صورت پشتیبانی schema، حداقل یک کاربر دارای بیش از یک caution نیز داشته باش.
+
+اما cautionها را فقط از enum واقعی Fitsho انتخاب کن.
+
+اگر نیاز به جزئیات بیشتری مثل:
+
+- درد در overhead
+- محدودیت فلکشن زانو
+- حساسیت هنگام wrist extension
+- محدودیت lumbar loading
+
+وجود داشت، فقط در "physical_limitations" توضیح بده و enum جدید نساز.
+
+E. Fitness Goals
+
+بین کاربران چند هدف متفاوت واقعی Fitsho استفاده کن.
+
+هدف این است که بفهمیم Program Engine واقعاً بین هدف‌هایی مثل:
+
+- muscle building
+- fat loss / weight loss
+- body recomposition
+- strength
+- سایر goalهای فعال onboarding
+
+تفاوت ایجاد می‌کند یا خیر.
+
+F. Priority Muscles
+
+Priority muscleها را فقط از "MuscleGroup" واقعی repository انتخاب کن.
+
+بین کاربران ترکیب‌های مختلف انتخاب کن؛ مثلاً یک نفر upper-body priority، یک نفر posterior-chain، یک نفر glutes، یک نفر chest/back و غیره، فقط در حد enumهای واقعی پروژه.
+
+G. سن
+
+فقط جوان تولید نکن.
+
+در کنار کاربران جوان و میانسال، حداقل یک کاربر سالمند‌تر که همچنان داخل محدوده سنی پشتیبانی‌شده Fitsho است ایجاد کن تا age-related rules موتور نیز تست شوند.
+
+---
+
+مرحله ۴ — عدم تکرار ۱۰ تست قبلی
+
+گزارش قبلی "fitsho_10_users_workout_plans.pdf" را اگر در repository یا context موجود است بخوان.
+
+۱۰ پروفایل جدید نباید همان سناریوهای قبلی را دوباره بازسازی کنند.
+
+به‌خصوص فقط اسم، سن یا وزن را عوض نکن و همان ترکیب زیر را دوباره نساز.
+
+سناریوی جدید باید از نظر حداقل چند پارامتر مهم متفاوت باشد:
+
+- goal
+- training days
+- experience
+- location/setup
+- injury/caution
+- priority muscle
+- age
+- session duration
+
+در انتها برای هر کاربر یک جمله کوتاه بنویس که چرا این کیس نسبت به ۱۰ تست قبلی coverage جدید ایجاد می‌کند.
+
+---
+
+مرحله ۵ — ایجاد Profile واقعی برای هر کاربر
+
+برای هر یک از ۱۰ کاربر یک Profile مستقل و معتبر Fitsho بساز.
+
+اگر محیط اجرای repository و test database در دسترس است، این کار را با fixture/test data یا مسیر امن تست انجام بده.
+
+هیچ داده‌ای را در production ایجاد یا تغییر نده.
+
+اگر برای اجرای موتور لازم است user/profile داخل database وجود داشته باشد، از test database پروژه استفاده کن.
+
+هر کاربر باید Profile مستقل خودش را داشته باشد.
+
+Profileها را قبل از اجرای موتور با validation واقعی Pydantic/DB Fitsho validate کن.
+
+اگر یک Profile invalid شد، مقدار unsupported اختراع نکن؛ آن را در چهارچوب schema اصلاح کن.
+
+---
+
+مرحله ۶ — اجرای واقعی Program Engine
+
+این بخش بسیار مهم است.
+
+برای هر ۱۰ Profile، خود Program Engine واقعی Fitsho را اجرا کن.
+
+برنامه تمرینی را خودت طراحی نکن.
+
+از دانش عمومی بدنسازی برای جایگزین کردن خروجی موتور استفاده نکن.
+
+Exercise انتخاب نکن.
+
+Set/rep/RIR را خودت تنظیم نکن.
+
+Split را خودت تعیین نکن.
+
+خروجی باید دقیقاً چیزی باشد که نسخه فعلی Fitsho تولید می‌کند.
+
+اگر موتور fail کرد یا نتوانست برنامه بسازد، failure را همان‌طور که رخ داده ثبت کن؛ خروجی مصنوعی جایگزین نساز.
+
+تمام warningها، fallbackها یا reason codeهای مهم موتور را در صورت دسترسی ثبت کن.
+
+---
+
+مرحله ۷ — خروجی برنامه را دستکاری نکن
+
+برای اینکه بتوانیم bugهای واقعی موتور را پیدا کنیم:
+
+هیچ ایرادی را در این مرحله اصلاح نکن.
+
+مثلاً اگر موتور:
+
+- تعداد روز اشتباه داد
+- وسیله ناموجود انتخاب کرد
+- حرکت مشکوک برای injury انتخاب کرد
+- حجم عجیب داد
+- ۶ ست یک حرکت داد
+- عضله priority را نادیده گرفت
+- duration خیلی کم یا زیاد شد
+- split غیرمنطقی ساخت
+- یک حرکت را در دسته اشتباه گذاشت
+- repetition نامناسب برای یک حرکت انتخاب کرد
+
+همان خروجی را بدون تغییر در گزارش قرار بده.
+
+هدف این گزارش ارزیابی موتور است، نه تولید یک برنامه ایده‌آل.
+
+---
+
+مرحله ۸ — ساخت گزارش مشابه PDF قبلی
+
+یک گزارش منظم برای هر ۱۰ کاربر تولید کن که از نظر ساختار شبیه گزارش تست قبلی باشد.
+
+برای هر User دقیقاً این ساختار را استفاده کن:
+
+کاربر N — عنوان کوتاه سناریو
+
+مثال ساختاری:
+
+"کاربر ۱: مرد ۶۲ ساله · مبتدی · ۳ روز در باشگاه · Strength · Knee caution"
+
+عنوان فقط خلاصه باشد و بر اساس Profile واقعی همان فرد نوشته شود.
+
+1. خلاصه Profile
+
+نمایش بده:
+
+- نام مصنوعی
+- سن
+- جنسیت
+- قد
+- وزن
+- BMI محاسبه‌شده
+- fitness goal
+- experience level
+- training age
+- تعداد روز تمرین در هفته
+- preferred weekdays در صورت وجود
+- session duration
+- training intensity
+- training location
+- home training setup در صورت Home
+- priority muscles
+- training cautions
+- physical limitations
+- plan duration
+
+هم نام نمایشی فارسی و هم enum/value واقعی ذخیره‌شده در Fitsho را در جاهایی مثل Goal/Caution نشان بده تا بعداً بتوانیم mapping را کنترل کنیم.
+
+---
+
+2. دلیل انتخاب این سناریو
+
+در ۲ تا ۴ جمله توضیح بده:
+
+این Profile کدام بخش از Program Engine را تست می‌کند؟
+
+مثلاً:
+
+- recovery
+- equipment filtering
+- injury filtering
+- age modifier
+- strength programming
+- high-frequency programming
+- home constraint
+- priority-muscle allocation
+- session-time budget
+- multi-caution interaction
+
+این قسمت فقط توضیح تست است؛ درباره خوب یا بد بودن برنامه قضاوت نکن.
+
+---
+
+3. خلاصه خروجی موتور
+
+مشخص کن:
+
+- تعداد روز درخواست‌شده در Profile
+- تعداد روز واقعی تولیدشده توسط Engine
+- ساختار/split واقعی تولیدشده، اگر موتور چنین اطلاعاتی دارد
+- مدت تخمینی هر جلسه
+- تعداد حرکات هر جلسه
+
+اگر engine reason code یا metadata مربوط به template/split/fallback دارد، همان را نیز ثبت کن.
+
+---
+
+4. برنامه تمرینی تولیدشده
+
+برای هر Workout Day یک جدول جدا بساز:
+
+#| Exercise| نام فارسی| Sets| Reps/Duration| Rest| RIR| اطلاعات اضافی
+
+اطلاعات را دقیقاً از خروجی موتور بگیر.
+
+اگر prescription یک حرکت time-based است، duration واقعی را نمایش بده و آن را به reps تبدیل نکن.
+
+اگر خود سیستم به اشتباه آن را reps ثبت کرده است، مقدار خام سیستم را نمایش بده.
+
+---
+
+5. Engine Trace مختصر
+
+در صورت موجود بودن، موارد زیر را بدون تفسیر زیاد نمایش بده:
+
+- template selected
+- fallback/recovery
+- rejected candidates
+- safety reason codes
+- exercise selection reason codes
+- cardio selection
+- session repair
+- duration repair
+- volume adjustments
+
+فقط مهم‌ترین اطلاعاتی که برای debugging بعدی مفید هستند.
+
+---
+
+6. Coverage جدید این User
+
+در یک جمله بنویس این کاربر نسبت به ۱۰ کاربر قبلی چه حالت جدیدی را تست کرده است.
+
+---
+
+مرحله ۹ — جدول مقایسه‌ای انتهای گزارش
+
+بعد از ۱۰ کاربر یک جدول overview بده:
+
+User| Sex| Age| BMI| Goal| Experience| Days Requested| Days Generated| Location| Home Setup| Cautions| Priority Muscles| Session Duration
+
+این جدول باید از داده‌های واقعی همان ۱۰ Profile و خروجی واقعی Engine ساخته شود.
+
+---
+
+مرحله ۱۰ — فعلاً ایرادات را تحلیل نکن
+
+در انتهای گزارش لیست ایرادات برنامه‌ها را ننویس.
+
+ما می‌خواهیم در مرحله بعد گزارش را مستقل بررسی کنیم.
+
+فقط اگر اتفاق کاملاً مکانیکی رخ داده، آن را در بخش جداگانه زیر ثبت کن:
+
+Execution Anomalies
+
+مثلاً:
+
+- Profile validation failed
+- Program Engine exception
+- requested 5 days / generated 4 days
+- missing exercise metadata
+- no feasible template
+- fallback activated
+
+اما نگوی:
+
+«این برنامه از نظر علمی بد است.»
+
+یا:
+
+«بهتر بود فلان حرکت انتخاب شود.»
+
+تحلیل تخصصی را برای مرحله بعد نگه دار.
+
+---
+
+الزامات نهایی
+
+1. فقط از Profile و enumهای واقعی Fitsho استفاده کن.
+2. هیچ فیلد ساختگی اضافه نکن.
+3. هیچ equipment option ساختگی به Profile اضافه نکن.
+4. Profile هر ۱۰ کاربر باید validation واقعی Fitsho را پاس کند.
+5. هر User باید Profile مستقل داشته باشد.
+6. همه برنامه‌ها باید توسط Program Engine واقعی پروژه ساخته شوند.
+7. برنامه تولیدشده را اصلاح یا بهینه نکن.
+8. اگر Engine نتیجه بد داد همان را گزارش کن.
+9. اگر Engine fail کرد failure را پنهان نکن.
+10. ۱۰ کیس باید از نظر ترکیب شرایط واقعاً متنوع باشند.
+11. از ۱۰ کیس قبلی تا حد ممکن تکرار سناریویی نداشته باشند.
+12. هیچ تغییری در production database نده.
+13. بدون درخواست صریح من هیچ commit یا push انجام نده.
+
+فرمت تحویل
+
+خروجی نهایی را به‌صورت یک گزارش Markdown قابل تبدیل مستقیم به PDF تولید کن.
+
+نام پیشنهادی:
+
+"fitsho_10_new_users_workout_plans.md"
+
+اگر محیطت قابلیت تولید PDF بدون تغییر محتوای گزارش را دارد، یک نسخه PDF نیز در کنار آن ایجاد کن:
+
+"fitsho_10_new_users_workout_plans.pdf"
+
+ابتدای گزارش بنویس:
+
+گزارش آزمون و شبیه‌سازی دوم موتور برنامه تمرینی فیتشو — ۱۰ پروفایل جدید
+
+و زیر آن:
+
+هدف: افزایش coverage تست Program Engine با ۱۰ پروفایل معتبر، متفاوت و ساخته‌شده صرفاً در چارچوب Profile واقعی Fitsho.

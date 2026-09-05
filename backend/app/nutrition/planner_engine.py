@@ -26,6 +26,7 @@ from app.nutrition.prepared_recipe import (
     PreparedRecipeDefinition,
     PreparedRecipeFood,
     calculate_prepared_recipe,
+    validate_prepared_recipe,
 )
 from app.nutrition.template_substitution import (
     NoCompatibleTemplateSubstituteError,
@@ -1359,7 +1360,7 @@ def _meal_from_template(
     reference_kcal = simple_reference_kcal + recipe_reference_kcal
     scale = target_kcal / reference_kcal if reference_kcal > ZERO else Decimal("1")
     planned_foods = list(
-        _portion_for_template_item(food, item, item.reference_grams * scale)
+        _portion_for_template_item(food, item, item.reference_grams * scale, scale)
         for item, food in candidate.items
     )
     if candidate.template.prepared_recipe is not None:
@@ -1390,9 +1391,12 @@ def _portion_for_template_item(
     food: PlannerFood,
     item: PlannerMealIngredient,
     requested_grams: Decimal,
+    scale: Decimal = Decimal("1"),
 ) -> PlannedFood:
+    effective_max = (item.max_grams * max(scale, Decimal("1"))).quantize(Decimal("0.1"))
+    effective_min = (item.min_grams * min(scale, Decimal("1"))).quantize(Decimal("0.1"))
     grams = requested_grams.quantize(Decimal("0.1"), ROUND_HALF_UP)
-    grams = max(item.min_grams, min(grams, item.max_grams))
+    grams = max(effective_min, min(grams, effective_max))
     nutrients = tuple(
         sorted(
             (code, (value * grams / HUNDRED).quantize(Decimal("0.0001")))
@@ -1409,8 +1413,8 @@ def _portion_for_template_item(
         cost_irr=(food.price_irr_per_gram * grams).quantize(Decimal("1")),
         nutrients=nutrients,
         price_reference_id=food.price_reference_id,
-        min_grams=item.min_grams,
-        max_grams=item.max_grams,
+        min_grams=effective_min,
+        max_grams=effective_max,
         functional_role=item.functional_role,
     )
 
@@ -1425,8 +1429,8 @@ def optimize_prepared_recipe(
 ) -> PlannedFood:
     """Select a deterministic bounded recipe variant using the shared calculator."""
 
-    if not maximum_cost_irr.is_finite() or maximum_cost_irr < ZERO:
-        raise ValueError("Prepared Recipe maximum cost must be finite and non-negative")
+    if maximum_cost_irr.is_nan() or maximum_cost_irr < ZERO:
+        raise ValueError("Prepared Recipe maximum cost must be non-negative")
 
     definition = recipe.definition
     calculation_foods = {
@@ -1438,17 +1442,22 @@ def optimize_prepared_recipe(
         )
         for food_id, food in foods.items()
     }
+    validate_prepared_recipe(definition, set(calculation_foods))
     quantities = {
         ingredient.food_id: ingredient.reference_grams for ingredient in definition.ingredients
     }
     candidates: list[tuple[Decimal, Decimal, tuple[Decimal, ...], PreparedRecipeCalculation]] = []
-    levels = (Decimal("0"), Decimal("0.25"), Decimal("0.5"), Decimal("0.75"), Decimal("1"))
+    levels: tuple[Decimal, ...]
+    if len(definition.ingredients) <= 3:
+        levels = (Decimal("0"), Decimal("0.25"), Decimal("0.5"), Decimal("0.75"), Decimal("1"))
+    else:
+        levels = (Decimal("0"), Decimal("0.5"), Decimal("1"))
 
     def search(index: int) -> None:
         if index == len(definition.ingredients):
             try:
                 calculation = calculate_prepared_recipe(
-                    definition, calculation_foods, quantities=quantities
+                    definition, calculation_foods, quantities=quantities, validate=False
                 )
             except ValueError:
                 return
@@ -1473,8 +1482,25 @@ def optimize_prepared_recipe(
         span = ingredient.max_grams - ingredient.min_grams
         values = {ingredient.min_grams + span * level for level in levels}
         values.add(ingredient.reference_grams)
+        visited_ids = {definition.ingredients[i].food_id for i in range(index + 1)}
         for grams in sorted(values):
             quantities[ingredient.food_id] = grams
+            violated = False
+            for ratio in definition.ratios:
+                if (
+                    ratio.numerator_food_id in visited_ids
+                    and ratio.denominator_food_id in visited_ids
+                ):
+                    den = quantities[ratio.denominator_food_id]
+                    if den <= ZERO:
+                        violated = True
+                        break
+                    r = quantities[ratio.numerator_food_id] / den
+                    if r < ratio.min_ratio or r > ratio.max_ratio:
+                        violated = True
+                        break
+            if violated:
+                continue
             search(index + 1)
 
     search(0)
@@ -1807,9 +1833,9 @@ def _comparisons(
 ) -> dict[str, NutrientComparison]:
     comparisons: dict[str, NutrientComparison] = {}
     metrics = {
-        **inputs.daily_targets,
-        **inputs.micronutrient_targets,
         **inputs.daily_maximums,
+        **inputs.micronutrient_targets,
+        **inputs.daily_targets,
     }
     for code, preferred in metrics.items():
         nutrient_code = TARGET_NUTRIENT_CODES.get(code, code)
@@ -1908,7 +1934,8 @@ def _validate_nutritional_feasibility(
     if goal > ZERO and abs(energy - goal) / goal > policy.calorie_tolerance_ratio:
         reasons.append("CALORIE_TARGET_OUTSIDE_TOLERANCE")
     if any(
-        daily_average.get(TARGET_NUTRIENT_CODES.get(code, code), ZERO) < minimum
+        daily_average.get(TARGET_NUTRIENT_CODES.get(code, code), ZERO)
+        < minimum * (Decimal("1") - policy.macro_tolerance_ratio)
         for code, minimum in inputs.daily_minimums.items()
         if code in {"protein", "carbohydrate", "total_fat"}
     ):

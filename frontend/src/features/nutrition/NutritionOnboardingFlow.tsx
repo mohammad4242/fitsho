@@ -699,7 +699,7 @@ function PostAccountNutritionDetails(props: {
           )}
           <SelectField icon="utensils" label={l("وعده اصلی در روز", "Main meals per day")} value={props.mealCount} onChange={props.onMealCount} options={[["2", l("۲ وعده", "2 meals")], ["3", l("۳ وعده", "3 meals")], ["4", l("۴ وعده یا بیشتر", "4 or more meals")]]} />
           <SelectField icon="nutrition" label={l("میان‌وعده در روز", "Snacks per day")} value={props.snackCount} onChange={props.onSnackCount} options={[["0", l("هیچ‌کدام", "None")], ["1", l("۱ میان‌وعده", "1 snack")], ["2", l("۲ میان‌وعده", "2 snacks")], ["3", l("۳ میان‌وعده یا بیشتر", "3 or more snacks")]]} />
-          <SelectField icon="catalogue" label={l("الگوی غذایی", "Dietary pattern")} value={props.foods.dietaryPattern} onChange={(value) => props.onFoods({ ...props.foods, dietaryPattern: value as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار", "Vegetarian")], ["vegan", l("وگان", "Vegan")]]} />
+          <SelectField icon="catalogue" label={l("الگوی غذایی", "Dietary pattern")} value={props.foods.dietaryPattern} onChange={(value) => props.onFoods({ ...props.foods, dietaryPattern: value as FoodsState["dietaryPattern"] })} options={[["omnivore", l("همه‌چیزخوار", "Omnivore")], ["vegetarian", l("گیاه‌خوار (به‌زودی)", "Vegetarian (Coming soon)"), true], ["vegan", l("وگان (به‌زودی)", "Vegan (Coming soon)"), true]]} />
         </fieldset>
         <fieldset className="profile-fieldset" disabled={props.busy}>
           <legend>
@@ -993,8 +993,8 @@ function PreAccountNutritionQuestions(props: {
           }}
           options={[
             ["omnivore", l("همه‌چیزخوار", "Omnivore")],
-            ["vegetarian", l("گیاه‌خوار", "Vegetarian")],
-            ["vegan", l("وگان", "Vegan")],
+            ["vegetarian", l("گیاه‌خوار (به‌زودی)", "Vegetarian (Coming soon)"), true],
+            ["vegan", l("وگان (به‌زودی)", "Vegan (Coming soon)"), true],
           ]}
         />
       )}
@@ -1246,7 +1246,7 @@ function TextArea(props: {
 function SelectField(props: {
   label: string;
   value: string;
-  options: Array<[string, string]>;
+  options: Array<[string, string] | [string, string, boolean]>;
   onChange: (value: string) => void;
   icon?: IconName;
 }) {
@@ -1265,8 +1265,8 @@ function SelectField(props: {
           value={props.value}
           onChange={(event) => props.onChange(event.target.value)}
         >
-          {props.options.map(([value, label]) => (
-            <option key={value} value={value}>
+          {props.options.map(([value, label, disabled]) => (
+            <option key={value} value={value} disabled={disabled}>
               {label}
             </option>
           ))}

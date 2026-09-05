@@ -54,3 +54,15 @@ class ScheduledTemplateUnavailableError(Exception):
         self.meal_id = meal_id
         self.category = category
         super().__init__(f"{meal_id}:{category}")
+
+
+class DietaryPatternNotSupportedV1Error(Exception):
+    """Raised when an unsupported dietary pattern (e.g. vegetarian, vegan) is submitted in V1."""
+
+
+class WeeklyPlanBundleNotFoundError(Exception):
+    """Raised when a nutrition plan bundle is not found."""
+
+
+class PlanSelectionInvalidError(Exception):
+    """Raised when selecting a plan in a bundle is invalid or infeasible."""

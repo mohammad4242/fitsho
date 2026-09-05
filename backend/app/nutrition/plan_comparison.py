@@ -233,16 +233,18 @@ def compare_plans(
             core_keys = ("goal_calories", "protein", "carbohydrate", "total_fat")
             b_comps = budget_plan_result.nutrient_comparisons or {}
             i_comps = ideal_plan_result.nutrient_comparisons or {}
-            b_devs = [
-                abs(b_comps[k].planned - b_comps[k].preferred) / b_comps[k].preferred
-                for k in core_keys
-                if k in b_comps and b_comps[k].preferred and b_comps[k].preferred > Decimal("0")
-            ]
-            i_devs = [
-                abs(i_comps[k].planned - i_comps[k].preferred) / i_comps[k].preferred
-                for k in core_keys
-                if k in i_comps and i_comps[k].preferred and i_comps[k].preferred > Decimal("0")
-            ]
+            b_devs: list[Decimal] = []
+            for k in core_keys:
+                if k in b_comps:
+                    pref = b_comps[k].preferred
+                    if pref is not None and pref > Decimal("0"):
+                        b_devs.append(abs(b_comps[k].planned - pref) / pref)
+            i_devs: list[Decimal] = []
+            for k in core_keys:
+                if k in i_comps:
+                    pref = i_comps[k].preferred
+                    if pref is not None and pref > Decimal("0"):
+                        i_devs.append(abs(i_comps[k].planned - pref) / pref)
             if b_devs and i_devs:
                 max_b = max(b_devs)
                 max_i = max(i_devs)
@@ -301,16 +303,8 @@ def compare_plans(
     ) -> PlanComparisonMetric | None:
         if gap_val is None and not budget_nutrients and not ideal_nutrients:
             return None
-        b_val = (
-            round(float(budget_nutrients.get(b_key, 0)), 1)
-            if budget_nutrients
-            else None
-        )
-        i_val = (
-            round(float(ideal_nutrients.get(b_key, 0)), 1)
-            if ideal_nutrients
-            else None
-        )
+        b_val = round(float(budget_nutrients.get(b_key, 0)), 1) if budget_nutrients else None
+        i_val = round(float(ideal_nutrients.get(b_key, 0)), 1) if ideal_nutrients else None
         d_val = round(float(gap_val), 1) if gap_val is not None else None
         return PlanComparisonMetric(
             budget_value=b_val,

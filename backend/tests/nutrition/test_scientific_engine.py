@@ -84,14 +84,14 @@ def test_high_bmi_uses_adjusted_weight_for_protein() -> None:
     result = scientific.calculate_targets(
         make_inputs(
             weight_kg=Decimal("100"),
-            fitness_goal="fat_loss",
+            fitness_goal="maintain_weight",
             structured_exercise=exercise,
         )
     )
 
     assert result.protein_calculation_weight_kg == Decimal("84.296875")
     assert result.protein.minimum == Decimal("67.4375000")
-    assert result.protein.preferred == Decimal("151.7343750")
+    assert result.protein.preferred == Decimal("134.8750000")
     assert result.protein.maximum == Decimal("185.4531250")
 
 

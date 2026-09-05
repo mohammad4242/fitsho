@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.nutrition.enums import (
     CookingSkill,
+    DietaryPattern,
     FoodItemKind,
     MealPreparationPreference,
     NutritionOnboardingStatus,
@@ -19,6 +20,7 @@ from app.nutrition.enums import (
     snack_effective_slots,
 )
 from app.nutrition.exceptions import (
+    DietaryPatternNotSupportedV1Error,
     NutritionOnboardingBlockedError,
     NutritionProfileNotFoundError,
     SafetyDecisionNotFoundError,
@@ -276,6 +278,11 @@ def save_nutrition_profile(
         SafetyOutcome.UNSUPPORTED_OR_HARD_BLOCKED,
     }:
         raise NutritionOnboardingBlockedError
+
+    if payload.dietary_pattern in {DietaryPattern.VEGETARIAN, DietaryPattern.VEGAN}:
+        raise DietaryPatternNotSupportedV1Error(
+            "Vegetarian and vegan dietary patterns are not supported in V1."
+        )
 
     profile = db.get(NutritionProfile, user_id)
     scalar_values = payload.model_dump(

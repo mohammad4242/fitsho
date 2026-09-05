@@ -81,7 +81,7 @@ def rank_template_substitutes(
     """Return only safe, category-compatible alternatives in stable order."""
 
     usage = dict(context.template_usage)
-    candidates = (
+    candidates = [
         candidate
         for candidate in eligible_candidates
         if _is_eligible_for_slot(
@@ -91,7 +91,20 @@ def rank_template_substitutes(
             context.maximum_repetition,
             context.food_constraints,
         )
-    )
+    ]
+    if not candidates:
+        candidates = [
+            candidate
+            for candidate in eligible_candidates
+            if _is_eligible_for_slot(
+                candidate,
+                context.slot_category,
+                usage,
+                context.maximum_repetition,
+                context.food_constraints,
+                ignore_repetition=True,
+            )
+        ]
     return tuple(
         sorted(
             candidates,
@@ -178,12 +191,14 @@ def _is_eligible_for_slot(
     usage: dict[str, int],
     maximum_repetition: int,
     constraints: tuple[NormalizedFoodConstraint, ...] = (),
+    *,
+    ignore_repetition: bool = False,
 ) -> bool:
     if getattr(candidate.template, "verification_status", "verified") != "verified":
         return False
     if candidate.template.category != category:
         return False
-    if usage.get(candidate.template.meal_id, 0) >= maximum_repetition:
+    if not ignore_repetition and usage.get(candidate.template.meal_id, 0) >= maximum_repetition:
         return False
     if constraints:
         for _item, food in candidate.items:

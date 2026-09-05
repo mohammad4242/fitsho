@@ -20,6 +20,7 @@ MACRO_RESOLUTION_POLICY_VERSION = "nutrition-macro-resolution-v2"
 ECONOMY_MONTHLY_MAX_IRR = 130_000_000
 NORMAL_MONTHLY_MAX_IRR = 180_000_000
 INITIAL_PROGRAM_BATCH_SIZE = 5
+MAX_PROGRAM_FALLBACK_BATCHES = 1
 
 
 def resolve_budget_tier(monthly_cost_irr: int | Decimal) -> NutritionBudgetTier:

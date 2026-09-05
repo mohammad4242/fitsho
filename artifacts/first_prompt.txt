@@ -1,0 +1,135 @@
+<USER_REQUEST>
+You are working on the Fitsho repository:
+
+mohammad4242/fitsho
+
+This is an architectural correction of the nutrition engine, not a cosmetic refactor.
+
+Read the CURRENT repository state first. Do not rely only on old roadmap assumptions because the product requirements below supersede parts of Phase 4 and Phase 5.
+
+Also read the existing nutrition roadmap and the latest 100-profile nutrition audit artifacts if they are present in the repository/workspace.
+
+IMPORTANT EXECUTION RULE:
+Continue through the entire task until implementation, migrations, tests, lint, frontend build, and the final deterministic 100-profile audit are complete.
+
+Do not stop after analysis or planning.
+Only ask me a question if there is a genuine ambiguity that cannot be resolved from the repository.
+
+Do not reset, clean, discard, or overwrite unrelated local changes.
+
+==================================================
+PRODUCT INTENT — SOURCE OF TRUTH
+==================================================
+
+The final nutrition engine must behave conceptually like this:
+
+Profile + Safety
+    ↓
+Scientific calculation
+    ↓
+EXACTLY ONE goal strategy
+    ↓
+Program cost preflight
+    ↓
+Hard eligibility
+    ↓
+ONE complete unified ranking across programs
+    ↓
+Top candidates are actually constructed/evaluated in batches
+    ↓
+ONE final Base Nutrition Program is selected
+    ↓
+Meal-count adaptation
+    ↓
+Hard food constraints / allergy substitution
+    ↓
+Freeze ONE safe BasePlanBlueprint
+    ↓
+         ┌─────────────────┐
+         │                 │
+         ↓                 ↓
+   Budget Variant      Ideal Variant
+         │                 │
+         └────────┬────────┘
+                  ↓
+             Comparison
+                  ↓
+          USER CHOOSES ONE
+                  ↓
+ Existing physician-review / activation / tracking flow
+
+The two variants MUST NOT originate from two independently selected NutritionPrograms.
+
+
+<truncated 22368 bytes>
+====
+
+Backend:
+
+cd backend
+
+Run focused tests first.
+
+Then:
+
+uv run pytest tests/nutrition -q
+uv run ruff check app/nutrition scripts tests/nutrition
+
+Run the final deterministic 100-profile audit with:
+
+count = 100
+seed = 20260903
+
+using the current script CLI and generate JSON + PDF artifacts.
+
+Frontend:
+
+cd frontend
+
+npm test
+npm run lint
+npm run build
+
+==================================================
+14. FINAL REPORT
+==================================================
+
+At the end report:
+
+1. current HEAD used
+2. exact files changed
+3. migrations added
+4. the 19 baseline unhandled profile IDs
+5. unique root causes found for those 19
+6. exact fix for each root-cause group
+7. before/after UNHANDLED_ENGINE_ERROR count
+8. before/after V1 supported success rate
+9. final failure histogram
+10. hard safety violation counts
+11. proof that all five goals bypass legacy fallback
+12. proof Budget/Ideal share one base program + blueprint
+13. proof user can select either variant
+14. backend test result
+15. frontend test/lint/build result
+16. final audit artifact paths
+
+Important:
+
+Do not stop at scaffolding.
+Do not hide crashes with broad exception handling.
+Do not loosen safety to improve the percentage.
+Do not create independent Budget and Ideal program selections.
+Do not preserve the old “Ideal is never selectable” rule.
+Do not allow the five product goals to enter the old scientific fallback.
+Do not enable vegetarian/vegan in V1.
+
+Continue until all feasible acceptance gates are green.
+If a gate still fails, diagnose the root cause and continue fixing it.
+Only ask me if there is a genuine unresolved product ambiguity.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-05T01:17:10+03:30.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.8 Flash (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>

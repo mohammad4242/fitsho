@@ -1,0 +1,294 @@
+........................................................................ [  2%]
+........................................................................ [  5%]
+....................................s................F.................. [  7%]
+........................................................................ [ 10%]
+........................................................................ [ 12%]
+........................................................................ [ 15%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+........................................................................ [ 28%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 35%]
+........................................................................ [ 38%]
+........................................................................ [ 40%]
+........................................................................ [ 43%]
+........................................................................ [ 46%]
+........................................................................ [ 48%]
+........................................................................ [ 51%]
+.........F...........F.................................................. [ 53%]
+F.................................................................F..... [ 56%]
+........................................................................ [ 58%]
+...................................................F.................... [ 61%]
+F.........................................F............................. [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 69%]
+........................................................................ [ 71%]
+......................FF.FF.....................F....................... [ 74%]
+..................................................................F..... [ 76%]
+........................................................................ [ 79%]
+..........................................F............................. [ 81%]
+......................................................................F. [ 84%]
+..............................F...F..................................... [ 86%]
+......................FF...............F................................ [ 89%]
+........................................................................ [ 92%]
+......................F..FF........................................F...F [ 94%]
+F.F..................................................................... [ 97%]
+........................................................................ [ 99%]
+........                                                                 [100%]
+=================================== FAILURES ===================================
+____ test_replacement_approval_preserves_edits_provenance_and_is_idempotent ____
+tests/athlete_state/test_coach_review_lifecycle_regression.py:268: in test_replacement_approval_preserves_edits_provenance_and_is_idempotent
+    assert {item["change_type"] for item in diff["coach_diff"]} >= {
+E   AssertionError: assert {'exercise_ch...'rir_changed'} >= {'exercise_ch...sets_changed'}
+E     
+E     Extra items in the right set:
+E     'sets_changed'
+_____ test_reference_template_cannot_relax_configured_weekly_hard_maximum ______
+tests/workouts/program_engine/test_body_analysis_influence.py:310: in test_reference_template_cannot_relax_configured_weekly_hard_maximum
+    assert result.program.aggregate_metrics.get("reference_template") == oversized.slug
+E   AssertionError: assert None == 'oversized-chest-reference'
+E    +  where None = <built-in method get of dict object at 0x7f2c0ac46cc0>('reference_template')
+E    +    where <built-in method get of dict object at 0x7f2c0ac46cc0> = {'planned_direct_sets_by_muscle': {'chest': 10, 'back': 11, 'shoulders': 10, 'glutes': 10, ...}, 'volume_ranges_by_mus..., ...}, 'weekly_fractional_sets_by_muscle': {'triceps': 2.0, 'shoulders': 2.0, 'biceps': 3.0, 'glutes': 3.0, ...}, ...}.get
+E    +      where {'planned_direct_sets_by_muscle': {'chest': 10, 'back': 11, 'shoulders': 10, 'glutes': 10, ...}, 'volume_ranges_by_mus..., ...}, 'weekly_fractional_sets_by_muscle': {'triceps': 2.0, 'shoulders': 2.0, 'biceps': 3.0, 'glutes': 3.0, ...}, ...} = WorkoutProgram(user_profile_snapshot={'user_id': 'b4582076-a326-4790-951e-c0e95c4b5713', 'age': 30, 'biological_sex_op...: 'passed', 'reason_codes': ()}, 'day_count': {'status': 'passed', 'reason_codes': ()}}}), body_analysis_provenance={}).aggregate_metrics
+E    +        where WorkoutProgram(user_profile_snapshot={'user_id': 'b4582076-a326-4790-951e-c0e95c4b5713', 'age': 30, 'biological_sex_op...: 'passed', 'reason_codes': ()}, 'day_count': {'status': 'passed', 'reason_codes': ()}}}), body_analysis_provenance={}) = ProgramGenerationResult(program=WorkoutProgram(user_profile_snapshot={'user_id': 'b4582076-a326-4790-951e-c0e95c4b5713...es': ()}, 'safety': {'status': 'passed', 'reason_codes': ()}, 'day_count': {'status': 'passed', 'reason_codes': ()}}})).program
+E    +  and   'oversized-chest-reference' = TemplateReference(slug='oversized-chest-reference', days_per_week=4, supported_levels=('intermediate',), focus_tags=('..._hint=None, sets=3, rep_min=8, rep_max=12, target_rir=2, rest_seconds=90)), structure_focus='full_body', title_fa=''))).slug
+___ test_template_session_replaces_excess_redundancy_with_complementary_role ___
+tests/workouts/program_engine/test_coach_quality_regressions.py:389: in test_template_session_replaces_excess_redundancy_with_complementary_role
+    assert any(muscle is MuscleGroup.SHOULDERS for muscle, _pattern in roles)
+E   assert False
+E    +  where False = any(<generator object test_template_session_replaces_excess_redundancy_with_complementary_role.<locals>.<genexpr> at 0x7f2c043d79f0>)
+______ test_short_session_preserves_explicit_priority_above_body_analysis ______
+tests/workouts/program_engine/test_duration_first_planning.py:131: in test_short_session_preserves_explicit_priority_above_body_analysis
+    program = _program(
+tests/workouts/program_engine/test_duration_first_planning.py:33: in _program
+    assert result.program is not None, result.errors
+E   AssertionError: ('PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED', 'EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED', 'REQUESTED_TRAINING_DAYS_UNSATISFIED', 'FULL_BODY_COVERAGE_MISSING:shoulders', 'FULL_BODY_COVERAGE_UNSATISFIED')
+E   assert None is not None
+E    +  where None = ProgramGenerationResult(program=None, error_code=<GenerationErrorCode.UNSATISFIED_CONSTRAINT: 'UNSATISFIED_CONSTRAINT'...', 'REQUESTED_TRAINING_DAYS_UNSATISFIED', 'FULL_BODY_COVERAGE_MISSING:shoulders', 'FULL_BODY_COVERAGE_UNSATISFIED')},)).program
+___ test_golden_split_and_validation[novice_2_days_35_general-full_body_ab] ____
+tests/workouts/program_engine/test_golden_scenarios.py:60: in test_golden_split_and_validation
+    assert result.program.split.split_type is split_type
+E   AssertionError: assert <SplitType.DYNAMIC_FALLBACK: 'dynamic_fallback'> is <SplitType.FULL_BODY_AB: 'full_body_ab'>
+E    +  where <SplitType.DYNAMIC_FALLBACK: 'dynamic_fallback'> = SplitPlan(split_type=<SplitType.DYNAMIC_FALLBACK: 'dynamic_fallback'>, day_focuses=('chest_triceps', 'full_body'), wee...T_RANKED_FROM_ELIGIBLE_POOL', 'DYNAMIC_LAYOUT_RECOVERY_SPACING_SCREENED', 'DYNAMIC_LAYOUT_DURATION_CAPACITY_SCREENED')).split_type
+E    +    where SplitPlan(split_type=<SplitType.DYNAMIC_FALLBACK: 'dynamic_fallback'>, day_focuses=('chest_triceps', 'full_body'), wee...T_RANKED_FROM_ELIGIBLE_POOL', 'DYNAMIC_LAYOUT_RECOVERY_SPACING_SCREENED', 'DYNAMIC_LAYOUT_DURATION_CAPACITY_SCREENED')) = WorkoutProgram(user_profile_snapshot={'user_id': '52de3f10-e8ae-4ebc-b1d1-b2f1d203face', 'age': 30, 'biological_sex_op...: 'passed', 'reason_codes': ()}, 'day_count': {'status': 'passed', 'reason_codes': ()}}}), body_analysis_provenance={}).split
+E    +      where WorkoutProgram(user_profile_snapshot={'user_id': '52de3f10-e8ae-4ebc-b1d1-b2f1d203face', 'age': 30, 'biological_sex_op...: 'passed', 'reason_codes': ()}, 'day_count': {'status': 'passed', 'reason_codes': ()}}}), body_analysis_provenance={}) = ProgramGenerationResult(program=WorkoutProgram(user_profile_snapshot={'user_id': '52de3f10-e8ae-4ebc-b1d1-b2f1d203face...es': ()}, 'safety': {'status': 'passed', 'reason_codes': ()}, 'day_count': {'status': 'passed', 'reason_codes': ()}}})).program
+_ test_phase10_template_intent_survives_priority_and_body_analysis_personalization _
+tests/workouts/program_engine/test_phase10_integration.py:396: in test_phase10_template_intent_survives_priority_and_body_analysis_personalization
+    assert baseline.aggregate_metrics["reference_template"] == "balanced-structure"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'reference_template'
+_______________ test_phase119_underfill_repair_no_rest_extension _______________
+tests/workouts/program_engine/test_phase119_closeout.py:95: in test_phase119_underfill_repair_no_rest_extension
+    assert len(repaired.exercises) >= 5
+E   AssertionError: assert 2 >= 5
+E    +  where 2 = len((ProgrammedExercise(exercise_id=UUID('ce7909cd-c019-57dc-a682-96a0171cb9ec'), exercise_name='Dumbbell Floor Press', or...'standing'>, laterality=<Laterality.BILATERAL: 'bilateral'>, substitution_group='horizontal_push', exercise_slug=None)))
+E    +    where (ProgrammedExercise(exercise_id=UUID('ce7909cd-c019-57dc-a682-96a0171cb9ec'), exercise_name='Dumbbell Floor Press', or...'standing'>, laterality=<Laterality.BILATERAL: 'bilateral'>, substitution_group='horizontal_push', exercise_slug=None)) = WorkoutDay(day_index=1, weekday=0, title='Day 1: Chest', focus='chest', estimated_duration_minutes=21, exercises=(Prog...'horizontal_push', exercise_slug=None)), cardio=None, template_target_muscles=(), template_structure_focus='full_body').exercises
+____________ test_template_retry_order_and_trace_are_deterministic _____________
+tests/workouts/program_engine/test_phase11_7_template_recovery.py:185: in test_template_retry_order_and_trace_are_deterministic
+    assert first.program == second.program
+E   AssertionError: assert WorkoutProgra...provenance={}) == WorkoutProgra...provenance={})
+E     
+E     Omitting 16 identical items, use -vv to show
+E     Differing attributes:
+E     ['validation_report', 'decision_trace']
+E     
+E     Drill down into differing attribute validation_report:
+E       validation_report: ValidationReport(errors=(), warnings=('DURATION_PLANNED_REDUCED_EXERCISE_COUNT', 'EFFECTIVE_VOLUME_BELOW_ACCEPTABLE_RANGE', 'WEEKLY_VOLUME_CONSTRAINED', 'DIRECT_VOLUME_BELOW_SOFT_TARGET', 'PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT'), assumptions=(), metrics={'planned_direct_sets_by_muscle': {'chest': 12, 'back': 10, 'shoulders': 10, 'glutes': 10, 'quadriceps': 10, 'hamstrings': 10, 'calves...
+E     
+E     ...Full output truncated (15 lines hidden), use '-vv' to show
+_ test_generate_program_ranks_and_attempts_feasible_professional_reference_first _
+tests/workouts/program_engine/test_professional_topology_integration.py:286: in test_generate_program_ranks_and_attempts_feasible_professional_reference_first
+    assert attempt["status"] == "succeeded"
+E   AssertionError: assert 'rejected' == 'succeeded'
+E     
+E     - succeeded
+E     + rejected
+______ test_generate_program_compares_close_successes_by_real_repair_cost ______
+tests/workouts/program_engine/test_professional_topology_integration.py:319: in test_generate_program_compares_close_successes_by_real_repair_cost
+    result = generate_program(
+app/workouts/program_engine/engine.py:274: in generate_program
+    repair_events=_post_construction_repair_events(reference_result),
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/workouts/program_engine/test_professional_topology_integration.py:312: in repair_events
+    assert result.program is not None
+E   AssertionError: assert None is not None
+E    +  where None = ProgramGenerationResult(program=None, error_code=<GenerationErrorCode.PROGRAM_VALIDATION_FAILED: 'PROGRAM_VALIDATION_F...es': ()}, 'safety': {'status': 'passed', 'reason_codes': ()}, 'day_count': {'status': 'passed', 'reason_codes': ()}}})).program
+_ test_generate_program_keeps_upper_lower_when_professional_reference_is_ineligible _
+tests/workouts/program_engine/test_professional_topology_integration.py:396: in test_generate_program_keeps_upper_lower_when_professional_reference_is_ineligible
+    assert result.program.aggregate_metrics["reference_template"] == generic.slug
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   KeyError: 'reference_template'
+_ test_generate_program_falls_back_to_generic_after_professional_construction_failure _
+tests/workouts/program_engine/test_professional_topology_integration.py:434: in test_generate_program_falls_back_to_generic_after_professional_construction_failure
+    assert attempts[1]["status"] == "succeeded"
+E   AssertionError: assert 'rejected' == 'succeeded'
+E     
+E     - succeeded
+E     + rejected
+_ test_production_dense_chest_shoulder_generation_preserves_valid_preferred_weekdays _
+tests/workouts/program_engine/test_recovery_exposure_load.py:251: in test_production_dense_chest_shoulder_generation_preserves_valid_preferred_weekdays
+    assert all(
+E   assert False
+E    +  where False = all(<generator object test_production_dense_chest_shoulder_generation_preserves_valid_preferred_weekdays.<locals>.<genexpr> at 0x7f2c148db060>)
+______ test_required_slot_uses_valid_suboptimal_candidate_before_relaxing ______
+tests/workouts/program_engine/test_selection_sessions.py:1237: in test_required_slot_uses_valid_suboptimal_candidate_before_relaxing
+    assert suboptimal_press in sessions[0].exercises
+E   AssertionError: assert ExerciseCandidate(id=UUID('5cd441c0-60c5-4825-8b34-b24a77b79e5e'), name='compound chest press with shoulder target', p...y_snapshot={}, prescription_mode=<PrescriptionMode.REPS: 'reps'>, duration_min_seconds=None, duration_max_seconds=None) in [ExerciseCandidate(id=UUID('21e8625f-0f19-4cb9-ad30-f38168e63dec'), name='shoulder trap row 0', primary_muscle=<Muscle..._snapshot={}, prescription_mode=<PrescriptionMode.REPS: 'reps'>, duration_min_seconds=None, duration_max_seconds=None)]
+E    +  where [ExerciseCandidate(id=UUID('21e8625f-0f19-4cb9-ad30-f38168e63dec'), name='shoulder trap row 0', primary_muscle=<Muscle..._snapshot={}, prescription_mode=<PrescriptionMode.REPS: 'reps'>, duration_min_seconds=None, duration_max_seconds=None)] = SessionDraft(day_index=1, weekday=1, focus='shoulders_traps', exercises=[ExerciseCandidate(id=UUID('21e8625f-0f19-4cb9...rget_muscles=(<MuscleGroup.SHOULDERS: 'shoulders'>,), template_target_muscles=(), template_structure_focus='full_body').exercises
+__ test_compatible_compound_secondary_target_is_allowed_but_isolation_is_not ___
+tests/workouts/program_engine/test_slot_compatibility.py:134: in test_compatible_compound_secondary_target_is_allowed_but_isolation_is_not
+    assert evaluate_candidate_slot_compatibility(
+E   AssertionError: assert False
+E    +  where False = SlotCompatibility(level=<CompatibilityLevel.HARD_INCOMPATIBLE: 'HARD_INCOMPATIBLE'>, reason_codes=('SLOT_SEMANTIC_MISMATCH',)).compatible
+E    +    where SlotCompatibility(level=<CompatibilityLevel.HARD_INCOMPATIBLE: 'HARD_INCOMPATIBLE'>, reason_codes=('SLOT_SEMANTIC_MISMATCH',)) = evaluate_candidate_slot_compatibility(ExerciseCandidate(id=UUID('f4a426d0-60cb-5c49-b481-0be3e446d482'), name='Compound Lunge', primary_muscle=<MuscleGroup....y_snapshot={}, prescription_mode=<PrescriptionMode.REPS: 'reps'>, duration_min_seconds=None, duration_max_seconds=None), allowed_patterns=frozenset({<MovementPattern.LUNGE: 'lunge'>}), target_muscles=frozenset({<MuscleGroup.QUADRICEPS: 'quadriceps'>}), day_focus='lower')
+E    +      where frozenset({<MovementPattern.LUNGE: 'lunge'>}) = frozenset({<MovementPattern.LUNGE: 'lunge'>})
+E    +      and   frozenset({<MuscleGroup.QUADRICEPS: 'quadriceps'>}) = frozenset({<MuscleGroup.QUADRICEPS: 'quadriceps'>})
+____ test_template_builder_keeps_simultaneous_constraint_replacements_safe _____
+tests/workouts/program_engine/test_substitution_limitations.py:364: in test_template_builder_keeps_simultaneous_constraint_replacements_safe
+    build = build_template_sessions(
+app/workouts/program_engine/template_sessions.py:315: in build_template_sessions
+    raise TemplateConstructionError(
+E   app.workouts.program_engine.template_sessions.TemplateConstructionError: TEMPLATE_CORE_SLOT_OUT_OF_SCOPE;TEMPLATE_DAY:1
+_______ test_template_retains_core_candidate_with_non_core_slot_metadata _______
+tests/workouts/program_engine/test_task2_construction_duration_repair.py:238: in test_template_retains_core_candidate_with_non_core_slot_metadata
+    build = build_template_sessions(normalized, template, catalog, RULESET)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/workouts/program_engine/template_sessions.py:315: in build_template_sessions
+    raise TemplateConstructionError(
+E   app.workouts.program_engine.template_sessions.TemplateConstructionError: TEMPLATE_CORE_SLOT_OUT_OF_SCOPE;TEMPLATE_DAY:1
+_____ test_cross_session_progression_repeat_is_not_same_session_redundancy _____
+tests/workouts/program_engine/test_task_c_semantic_redundancy.py:202: in test_cross_session_progression_repeat_is_not_same_session_redundancy
+    assert "SEMANTIC_NEAR_DUPLICATE_EXERCISE" not in report.errors
+E   AssertionError: assert 'SEMANTIC_NEAR_DUPLICATE_EXERCISE' not in ('SESSION_DURATION_UNDER_TARGET', 'SESSION_DURATION_TARGET_UNSATISFIED', 'SEMANTIC_NEAR_DUPLICATE_EXERCISE', 'UNJUSTIFIED_DUPLICATE_EXERCISE')
+E    +  where ('SESSION_DURATION_UNDER_TARGET', 'SESSION_DURATION_TARGET_UNSATISFIED', 'SEMANTIC_NEAR_DUPLICATE_EXERCISE', 'UNJUSTIFIED_DUPLICATE_EXERCISE') = ValidationReport(errors=('SESSION_DURATION_UNDER_TARGET', 'SESSION_DURATION_TARGET_UNSATISFIED', 'SEMANTIC_NEAR_DUPLIC...on_codes': ()}, 'day_count': {'status': 'passed', 'reason_codes': ()}}}), status=<ValidationStatus.INVALID: 'INVALID'>).errors
+___ test_safe_core_substitution_can_repeat_across_sessions_deterministically ___
+tests/workouts/program_engine/test_template_reference.py:323: in test_safe_core_substitution_can_repeat_across_sessions_deterministically
+    first = build_template_sessions(normalized, reference, tuple(catalog), RULESET)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+app/workouts/program_engine/template_sessions.py:315: in build_template_sessions
+    raise TemplateConstructionError(
+E   app.workouts.program_engine.template_sessions.TemplateConstructionError: TEMPLATE_CORE_SLOT_OUT_OF_SCOPE;TEMPLATE_DAY:1
+_____ test_body_part_template_does_not_claim_aggregate_full_body_coverage ______
+tests/workouts/program_engine/test_template_reference.py:399: in test_body_part_template_does_not_claim_aggregate_full_body_coverage
+    assert [entry["stage"] for entry in result.program.decision_trace] == [
+E   AssertionError: assert ['template_se...ference', ...] == ['template_se...ference', ...]
+E     
+E     At index 12 diff: 'session_coherence' != 'session_structure'
+E     Left contains one more item: 'final_quality_gate'
+E     Use -v to get more diff
+_______ test_final_program_caps_30_min_main_slots_without_dropping_core ________
+tests/workouts/program_engine/test_template_reference.py:977: in test_final_program_caps_30_min_main_slots_without_dropping_core
+    assert "TEMPLATE_MAIN_COUNT_CAPPED_FOR_DURATION" in adaptation["reason_codes"]
+E   AssertionError: assert 'TEMPLATE_MAIN_COUNT_CAPPED_FOR_DURATION' in ('TEMPLATE_DIRECT_MUSCLE_OUT_OF_SCOPE',)
+____ test_reference_repair_adds_hard_major_coverage_outside_original_focus _____
+tests/workouts/program_engine/test_volume_allocation.py:510: in test_reference_repair_adds_hard_major_coverage_outside_original_focus
+    assert any(item.primary_muscle is MuscleGroup.ABS for item in days[0].exercises)
+E   assert False
+E    +  where False = any(<generator object test_reference_repair_adds_hard_major_coverage_outside_original_focus.<locals>.<genexpr> at 0x7f2c113b71d0>)
+__ test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten ___
+tests/workouts/program_engine/test_volume_allocation.py:633: in test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten
+    selected = _select_addition_candidate(
+E   TypeError: _select_addition_candidate() missing 1 required positional argument: 'ruleset'
+______ test_volume_repair_handles_secondary_target_for_untracked_primary _______
+tests/workouts/program_engine/test_volume_allocation.py:654: in test_volume_repair_handles_secondary_target_for_untracked_primary
+    selected = _select_addition_candidate(
+E   TypeError: _select_addition_candidate() missing 1 required positional argument: 'ruleset'
+_____ test_reference_profiles_preserve_safety_quality_and_determinism[U2] ______
+tests/workouts/program_engine/test_workout_engine_reference_profiles.py:324: in test_reference_profiles_preserve_safety_quality_and_determinism
+    assert reversed_result.program == result.program
+E   AssertionError: assert WorkoutProgra...provenance={}) == WorkoutProgra...provenance={})
+E     
+E     Omitting 15 identical items, use -vv to show
+E     Differing attributes:
+E     ['validation_report', 'aggregate_metrics', 'decision_trace']
+E     
+E     Drill down into differing attribute validation_report:
+E       validation_report: ValidationReport(errors=(), warnings=('SOFT_WEEKLY_VOLUME_EXCEEDED', 'WEEKLY_VOLUME_CONSTRAINED', 'EFFECTIVE_VOLUME_BELOW_ACCEPTABLE_RANGE', 'DIRECT_VOLUME_BELOW_SOFT_TARGET', 'PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT'), assumptions=(), metrics={'planned_direct_sets_by_muscle': {'chest': 14, 'back': 12, 'shoulders': 12, 'glutes': 12, 'quadriceps': 12, 'hamstrings': 12...
+E     
+E     ...Full output truncated (29 lines hidden), use '-vv' to show
+_____ test_reference_profiles_preserve_safety_quality_and_determinism[U6] ______
+tests/workouts/program_engine/test_workout_engine_reference_profiles.py:324: in test_reference_profiles_preserve_safety_quality_and_determinism
+    assert reversed_result.program == result.program
+E   AssertionError: assert WorkoutProgra...provenance={}) == WorkoutProgra...provenance={})
+E     
+E     Omitting 15 identical items, use -vv to show
+E     Differing attributes:
+E     ['validation_report', 'aggregate_metrics', 'decision_trace']
+E     
+E     Drill down into differing attribute validation_report:
+E       validation_report: ValidationReport(errors=(), warnings=('SOFT_WEEKLY_VOLUME_EXCEEDED', 'WEEKLY_VOLUME_CONSTRAINED', 'DIRECT_VOLUME_BELOW_SOFT_TARGET', 'EFFECTIVE_VOLUME_BELOW_ACCEPTABLE_RANGE', 'PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT'), assumptions=(), metrics={'planned_direct_sets_by_muscle': {'chest': 14, 'back': 12, 'shoulders': 12, 'glutes': 12, 'quadriceps': 12, 'hamstrings': 12...
+E     
+E     ...Full output truncated (29 lines hidden), use '-vv' to show
+_____ test_reference_profiles_preserve_safety_quality_and_determinism[U7] ______
+tests/workouts/program_engine/test_workout_engine_reference_profiles.py:324: in test_reference_profiles_preserve_safety_quality_and_determinism
+    assert reversed_result.program == result.program
+E   AssertionError: assert WorkoutProgra...provenance={}) == WorkoutProgra...provenance={})
+E     
+E     Omitting 15 identical items, use -vv to show
+E     Differing attributes:
+E     ['validation_report', 'aggregate_metrics', 'decision_trace']
+E     
+E     Drill down into differing attribute validation_report:
+E       validation_report: ValidationReport(errors=(), warnings=('SOFT_WEEKLY_VOLUME_EXCEEDED', 'WEEKLY_VOLUME_CONSTRAINED', 'DIRECT_VOLUME_BELOW_SOFT_TARGET', 'PLANNED_SOFT_VOLUME_REDUCED_DURING_SESSION_FIT'), assumptions=(), metrics={'planned_direct_sets_by_muscle': {'chest': 10, 'back': 10, 'shoulders': 10, 'glutes': 12, 'quadriceps': 10, 'hamstrings': 10, 'calves': 6, 'biceps': 6, 'triceps': 6, '...
+E     
+E     ...Full output truncated (29 lines hidden), use '-vv' to show
+_____ test_reference_profiles_preserve_safety_quality_and_determinism[U9] ______
+tests/workouts/program_engine/test_workout_engine_reference_profiles.py:324: in test_reference_profiles_preserve_safety_quality_and_determinism
+    assert reversed_result.program == result.program
+E   AssertionError: assert WorkoutProgra...provenance={}) == WorkoutProgra...provenance={})
+E     
+E     Omitting 15 identical items, use -vv to show
+E     Differing attributes:
+E     ['validation_report', 'aggregate_metrics', 'decision_trace']
+E     
+E     Drill down into differing attribute validation_report:
+E       validation_report: ValidationReport(errors=(), warnings=('SOFT_WEEKLY_VOLUME_EXCEEDED', 'WEEKLY_VOLUME_CONSTRAINED'), assumptions=(), metrics={'planned_direct_sets_by_muscle': {'chest': 12, 'back': 12, 'shoulders': 12, 'glutes': 14, 'quadriceps': 12, 'hamstrings': 12, 'calves': 8, 'biceps': 8, 'triceps': 8, 'traps': 5}, 'volume_ranges_by_muscle': {'chest': {'preferred_weekly_target': 12, 'acc...
+E     
+E     ...Full output truncated (29 lines hidden), use '-vv' to show
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /home/mohammad/project/fitsho/backend/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/admin/test_training_program_structure_api.py::test_admin_cannot_change_days_for_referenced_structure
+  /home/mohammad/project/fitsho/backend/.venv/lib/python3.12/site-packages/anyio/_backends/_asyncio.py:1033: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    result = context.run(func, *args)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+SKIPPED [1] tests/ai/test_zen_live.py:14: requires explicit ZEN_LIVE_TEST=true
+FAILED tests/athlete_state/test_coach_review_lifecycle_regression.py::test_replacement_approval_preserves_edits_provenance_and_is_idempotent
+FAILED tests/workouts/program_engine/test_body_analysis_influence.py::test_reference_template_cannot_relax_configured_weekly_hard_maximum
+FAILED tests/workouts/program_engine/test_coach_quality_regressions.py::test_template_session_replaces_excess_redundancy_with_complementary_role
+FAILED tests/workouts/program_engine/test_duration_first_planning.py::test_short_session_preserves_explicit_priority_above_body_analysis
+FAILED tests/workouts/program_engine/test_golden_scenarios.py::test_golden_split_and_validation[novice_2_days_35_general-full_body_ab]
+FAILED tests/workouts/program_engine/test_phase10_integration.py::test_phase10_template_intent_survives_priority_and_body_analysis_personalization
+FAILED tests/workouts/program_engine/test_phase119_closeout.py::test_phase119_underfill_repair_no_rest_extension
+FAILED tests/workouts/program_engine/test_phase11_7_template_recovery.py::test_template_retry_order_and_trace_are_deterministic
+FAILED tests/workouts/program_engine/test_professional_topology_integration.py::test_generate_program_ranks_and_attempts_feasible_professional_reference_first
+FAILED tests/workouts/program_engine/test_professional_topology_integration.py::test_generate_program_compares_close_successes_by_real_repair_cost
+FAILED tests/workouts/program_engine/test_professional_topology_integration.py::test_generate_program_keeps_upper_lower_when_professional_reference_is_ineligible
+FAILED tests/workouts/program_engine/test_professional_topology_integration.py::test_generate_program_falls_back_to_generic_after_professional_construction_failure
+FAILED tests/workouts/program_engine/test_recovery_exposure_load.py::test_production_dense_chest_shoulder_generation_preserves_valid_preferred_weekdays
+FAILED tests/workouts/program_engine/test_selection_sessions.py::test_required_slot_uses_valid_suboptimal_candidate_before_relaxing
+FAILED tests/workouts/program_engine/test_slot_compatibility.py::test_compatible_compound_secondary_target_is_allowed_but_isolation_is_not
+FAILED tests/workouts/program_engine/test_substitution_limitations.py::test_template_builder_keeps_simultaneous_constraint_replacements_safe
+FAILED tests/workouts/program_engine/test_task2_construction_duration_repair.py::test_template_retains_core_candidate_with_non_core_slot_metadata
+FAILED tests/workouts/program_engine/test_task_c_semantic_redundancy.py::test_cross_session_progression_repeat_is_not_same_session_redundancy
+FAILED tests/workouts/program_engine/test_template_reference.py::test_safe_core_substitution_can_repeat_across_sessions_deterministically
+FAILED tests/workouts/program_engine/test_template_reference.py::test_body_part_template_does_not_claim_aggregate_full_body_coverage
+FAILED tests/workouts/program_engine/test_template_reference.py::test_final_program_caps_30_min_main_slots_without_dropping_core
+FAILED tests/workouts/program_engine/test_volume_allocation.py::test_reference_repair_adds_hard_major_coverage_outside_original_focus
+FAILED tests/workouts/program_engine/test_volume_allocation.py::test_volume_repair_accepts_valid_increment_between_plus_five_and_plus_ten
+FAILED tests/workouts/program_engine/test_volume_allocation.py::test_volume_repair_handles_secondary_target_for_untracked_primary
+FAILED tests/workouts/program_engine/test_workout_engine_reference_profiles.py::test_reference_profiles_preserve_safety_quality_and_determinism[U2]
+FAILED tests/workouts/program_engine/test_workout_engine_reference_profiles.py::test_reference_profiles_preserve_safety_quality_and_determinism[U6]
+FAILED tests/workouts/program_engine/test_workout_engine_reference_profiles.py::test_reference_profiles_preserve_safety_quality_and_determinism[U7]
+FAILED tests/workouts/program_engine/test_workout_engine_reference_profiles.py::test_reference_profiles_preserve_safety_quality_and_determinism[U9]
+28 failed, 2787 passed, 1 skipped, 2 warnings in 334.08s (0:05:34)
+real 342.75
+user 340.50
+sys 16.21

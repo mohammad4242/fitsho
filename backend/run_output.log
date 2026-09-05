@@ -1,0 +1,17 @@
+Starting generation for 11 diverse user profiles across 2-6 days...
+Generated successfully for سحر طاهری (1) - 2 days
+Generated successfully for پوریا اسدی (2) - 2 days
+Generated successfully for نگار صادقی (3) - 3 days
+Failed for احسان کریمی (4): UNSATISFIED_CONSTRAINT
+Generated successfully for مهتاب کاظمی (5) - 3 days
+Failed for دانیال نوری (6): UNSATISFIED_CONSTRAINT
+Failed for نیلوفر راد (7): UNSATISFIED_CONSTRAINT
+Failed for سیاوش جهانگیری (8): UNSATISFIED_CONSTRAINT
+Failed for مهرداد خسروی (9): UNSATISFIED_CONSTRAINT
+Failed for بهار شریفی (10): UNSATISFIED_CONSTRAINT
+Failed for کیوان فلاحی (11): UNSATISFIED_CONSTRAINT
+Database transactions rolled back successfully.
+Building Persian HTML document...
+HTML saved to /home/mohammad/project/fitsho/reports/workout_engine_11_profiles.html
+Rendering PDF to /home/mohammad/project/fitsho/reports/workout_engine_11_profiles.pdf using WeasyPrint...
+PDF generated successfully at /home/mohammad/project/fitsho/reports/workout_engine_11_profiles.pdf (Size: 97347 bytes)

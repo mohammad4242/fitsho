@@ -133,6 +133,9 @@ def optimize_weekly_budget(
         )
 
     builder = meal_builder or _default_meal_builder
+    safe_eligible_templates = tuple(
+        candidate for candidate in eligible_templates if _template_is_safe(candidate, inputs)
+    )
     mutable_days = days
     actions: list[BudgetRepairAction] = []
     for _ in range(policy.maximum_budget_repair_iterations):
@@ -142,7 +145,7 @@ def optimize_weekly_budget(
         moves = _generate_moves(
             mutable_days,
             inputs,
-            eligible_templates,
+            safe_eligible_templates,
             policy,
             budget_cap=budget_cap,
             meal_builder=builder,
@@ -711,7 +714,7 @@ def _default_meal_builder(
 
 
 def _budget_cap(inputs: PlannerInput, policy: PlannerPolicy) -> Decimal:
-    allowance = Decimal(inputs.weekly_budget_irr)
+    allowance = Decimal(inputs.weekly_budget_irr if inputs.weekly_budget_irr is not None else 0)
     if inputs.budget_mode == "strict":
         return allowance
     return allowance * (Decimal("1") + policy.flexible_budget_overage_cap)

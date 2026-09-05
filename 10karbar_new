@@ -1,0 +1,464 @@
+روی repository زیر کار کن:
+
+mohammad4242/fitsho
+
+هدف:
+بعد از اصلاحات اخیر Program Engine، یک تست جدید با ۱۰ کاربر مصنوعی کاملاً جدید انجام بده و خروجی واقعی موتور را به‌صورت PDF تحویل بده تا بتوانیم کیفیت برنامه‌ها و regressionهای احتمالی را بررسی کنیم.
+
+این تست باید مستقل از ۱۰ کاربر PDF قبلی باشد.
+
+━━━━━━━━━━━━━━━━━━
+1. ابتدا نسخه فعلی Fitsho را بخوان
+━━━━━━━━━━━━━━━━━━
+
+قبل از ساخت هیچ کاربری، source of truth را از کد فعلی repository استخراج کن.
+
+حداقل این بخش‌ها را بررسی کن:
+
+- backend/app/profile/schemas.py
+- backend/app/profile/enums.py
+- backend/app/exercises/enums.py
+- frontend Training Onboarding
+- backend/app/workouts/program_engine/
+- exercise catalog / metadata
+- workout generation pipeline
+- template/rulesetها
+- normalization و constraintها
+
+هیچ فرضی بر اساس نسخه قدیمی پروژه نزن.
+
+اگر schema یا enum نسبت به قبل تغییر کرده، فقط نسخه فعلی repository معتبر است.
+
+━━━━━━━━━━━━━━━━━━
+2. فقط در چارچوب Profile واقعی Fitsho
+━━━━━━━━━━━━━━━━━━
+
+۱۰ Profile کاملاً معتبر بساز.
+
+هیچ فیلد، گزینه، آسیب، تجهیزات، هدف یا مقدار جدیدی اختراع نکن.
+
+فقط فیلدهایی را استفاده کن که Profile فعلی Fitsho واقعاً پشتیبانی می‌کند.
+
+Profile هر کاربر باید validation واقعی backend را پاس کند.
+
+مثلاً اطلاعاتی از جنس:
+
+- display_name
+- birth_date
+- sex
+- height_cm
+- current_weight_kg
+- fitness_goal
+- experience_level
+- training_age_months
+- training_days_per_week
+- preferred_weekdays
+- priority_muscles
+- training_location
+- home_training_setup
+- training_cautions
+- physical_limitations
+- plan_duration_weeks
+- session_duration_minutes
+- training_intensity
+- workout_generation_method
+
+را فقط مطابق schema فعلی استفاده کن.
+
+برای ساخت برنامه حتماً:
+
+workout_generation_method = fitsho_coach
+
+باشد.
+
+AI نباید خودش برنامه بدنسازی طراحی کند.
+
+━━━━━━━━━━━━━━━━━━
+3. ده کاربر جدید و رندوم بساز
+━━━━━━━━━━━━━━━━━━
+
+۱۰ کاربر جدید بساز که نسبت به یکدیگر اختلاف واقعی داشته باشند.
+
+Random بودن خوب است، ولی Random باید داخل validation و گزینه‌های واقعی Fitsho باشد.
+
+بین ۱۰ نفر تنوع جدی ایجاد کن در:
+
+- زن / مرد و سایر Sexهای قابل استفاده فعلی در صورت مناسب بودن
+- سن
+- قد
+- وزن
+- BMI
+- fitness goal
+- experience level
+- training age
+- تعداد روز تمرین
+- مدت جلسه
+- شدت
+- باشگاه / خانه
+- setup خانه
+- priority muscles
+- injury/caution
+- multi-caution
+- physical limitations
+- preferred weekdays
+- plan duration
+
+فقط افراد جوان و سالم نساز.
+
+ترکیبی از کاربران:
+- بدون آسیب
+- یک caution
+- چند caution
+- beginner
+- first_month
+- intermediate
+- advanced
+- Home
+- Gym
+- وزن پایین
+- وزن متوسط
+- BMI بالا
+- تعداد روز کم
+- تعداد روز زیاد
+
+داشته باش.
+
+━━━━━━━━━━━━━━━━━━
+4. از کیس‌های قبلی کپی نکن
+━━━━━━━━━━━━━━━━━━
+
+اگر PDFهای تست قبلی در context/workspace موجود هستند، آن‌ها را بخوان.
+
+۱۰ کاربر جدید نباید کپی مستقیم یا تغییر جزئی کاربران قبلی باشند.
+
+فقط تغییر اسم، قد یا وزن کافی نیست.
+
+هر کیس جدید باید در چند متغیر اصلی با تست‌های قبلی متفاوت باشد.
+
+هدف این دور:
+کشف bugهای جدید و regression بعد از fixهای اخیر است.
+
+━━━━━━━━━━━━━━━━━━
+5. ده مشکل قبلی را دوباره ایجاد نکن؛ ولی regression آنها را ثبت کن
+━━━━━━━━━━━━━━━━━━
+
+Program Engine اخیراً برای ۱۰ دسته مشکل اصلاح شده است.
+
+در این تست برنامه را برای پاس کردن این موارد دستکاری نکن.
+
+خروجی خام موتور را بگیر و بعد فقط Pass/Fail مکانیکی این invariantها را گزارش کن:
+
+1. Injury/Caution safety
+2. Equipment compatibility
+3. جلوگیری از failure غیرضروری CONSTRAINT_UNSATISFIED
+4. حفظ دقیق training_days_per_week
+5. prescription صحیح reps-based و duration-based
+6. جلوگیری از excessive set dumping روی یک exercise
+7. Strength-specific exercise selection/prescription
+8. Session duration
+9. Exercise classification / slot compatibility
+10. Priority muscle distribution
+
+مهم:
+اگر هرکدام دوباره خراب شده بود، آن را اصلاح نکن.
+همان خروجی را در PDF ثبت کن تا regression قابل مشاهده باشد.
+
+━━━━━━━━━━━━━━━━━━
+6. قانون زمان جلسه
+━━━━━━━━━━━━━━━━━━
+
+طبق رفتار مورد انتظار فعلی پروژه، زمان تخمینی هر جلسه باید حداکثر ۱۰ دقیقه کمتر یا ۱۰ دقیقه بیشتر از زمان انتخاب‌شده کاربر باشد.
+
+یعنی:
+
+requested - 10 <= estimated_duration <= requested + 10
+
+مثال:
+
+30 → 20 تا 40 دقیقه
+45 → 35 تا 55 دقیقه
+60 → 50 تا 70 دقیقه
+75 → 65 تا 85 دقیقه
+90 → 80 تا 100 دقیقه
+120 → 110 تا 130 دقیقه
+
+در گزارش فقط بررسی کن موتور این قانون را رعایت کرده یا نه.
+
+برنامه را برای پاس کردن این قانون دستی تغییر نده.
+
+━━━━━━━━━━━━━━━━━━
+7. Profileها را واقعاً validate کن
+━━━━━━━━━━━━━━━━━━
+
+هر Profile را از validation واقعی Fitsho عبور بده.
+
+اگر Profile invalid بود:
+مقدار unsupported اختراع نکن.
+
+Profile را فقط با گزینه معتبر دیگری از schema اصلاح کن.
+
+هر کاربر باید Profile مستقل داشته باشد.
+
+از production database استفاده نکن.
+
+در صورت نیاز از test database / fixture / isolated environment استفاده کن.
+
+━━━━━━━━━━━━━━━━━━
+8. Program Engine واقعی را اجرا کن
+━━━━━━━━━━━━━━━━━━
+
+برای هر ۱۰ کاربر خود Program Engine فعلی Fitsho را اجرا کن.
+
+ممنوع:
+
+- طراحی دستی برنامه
+- اصلاح Exerciseها
+- اصلاح Sets
+- اصلاح Reps
+- اصلاح Duration
+- اصلاح RIR
+- اصلاح Rest
+- تغییر Split
+- جایگزینی حرکت با نظر خودت
+
+خروجی باید دقیقاً Raw Output نسخه فعلی Fitsho باشد.
+
+اگر Engine fail کرد:
+همان failure را ثبت کن.
+
+اگر fallback انجام شد:
+ثبت کن.
+
+اگر warning/reason code وجود داشت:
+ثبت کن.
+
+━━━━━━━━━━━━━━━━━━
+9. برای هر User این ساختار را در PDF استفاده کن
+━━━━━━━━━━━━━━━━━━
+
+# User N — عنوان کوتاه سناریو
+
+مثلاً:
+
+زن ۴۸ ساله · Intermediate · Home Dumbbells · 4 Days · Shoulder Caution · Body Recomposition
+
+## A. Profile
+
+نمایش بده:
+
+- نام مصنوعی
+- سن
+- جنسیت
+- قد
+- وزن
+- BMI محاسبه‌شده
+- fitness goal + enum واقعی
+- experience level + enum
+- training age
+- requested training days
+- preferred weekdays
+- session duration
+- intensity
+- location
+- home setup
+- priority muscles
+- training cautions
+- physical limitations
+- plan duration
+
+BMI فقط محاسبه شود؛ اگر فیلد Profile نیست، به Profile اضافه نکن.
+
+## B. دلیل انتخاب کیس
+
+فقط در ۲ تا ۳ جمله بگو این کاربر چه شرایط متفاوتی برای تست موتور دارد.
+
+تحلیل نکن برنامه خوب است یا بد.
+
+## C. Engine Output Summary
+
+نمایش بده:
+
+- Days Requested
+- Days Generated
+- Split
+- Template
+- Training status/level تشخیص‌داده‌شده
+- Safety status
+- Goal normalized توسط Engine
+- fallback/recovery در صورت وجود
+- reason codes اصلی
+
+## D. Workout Program
+
+برای تک‌تک روزها:
+
+### Day N
+
+- عنوان روز
+- Focus
+- Estimated Duration
+- تعداد Exerciseها
+- Cardio در صورت وجود
+
+جدول:
+
+| # | Exercise EN | Exercise FA | Sets | Prescription | Rest | RIR | Equipment | Main Muscle |
+
+Prescription را دقیقاً مطابق مدل فعلی موتور نمایش بده.
+
+اگر exercise rep-based است:
+مثلاً 8–12 reps
+
+اگر duration-based است:
+مثلاً 30–45 sec
+
+duration را به reps تبدیل نکن.
+
+## E. Engine Trace
+
+در صورت موجود بودن خلاصه موارد زیر را نمایش بده:
+
+- template selection
+- candidate rejection
+- safety filtering
+- equipment filtering
+- recovery/fallback
+- volume adjustment
+- duration repair
+- priority allocation
+- final validation reason codes
+
+فقط مهم‌ترین موارد.
+
+━━━━━━━━━━━━━━━━━━
+10. Regression Checklist برای هر User
+━━━━━━━━━━━━━━━━━━
+
+بعد از برنامه هر کاربر یک جدول کوچک بده:
+
+| Check | Result | Evidence |
+|---|---|---|
+| Injury/Caution respected | PASS/FAIL/N/A | کوتاه |
+| Equipment respected | PASS/FAIL | کوتاه |
+| Requested days preserved | PASS/FAIL | X requested / Y generated |
+| Session duration ±10 | PASS/FAIL | durationهای واقعی |
+| Time-based prescription valid | PASS/FAIL/N/A | کوتاه |
+| Excessive set dumping absent | PASS/FAIL | کوتاه |
+| Strength programming coherent | PASS/FAIL/N/A | کوتاه |
+| Slot/classification coherent | PASS/FAIL | کوتاه |
+| Priority muscle emphasis distributed | PASS/FAIL/N/A | کوتاه |
+| Engine completed successfully | PASS/FAIL | کوتاه |
+
+نکته:
+
+این بخش فقط regression مکانیکی/واضح را ثبت کند.
+
+در این مرحله وارد تحلیل تخصصی مربی‌گری نشو.
+
+اگر موردی مرزی یا سلیقه‌ای است:
+`REVIEW`
+بنویس، نه FAIL.
+
+━━━━━━━━━━━━━━━━━━
+11. جدول Overview ده کاربر
+━━━━━━━━━━━━━━━━━━
+
+در انتها جدول زیر را تولید کن:
+
+| User | Sex | Age | Height | Weight | BMI | Goal | Experience | Days Req | Days Gen | Location | Setup | Cautions | Priority | Session Time |
+
+━━━━━━━━━━━━━━━━━━
+12. جدول Regression Summary
+━━━━━━━━━━━━━━━━━━
+
+یک جدول دوم:
+
+| User | Safety | Equipment | Day Count | Duration ±10 | Prescription | Set Distribution | Strength | Classification | Priority | Engine Success |
+
+از PASS / FAIL / REVIEW / N/A استفاده کن.
+
+این جدول برای پیدا کردن سریع regression بسیار مهم است.
+
+━━━━━━━━━━━━━━━━━━
+13. Execution Anomalies
+━━━━━━━━━━━━━━━━━━
+
+در انتهای PDF فقط اتفاقات قطعی مکانیکی را فهرست کن، مثل:
+
+- Engine exception
+- CONSTRAINT_UNSATISFIED
+- requested 5 / generated 4
+- duration خارج از ±10
+- unavailable equipment
+- blocked caution exercise
+- invalid prescription type
+- missing metadata
+- empty WorkoutDay
+- fallback failure
+
+ولی هنوز تحلیل مربی‌گری نکن.
+
+مثلاً ننویس:
+
+«این برنامه علمی نیست.»
+
+یا:
+
+«بهتر بود حرکت دیگری داده شود.»
+
+این تحلیل را بعداً جداگانه انجام می‌دهیم.
+
+━━━━━━━━━━━━━━━━━━
+14. PDF نهایی
+━━━━━━━━━━━━━━━━━━
+
+خروجی نهایی حتماً PDF باشد.
+
+نام فایل:
+
+fitsho_10_random_users_post_fixes_workout_plans.pdf
+
+در صورت امکان Markdown سورس را هم نگه دار:
+
+fitsho_10_random_users_post_fixes_workout_plans.md
+
+عنوان صفحه اول:
+
+گزارش آزمون سوم موتور برنامه تمرینی Fitsho
+۱۰ پروفایل تصادفی جدید پس از اصلاحات Program Engine
+
+زیرعنوان:
+
+هدف: بررسی کیفیت خروجی نسخه فعلی Fitsho و کشف regression یا مشکلات جدید پس از اصلاح ۱۰ مشکل قبلی.
+
+PDF باید خوانا باشد:
+- هر User بخش جدا داشته باشد.
+- جدول‌ها از صفحه بیرون نزنند.
+- فارسی و انگلیسی خوانا باشند.
+- شماره صفحه داشته باشد.
+- اطلاعات هیچ User با User دیگر مخلوط نشود.
+
+━━━━━━━━━━━━━━━━━━
+15. قوانین نهایی
+━━━━━━━━━━━━━━━━━━
+
+- هیچ Profile خارج از schema واقعی Fitsho نساز.
+- هیچ enum ساختگی ایجاد نکن.
+- هیچ equipment ساختگی اضافه نکن.
+- هیچ injury جدید خارج از مدل Profile اختراع نکن.
+- ۱۰ Profile باید validation واقعی را پاس کنند.
+- همه برنامه‌ها باید خروجی واقعی Program Engine باشند.
+- برنامه‌ها را دستی اصلاح نکن.
+- failureها را پنهان نکن.
+- خروجی‌های عجیب را اصلاح نکن.
+- ۱۰ کاربر واقعاً متفاوت باشند.
+- از تست‌های قبلی کپی نکن.
+- production را تغییر نده.
+- برای انجام این تست کد Program Engine را تغییر نده.
+- commit یا push انجام نده.
+- فقط test/run/report انجام بده.
+- اگر تستی fail شد، برای سبز کردن گزارش production code را تغییر نده.
+- PDF واقعی را در پایان تحویل بده، نه فقط توضیح اینکه چگونه ساخته می‌شود.
+
+تا آخر کار ادامه بده و PDF نهایی را تحویل بده.
+فقط اگر ابهام واقعی داری که بدون پاسخ من امکان ادامه وجود ندارد، سؤال بپرس.

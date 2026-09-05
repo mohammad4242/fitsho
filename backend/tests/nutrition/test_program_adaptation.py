@@ -137,3 +137,91 @@ def test_snack_buckets_and_post_workout_are_independent_and_deterministic() -> N
     assert adapt_program(
         program, MainMealCountBucket.FOUR_OR_MORE, SnackCountBucket.TWO
     ) == adapt_program(program, MainMealCountBucket.FOUR_OR_MORE, SnackCountBucket.TWO)
+
+
+def test_adaptation_handles_missing_optional_slots_gracefully() -> None:
+    import pytest
+
+    from app.nutrition.program_adaptation import ProgramStructureIncompatibleError
+
+    # Program with ONLY lunch and dinner (no breakfast, no snacks)
+    lunches = [_meal("LU01", MealCategory.LUNCH)]
+    dinners = [_meal("DN01", MealCategory.DINNER)]
+    days = []
+    for i in range(7):
+        slots = [
+            NutritionProgramSlot(
+                kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                category=MealCategory.LUNCH,
+                meal=lunches[0],
+                meal_id=lunches[0].id,
+            ),
+            NutritionProgramSlot(
+                kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                category=MealCategory.DINNER,
+                meal=dinners[0],
+                meal_id=dinners[0].id,
+            ),
+        ]
+        days.append(NutritionProgramDay(day_number=i + 1, slots=slots))
+    minimal_prog = NutritionProgram(code="MIN01", slug="min01", days=days)
+
+    # 2 meals + 0 snacks should succeed perfectly
+    adapted_2_0 = adapt_program(minimal_prog, MainMealCountBucket.TWO, SnackCountBucket.ZERO)
+    assert len(adapted_2_0.days[0].slots) == 2
+    assert [s.role for s in adapted_2_0.days[0].slots] == ["lunch", "dinner"]
+
+    # 3 meals (needs breakfast) should raise ProgramStructureIncompatibleError
+    with pytest.raises(ProgramStructureIncompatibleError, match="breakfast"):
+        adapt_program(minimal_prog, MainMealCountBucket.THREE, SnackCountBucket.ZERO)
+
+    # 1 snack requested when no snacks exist should raise ProgramStructureIncompatibleError
+    with pytest.raises(ProgramStructureIncompatibleError, match="snack"):
+        adapt_program(minimal_prog, MainMealCountBucket.TWO, SnackCountBucket.ONE)
+
+
+def test_adaptation_cycles_single_snack_without_division_by_zero() -> None:
+    # Program with exactly 1 snack for the whole week
+    lunches = [_meal("LU01", MealCategory.LUNCH)]
+    dinners = [_meal("DN01", MealCategory.DINNER)]
+    breakfasts = [_meal("BF01", MealCategory.BREAKFAST)]
+    snack = _meal("SN01", MealCategory.SNACK)
+    days = []
+    for i in range(7):
+        slots = [
+            NutritionProgramSlot(
+                kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                category=MealCategory.BREAKFAST,
+                meal=breakfasts[0],
+                meal_id=breakfasts[0].id,
+            ),
+            NutritionProgramSlot(
+                kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                category=MealCategory.LUNCH,
+                meal=lunches[0],
+                meal_id=lunches[0].id,
+            ),
+            NutritionProgramSlot(
+                kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                category=MealCategory.DINNER,
+                meal=dinners[0],
+                meal_id=dinners[0].id,
+            ),
+            NutritionProgramSlot(
+                kind=NutritionProgramSlotKind.CATALOGUE_MEAL,
+                category=MealCategory.SNACK,
+                meal=snack,
+                meal_id=snack.id,
+            ),
+        ]
+        days.append(NutritionProgramDay(day_number=i + 1, slots=slots))
+    single_snack_prog = NutritionProgram(code="SNK01", slug="snk01", days=days)
+
+    # Requesting 3 snacks when only 1 snack exists should cycle that snack without ZeroDivisionError
+    adapted_3_snacks = adapt_program(
+        single_snack_prog, MainMealCountBucket.THREE, SnackCountBucket.THREE_OR_MORE
+    )
+    assert len(adapted_3_snacks.days[0].slots) == 6
+    snack_roles = [s for s in adapted_3_snacks.days[0].slots if s.role == "snack"]
+    assert len(snack_roles) == 3
+    assert all(s.meal_code == "SN01" for s in snack_roles)

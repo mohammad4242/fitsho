@@ -270,6 +270,20 @@ export type WeeklyPlanGeneration = {
   budget_plan?: WeeklyPlan | null;
   ideal_plan?: WeeklyPlan | null;
   comparison?: PlanComparison | null;
+  bundle_id?: string | null;
+  selected_plan_id?: string | null;
+  selected_plan_role?: string | null;
+  blueprint_signature?: string | null;
+  nutrition_program_id?: string | null;
+  nutrition_program_code?: string | null;
+};
+
+export type PlanBundleSelectResponse = {
+  bundle_id: string;
+  selected_plan_id: string;
+  selected_plan_role: string;
+  selected_at: string;
+  plan: WeeklyPlan;
 };
 
 export type DailyTrackingSummary = {

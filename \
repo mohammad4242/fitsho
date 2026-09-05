@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: fitsho
+      POSTGRES_PASSWORD: fitsho
+      POSTGRES_DB: fitsho
+    ports:
+      - "5432:5432"
+    volumes:
+      - fitsho_postgres_data:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitsho -d fitsho"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://fitsho:fitsho@db:5432/fitsho
+      FRONTEND_ORIGIN: http://localhost:5173
+      APP_ENV: local
+      COOKIE_SECURE: "false"
+      SESSION_COOKIE_NAME: fitsho_session
+      MEDIA_ROOT: /var/lib/fitsho/media
+      MEDIA_PUBLIC_PATH: /media
+      MEDIA_MAX_BYTES: "20971520"
+      MEDIA_MAX_VIDEO_DURATION_SECONDS: "20"
+    ports:
+      - "8001:8000"
+    volumes:
+      - fitsho_exercise_media:/var/lib/fitsho/media
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+volumes:
+  fitsho_postgres_data:
+  fitsho_exercise_media:

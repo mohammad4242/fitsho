@@ -193,6 +193,24 @@ def select_program_candidates(
     )
 
 
+def rank_base_programs(
+    programs: Iterable[NutritionProgram],
+    request: NormalizedNutritionRequest,
+    *,
+    cost_estimates: dict[str, ProgramCostEstimate] | None = None,
+    policy_version: str = PROGRAM_SELECTION_POLICY_VERSION,
+) -> ProgramSelectionResult:
+    """Unified base program proposal ordering combining budget, goal, preference,
+    training, and meal structure."""
+    return select_program_candidates(
+        programs,
+        request,
+        cost_estimates=cost_estimates,
+        policy_version=policy_version,
+        mode=NutritionOptimizationMode.BUDGET_CONSTRAINED,
+    )
+
+
 def rank_for_budget(
     programs: Iterable[NutritionProgram],
     request: NormalizedNutritionRequest,
@@ -200,12 +218,11 @@ def rank_for_budget(
     cost_estimates: dict[str, ProgramCostEstimate] | None = None,
     policy_version: str = PROGRAM_SELECTION_POLICY_VERSION,
 ) -> ProgramSelectionResult:
-    return select_program_candidates(
+    return rank_base_programs(
         programs,
         request,
         cost_estimates=cost_estimates,
         policy_version=policy_version,
-        mode=NutritionOptimizationMode.BUDGET_CONSTRAINED,
     )
 
 

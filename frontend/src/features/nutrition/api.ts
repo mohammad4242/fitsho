@@ -15,6 +15,7 @@ import type {
   ShoppingList,
   WeeklyPlanHistoryItem,
   MealFeedbackType,
+  PlanBundleSelectResponse,
 } from "./types";
 
 const nutritionPath = "/api/v1/nutrition";
@@ -327,6 +328,16 @@ export function getWeeklyNutritionPlan(planId: string): Promise<WeeklyPlan> {
 
 export function listWeeklyNutritionPlans(): Promise<WeeklyPlanHistoryItem[]> {
   return request(`${nutritionPath}/plans/history`);
+}
+
+export function selectBundlePlan(
+  bundleId: string,
+  payload: { selected_plan_id?: string; selected_plan_role?: "budget" | "ideal"; plan_id?: string }
+): Promise<PlanBundleSelectResponse> {
+  return request<PlanBundleSelectResponse>(`${nutritionPath}/plan-bundles/${bundleId}/select`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function getShoppingList(planId: string): Promise<ShoppingList> {

@@ -1355,6 +1355,11 @@ class NutritionPlanBundle(Base):
     estimate_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("nutrition_estimates.id", ondelete="RESTRICT"), nullable=True
     )
+    selected_plan_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("nutrition_weekly_plans.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    selected_plan_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    selected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     comparison_snapshot: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -1362,6 +1367,9 @@ class NutritionPlanBundle(Base):
 
     generations: Mapped[list[NutritionPlanGeneration]] = relationship(
         back_populates="bundle", cascade="all, delete-orphan"
+    )
+    selected_plan: Mapped[NutritionWeeklyPlan | None] = relationship(
+        foreign_keys=[selected_plan_id]
     )
 
 

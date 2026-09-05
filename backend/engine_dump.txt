@@ -1,0 +1,1492 @@
+     1	from collections import Counter
+     2	from dataclasses import replace
+     3	
+     4	from app.exercises.enums import MovementPattern, MuscleGroup
+     5	from app.profile.enums import ExperienceLevel
+     6	from app.profile.training_compatibility import (
+     7	    SUPPORTED_RESISTANCE_TRAINING_DAYS,
+     8	    ResistanceTrainingDayStatus,
+     9	    resistance_training_day_status,
+    10	)
+    11	from app.workouts.program_engine.body_analysis import (
+    12	    applicable_body_analysis_influence,
+    13	    body_analysis_priority_muscles,
+    14	    body_analysis_provenance,
+    15	    body_analysis_trace,
+    16	    eligible_body_analysis_priorities,
+    17	)
+    18	from app.workouts.program_engine.cardio import add_cardio
+    19	from app.workouts.program_engine.coach_quality import build_coach_quality_metrics
+    20	from app.workouts.program_engine.duration_capacity import (
+    21	    SessionCapacity,
+    22	    build_session_capacity,
+    23	)
+    24	from app.workouts.program_engine.duration_policy import (
+    25	    calculate_resistance_minutes,
+    26	)
+    27	from app.workouts.program_engine.effective_volume import (
+    28	    calculate_effective_volume,
+    29	    complete_tracked_metrics,
+    30	)
+    31	from app.workouts.program_engine.eligibility import filter_eligible_exercises
+    32	from app.workouts.program_engine.enums import GenerationErrorCode, SafetyStatus
+    33	from app.workouts.program_engine.normalization import normalize_request
+    34	from app.workouts.program_engine.prescription import prescribe_sessions
+    35	from app.workouts.program_engine.priority_allocation import PriorityAllocationPolicy
+    36	from app.workouts.program_engine.progression import deload_policy, double_progression_policy
+    37	from app.workouts.program_engine.recovery import recovery_spacing_is_valid, repair_recovery_weekdays
+    38	from app.workouts.program_engine.rulesets.resistance_training_v1 import ProgramRuleset
+    39	from app.workouts.program_engine.safety import screen_safety
+    40	from app.workouts.program_engine.schemas import (
+    41	    ExerciseCandidate,
+    42	    NormalizedProgramRequest,
+    43	    ProgramGenerationRequest,
+    44	    ProgramGenerationResult,
+    45	    RejectedCandidate,
+    46	    SplitPlan,
+    47	    TemplateReference,
+    48	    ValidationReport,
+    49	    VolumeTarget,
+    50	    WeeklyVolumePlan,
+    51	    WorkoutDay,
+    52	    WorkoutProgram,
+    53	)
+    54	from app.workouts.program_engine.session_builder import SessionConstructionError, build_sessions
+    55	from app.workouts.program_engine.session_duration import repair_session_durations
+    56	from app.workouts.program_engine.session_structure import finalize_session_structure
+    57	from app.workouts.program_engine.split_selector import (
+    58	    rank_availability_aware_fallbacks,
+    59	    rank_split_candidates,
+    60	)
+    61	from app.workouts.program_engine.substitution_observability import (
+    62	    aggregate_substitution_observability,
+    63	    substitution_decision_summaries,
+    64	)
+    65	from app.workouts.program_engine.template_selector import (
+    66	    TemplateRankingResult,
+    67	    select_template_reference_result,
+    68	)
+    69	from app.workouts.program_engine.template_sessions import (
+    70	    TemplateConstructionError,
+    71	    TemplateSessionBuild,
+    72	    apply_template_intent,
+    73	    build_template_sessions,
+    74	    template_resolution_trace,
+    75	)
+    76	from app.workouts.program_engine.validation import validate_program
+    77	from app.workouts.program_engine.volume_history import (
+    78	    PreviousVolumeBaseline,
+    79	    derive_previous_volume_baseline,
+    80	)
+    81	from app.workouts.program_engine.volume_planner import plan_weekly_volume
+    82	from app.workouts.program_engine.volume_repair import repair_weekly_volume
+    83	
+    84	
+    85	def generate_program(
+    86	    request: ProgramGenerationRequest,
+    87	    exercise_catalog: list[ExerciseCandidate] | tuple[ExerciseCandidate, ...],
+    88	    ruleset: ProgramRuleset,
+    89	    *,
+    90	    reference_templates: tuple[TemplateReference, ...] = (),
+    91	) -> ProgramGenerationResult:
+    92	    training_day_error = _training_day_error(request, ruleset)
+    93	    if training_day_error is not None:
+    94	        return ProgramGenerationResult(
+    95	            program=None,
+    96	            error_code=GenerationErrorCode.UNSUPPORTED_RESISTANCE_TRAINING_DAYS,
+    97	            errors=(training_day_error,),
+    98	        )
+    99	    request = request.model_copy(
+   100	        update={
+   101	            "body_analysis_influence": applicable_body_analysis_influence(
+   102	                request.body_analysis_influence, ruleset
+   103	            )
+   104	        }
+   105	    )
+   106	    normalized = normalize_request(request, ruleset)
+   107	    safety = screen_safety(normalized)
+   108	    if safety.status not in {SafetyStatus.CLEAR, SafetyStatus.CLEAR_WITH_MODIFICATIONS}:
+   109	        return ProgramGenerationResult(
+   110	            program=None,
+   111	            error_code=GenerationErrorCode.PROGRAM_REJECTED_SAFETY_STATUS,
+   112	            errors=safety.reason_codes,
+   113	            safety_status=safety.status,
+   114	        )
+   115	    eligibility = filter_eligible_exercises(normalized, exercise_catalog)
+   116	    session_capacity = build_session_capacity(
+   117	        normalized,
+   118	        eligibility.eligible,
+   119	        ruleset,
+   120	    )
+   121	    template_selection = select_template_reference_result(
+   122	        normalized,
+   123	        eligibility.eligible,
+   124	        reference_templates,
+   125	        ruleset,
+   126	        session_capacity=session_capacity,
+   127	    )
+   128	    template_selection_trace = (template_selection.decision_trace(),)
+   129	    if not eligibility.eligible:
+   130	        missing_equipment = any(
+   131	            "EXERCISE_REJECTED_MISSING_EQUIPMENT" in item.reason_codes
+   132	            for item in eligibility.rejected
+   133	        )
+   134	        return ProgramGenerationResult(
+   135	            program=None,
+   136	            error_code=(
+   137	                GenerationErrorCode.NO_AVAILABLE_EQUIPMENT_MATCH
+   138	                if missing_equipment
+   139	                else GenerationErrorCode.INSUFFICIENT_ELIGIBLE_EXERCISES
+   140	            ),
+   141	            errors=("NO_ELIGIBLE_EXERCISES",),
+   142	            safety_status=safety.status,
+   143	            rejected_candidates=eligibility.rejected,
+   144	            decision_trace=template_selection_trace,
+   145	        )
+   146	    previous_volume = derive_previous_volume_baseline(normalized.source.recent_training_history)
+   147	    rejected_by_id = {item.exercise_id: item.reason_codes for item in eligibility.rejected}
+   148	    rejected_slot_candidates = tuple(
+   149	        (candidate, rejected_by_id[candidate.id])
+   150	        for candidate in exercise_catalog
+   151	        if candidate.id in rejected_by_id
+   152	    )
+   153	    template_rejection_trace: tuple[dict[str, object], ...] = template_selection_trace
+   154	    for ranking in template_selection.candidates:
+   155	        reference = ranking.template
+   156	        try:
+   157	            reference_build = build_template_sessions(
+   158	                normalized,
+   159	                reference,
+   160	                eligibility.eligible,
+   161	                ruleset,
+   162	                session_capacity=session_capacity,
+   163	                exercise_catalog=exercise_catalog,
+   164	            )
+   165	            reference_result = _reference_program(
+   166	                request,
+   167	                normalized,
+   168	                safety.status,
+   169	                safety.reason_codes,
+   170	                eligibility.rejected,
+   171	                eligibility.eligible,
+   172	                eligibility.cardio_eligible,
+   173	                reference,
+   174	                reference_build,
+   175	                ruleset,
+   176	                previous_volume=previous_volume,
+   177	                session_capacity=session_capacity,
+   178	                template_selection_trace=template_rejection_trace,
+   179	            )
+   180	            if reference_result.is_success:
+   181	                return _append_successful_template_attempt(
+   182	                    reference_result,
+   183	                    _template_attempt_trace(ranking, status="succeeded"),
+   184	                )
+   185	            rejection_category = _template_rejection_category(reference_result.errors)
+   186	            rejection = {
+   187	                "stage": "template_reference",
+   188	                "rank": ranking.rank,
+   189	                "selected": reference.slug,
+   190	                "status": "rejected",
+   191	                "hard_eligibility": (
+   192	                    "days",
+   193	                    "training_level",
+   194	                    "core_slots_resolvable",
+   195	                ),
+   196	                "goal_used_for_exclusion": False,
+   197	                "score": ranking.decision_trace()["score"],
+   198	                "feasibility": ranking.feasibility.decision_trace(),
+   199	                "rejection_category": rejection_category,
+   200	                "reason_codes": reference_result.errors,
+   201	                "decision_trace": reference_result.decision_trace[len(template_rejection_trace) :],
+   202	            }
+   203	            template_rejection_trace += (
+   204	                rejection,
+   205	                _template_attempt_trace(
+   206	                    ranking,
+   207	                    status="rejected",
+   208	                    rejection_category=rejection_category,
+   209	                    reason_codes=reference_result.errors,
+   210	                ),
+   211	            )
+   212	        except TemplateConstructionError as exc:
+   213	            reason_codes = ("INITIAL_TEMPLATE_REJECTED_UNFILLABLE", *exc.reason_codes)
+   214	            rejection_category = _template_rejection_category(reason_codes)
+   215	            rejection = {
+   216	                "stage": "template_reference",
+   217	                "rank": ranking.rank,
+   218	                "selected": reference.slug,
+   219	                "status": "rejected",
+   220	                "hard_eligibility": (
+   221	                    "days",
+   222	                    "training_level",
+   223	                    "core_slots_resolvable",
+   224	                ),
+   225	                "goal_used_for_exclusion": False,
+   226	                "score": ranking.decision_trace()["score"],
+   227	                "feasibility": ranking.feasibility.decision_trace(),
+   228	                "rejection_category": rejection_category,
+   229	                "reason_codes": reason_codes,
+   230	            }
+   231	            template_rejection_trace += (
+   232	                rejection,
+   233	                _template_attempt_trace(
+   234	                    ranking,
+   235	                    status="rejected",
+   236	                    rejection_category=rejection_category,
+   237	                    reason_codes=reason_codes,
+   238	                ),
+   239	            )
+   240	    if template_selection.candidates:
+   241	        template_rejection_trace += (
+   242	            {
+   243	                "stage": "template_recovery",
+   244	                "status": "exhausted",
+   245	                "attempted_count": len(template_selection.candidates),
+   246	                "candidate_count": len(template_selection.candidates),
+   247	                "reason_codes": ("TEMPLATE_ALTERNATIVES_EXHAUSTED",),
+   248	            },
+   249	        )
+   250	    requested_days = normalized.resistance_training_days
+   251	    ranked_splits = rank_split_candidates(
+   252	        normalized,
+   253	        ruleset,
+   254	        exercises=eligibility.eligible,
+   255	        session_capacity=session_capacity,
+   256	    )
+   257	    exact_day_splits = tuple(
+   258	        candidate for candidate in ranked_splits if len(candidate.day_focuses) == requested_days
+   259	    )
+   260	    if not exact_day_splits:
+   261	        collected_errors: list[str] = [
+   262	            "REQUESTED_TRAINING_DAYS_UNSATISFIED",
+   263	            "NO_EXACT_DAY_SPLIT_AVAILABLE",
+   264	        ]
+   265	        rejected_splits: list[dict[str, object]] = []
+   266	    else:
+   267	        rejected_splits = []
+   268	        collected_errors = []
+   269	    for attempt_index, candidate in enumerate(exact_day_splits):
+   270	        split = candidate
+   271	        if attempt_index:
+   272	            split = replace(
+   273	                candidate,
+   274	                reason_codes=candidate.reason_codes
+   275	                + ("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",),
+   276	            )
+   277	        result = _program_for_split(
+   278	            request,
+   279	            normalized,
+   280	            safety.status,
+   281	            safety.reason_codes,
+   282	            eligibility.rejected,
+   283	            eligibility.eligible,
+   284	            eligibility.cardio_eligible,
+   285	            split,
+   286	            ruleset,
+   287	            previous_volume=previous_volume,
+   288	            session_capacity=session_capacity,
+   289	            rejected_splits=tuple(rejected_splits),
+   290	            template_rejection_trace=template_rejection_trace,
+   291	            rejected_slot_candidates=rejected_slot_candidates,
+   292	        )
+   293	        if result.is_success:
+   294	            return result
+   295	        collected_errors.extend(result.errors)
+   296	        rejected_attempt: dict[str, object] = {
+   297	            "split": split.split_type.value,
+   298	            "day_focuses": split.day_focuses,
+   299	            "status": "rejected",
+   300	            "reason_codes": result.errors,
+   301	        }
+   302	        if result.decision_trace:
+   303	            rejected_attempt["decision_trace"] = result.decision_trace
+   304	        rejected_splits.append(rejected_attempt)
+   305	
+   306	    weekdays_fallback = (
+   307	        exact_day_splits[0].weekdays if exact_day_splits else tuple(range(requested_days))
+   308	    )
+   309	    dynamic_splits = rank_availability_aware_fallbacks(
+   310	        normalized,
+   311	        eligibility.eligible,
+   312	        ruleset,
+   313	        weekdays=weekdays_fallback,
+   314	        excluded_layouts=frozenset(candidate.day_focuses for candidate in exact_day_splits),
+   315	        session_capacity=session_capacity,
+   316	    )
+   317	    for fallback_split in dynamic_splits:
+   318	        result = _program_for_split(
+   319	            request,
+   320	            normalized,
+   321	            safety.status,
+   322	            safety.reason_codes,
+   323	            eligibility.rejected,
+   324	            eligibility.eligible,
+   325	            eligibility.cardio_eligible,
+   326	            fallback_split,
+   327	            ruleset,
+   328	            previous_volume=previous_volume,
+   329	            session_capacity=session_capacity,
+   330	            rejected_splits=tuple(rejected_splits),
+   331	            template_rejection_trace=template_rejection_trace,
+   332	            rejected_slot_candidates=rejected_slot_candidates,
+   333	        )
+   334	        if result.is_success:
+   335	            return result
+   336	        collected_errors.extend(result.errors)
+   337	        rejected_splits.append(
+   338	            {
+   339	                "split": fallback_split.split_type.value,
+   340	                "day_focuses": fallback_split.day_focuses,
+   341	                "status": "rejected",
+   342	                "reason_codes": result.errors,
+   343	                "decision_trace": result.decision_trace,
+   344	            }
+   345	        )
+   346	    print('BEFORE TUPLE: ', collected_errors)
+   347	    errors = (
+   348	        "PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED",
+   349	        "EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED",
+   350	        "REQUESTED_TRAINING_DAYS_UNSATISFIED",
+   351	        *tuple(dict.fromkeys(collected_errors)),
+   352	    )
+   353	    print('AFTER TUPLE: ', errors)
+   354	    print('RETURNING RESULT WITH ERRORS:', errors)
+   355	    print('RETURNING FOR SEED:', getattr(request, 'seed', 'no seed'))
+   356	    return ProgramGenerationResult(
+   357	        program=None,
+   358	        error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+   359	        errors=errors,
+   360	        safety_status=safety.status,
+   361	        rejected_candidates=eligibility.rejected,
+   362	        decision_trace=(
+   363	            {
+   364	                "stage": "construction_recovery",
+   365	                "status": "exhausted",
+   366	                "attempts": tuple(rejected_splits),
+   367	                "reason_codes": errors,
+   368	            },
+   369	        ),
+   370	    )
+   371	
+   372	
+   373	def _template_rejection_category(reason_codes: tuple[str, ...]) -> str:
+   374	    joined = " ".join(reason_codes)
+   375	    if any(marker in joined for marker in ("CORE_SLOT", "REQUIRED_CORE")):
+   376	        return "CORE_SLOT_UNRESOLVED"
+   377	    if any(marker in joined for marker in ("SAFETY", "EQUIPMENT", "NO_ELIGIBLE")):
+   378	        return "SAFETY_EQUIPMENT_INCOMPATIBILITY"
+   379	    if "PRIORITY_HARD_MINIMUM" in joined:
+   380	        return "HARD_PRIORITY_MINIMUM_FAILURE"
+   381	    if any(marker in joined for marker in ("DURATION", "RECOVERY")):
+   382	        return "DURATION_RECOVERY_HARD_IMPOSSIBILITY"
+   383	    if any(
+   384	        marker in joined
+   385	        for marker in (
+   386	            "VALIDATION",
+   387	            "REQUIRED_MOVEMENT",
+   388	            "WEEKLY_MUSCLE_VOLUME",
+   389	            "PER_SESSION_MUSCLE_VOLUME",
+   390	            "REQUESTED_TRAINING_DAYS",
+   391	        )
+   392	    ):
+   393	        return "VALIDATION_FAILURE"
+   394	    return "ADAPTATION_EXHAUSTED"
+   395	
+   396	
+   397	def _template_attempt_trace(
+   398	    ranking: TemplateRankingResult,
+   399	    *,
+   400	    status: str,
+   401	    rejection_category: str | None = None,
+   402	    reason_codes: tuple[str, ...] = ("TEMPLATE_ATTEMPT_SUCCEEDED",),
+   403	) -> dict[str, object]:
+   404	    return {
+   405	        "stage": "template_attempt",
+   406	        "rank": ranking.rank,
+   407	        "slug": ranking.template.slug,
+   408	        "score": ranking.decision_trace()["score"],
+   409	        "feasibility": ranking.feasibility.decision_trace(),
+   410	        "scoring_reason_codes": ranking.reason_codes,
+   411	        "status": status,
+   412	        "rejection_category": rejection_category,
+   413	        "reason_codes": reason_codes,
+   414	    }
+   415	
+   416	
+   417	def _append_successful_template_attempt(
+   418	    result: ProgramGenerationResult,
+   419	    attempt_trace: dict[str, object],
+   420	) -> ProgramGenerationResult:
+   421	    if result.program is None:
+   422	        return result
+   423	    coach_index = next(
+   424	        (
+   425	            index
+   426	            for index, entry in enumerate(result.program.decision_trace)
+   427	            if entry.get("stage") == "final_construction"
+   428	        ),
+   429	        len(result.program.decision_trace),
+   430	    )
+   431	    final_trace = (
+   432	        result.program.decision_trace[:coach_index]
+   433	        + (attempt_trace,)
+   434	        + result.program.decision_trace[coach_index:]
+   435	    )
+   436	    report = replace(result.program.validation_report, decision_trace=final_trace)
+   437	    program = replace(
+   438	        result.program,
+   439	        validation_report=report,
+   440	        decision_trace=final_trace,
+   441	    )
+   442	    return replace(result, program=program, decision_trace=final_trace)
+   443	
+   444	
+   445	def _training_day_error(
+   446	    request: ProgramGenerationRequest,
+   447	    ruleset: ProgramRuleset,
+   448	) -> str | None:
+   449	    requested_days = request.available_training_days
+   450	    if requested_days > SUPPORTED_RESISTANCE_TRAINING_DAYS[-1]:
+   451	        return "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
+   452	    if requested_days < SUPPORTED_RESISTANCE_TRAINING_DAYS[0]:
+   453	        return None
+   454	    if requested_days > ruleset.max_resistance_days:
+   455	        return "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
+   456	    experience_level = ExperienceLevel(request.training_experience.value)
+   457	    if (
+   458	        resistance_training_day_status(experience_level, requested_days)
+   459	        is ResistanceTrainingDayStatus.UNSUPPORTED
+   460	    ):
+   461	        return "UNSUPPORTED_RESISTANCE_TRAINING_DAYS"
+   462	    return None
+   463	
+   464	
+   465	def _rejected_split_recovery_reasons(
+   466	    rejected_splits: tuple[dict[str, object], ...],
+   467	) -> tuple[str, ...]:
+   468	    reasons: list[str] = []
+   469	    for rejected_split in rejected_splits:
+   470	        decision_trace = rejected_split.get("decision_trace")
+   471	        if not isinstance(decision_trace, tuple):
+   472	            continue
+   473	        for entry in decision_trace:
+   474	            if not isinstance(entry, dict) or entry.get("stage") != "construction_recovery":
+   475	                continue
+   476	            reason_codes = entry.get("reason_codes")
+   477	            if isinstance(reason_codes, tuple):
+   478	                reasons.extend(code for code in reason_codes if isinstance(code, str))
+   479	    return tuple(dict.fromkeys(reasons))
+   480	
+   481	
+   482	def _program_for_split(
+   483	    request: ProgramGenerationRequest,
+   484	    normalized: NormalizedProgramRequest,
+   485	    safety_status: SafetyStatus,
+   486	    safety_reasons: tuple[str, ...],
+   487	    rejected: tuple[RejectedCandidate, ...],
+   488	    eligible: tuple[ExerciseCandidate, ...],
+   489	    cardio_eligible: tuple[ExerciseCandidate, ...],
+   490	    split: SplitPlan,
+   491	    ruleset: ProgramRuleset,
+   492	    *,
+   493	    previous_volume: PreviousVolumeBaseline,
+   494	    session_capacity: SessionCapacity,
+   495	    rejected_splits: tuple[dict[str, object], ...],
+   496	    template_rejection_trace: tuple[dict[str, object], ...],
+   497	    rejected_slot_candidates: tuple[tuple[ExerciseCandidate, tuple[str, ...]], ...],
+   498	) -> ProgramGenerationResult:
+   499	    volume = plan_weekly_volume(
+   500	        normalized,
+   501	        split,
+   502	        ruleset,
+   503	        previous_volume=previous_volume,
+   504	        session_capacity=session_capacity,
+   505	    )
+   506	    try:
+   507	        drafts = build_sessions(
+   508	            normalized,
+   509	            split,
+   510	            volume,
+   511	            eligible,
+   512	            ruleset,
+   513	            rejected_slot_candidates=rejected_slot_candidates,
+   514	            session_capacity=session_capacity,
+   515	        )
+   516	    except SessionConstructionError as exc:
+   517	        construction_trace: tuple[dict[str, object], ...] = template_rejection_trace + (
+   518	            {
+   519	                "stage": "session_construction",
+   520	                "status": "rejected",
+   521	                "split": split.split_type.value,
+   522	                "day_index": exc.day_index,
+   523	                "focus": exc.focus,
+   524	                "required_patterns": exc.patterns,
+   525	                "required_target_muscle": exc.target_muscle,
+   526	                "candidate_rejection_reasons": exc.rejection_reasons,
+   527	                "reason_codes": exc.reason_codes,
+   528	            },
+   529	        )
+   530	        return ProgramGenerationResult(
+   531	            program=None,
+   532	            error_code=GenerationErrorCode.NO_SAFE_EXERCISE_FOR_PATTERN,
+   533	            errors=exc.reason_codes,
+   534	            safety_status=safety_status,
+   535	            rejected_candidates=rejected,
+   536	            decision_trace=construction_trace,
+   537	        )
+   538	    substitution_decisions = [
+   539	        decision for draft in drafts for decision in draft.substitution_decisions
+   540	    ]
+   541	    days = prescribe_sessions(
+   542	        normalized,
+   543	        drafts,
+   544	        volume,
+   545	        ruleset,
+   546	    )
+   547	    days, repair_reasons = repair_weekly_volume(
+   548	        days,
+   549	        normalized,
+   550	        volume,
+   551	        ruleset,
+   552	        candidates=eligible,
+   553	        substitution_decisions=substitution_decisions,
+   554	    )
+   555	    days_before_duration_repair = days
+   556	    days, duration_repair_reasons = repair_session_durations(
+   557	        days,
+   558	        normalized,
+   559	        eligible,
+   560	        ruleset,
+   561	        volume=volume,
+   562	        session_capacity=session_capacity,
+   563	    )
+   564	    split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
+   565	    days = finalize_session_structure(days, normalized, ruleset)
+   566	    day_count_errors = _day_count_errors(
+   567	        len(days), normalized.resistance_training_days, stage="dynamic_construction"
+   568	    )
+   569	    if day_count_errors:
+   570	        return ProgramGenerationResult(
+   571	            program=None,
+   572	            error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+   573	            errors=day_count_errors,
+   574	            safety_status=safety_status,
+   575	            rejected_candidates=rejected,
+   576	            decision_trace=template_rejection_trace
+   577	            + (
+   578	                {
+   579	                    "stage": "day_count_invariant",
+   580	                    "status": "rejected",
+   581	                    "expected_days": normalized.resistance_training_days,
+   582	                    "actual_days": len(days),
+   583	                    "split": split.split_type.value,
+   584	                    "reason_codes": day_count_errors,
+   585	                },
+   586	            ),
+   587	        )
+   588	    effective_volume = calculate_effective_volume(
+   589	        (item for day in days for item in day.exercises),
+   590	        ruleset,
+   591	    )
+   592	    direct = Counter(effective_volume.direct_sets_by_muscle)
+   593	    relaxed_groups = tuple(
+   594	        dict.fromkeys(group for draft in drafts for group in draft.relaxed_required_pattern_groups)
+   595	    )
+   596	    relaxed_slots = tuple(
+   597	        dict.fromkeys(
+   598	            (group, target)
+   599	            for draft in drafts
+   600	            for group, target in zip(
+   601	                draft.relaxed_required_pattern_groups,
+   602	                draft.relaxed_required_target_muscles,
+   603	                strict=True,
+   604	            )
+   605	        )
+   606	    )
+   607	    substitution_metrics = aggregate_substitution_observability(substitution_decisions)
+   608	    metrics = {
+   609	        **_volume_metrics(
+   610	            days,
+   611	            volume,
+   612	            previous_volume,
+   613	            ruleset,
+   614	            request=normalized,
+   615	            relaxed_required_pattern_groups=relaxed_groups,
+   616	            relaxed_required_slots=relaxed_slots,
+   617	            repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
+   618	        ),
+   619	        **substitution_metrics,
+   620	    }
+   621	    body_trace = body_analysis_trace(normalized, ruleset)
+   622	    session_reasons = tuple(
+   623	        dict.fromkeys(reason for draft in drafts for reason in draft.reason_codes)
+   624	    )
+   625	    recovery_reasons = tuple(
+   626	        dict.fromkeys(
+   627	            (
+   628	                *(("SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE",) if rejected_splits else ()),
+   629	                *_rejected_split_recovery_reasons(rejected_splits),
+   630	                *session_reasons,
+   631	                *recovery_repair_reasons,
+   632	                *duration_repair_reasons,
+   633	            )
+   634	        )
+   635	    )
+   636	    trace: tuple[dict[str, object], ...] = template_rejection_trace + (
+   637	        {"stage": "normalization", "assumptions": normalized.assumptions},
+   638	        {"stage": "safety", "status": safety_status.value, "reasons": safety_reasons},
+   639	        {
+   640	            "stage": "eligibility",
+   641	            "eligible_count": len(eligible),
+   642	            "rejected_count": len(rejected),
+   643	        },
+   644	        _duration_capacity_trace(session_capacity),
+   645	        *((body_trace,) if body_trace is not None else ()),
+   646	        {
+   647	            "stage": "construction_recovery",
+   648	            "status": "recovered" if recovery_reasons else "not_required",
+   649	            "selected_split": split.split_type.value,
+   650	            "rejected_splits": rejected_splits,
+   651	            "reason_codes": recovery_reasons,
+   652	            "session_reasons": tuple(
+   653	                {
+   654	                    "day_index": draft.day_index,
+   655	                    "focus": draft.focus,
+   656	                    "reason_codes": draft.reason_codes,
+   657	                }
+   658	                for draft in drafts
+   659	                if draft.reason_codes
+   660	            ),
+   661	        },
+   662	        {
+   663	            "stage": "day_count_invariant",
+   664	            "status": "satisfied",
+   665	            "expected_days": normalized.resistance_training_days,
+   666	            "actual_days": len(days),
+   667	            "reason_codes": ("REQUESTED_TRAINING_DAYS_SATISFIED",),
+   668	        },
+   669	        {"stage": "split", "selected": split.split_type.value, "reasons": split.reason_codes},
+   670	        _volume_decision_trace(volume, previous_volume, normalized, ruleset),
+   671	        {
+   672	            "stage": "volume_repair",
+   673	            "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
+   674	            "weekly_direct_sets": dict(direct),
+   675	            "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
+   676	        },
+   677	        _duration_repair_trace(
+   678	            session_capacity,
+   679	            days_before_duration_repair,
+   680	            days,
+   681	            duration_repair_reasons,
+   682	        ),
+   683	        {
+   684	            "stage": "session_structure",
+   685	            "status": "finalized",
+   686	            "reason_codes": ("FINAL_SESSION_SEQUENCE_APPLIED",),
+   687	        },
+   688	        {
+   689	            "stage": "substitution_observability",
+   690	            "metrics": substitution_metrics,
+   691	            "decisions": substitution_decision_summaries(substitution_decisions),
+   692	        },
+   693	    )
+   694	    empty_report = ValidationReport(
+   695	        errors=(),
+   696	        warnings=(),
+   697	        assumptions=normalized.assumptions,
+   698	        metrics=metrics,
+   699	        decision_trace=trace,
+   700	    )
+   701	    days = add_cardio(normalized, days, cardio_eligible, ruleset)
+   702	    program = WorkoutProgram(
+   703	        user_profile_snapshot=request.model_dump(mode="json"),
+   704	        engine_version=ruleset.engine_version,
+   705	        ruleset_version=ruleset.version,
+   706	        seed=normalized.seed,
+   707	        primary_goal=normalized.primary_goal,
+   708	        secondary_goal=request.secondary_goal_optional,
+   709	        training_status=normalized.training_status,
+   710	        safety_status=safety_status,
+   711	        assumptions=normalized.assumptions,
+   712	        warnings=(),
+   713	        duration_weeks=request.program_duration_weeks,
+   714	        split=split,
+   715	        weekly_schedule=days,
+   716	        progression_policy={
+   717	            **double_progression_policy(ruleset),
+   718	            "deload": deload_policy(ruleset),
+   719	        },
+   720	        validation_report=empty_report,
+   721	        aggregate_metrics=metrics,
+   722	        decision_trace=trace,
+   723	        body_analysis_provenance=body_analysis_provenance(normalized),
+   724	    )
+   725	    report = validate_program(program, request, ruleset)
+   726	    if not report.is_valid:
+   727	        return ProgramGenerationResult(
+   728	            program=None,
+   729	            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
+   730	            errors=report.errors,
+   731	            safety_status=safety_status,
+   732	            rejected_candidates=rejected,
+   733	            decision_trace=trace,
+   734	        )
+   735	    program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
+   736	    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
+   737	    final_trace = trace + (
+   738	        {
+   739	            "stage": "final_construction",
+   740	            "status": "succeeded",
+   741	            "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
+   742	        },
+   743	        {"stage": "coach_quality", "metrics": quality_metrics},
+   744	    )
+   745	    report = replace(report, decision_trace=final_trace)
+   746	    program = replace(
+   747	        program,
+   748	        validation_report=report,
+   749	        warnings=report.warnings,
+   750	        decision_trace=final_trace,
+   751	    )
+   752	    return ProgramGenerationResult(
+   753	        program=program,
+   754	        safety_status=safety_status,
+   755	        rejected_candidates=rejected,
+   756	        decision_trace=final_trace,
+   757	    )
+   758	
+   759	
+   760	def _reference_program(
+   761	    request: ProgramGenerationRequest,
+   762	    normalized: NormalizedProgramRequest,
+   763	    safety_status: SafetyStatus,
+   764	    safety_reasons: tuple[str, ...],
+   765	    rejected: tuple[RejectedCandidate, ...],
+   766	    eligible: tuple[ExerciseCandidate, ...],
+   767	    cardio_eligible: tuple[ExerciseCandidate, ...],
+   768	    reference: TemplateReference,
+   769	    build: TemplateSessionBuild,
+   770	    ruleset: ProgramRuleset,
+   771	    *,
+   772	    previous_volume: PreviousVolumeBaseline,
+   773	    session_capacity: SessionCapacity,
+   774	    template_selection_trace: tuple[dict[str, object], ...],
+   775	) -> ProgramGenerationResult:
+   776	    split = SplitPlan(
+   777	        split_type=reference.split_type,
+   778	        day_focuses=tuple(draft.focus for draft in build.drafts),
+   779	        weekdays=tuple(draft.weekday for draft in build.drafts if draft.weekday is not None),
+   780	        score=100,
+   781	        reason_codes=("TEMPLATE_REFERENCE_SELECTED",),
+   782	    )
+   783	    volume = plan_weekly_volume(
+   784	        normalized,
+   785	        split,
+   786	        ruleset,
+   787	        previous_volume=previous_volume,
+   788	        direct_exposure_counts=build.direct_exposure_counts(),
+   789	        session_capacity=session_capacity,
+   790	    )
+   791	    substitution_decisions = [
+   792	        decision for draft in build.drafts for decision in draft.substitution_decisions
+   793	    ]
+   794	    days = prescribe_sessions(
+   795	        normalized,
+   796	        build.drafts,
+   797	        volume,
+   798	        ruleset,
+   799	    )
+   800	    days = apply_template_intent(days, build, ruleset)
+   801	    days, repair_reasons = repair_weekly_volume(
+   802	        days,
+   803	        normalized,
+   804	        volume,
+   805	        ruleset,
+   806	        candidates=eligible,
+   807	        allow_soft_exercise_additions=False,
+   808	        preserve_template_core_structure=True,
+   809	        substitution_decisions=substitution_decisions,
+   810	    )
+   811	    days_before_duration_repair = days
+   812	    days, duration_repair_reasons = repair_session_durations(
+   813	        days,
+   814	        normalized,
+   815	        eligible,
+   816	        ruleset,
+   817	        volume=volume,
+   818	        prefer_acceptable_volume_for_minimum_fill=True,
+   819	        session_capacity=session_capacity,
+   820	    )
+   821	    split, days, recovery_repair_reasons = repair_recovery_weekdays(split, days, ruleset)
+   822	    days = finalize_session_structure(days, normalized, ruleset)
+   823	    substitution_metrics = aggregate_substitution_observability(substitution_decisions)
+   824	    metrics = {
+   825	        **_volume_metrics(
+   826	            days,
+   827	            volume,
+   828	            previous_volume,
+   829	            ruleset,
+   830	            request=normalized,
+   831	            reference_template=reference.slug,
+   832	            repair_reason_codes=tuple(dict.fromkeys((*repair_reasons, *duration_repair_reasons))),
+   833	        ),
+   834	        **substitution_metrics,
+   835	    }
+   836	    effective_volume = calculate_effective_volume(
+   837	        (item for day in days for item in day.exercises), ruleset
+   838	    )
+   839	    direct = Counter(effective_volume.direct_sets_by_muscle)
+   840	    body_trace = body_analysis_trace(normalized, ruleset)
+   841	    day_count_errors = _day_count_errors(
+   842	        len(days), normalized.resistance_training_days, stage="template_construction"
+   843	    )
+   844	    day_count_trace: dict[str, object] = {
+   845	        "stage": "day_count_invariant",
+   846	        "status": "rejected" if day_count_errors else "satisfied",
+   847	        "expected_days": normalized.resistance_training_days,
+   848	        "actual_days": len(days),
+   849	        "split": split.split_type.value,
+   850	        "reason_codes": day_count_errors or ("REQUESTED_TRAINING_DAYS_SATISFIED",),
+   851	    }
+   852	    trace: tuple[dict[str, object], ...] = template_selection_trace + (
+   853	        {"stage": "normalization", "assumptions": normalized.assumptions},
+   854	        {"stage": "safety", "status": safety_status.value, "reasons": safety_reasons},
+   855	        {
+   856	            "stage": "eligibility",
+   857	            "eligible_count": len(eligible),
+   858	            "rejected_count": len(rejected),
+   859	        },
+   860	        _duration_capacity_trace(session_capacity),
+   861	        *((body_trace,) if body_trace is not None else ()),
+   862	        {
+   863	            "stage": "template_reference",
+   864	            "selected": reference.slug,
+   865	            "status": "adapted",
+   866	            "hard_eligibility": (
+   867	                "days",
+   868	                "training_level",
+   869	                "core_slots_resolvable",
+   870	            ),
+   871	            "goal_used_for_exclusion": False,
+   872	            "focus_tags": reference.focus_tags,
+   873	            "intensity_methods": reference.intensity_methods,
+   874	        },
+   875	        template_resolution_trace(build, days),
+   876	        day_count_trace,
+   877	        _volume_decision_trace(volume, previous_volume, normalized, ruleset),
+   878	        {
+   879	            "stage": "volume_repair",
+   880	            "reasons": tuple(dict.fromkeys((*repair_reasons, *recovery_repair_reasons))),
+   881	            "weekly_direct_sets": dict(direct),
+   882	            "weekly_effective_sets": effective_volume.effective_sets_by_muscle,
+   883	        },
+   884	        _duration_repair_trace(
+   885	            session_capacity,
+   886	            days_before_duration_repair,
+   887	            days,
+   888	            duration_repair_reasons,
+   889	        ),
+   890	        {
+   891	            "stage": "session_structure",
+   892	            "status": "finalized",
+   893	            "reason_codes": ("FINAL_SESSION_SEQUENCE_APPLIED",),
+   894	        },
+   895	        {
+   896	            "stage": "substitution_observability",
+   897	            "metrics": substitution_metrics,
+   898	            "decisions": substitution_decision_summaries(substitution_decisions),
+   899	        },
+   900	    )
+   901	    if day_count_errors:
+   902	        return ProgramGenerationResult(
+   903	            program=None,
+   904	            error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+   905	            errors=day_count_errors,
+   906	            safety_status=safety_status,
+   907	            rejected_candidates=rejected,
+   908	            decision_trace=trace,
+   909	        )
+   910	    explicit_priority_muscles = normalized.source.priority_muscles
+   911	    body_priority_muscles = body_analysis_priority_muscles(normalized, ruleset)
+   912	    targets_by_muscle = {target.muscle: target for target in volume.targets}
+   913	    unmet_priority_errors: list[str] = []
+   914	    for muscle in sorted(explicit_priority_muscles, key=lambda item: item.value):
+   915	        target = targets_by_muscle.get(muscle)
+   916	        if target is None:
+   917	            continue
+   918	        direct_value = direct[muscle.value]
+   919	        if target.direct_minimum_required and direct_value < target.minimum_direct_sets:
+   920	            unmet_priority_errors.append(
+   921	                f"TEMPLATE_PRIORITY_HARD_MINIMUM_UNSATISFIED:{muscle.value}"
+   922	            )
+   923	    if unmet_priority_errors:
+   924	        errors = tuple(unmet_priority_errors)
+   925	        return ProgramGenerationResult(
+   926	            program=None,
+   927	            error_code=GenerationErrorCode.UNSATISFIED_CONSTRAINT,
+   928	            errors=errors,
+   929	            safety_status=safety_status,
+   930	            rejected_candidates=rejected,
+   931	            decision_trace=trace,
+   932	        )
+   933	    soft_priority_shortfalls = tuple(
+   934	        f"TEMPLATE_PRIORITY_PREFERRED_TARGET_PARTIAL:{muscle.value}"
+   935	        for muscle in sorted(
+   936	            explicit_priority_muscles | body_priority_muscles,
+   937	            key=lambda item: item.value,
+   938	        )
+   939	        if (target := targets_by_muscle.get(muscle))
+   940	        and (
+   941	            direct[muscle.value] < target.target_sets
+   942	            or effective_volume.effective_sets_by_muscle.get(muscle.value, 0)
+   943	            < target.effective_target_sets
+   944	        )
+   945	    )
+   946	    if soft_priority_shortfalls:
+   947	        trace += (
+   948	            {
+   949	                "stage": "template_priority_adaptation",
+   950	                "status": "constrained",
+   951	                "reason_codes": soft_priority_shortfalls,
+   952	            },
+   953	        )
+   954	    days = add_cardio(normalized, days, cardio_eligible, ruleset)
+   955	    program = WorkoutProgram(
+   956	        user_profile_snapshot=request.model_dump(mode="json"),
+   957	        engine_version=ruleset.engine_version,
+   958	        ruleset_version=ruleset.version,
+   959	        seed=normalized.seed,
+   960	        primary_goal=normalized.primary_goal,
+   961	        secondary_goal=request.secondary_goal_optional,
+   962	        training_status=normalized.training_status,
+   963	        safety_status=safety_status,
+   964	        assumptions=normalized.assumptions,
+   965	        warnings=(),
+   966	        duration_weeks=request.program_duration_weeks,
+   967	        split=split,
+   968	        weekly_schedule=days,
+   969	        progression_policy={
+   970	            **double_progression_policy(ruleset),
+   971	            "deload": deload_policy(ruleset),
+   972	        },
+   973	        validation_report=ValidationReport((), (), normalized.assumptions, metrics, trace),
+   974	        aggregate_metrics=metrics,
+   975	        decision_trace=trace,
+   976	        body_analysis_provenance=body_analysis_provenance(normalized),
+   977	    )
+   978	    report = validate_program(program, request, ruleset)
+   979	    if not report.is_valid:
+   980	        return ProgramGenerationResult(
+   981	            program=None,
+   982	            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
+   983	            errors=report.errors,
+   984	            safety_status=safety_status,
+   985	            rejected_candidates=rejected,
+   986	            decision_trace=trace,
+   987	        )
+   988	    program, report = _attach_coach_quality_metrics(program, request, normalized, report, ruleset)
+   989	    quality_metrics = build_coach_quality_metrics(program, request, report, ruleset)
+   990	    final_trace = trace + (
+   991	        {
+   992	            "stage": "final_construction",
+   993	            "status": "succeeded",
+   994	            "reason_codes": ("FINAL_CONSTRUCTION_SUCCEEDED",),
+   995	        },
+   996	        {"stage": "coach_quality", "metrics": quality_metrics},
+   997	    )
+   998	    report = replace(report, decision_trace=final_trace)
+   999	    return ProgramGenerationResult(
+  1000	        program=replace(
+  1001	            program,
+  1002	            validation_report=report,
+  1003	            warnings=report.warnings,
+  1004	            decision_trace=final_trace,
+  1005	        ),
+  1006	        safety_status=safety_status,
+  1007	        rejected_candidates=rejected,
+  1008	        decision_trace=final_trace,
+  1009	    )
+  1010	
+  1011	
+  1012	def _day_count_errors(actual: int, expected: int, *, stage: str) -> tuple[str, ...]:
+  1013	    if actual == expected:
+  1014	        return ()
+  1015	    return (
+  1016	        "REQUESTED_TRAINING_DAYS_UNSATISFIED",
+  1017	        f"REQUESTED_TRAINING_DAYS_MISMATCH:expected={expected}:actual={actual}",
+  1018	        f"DAY_COUNT_INVARIANT_FAILED:{stage}",
+  1019	    )
+  1020	
+  1021	
+  1022	def _attach_coach_quality_metrics(
+  1023	    program: WorkoutProgram,
+  1024	    request: ProgramGenerationRequest,
+  1025	    normalized: NormalizedProgramRequest,
+  1026	    report: ValidationReport,
+  1027	    ruleset: ProgramRuleset,
+  1028	) -> tuple[WorkoutProgram, ValidationReport]:
+  1029	    quality = _coach_quality_metrics(program, request, normalized, report, ruleset)
+  1030	    aggregate_metrics = {**program.aggregate_metrics, "coach_quality": quality}
+  1031	    report = replace(report, metrics={**report.metrics, "coach_quality": quality})
+  1032	    return replace(program, aggregate_metrics=aggregate_metrics), report
+  1033	
+  1034	
+  1035	def _duration_capacity_trace(capacity: SessionCapacity) -> dict[str, object]:
+  1036	    return {
+  1037	        "stage": "duration_capacity",
+  1038	        "requested_workout_minutes": capacity.requested_workout_minutes,
+  1039	        "target_total_minutes": capacity.target_total_minutes,
+  1040	        "minimum_workout_minutes": capacity.minimum_workout_minutes,
+  1041	        "maximum_workout_minutes": capacity.maximum_workout_minutes,
+  1042	        "resistance_work_budget_minutes": capacity.resistance_work_budget_minutes,
+  1043	        "minimum_resistance_work_minutes": capacity.minimum_resistance_work_minutes,
+  1044	        "maximum_resistance_work_minutes": capacity.maximum_resistance_work_minutes,
+  1045	        "expected_exercise_count_capacity": capacity.expected_exercise_count_capacity,
+  1046	        "expected_working_set_capacity": capacity.expected_working_set_capacity,
+  1047	        "reason_codes": ("DURATION_CAPACITY_PLANNED_BEFORE_CONSTRUCTION",),
+  1048	    }
+  1049	
+  1050	
+  1051	def _duration_repair_trace(
+  1052	    capacity: SessionCapacity,
+  1053	    before: tuple[WorkoutDay, ...],
+  1054	    after: tuple[WorkoutDay, ...],
+  1055	    reason_codes: tuple[str, ...],
+  1056	) -> dict[str, object]:
+  1057	    repair_applied = "SESSION_DURATION_REPAIR_APPLIED" in reason_codes
+  1058	    duration_deltas = tuple(
+  1059	        abs(updated.estimated_duration_minutes - original.estimated_duration_minutes)
+  1060	        for original, updated in zip(before, after, strict=True)
+  1061	    )
+  1062	    exercise_deltas = tuple(
+  1063	        abs(len(updated.exercises) - len(original.exercises))
+  1064	        for original, updated in zip(before, after, strict=True)
+  1065	    )
+  1066	    if not repair_applied:
+  1067	        classification = "not_needed"
+  1068	    elif max(duration_deltas, default=0) <= 10 and max(exercise_deltas, default=0) <= 1:
+  1069	        classification = "minor"
+  1070	    else:
+  1071	        classification = "major"
+  1072	    unavoidable_constraints = tuple(
+  1073	        code for code in reason_codes if "CONSTRAINED" in code or "EXTENDED" in code
+  1074	    )
+  1075	    return {
+  1076	        "stage": "session_duration",
+  1077	        "status": "repaired" if repair_applied else "validated",
+  1078	        "planned_resistance_work_budget_minutes": capacity.resistance_work_budget_minutes,
+  1079	        "planned_exercise_capacity": capacity.expected_exercise_count_capacity,
+  1080	        "planned_set_capacity": capacity.expected_working_set_capacity,
+  1081	        "estimated_duration_before_late_repair": tuple(
+  1082	            day.estimated_duration_minutes for day in before
+  1083	        ),
+  1084	        "estimated_duration_after_late_repair": tuple(
+  1085	            day.estimated_duration_minutes for day in after
+  1086	        ),
+  1087	        "repair_classification": classification,
+  1088	        "unavoidable_duration_constraints": unavoidable_constraints,
+  1089	        "reason_codes": reason_codes,
+  1090	    }
+  1091	
+  1092	
+  1093	def _coach_quality_metrics(
+  1094	    program: WorkoutProgram,
+  1095	    request: ProgramGenerationRequest,
+  1096	    normalized: NormalizedProgramRequest,
+  1097	    report: ValidationReport,
+  1098	    ruleset: ProgramRuleset,
+  1099	) -> dict[str, object]:
+  1100	    trace_reason_codes = {
+  1101	        code
+  1102	        for entry in program.decision_trace
+  1103	        for key in ("reason_codes", "reasons")
+  1104	        for code in _string_sequence(entry.get(key))
+  1105	    }
+  1106	    ranges = program.aggregate_metrics.get("volume_ranges_by_muscle", {})
+  1107	    hard_volume_exceeded = isinstance(ranges, dict) and any(
+  1108	        isinstance(values, dict)
+  1109	        and float(values.get("actual_effective_volume", 0))
+  1110	        > float(values.get("effective_maximum_hard", ruleset.maximum_sets[program.training_status]))
+  1111	        for values in ranges.values()
+  1112	    )
+  1113	    volume_fit = (
+  1114	        "failed"
+  1115	        if hard_volume_exceeded or "WEEKLY_MUSCLE_VOLUME_EXCEEDED" in report.errors
+  1116	        else "constrained"
+  1117	        if "WEEKLY_VOLUME_CONSTRAINED" in report.warnings
+  1118	        or "VOLUME_REPAIR_SOFT_TARGET_REDUCED" in trace_reason_codes
+  1119	        else "fit"
+  1120	    )
+  1121	    resistance_budget = request.session_duration_minutes
+  1122	    # resistance_time_budget_fit: did every session stay within the resistance budget (+tolerance)?
+  1123	    session_resistance_minutes = [
+  1124	        calculate_resistance_minutes(day, ruleset.general_warmup_minutes)
+  1125	        for day in program.weekly_schedule
+  1126	    ]
+  1127	    overrun_minutes = [max(0, m - resistance_budget) for m in session_resistance_minutes]
+  1128	    resistance_time_budget_fit = all(m <= resistance_budget for m in session_resistance_minutes)
+  1129	    utilization = [round(m / max(1, resistance_budget), 3) for m in session_resistance_minutes]
+  1130	    duration_fit = (
+  1131	        "fit"
+  1132	        if resistance_time_budget_fit
+  1133	        else "constrained"
+  1134	        if "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS" in trace_reason_codes
+  1135	        else "failed"
+  1136	    )
+  1137	    duration_constrained_quality = bool(
+  1138	        trace_reason_codes.intersection(
+  1139	            {
+  1140	                "SESSION_DURATION_CONSTRAINED_BY_HARD_VOLUME_LIMITS",
+  1141	                "DURATION_REDUCTION_VIOLATED_MINIMUM_EXERCISE_FLOOR",
+  1142	            }
+  1143	        )
+  1144	    )
+  1145	    late_repair_class = "not_needed"
+  1146	    if "SESSION_DURATION_REPAIR_APPLIED" in trace_reason_codes:
+  1147	        # classify based on the repair trace
+  1148	        duration_trace = next(
+  1149	            (e for e in program.decision_trace if e.get("stage") == "session_duration"),
+  1150	            {},
+  1151	        )
+  1152	        rc = duration_trace.get("repair_classification", "minor")
+  1153	        late_repair_class = rc if isinstance(rc, str) else "minor"
+  1154	
+  1155	    recovery_fit = (
+  1156	        "fit" if recovery_spacing_is_valid(program.weekly_schedule, ruleset) else "failed"
+  1157	    )
+  1158	    priority_metrics_raw = program.aggregate_metrics.get("priority_metrics", {})
+  1159	    priority_metrics = priority_metrics_raw if isinstance(priority_metrics_raw, dict) else {}
+  1160	    explicit_priorities = tuple(request.priority_muscles)
+  1161	    body_priorities = tuple(
+  1162	        item.muscle for item in eligible_body_analysis_priorities(normalized, ruleset)
+  1163	    )
+  1164	
+  1165	    def satisfaction(muscles: tuple[MuscleGroup, ...]) -> str:
+  1166	        statuses: list[str] = []
+  1167	        for muscle in muscles:
+  1168	            metric = priority_metrics.get(muscle.value, {})
+  1169	            if not isinstance(metric, dict):
+  1170	                continue
+  1171	            status = metric.get("status")
+  1172	            if status in {"satisfied", "partial"}:
+  1173	                statuses.append(status)
+  1174	        if not statuses:
+  1175	            return "not_applicable"
+  1176	        return "satisfied" if all(status == "satisfied" for status in statuses) else "partial"
+  1177	
+  1178	    constraint_codes = {
+  1179	        code
+  1180	        for code in trace_reason_codes
+  1181	        if any(marker in code for marker in ("CONSTRAIN", "CAP", "LIMIT", "UNSATISFIED", "REPAIR"))
+  1182	    }
+  1183	    substitution_count = sum(
+  1184	        "TEMPLATE_SAFE_SUBSTITUTION" in item.reason_codes
+  1185	        for day in program.weekly_schedule
+  1186	        for item in day.exercises
+  1187	    )
+  1188	    has_template = isinstance(program.aggregate_metrics.get("reference_template"), str)
+  1189	    template_preservation = (
+  1190	        "preserved"
+  1191	        if has_template
+  1192	        and any(
+  1193	            any(code.startswith("TEMPLATE_") for code in item.reason_codes)
+  1194	            for day in program.weekly_schedule
+  1195	            for item in day.exercises
+  1196	        )
+  1197	        else "not_applicable"
+  1198	    )
+  1199	    return {
+  1200	        "template_preservation": template_preservation,
+  1201	        "priority_target_satisfaction": satisfaction(explicit_priorities),
+  1202	        "body_analysis_target_satisfaction": satisfaction(body_priorities),
+  1203	        "volume_fit": volume_fit,
+  1204	        "duration_fit": duration_fit,
+  1205	        "recovery_fit": recovery_fit,
+  1206	        "substitution_count": substitution_count,
+  1207	        "constraint_count": len(constraint_codes),
+  1208	        "hard_validation_status": "passed" if report.is_valid else "failed",
+  1209	        # Phase 11.9 duration metrics
+  1210	        "resistance_time_budget_fit": resistance_time_budget_fit,
+  1211	        "resistance_time_utilization": utilization,
+  1212	        "resistance_time_overrun_minutes": overrun_minutes,
+  1213	        "duration_constrained_quality": duration_constrained_quality,
+  1214	        "late_duration_repair_class": late_repair_class,
+  1215	    }
+  1216	
+  1217	
+  1218	def _volume_metrics(
+  1219	    days: tuple[WorkoutDay, ...],
+  1220	    volume: WeeklyVolumePlan,
+  1221	    previous_volume: PreviousVolumeBaseline,
+  1222	    ruleset: ProgramRuleset,
+  1223	    *,
+  1224	    request: NormalizedProgramRequest,
+  1225	    reference_template: str | None = None,
+  1226	    relaxed_required_pattern_groups: tuple[tuple[MovementPattern, ...], ...] = (),
+  1227	    relaxed_required_slots: tuple[tuple[tuple[MovementPattern, ...], MuscleGroup | None], ...] = (),
+  1228	    repair_reason_codes: tuple[str, ...] = (),
+  1229	) -> dict[str, object]:
+  1230	    effective_volume = calculate_effective_volume(
+  1231	        (item for day in days for item in day.exercises), ruleset
+  1232	    )
+  1233	    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+  1234	    direct = Counter(effective_volume.direct_sets_by_muscle)
+  1235	    metrics: dict[str, object] = {
+  1236	        "planned_direct_sets_by_muscle": {
+  1237	            target.muscle.value: target.direct_sets for target in volume.targets
+  1238	        },
+  1239	        "volume_ranges_by_muscle": {
+  1240	            target.muscle.value: _volume_range_metric(
+  1241	                target,
+  1242	                direct.get(target.muscle.value, 0),
+  1243	                effective_volume.effective_sets_by_muscle.get(target.muscle.value, 0.0),
+  1244	                days,
+  1245	                repair_reason_codes,
+  1246	            )
+  1247	            for target in volume.targets
+  1248	        },
+  1249	        "weekly_direct_sets_by_muscle": complete_tracked_metrics(dict(direct)),
+  1250	        "weekly_fractional_sets_by_muscle": complete_tracked_metrics(
+  1251	            effective_volume.secondary_sets_by_muscle
+  1252	        ),
+  1253	        "weekly_effective_sets_by_muscle": complete_tracked_metrics(
+  1254	            effective_volume.effective_sets_by_muscle
+  1255	        ),
+  1256	        "previous_volume_baseline": {
+  1257	            "direct_sets_by_muscle": {
+  1258	                muscle.value: sets for muscle, sets in previous_volume.direct_sets_by_muscle.items()
+  1259	            },
+  1260	            "effective_sets_by_muscle": {
+  1261	                muscle.value: sets
+  1262	                for muscle, sets in previous_volume.effective_sets_by_muscle.items()
+  1263	            },
+  1264	            "confidence": previous_volume.confidence,
+  1265	            "source": previous_volume.source,
+  1266	            "reason_codes": previous_volume.reason_codes,
+  1267	        },
+  1268	        "weekly_cardio_minutes": sum(
+  1269	            day.cardio.duration_minutes for day in days if day.cardio is not None
+  1270	        ),
+  1271	        "estimated_weekly_duration": sum(day.estimated_duration_minutes for day in days),
+  1272	        "hard_training_days": len(days),
+  1273	        "recovery_days": ruleset.days_per_week - len(days),
+  1274	        "priority_metrics": _priority_metrics(
+  1275	            days,
+  1276	            volume,
+  1277	            effective_volume.direct_sets_by_muscle,
+  1278	            effective_volume.effective_sets_by_muscle,
+  1279	            priority_policy,
+  1280	            ruleset,
+  1281	        ),
+  1282	    }
+  1283	    if reference_template is not None:
+  1284	        metrics["reference_template"] = reference_template
+  1285	    if relaxed_required_pattern_groups:
+  1286	        relaxed_group_values = tuple(
+  1287	            tuple(pattern.value for pattern in group) for group in relaxed_required_pattern_groups
+  1288	        )
+  1289	        metrics["relaxed_required_pattern_groups"] = relaxed_group_values
+  1290	        metrics["relaxed_required_slots"] = tuple(
+  1291	            {
+  1292	                "patterns": tuple(pattern.value for pattern in group),
+  1293	                "target_muscle": target.value if target is not None else None,
+  1294	            }
+  1295	            for group, target in relaxed_required_slots
+  1296	        )
+  1297	        target_values: set[str] = set()
+  1298	        pattern_muscles: dict[frozenset[MovementPattern], tuple[MuscleGroup, ...]] = {
+  1299	            frozenset({MovementPattern.HORIZONTAL_PUSH, MovementPattern.VERTICAL_PUSH}): (
+  1300	                MuscleGroup.CHEST,
+  1301	                MuscleGroup.SHOULDERS,
+  1302	                MuscleGroup.TRICEPS,
+  1303	            ),
+  1304	            frozenset({MovementPattern.HORIZONTAL_PULL, MovementPattern.VERTICAL_PULL}): (
+  1305	                MuscleGroup.BACK,
+  1306	                MuscleGroup.BICEPS,
+  1307	            ),
+  1308	            frozenset(
+  1309	                {MovementPattern.SQUAT, MovementPattern.LUNGE, MovementPattern.KNEE_EXTENSION}
+  1310	            ): (MuscleGroup.QUADRICEPS,),
+  1311	            frozenset({MovementPattern.HIP_HINGE, MovementPattern.HIP_EXTENSION}): (
+  1312	                MuscleGroup.HAMSTRINGS,
+  1313	                MuscleGroup.GLUTES,
+  1314	            ),
+  1315	            frozenset(
+  1316	                {
+  1317	                    MovementPattern.CORE_ANTI_EXTENSION,
+  1318	                    MovementPattern.CORE_ANTI_ROTATION,
+  1319	                    MovementPattern.CORE_ANTI_LATERAL_FLEXION,
+  1320	                }
+  1321	            ): (MuscleGroup.ABS,),
+  1322	        }
+  1323	        for group, target in relaxed_required_slots:
+  1324	            if target is None:
+  1325	                target_values.update(
+  1326	                    muscle.value for muscle in pattern_muscles.get(frozenset(group), ())
+  1327	                )
+  1328	        if target_values:
+  1329	            metrics["unavailable_muscle_coverage"] = tuple(sorted(target_values))
+  1330	            ranges = metrics["volume_ranges_by_muscle"]
+  1331	            if isinstance(ranges, dict):
+  1332	                for muscle in target_values:
+  1333	                    values = ranges.get(muscle)
+  1334	                    if not isinstance(values, dict):
+  1335	                        continue
+  1336	                    values["status"] = "constrained"
+  1337	                    values["constraint_reason_codes"] = tuple(
+  1338	                        dict.fromkeys(
+  1339	                            (
+  1340	                                *_string_sequence(values.get("constraint_reason_codes")),
+  1341	                                "VOLUME_CONSTRAINED_BY_SAFETY_OR_EQUIPMENT",
+  1342	                            )
+  1343	                        )
+  1344	                    )
+  1345	
+  1346	    return metrics
+  1347	
+  1348	
+  1349	def _volume_range_metric(
+  1350	    target: VolumeTarget,
+  1351	    actual_direct: int,
+  1352	    actual_effective: float,
+  1353	    days: tuple[WorkoutDay, ...],
+  1354	    repair_reason_codes: tuple[str, ...],
+  1355	) -> dict[str, object]:
+  1356	    constraint_reasons = list(target.constraint_reason_codes)
+  1357	    inside_range = target.acceptable_minimum <= actual_effective <= target.acceptable_maximum
+  1358	    if not inside_range and set(repair_reason_codes).intersection(
+  1359	        {
+  1360	            "VOLUME_REPAIR_SOFT_TARGET_REDUCED",
+  1361	            "VOLUME_REPAIR_HARD_MINIMUM_UNSATISFIED",
+  1362	        }
+  1363	    ):
+  1364	        constraint_reasons.append("VOLUME_CONSTRAINED_BY_SESSION_FEASIBILITY")
+  1365	    if not inside_range and any(
+  1366	        "TEMPLATE_ADAPTATION_PRIORITY:core" in item.reason_codes
+  1367	        and (item.primary_muscle is target.muscle or target.muscle in item.secondary_muscles)
+  1368	        for day in days
+  1369	        for item in day.exercises
+  1370	    ):
+  1371	        constraint_reasons.append("VOLUME_CONSTRAINED_BY_TEMPLATE_STRUCTURE")
+  1372	    if actual_effective == target.preferred_target:
+  1373	        status = "exact_target"
+  1374	    elif inside_range:
+  1375	        status = "within_flexible_range"
+  1376	    elif constraint_reasons:
+  1377	        status = "constrained"
+  1378	    else:
+  1379	        status = "outside_acceptable_range"
+  1380	    return {
+  1381	        "preferred_weekly_target": target.preferred_target,
+  1382	        "acceptable_minimum": target.acceptable_minimum,
+  1383	        "acceptable_maximum": target.acceptable_maximum,
+  1384	        "actual_direct_volume": actual_direct,
+  1385	        "actual_effective_volume": actual_effective,
+  1386	        "status": status,
+  1387	        "constraint_reason_codes": tuple(dict.fromkeys(constraint_reasons)),
+  1388	        "minimum_soft": target.minimum_soft,
+  1389	        "target_sets": target.target_sets,
+  1390	        "maximum_soft": target.maximum_soft,
+  1391	        "maximum_hard": target.maximum_hard,
+  1392	        "effective_maximum_soft": target.acceptable_maximum,
+  1393	        "effective_maximum_hard": target.maximum_hard,
+  1394	        "effective_target_sets": target.effective_target_sets,
+  1395	        "minimum_direct_sets": target.minimum_direct_sets,
+  1396	        "minimum_effective_sets": target.minimum_effective_sets,
+  1397	        "minimum_coverage_required": target.minimum_coverage_required,
+  1398	        "direct_minimum_required": target.direct_minimum_required,
+  1399	    }
+  1400	
+  1401	
+  1402	def _string_sequence(value: object) -> tuple[str, ...]:
+  1403	    if not isinstance(value, (tuple, list, set, frozenset)):
+  1404	        return ()
+  1405	    return tuple(item for item in value if isinstance(item, str))
+  1406	
+  1407	
+  1408	def _priority_metrics(
+  1409	    days: tuple[WorkoutDay, ...],
+  1410	    volume: WeeklyVolumePlan,
+  1411	    direct_sets: dict[str, int],
+  1412	    effective_sets: dict[str, float],
+  1413	    policy: PriorityAllocationPolicy,
+  1414	    ruleset: ProgramRuleset,
+  1415	) -> dict[str, dict[str, object]]:
+  1416	    metrics: dict[str, dict[str, object]] = {}
+  1417	    for muscle in policy.priorities:
+  1418	        session_indexes = tuple(
+  1419	            day.day_index
+  1420	            for day in days
+  1421	            if any(item.primary_muscle is muscle for item in day.exercises)
+  1422	        )
+  1423	        direct = direct_sets.get(muscle.value, 0)
+  1424	        effective = effective_sets.get(muscle.value, 0.0)
+  1425	        target = volume.direct_sets_for(muscle)
+  1426	        effective_target = volume.effective_target_for(muscle)
+  1427	        target_available = target > 0 or effective_target > 0
+  1428	        direct_satisfied = target_available and direct >= target
+  1429	        effective_satisfied = target_available and effective >= effective_target
+  1430	        useful_frequency = policy.useful_frequency(target, ruleset)
+  1431	        frequency_satisfied = len(session_indexes) >= useful_frequency
+  1432	        status = (
+  1433	            "satisfied"
+  1434	            if direct_satisfied and effective_satisfied and frequency_satisfied
+  1435	            else "partial"
+  1436	        )
+  1437	        reason_codes: list[str] = []
+  1438	        if direct_satisfied and effective_satisfied:
+  1439	            reason_codes.append("PRIORITY_VOLUME_INCREASED")
+  1440	        else:
+  1441	            reason_codes.append("PRIORITY_TARGET_PARTIALLY_SATISFIED")
+  1442	        if frequency_satisfied and useful_frequency > 1:
+  1443	            reason_codes.append("PRIORITY_FREQUENCY_INCREASED")
+  1444	        else:
+  1445	            reason_codes.append("PRIORITY_TARGET_CONSTRAINED")
+  1446	        metrics[muscle.value] = {
+  1447	            "direct_sets": direct,
+  1448	            "effective_sets": effective,
+  1449	            "target_sets": target,
+  1450	            "effective_target_sets": effective_target,
+  1451	            "preferred_frequency": useful_frequency,
+  1452	            "session_frequency": len(session_indexes),
+  1453	            "session_indexes": session_indexes,
+  1454	            "distributed": frequency_satisfied,
+  1455	            "status": status,
+  1456	            "reason_codes": tuple(dict.fromkeys(reason_codes)),
+  1457	        }
+  1458	    return metrics
+  1459	
+  1460	
+  1461	def _volume_decision_trace(
+  1462	    volume: WeeklyVolumePlan,
+  1463	    previous_volume: PreviousVolumeBaseline,
+  1464	    request: NormalizedProgramRequest,
+  1465	    ruleset: ProgramRuleset,
+  1466	) -> dict[str, object]:
+  1467	    priority_policy = PriorityAllocationPolicy.for_request(request, ruleset)
+  1468	    return {
+  1469	        "stage": "volume",
+  1470	        "reasons": volume.reason_codes,
+  1471	        "priority_muscles": tuple(muscle.value for muscle in priority_policy.priorities),
+  1472	        "priority_preferred_frequency": priority_policy.preferred_frequency,
+  1473	        "previous_volume_baseline": {
+  1474	            "confidence": previous_volume.confidence,
+  1475	            "source": previous_volume.source,
+  1476	            "reason_codes": previous_volume.reason_codes,
+  1477	        },
+  1478	        "effective_targets": {
+  1479	            target.muscle.value: target.effective_target_sets for target in volume.targets
+  1480	        },
+  1481	        "minimum_direct_targets": {
+  1482	            target.muscle.value: target.minimum_direct_sets for target in volume.targets
+  1483	        },
+  1484	        "minimum_effective_coverage": {
+  1485	            target.muscle.value: target.minimum_effective_sets
+  1486	            for target in volume.targets
+  1487	            if target.minimum_coverage_required
+  1488	        },
+  1489	        "direct_minimum_required_muscles": tuple(
+  1490	            target.muscle.value for target in volume.targets if target.direct_minimum_required
+  1491	        ),
+  1492	    }

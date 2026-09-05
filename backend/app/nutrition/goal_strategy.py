@@ -77,13 +77,23 @@ def resolve_energy_consistent_macros(
         carb_adjust = (discrepancy / Decimal("4")).quantize(Decimal("1"))
         carb_g = max(Decimal("0"), carb_g + carb_adjust)
 
-    carb_min = max(Decimal("0"), carb_g - Decimal("30"))
-    carb_max = carb_g + Decimal("30")
+    carb_min = (
+        carbohydrate_soft_min_g
+        if carbohydrate_soft_min_g is not None
+        else max(
+            Decimal("130"),
+            min(carb_g, (calories * Decimal("0.35") / Decimal("4")).quantize(Decimal("1"))),
+        )
+    )
+    carb_max = (
+        carbohydrate_soft_max_g
+        if carbohydrate_soft_max_g is not None
+        else max(carb_g, (calories * Decimal("0.70") / Decimal("4")).quantize(Decimal("1")))
+    )
     carbohydrate_band = TargetBand(
         unit="g",
         minimum=carb_min,
         preferred=carb_g,
-        preferred_maximum=carb_g + Decimal("15"),
         maximum=carb_max,
     )
 
@@ -142,7 +152,7 @@ def resolve_goal_strategy(
     calc_weight = protein_calculation_weight_kg
     if goal == "lose_weight":
         if is_rt:
-            prot_min = (calc_weight * Decimal("1.5")).quantize(Decimal("1"))
+            prot_min = (calc_weight * Decimal("1.3")).quantize(Decimal("1"))
             prot_pref = (calc_weight * Decimal("1.8")).quantize(Decimal("1"))
             prot_max = (calc_weight * Decimal("2.2")).quantize(Decimal("1"))
         else:
@@ -162,13 +172,13 @@ def resolve_goal_strategy(
             prot_pref = (reliable_ffm_kg * Decimal("2.6")).quantize(Decimal("1"))
             prot_max = (reliable_ffm_kg * Decimal("3.1")).quantize(Decimal("1"))
         elif is_rt:
-            prot_min = (calc_weight * Decimal("1.8")).quantize(Decimal("1"))
+            prot_min = (calc_weight * Decimal("1.3")).quantize(Decimal("1"))
             prot_pref = (calc_weight * Decimal("2.2")).quantize(Decimal("1"))
             prot_max = (calc_weight * Decimal("2.6")).quantize(Decimal("1"))
         else:
-            prot_min = (calc_weight * Decimal("1.6")).quantize(Decimal("1"))
-            prot_pref = (calc_weight * Decimal("1.8")).quantize(Decimal("1"))
-            prot_max = (calc_weight * Decimal("2.2")).quantize(Decimal("1"))
+            prot_min = (calc_weight * Decimal("1.2")).quantize(Decimal("1"))
+            prot_pref = (calc_weight * Decimal("1.6")).quantize(Decimal("1"))
+            prot_max = (calc_weight * Decimal("2.0")).quantize(Decimal("1"))
         pref_fat_ratio = Decimal("0.25")
         fat_min_ratio = Decimal("0.20")
         fat_max_ratio = Decimal("0.30")
@@ -178,7 +188,7 @@ def resolve_goal_strategy(
 
     elif goal == "gain_weight":
         if is_rt:
-            prot_min = (calc_weight * Decimal("1.6")).quantize(Decimal("1"))
+            prot_min = (calc_weight * Decimal("1.3")).quantize(Decimal("1"))
             prot_pref = (calc_weight * Decimal("1.8")).quantize(Decimal("1"))
             prot_max = (calc_weight * Decimal("2.2")).quantize(Decimal("1"))
         else:
@@ -186,7 +196,7 @@ def resolve_goal_strategy(
             prot_pref = (calc_weight * Decimal("1.4")).quantize(Decimal("1"))
             prot_max = (calc_weight * Decimal("1.8")).quantize(Decimal("1"))
         pref_fat_ratio = Decimal("0.30")
-        fat_min_ratio = Decimal("0.25")
+        fat_min_ratio = Decimal("0.20")
         fat_max_ratio = Decimal("0.35")
         distribution = None
         carb_prio = "normal"
@@ -195,7 +205,7 @@ def resolve_goal_strategy(
     elif goal == "build_muscle":
         if not is_rt:
             reasons.append("TRAINING_STIMULUS_MISMATCH")
-        prot_min = (calc_weight * Decimal("1.6")).quantize(Decimal("1"))
+        prot_min = (calc_weight * Decimal("1.3")).quantize(Decimal("1"))
         prot_pref = (calc_weight * Decimal("2.0")).quantize(Decimal("1"))
         prot_max = (calc_weight * Decimal("2.4")).quantize(Decimal("1"))
         pref_fat_ratio = Decimal("0.25")
@@ -208,7 +218,7 @@ def resolve_goal_strategy(
     elif goal == "body_recomposition":
         if not is_rt:
             reasons.append("TRAINING_STIMULUS_MISMATCH")
-        prot_min = (calc_weight * Decimal("1.8")).quantize(Decimal("1"))
+        prot_min = (calc_weight * Decimal("1.4")).quantize(Decimal("1"))
         prot_pref = (calc_weight * Decimal("2.1")).quantize(Decimal("1"))
         prot_max = (calc_weight * Decimal("2.5")).quantize(Decimal("1"))
         pref_fat_ratio = Decimal("0.25")

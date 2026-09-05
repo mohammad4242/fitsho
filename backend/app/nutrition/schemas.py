@@ -971,6 +971,9 @@ class PlanComparisonResponse(BaseModel):
 
 class WeeklyPlanGenerationResponse(BaseModel):
     generation_id: UUID
+    bundle_id: UUID | None = None
+    selected_plan_id: UUID | None = None
+    selected_plan_role: str | None = None
     outcome: str
     reason_codes: list[str]
     warning_codes: list[str]
@@ -978,6 +981,19 @@ class WeeklyPlanGenerationResponse(BaseModel):
     budget_plan: WeeklyPlanResponse | None = None
     ideal_plan: WeeklyPlanResponse | None = None
     comparison: PlanComparisonResponse | None = None
+
+
+class PlanBundleSelectInput(BaseModel):
+    plan_id: UUID | None = None
+    plan_role: str | None = None
+
+
+class PlanBundleSelectResponse(BaseModel):
+    bundle_id: UUID
+    selected_plan_id: UUID
+    selected_plan_role: str
+    selected_at: datetime
+    plan: WeeklyPlanResponse
 
 
 class WeeklyPlanHistoryItemResponse(BaseModel):

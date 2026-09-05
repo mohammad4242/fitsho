@@ -948,3 +948,59 @@ it("keeps full backward compatibility when plan is generated without comparison 
   expect(screen.queryByLabelText("مقایسه برنامه‌ها")).not.toBeInTheDocument();
 });
 
+it("allows selecting between budget and ideal plan in bundle and persists choice", async () => {
+  await i18n.changeLanguage("fa");
+  const budgetPlan = { ...weeklyPlan, id: "plan-budget" };
+  const idealPlan = { ...weeklyPlan, id: "plan-ideal" };
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "gen-bundle-1",
+    bundle_id: "bundle-uuid-1",
+    selected_plan_id: "plan-budget",
+    selected_plan_role: "budget",
+    outcome: "success",
+    reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED"],
+    warning_codes: [],
+    plan: budgetPlan,
+    budget_plan: budgetPlan,
+    ideal_plan: idealPlan,
+    comparison: {
+      user_monthly_budget_irr: 150_000_000,
+      budget_plan_monthly_cost_irr: 140_000_000,
+      ideal_plan_monthly_cost_irr: 170_000_000,
+      minimum_feasible_monthly_cost_irr: null,
+      monthly_cost_gap_irr: 30_000_000,
+      meaningful_quality_improvement: true,
+      show_ideal_plan: true,
+      reason_codes: ["IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN"],
+      policy_version: "nutrition-plan-comparison-v1",
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: 12,
+      unique_meal_count_ideal: 16,
+      unique_protein_sources_budget: 3,
+      unique_protein_sources_ideal: 5,
+    },
+  });
+
+  vi.mocked(nutritionApi.selectBundlePlan).mockResolvedValue({
+    bundle_id: "bundle-uuid-1",
+    selected_plan_id: "plan-ideal",
+    selected_plan_role: "ideal",
+    selected_at: "2026-09-05T00:00:00Z",
+    plan: idealPlan,
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
+
+  expect(await screen.findByText("برنامه فعال شما")).toBeInTheDocument();
+  const selectIdealBtn = screen.getByRole("button", { name: "انتخاب برنامه مرجع" });
+  expect(selectIdealBtn).toBeInTheDocument();
+
+  await user.click(selectIdealBtn);
+
+  expect(nutritionApi.selectBundlePlan).toHaveBeenCalledWith("bundle-uuid-1", {
+    selected_plan_role: "ideal",
+  });
+});
+

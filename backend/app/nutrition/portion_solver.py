@@ -255,6 +255,8 @@ def _reason_codes(
 
     reasons: list[str] = []
     for code, target in sorted(targets.items()):
+        if code in minimums or code in maximums:
+            continue
         if target > ZERO and abs(totals.get(code, ZERO) - target) / target > tolerance_ratio:
             reason = _TARGET_REASON_CODES.get(code)
             if reason is not None:

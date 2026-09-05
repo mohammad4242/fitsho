@@ -144,8 +144,10 @@ def calculate_prepared_recipe(
     foods: Mapping[Any, PreparedRecipeFood],
     *,
     quantities: Mapping[Any, Decimal] | None = None,
+    validate: bool = True,
 ) -> PreparedRecipeCalculation:
-    validate_prepared_recipe(definition, set(foods))
+    if validate:
+        validate_prepared_recipe(definition, set(foods))
     requested = quantities or {
         ingredient.food_id: ingredient.reference_grams for ingredient in definition.ingredients
     }

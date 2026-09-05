@@ -1,0 +1,51 @@
+{
+  "failure_breakdowns": {
+    "days": {
+      "2": { "PASS_WITH_CONSTRAINTS": 10, "QUALITY_ISSUE": 51, "UNSATISFIED": 14 },
+      "3": { "PASS_WITH_CONSTRAINTS": 34, "QUALITY_ISSUE": 60, "UNSATISFIED": 6 },
+      "4": { "PASS_WITH_CONSTRAINTS": 76, "QUALITY_ISSUE": 23, "UNSATISFIED": 1 },
+      "5": { "PASS_WITH_CONSTRAINTS": 45, "QUALITY_ISSUE": 1, "UNSATISFIED": 4 },
+      "6": { "PASS_WITH_CONSTRAINTS": 41, "QUALITY_ISSUE": 4, "UNSATISFIED": 5 }
+    },
+    "duration": {
+      "120": { "PASS_WITH_CONSTRAINTS": 27, "QUALITY_ISSUE": 18, "UNSATISFIED": 15 },
+      "30": { "PASS_WITH_CONSTRAINTS": 45, "QUALITY_ISSUE": 23, "UNSATISFIED": 7 },
+      "45": { "PASS_WITH_CONSTRAINTS": 43, "QUALITY_ISSUE": 17 },
+      "60": { "PASS_WITH_CONSTRAINTS": 29, "QUALITY_ISSUE": 31 },
+      "75": { "PASS_WITH_CONSTRAINTS": 34, "QUALITY_ISSUE": 26 },
+      "90": { "PASS_WITH_CONSTRAINTS": 28, "QUALITY_ISSUE": 32 }
+    },
+    "equipment": {
+      "full_gym": { "PASS_WITH_CONSTRAINTS": 102, "QUALITY_ISSUE": 86, "UNSATISFIED": 7 },
+      "home_all": { "PASS_WITH_CONSTRAINTS": 11, "QUALITY_ISSUE": 4 },
+      "home_band": { "PASS_WITH_CONSTRAINTS": 10, "QUALITY_ISSUE": 5, "UNSATISFIED": 15 },
+      "home_band_pullup": { "PASS_WITH_CONSTRAINTS": 21, "QUALITY_ISSUE": 9 },
+      "home_bw": { "PASS_WITH_CONSTRAINTS": 15, "QUALITY_ISSUE": 15 },
+      "home_db": { "PASS_WITH_CONSTRAINTS": 21, "QUALITY_ISSUE": 9 },
+      "home_db_bench": { "PASS_WITH_CONSTRAINTS": 18, "QUALITY_ISSUE": 12 },
+      "home_db_pullup": { "PASS_WITH_CONSTRAINTS": 8, "QUALITY_ISSUE": 7 }
+    },
+    "experience_level": {
+      "advanced": { "PASS_WITH_CONSTRAINTS": 64, "QUALITY_ISSUE": 28, "UNSATISFIED": 8 },
+      "beginner": { "PASS_WITH_CONSTRAINTS": 33, "QUALITY_ISSUE": 39, "UNSATISFIED": 3 },
+      "first_month": { "PASS_WITH_CONSTRAINTS": 37, "QUALITY_ISSUE": 35, "UNSATISFIED": 3 },
+      "intermediate": { "PASS_WITH_CONSTRAINTS": 72, "QUALITY_ISSUE": 45, "UNSATISFIED": 8 }
+    },
+    "goal": {
+      "body_recomposition": { "PASS_WITH_CONSTRAINTS": 38, "QUALITY_ISSUE": 22 },
+      "fat_loss": { "PASS_WITH_CONSTRAINTS": 32, "QUALITY_ISSUE": 16, "UNSATISFIED": 12 },
+      "general_fitness": { "PASS_WITH_CONSTRAINTS": 66, "QUALITY_ISSUE": 60, "UNSATISFIED": 9 },
+      "hypertrophy": { "PASS_WITH_CONSTRAINTS": 36, "QUALITY_ISSUE": 23, "UNSATISFIED": 1 },
+      "strength": { "PASS_WITH_CONSTRAINTS": 34, "QUALITY_ISSUE": 26 }
+    },
+    "limitations": {
+      "": { "PASS_WITH_CONSTRAINTS": 134, "QUALITY_ISSUE": 90, "UNSATISFIED": 16 },
+      "ROM": { "PASS_WITH_CONSTRAINTS": 19, "QUALITY_ISSUE": 11 },
+      "axial_load": { "PASS_WITH_CONSTRAINTS": 7, "QUALITY_ISSUE": 8 },
+      "balance": { "PASS_WITH_CONSTRAINTS": 9, "QUALITY_ISSUE": 6 },
+      "impact": { "PASS_WITH_CONSTRAINTS": 7, "QUALITY_ISSUE": 7, "UNSATISFIED": 1 },
+      "overhead": { "PASS_WITH_CONSTRAINTS": 7, "QUALITY_ISSUE": 7, "UNSATISFIED": 1 },
+      "training_cautions": { "PASS_WITH_CONSTRAINTS": 23, "QUALITY_ISSUE": 18, "UNSATISFIED": 4 }
+    }
+  }
+}

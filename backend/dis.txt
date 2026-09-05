@@ -1,0 +1,971 @@
+              0 MAKE_CELL               37 (rejected_by_id)
+              2 MAKE_CELL               38 (requested_days)
+
+ 85           4 RESUME                   0
+
+ 92           6 LOAD_GLOBAL              1 (NULL + _training_day_error)
+             16 LOAD_FAST                0 (request)
+             18 LOAD_FAST                2 (ruleset)
+             20 CALL                     2
+             28 STORE_FAST               4 (training_day_error)
+
+ 93          30 LOAD_FAST                4 (training_day_error)
+             32 POP_JUMP_IF_NONE        29 (to 92)
+
+ 94          34 LOAD_GLOBAL              3 (NULL + ProgramGenerationResult)
+
+ 95          44 LOAD_CONST               0 (None)
+
+ 96          46 LOAD_GLOBAL              4 (GenerationErrorCode)
+             56 LOAD_ATTR                6 (UNSUPPORTED_RESISTANCE_TRAINING_DAYS)
+
+ 97          76 LOAD_FAST                4 (training_day_error)
+             78 BUILD_TUPLE              1
+
+ 94          80 KW_NAMES                 1 (('program', 'error_code', 'errors'))
+             82 CALL                     3
+             90 RETURN_VALUE
+
+ 99     >>   92 LOAD_FAST                0 (request)
+             94 LOAD_ATTR                9 (NULL|self + model_copy)
+
+101         114 LOAD_CONST               2 ('body_analysis_influence')
+            116 LOAD_GLOBAL             11 (NULL + applicable_body_analysis_influence)
+
+102         126 LOAD_FAST                0 (request)
+            128 LOAD_ATTR               12 (body_analysis_influence)
+            148 LOAD_FAST                2 (ruleset)
+
+101         150 CALL                     2
+
+100         158 BUILD_MAP                1
+
+ 99         160 KW_NAMES                 3 (('update',))
+            162 CALL                     1
+            170 STORE_FAST               0 (request)
+
+106         172 LOAD_GLOBAL             15 (NULL + normalize_request)
+            182 LOAD_FAST                0 (request)
+            184 LOAD_FAST                2 (ruleset)
+            186 CALL                     2
+            194 STORE_FAST               5 (normalized)
+
+107         196 LOAD_GLOBAL             17 (NULL + screen_safety)
+            206 LOAD_FAST                5 (normalized)
+            208 CALL                     1
+            216 STORE_FAST               6 (safety)
+
+108         218 LOAD_FAST                6 (safety)
+            220 LOAD_ATTR               18 (status)
+            240 LOAD_GLOBAL             20 (SafetyStatus)
+            250 LOAD_ATTR               22 (CLEAR)
+            270 LOAD_GLOBAL             20 (SafetyStatus)
+            280 LOAD_ATTR               24 (CLEAR_WITH_MODIFICATIONS)
+            300 BUILD_SET                2
+            302 CONTAINS_OP              1
+            304 POP_JUMP_IF_FALSE       49 (to 404)
+
+109         306 LOAD_GLOBAL              3 (NULL + ProgramGenerationResult)
+
+110         316 LOAD_CONST               0 (None)
+
+111         318 LOAD_GLOBAL              4 (GenerationErrorCode)
+            328 LOAD_ATTR               26 (PROGRAM_REJECTED_SAFETY_STATUS)
+
+112         348 LOAD_FAST                6 (safety)
+            350 LOAD_ATTR               28 (reason_codes)
+
+113         370 LOAD_FAST                6 (safety)
+            372 LOAD_ATTR               18 (status)
+
+109         392 KW_NAMES                 4 (('program', 'error_code', 'errors', 'safety_status'))
+            394 CALL                     4
+            402 RETURN_VALUE
+
+115     >>  404 LOAD_GLOBAL             31 (NULL + filter_eligible_exercises)
+            414 LOAD_FAST                5 (normalized)
+            416 LOAD_FAST                1 (exercise_catalog)
+            418 CALL                     2
+            426 STORE_FAST               7 (eligibility)
+
+116         428 LOAD_GLOBAL             33 (NULL + build_session_capacity)
+
+117         438 LOAD_FAST                5 (normalized)
+
+118         440 LOAD_FAST                7 (eligibility)
+            442 LOAD_ATTR               34 (eligible)
+
+119         462 LOAD_FAST                2 (ruleset)
+
+116         464 CALL                     3
+            472 STORE_FAST               8 (session_capacity)
+
+121         474 LOAD_GLOBAL             37 (NULL + select_template_reference_result)
+
+122         484 LOAD_FAST                5 (normalized)
+
+123         486 LOAD_FAST                7 (eligibility)
+            488 LOAD_ATTR               34 (eligible)
+
+124         508 LOAD_FAST                3 (reference_templates)
+
+125         510 LOAD_FAST                2 (ruleset)
+
+126         512 LOAD_FAST                8 (session_capacity)
+
+121         514 KW_NAMES                 5 (('session_capacity',))
+            516 CALL                     5
+            524 STORE_FAST               9 (template_selection)
+
+128         526 LOAD_FAST                9 (template_selection)
+            528 LOAD_ATTR               39 (NULL|self + decision_trace)
+            548 CALL                     0
+            556 BUILD_TUPLE              1
+            558 STORE_FAST              10 (template_selection_trace)
+
+129         560 LOAD_FAST                7 (eligibility)
+            562 LOAD_ATTR               34 (eligible)
+            582 POP_JUMP_IF_TRUE        97 (to 778)
+
+130         584 LOAD_GLOBAL             41 (NULL + any)
+            594 LOAD_CONST               6 (<code object <genexpr> at 0x72446e31a730, file "/home/mohammad/project/fitsho/backend/app/workouts/program_engine/engine.py", line 130>)
+            596 MAKE_FUNCTION            0
+
+132         598 LOAD_FAST                7 (eligibility)
+            600 LOAD_ATTR               42 (rejected)
+
+130         620 GET_ITER
+            622 CALL                     0
+            630 CALL                     1
+            638 STORE_FAST              11 (missing_equipment)
+
+134         640 LOAD_GLOBAL              3 (NULL + ProgramGenerationResult)
+
+135         650 LOAD_CONST               0 (None)
+
+138         652 LOAD_FAST               11 (missing_equipment)
+            654 POP_JUMP_IF_FALSE       16 (to 688)
+
+137         656 LOAD_GLOBAL              4 (GenerationErrorCode)
+            666 LOAD_ATTR               44 (NO_AVAILABLE_EQUIPMENT_MATCH)
+            686 JUMP_FORWARD            15 (to 718)
+
+139     >>  688 LOAD_GLOBAL              4 (GenerationErrorCode)
+            698 LOAD_ATTR               46 (INSUFFICIENT_ELIGIBLE_EXERCISES)
+
+141     >>  718 LOAD_CONST               7 (('NO_ELIGIBLE_EXERCISES',))
+
+142         720 LOAD_FAST                6 (safety)
+            722 LOAD_ATTR               18 (status)
+
+143         742 LOAD_FAST                7 (eligibility)
+            744 LOAD_ATTR               42 (rejected)
+
+144         764 LOAD_FAST               10 (template_selection_trace)
+
+134         766 KW_NAMES                 8 (('program', 'error_code', 'errors', 'safety_status', 'rejected_candidates', 'decision_trace'))
+            768 CALL                     6
+            776 RETURN_VALUE
+
+146     >>  778 LOAD_GLOBAL             49 (NULL + derive_previous_volume_baseline)
+            788 LOAD_FAST                5 (normalized)
+            790 LOAD_ATTR               50 (source)
+            810 LOAD_ATTR               52 (recent_training_history)
+            830 CALL                     1
+            838 STORE_FAST              12 (previous_volume)
+
+147         840 LOAD_FAST                7 (eligibility)
+            842 LOAD_ATTR               42 (rejected)
+            862 GET_ITER
+            864 LOAD_FAST_AND_CLEAR     13 (item)
+            866 SWAP                     2
+            868 BUILD_MAP                0
+            870 SWAP                     2
+        >>  872 FOR_ITER                25 (to 926)
+            876 STORE_FAST              13 (item)
+            878 LOAD_FAST               13 (item)
+            880 LOAD_ATTR               54 (exercise_id)
+            900 LOAD_FAST               13 (item)
+            902 LOAD_ATTR               28 (reason_codes)
+            922 MAP_ADD                  2
+            924 JUMP_BACKWARD           27 (to 872)
+        >>  926 END_FOR
+            928 SWAP                     2
+            930 STORE_FAST              13 (item)
+            932 STORE_DEREF             37 (rejected_by_id)
+
+148         934 LOAD_GLOBAL             57 (NULL + tuple)
+            944 LOAD_CLOSURE            37 (rejected_by_id)
+            946 BUILD_TUPLE              1
+            948 LOAD_CONST               9 (<code object <genexpr> at 0x72446e5605d0, file "/home/mohammad/project/fitsho/backend/app/workouts/program_engine/engine.py", line 148>)
+            950 MAKE_FUNCTION            8 (closure)
+
+150         952 LOAD_FAST                1 (exercise_catalog)
+
+148         954 GET_ITER
+            956 CALL                     0
+            964 CALL                     1
+            972 STORE_FAST              14 (rejected_slot_candidates)
+
+153         974 LOAD_FAST               10 (template_selection_trace)
+            976 STORE_FAST              15 (template_rejection_trace)
+
+154         978 LOAD_FAST                9 (template_selection)
+            980 LOAD_ATTR               58 (candidates)
+           1000 GET_ITER
+        >> 1002 EXTENDED_ARG             1
+           1004 FOR_ITER               312 (to 1632)
+           1008 STORE_FAST              16 (ranking)
+
+155        1010 LOAD_FAST               16 (ranking)
+           1012 LOAD_ATTR               60 (template)
+           1032 STORE_FAST              17 (reference)
+
+156        1034 NOP
+
+157        1036 LOAD_GLOBAL             63 (NULL + build_template_sessions)
+
+158        1046 LOAD_FAST                5 (normalized)
+
+159        1048 LOAD_FAST               17 (reference)
+
+160        1050 LOAD_FAST                7 (eligibility)
+           1052 LOAD_ATTR               34 (eligible)
+
+161        1072 LOAD_FAST                2 (ruleset)
+
+162        1074 LOAD_FAST                8 (session_capacity)
+
+163        1076 LOAD_FAST                1 (exercise_catalog)
+
+157        1078 KW_NAMES                10 (('session_capacity', 'exercise_catalog'))
+           1080 CALL                     6
+           1088 STORE_FAST              18 (reference_build)
+
+165        1090 LOAD_GLOBAL             65 (NULL + _reference_program)
+
+166        1100 LOAD_FAST                0 (request)
+
+167        1102 LOAD_FAST                5 (normalized)
+
+168        1104 LOAD_FAST                6 (safety)
+           1106 LOAD_ATTR               18 (status)
+
+169        1126 LOAD_FAST                6 (safety)
+           1128 LOAD_ATTR               28 (reason_codes)
+
+170        1148 LOAD_FAST                7 (eligibility)
+           1150 LOAD_ATTR               42 (rejected)
+
+171        1170 LOAD_FAST                7 (eligibility)
+           1172 LOAD_ATTR               34 (eligible)
+
+172        1192 LOAD_FAST                7 (eligibility)
+           1194 LOAD_ATTR               66 (cardio_eligible)
+
+173        1214 LOAD_FAST               17 (reference)
+
+174        1216 LOAD_FAST               18 (reference_build)
+
+175        1218 LOAD_FAST                2 (ruleset)
+
+176        1220 LOAD_FAST               12 (previous_volume)
+
+177        1222 LOAD_FAST                8 (session_capacity)
+
+178        1224 LOAD_FAST               15 (template_rejection_trace)
+
+165        1226 KW_NAMES                11 (('previous_volume', 'session_capacity', 'template_selection_trace'))
+           1228 CALL                    13
+           1236 STORE_FAST              19 (reference_result)
+
+180        1238 LOAD_FAST               19 (reference_result)
+           1240 LOAD_ATTR               68 (is_success)
+           1260 POP_JUMP_IF_FALSE       25 (to 1312)
+
+181        1262 LOAD_GLOBAL             71 (NULL + _append_successful_template_attempt)
+
+182        1272 LOAD_FAST               19 (reference_result)
+
+183        1274 LOAD_GLOBAL             73 (NULL + _template_attempt_trace)
+           1284 LOAD_FAST               16 (ranking)
+           1286 LOAD_CONST              12 ('succeeded')
+           1288 KW_NAMES                13 (('status',))
+           1290 CALL                     2
+
+181        1298 CALL                     2
+           1306 SWAP                     2
+           1308 POP_TOP
+           1310 RETURN_VALUE
+
+185     >> 1312 LOAD_GLOBAL             75 (NULL + _template_rejection_category)
+           1322 LOAD_FAST               19 (reference_result)
+           1324 LOAD_ATTR               76 (errors)
+           1344 CALL                     1
+           1352 STORE_FAST              20 (rejection_category)
+
+187        1354 LOAD_CONST              14 ('template_reference')
+
+188        1356 LOAD_FAST               16 (ranking)
+           1358 LOAD_ATTR               78 (rank)
+
+189        1378 LOAD_FAST               17 (reference)
+           1380 LOAD_ATTR               80 (slug)
+
+190        1400 LOAD_CONST              15 ('rejected')
+
+191        1402 LOAD_CONST              16 (('days', 'training_level', 'core_slots_resolvable'))
+
+196        1404 LOAD_CONST              17 (False)
+
+197        1406 LOAD_FAST               16 (ranking)
+           1408 LOAD_ATTR               39 (NULL|self + decision_trace)
+           1428 CALL                     0
+           1436 LOAD_CONST              18 ('score')
+           1438 BINARY_SUBSCR
+
+198        1442 LOAD_FAST               16 (ranking)
+           1444 LOAD_ATTR               82 (feasibility)
+           1464 LOAD_ATTR               39 (NULL|self + decision_trace)
+           1484 CALL                     0
+
+199        1492 LOAD_FAST               20 (rejection_category)
+
+200        1494 LOAD_FAST               19 (reference_result)
+           1496 LOAD_ATTR               76 (errors)
+
+201        1516 LOAD_FAST               19 (reference_result)
+           1518 LOAD_ATTR               38 (decision_trace)
+           1538 LOAD_GLOBAL             85 (NULL + len)
+           1548 LOAD_FAST               15 (template_rejection_trace)
+           1550 CALL                     1
+           1558 LOAD_CONST               0 (None)
+           1560 BINARY_SLICE
+
+186        1562 LOAD_CONST              19 (('stage', 'rank', 'selected', 'status', 'hard_eligibility', 'goal_used_for_exclusion', 'score', 'feasibility', 'rejection_category', 'reason_codes', 'decision_trace'))
+           1564 BUILD_CONST_KEY_MAP     11
+           1566 STORE_FAST              21 (rejection)
+
+203        1568 LOAD_FAST               15 (template_rejection_trace)
+
+204        1570 LOAD_FAST               21 (rejection)
+
+205        1572 LOAD_GLOBAL             73 (NULL + _template_attempt_trace)
+
+206        1582 LOAD_FAST               16 (ranking)
+
+207        1584 LOAD_CONST              15 ('rejected')
+
+208        1586 LOAD_FAST               20 (rejection_category)
+
+209        1588 LOAD_FAST               19 (reference_result)
+           1590 LOAD_ATTR               76 (errors)
+
+205        1610 KW_NAMES                20 (('status', 'rejection_category', 'reason_codes'))
+           1612 CALL                     4
+
+203        1620 BUILD_TUPLE              2
+           1622 BINARY_OP               13 (+=)
+           1626 STORE_FAST              15 (template_rejection_trace)
+           1628 EXTENDED_ARG             1
+           1630 JUMP_BACKWARD          315 (to 1002)
+
+154     >> 1632 END_FOR
+
+240        1634 LOAD_FAST                9 (template_selection)
+           1636 LOAD_ATTR               58 (candidates)
+           1656 POP_JUMP_IF_FALSE       50 (to 1758)
+
+241        1658 LOAD_FAST               15 (template_rejection_trace)
+
+243        1660 LOAD_CONST              23 ('template_recovery')
+
+244        1662 LOAD_CONST              24 ('exhausted')
+
+245        1664 LOAD_GLOBAL             85 (NULL + len)
+           1674 LOAD_FAST                9 (template_selection)
+           1676 LOAD_ATTR               58 (candidates)
+           1696 CALL                     1
+
+246        1704 LOAD_GLOBAL             85 (NULL + len)
+           1714 LOAD_FAST                9 (template_selection)
+           1716 LOAD_ATTR               58 (candidates)
+           1736 CALL                     1
+
+247        1744 LOAD_CONST              25 (('TEMPLATE_ALTERNATIVES_EXHAUSTED',))
+
+242        1746 LOAD_CONST              26 (('stage', 'status', 'attempted_count', 'candidate_count', 'reason_codes'))
+           1748 BUILD_CONST_KEY_MAP      5
+
+241        1750 BUILD_TUPLE              1
+           1752 BINARY_OP               13 (+=)
+           1756 STORE_FAST              15 (template_rejection_trace)
+
+250     >> 1758 LOAD_FAST                5 (normalized)
+           1760 LOAD_ATTR               88 (resistance_training_days)
+           1780 STORE_DEREF             38 (requested_days)
+
+251        1782 LOAD_GLOBAL             91 (NULL + rank_split_candidates)
+
+252        1792 LOAD_FAST                5 (normalized)
+
+253        1794 LOAD_FAST                2 (ruleset)
+
+254        1796 LOAD_FAST                7 (eligibility)
+           1798 LOAD_ATTR               34 (eligible)
+
+255        1818 LOAD_FAST                8 (session_capacity)
+
+251        1820 KW_NAMES                27 (('exercises', 'session_capacity'))
+           1822 CALL                     4
+           1830 STORE_FAST              24 (ranked_splits)
+
+257        1832 LOAD_GLOBAL             57 (NULL + tuple)
+           1842 LOAD_CLOSURE            38 (requested_days)
+           1844 BUILD_TUPLE              1
+           1846 LOAD_CONST              28 (<code object <genexpr> at 0x72446e3306f0, file "/home/mohammad/project/fitsho/backend/app/workouts/program_engine/engine.py", line 257>)
+           1848 MAKE_FUNCTION            8 (closure)
+
+258        1850 LOAD_FAST               24 (ranked_splits)
+
+257        1852 GET_ITER
+           1854 CALL                     0
+           1862 CALL                     1
+           1870 STORE_FAST              25 (exact_day_splits)
+
+260        1872 LOAD_FAST               25 (exact_day_splits)
+           1874 POP_JUMP_IF_TRUE         7 (to 1890)
+
+262        1876 LOAD_CONST              29 ('REQUESTED_TRAINING_DAYS_UNSATISFIED')
+
+263        1878 LOAD_CONST              30 ('NO_EXACT_DAY_SPLIT_AVAILABLE')
+
+261        1880 BUILD_LIST               2
+           1882 STORE_FAST              26 (collected_errors)
+
+265        1884 BUILD_LIST               0
+           1886 STORE_FAST              27 (rejected_splits)
+           1888 JUMP_FORWARD             4 (to 1898)
+
+267     >> 1890 BUILD_LIST               0
+           1892 STORE_FAST              27 (rejected_splits)
+
+268        1894 BUILD_LIST               0
+           1896 STORE_FAST              26 (collected_errors)
+
+269     >> 1898 LOAD_GLOBAL             93 (NULL + enumerate)
+           1908 LOAD_FAST               25 (exact_day_splits)
+           1910 CALL                     1
+           1918 GET_ITER
+        >> 1920 FOR_ITER               253 (to 2430)
+           1924 UNPACK_SEQUENCE          2
+           1928 STORE_FAST              28 (attempt_index)
+           1930 STORE_FAST              29 (candidate)
+
+270        1932 LOAD_FAST               29 (candidate)
+           1934 STORE_FAST              30 (split)
+
+271        1936 LOAD_FAST               28 (attempt_index)
+           1938 POP_JUMP_IF_FALSE       26 (to 1992)
+
+272        1940 LOAD_GLOBAL             95 (NULL + replace)
+
+273        1950 LOAD_FAST               29 (candidate)
+
+274        1952 LOAD_FAST               29 (candidate)
+           1954 LOAD_ATTR               28 (reason_codes)
+
+275        1974 LOAD_CONST              31 (('SPLIT_FALLBACK_AFTER_CONSTRUCTION_FAILURE',))
+
+274        1976 BINARY_OP                0 (+)
+
+272        1980 KW_NAMES                32 (('reason_codes',))
+           1982 CALL                     2
+           1990 STORE_FAST              30 (split)
+
+277     >> 1992 LOAD_GLOBAL             97 (NULL + _program_for_split)
+
+278        2002 LOAD_FAST                0 (request)
+
+279        2004 LOAD_FAST                5 (normalized)
+
+280        2006 LOAD_FAST                6 (safety)
+           2008 LOAD_ATTR               18 (status)
+
+281        2028 LOAD_FAST                6 (safety)
+           2030 LOAD_ATTR               28 (reason_codes)
+
+282        2050 LOAD_FAST                7 (eligibility)
+           2052 LOAD_ATTR               42 (rejected)
+
+283        2072 LOAD_FAST                7 (eligibility)
+           2074 LOAD_ATTR               34 (eligible)
+
+284        2094 LOAD_FAST                7 (eligibility)
+           2096 LOAD_ATTR               66 (cardio_eligible)
+
+285        2116 LOAD_FAST               30 (split)
+
+286        2118 LOAD_FAST                2 (ruleset)
+
+287        2120 LOAD_FAST               12 (previous_volume)
+
+288        2122 LOAD_FAST                8 (session_capacity)
+
+289        2124 LOAD_GLOBAL             57 (NULL + tuple)
+           2134 LOAD_FAST               27 (rejected_splits)
+           2136 CALL                     1
+
+290        2144 LOAD_FAST               15 (template_rejection_trace)
+
+291        2146 LOAD_FAST               14 (rejected_slot_candidates)
+
+277        2148 KW_NAMES                33 (('previous_volume', 'session_capacity', 'rejected_splits', 'template_rejection_trace', 'rejected_slot_candidates'))
+           2150 CALL                    14
+           2158 STORE_FAST              31 (result)
+
+293        2160 LOAD_FAST               31 (result)
+           2162 LOAD_ATTR               68 (is_success)
+           2182 POP_JUMP_IF_FALSE        4 (to 2192)
+
+294        2184 LOAD_FAST               31 (result)
+           2186 SWAP                     2
+           2188 POP_TOP
+           2190 RETURN_VALUE
+
+295     >> 2192 LOAD_FAST               26 (collected_errors)
+           2194 LOAD_ATTR               99 (NULL|self + extend)
+           2214 LOAD_FAST               31 (result)
+           2216 LOAD_ATTR               76 (errors)
+           2236 CALL                     1
+           2244 POP_TOP
+
+297        2246 LOAD_FAST               30 (split)
+           2248 LOAD_ATTR              100 (split_type)
+           2268 LOAD_ATTR              102 (value)
+
+298        2288 LOAD_FAST               30 (split)
+           2290 LOAD_ATTR              104 (day_focuses)
+
+299        2310 LOAD_CONST              15 ('rejected')
+
+300        2312 LOAD_FAST               31 (result)
+           2314 LOAD_ATTR               76 (errors)
+
+296        2334 LOAD_CONST              34 (('split', 'day_focuses', 'status', 'reason_codes'))
+           2336 BUILD_CONST_KEY_MAP      4
+           2338 STORE_FAST              32 (rejected_attempt)
+
+302        2340 LOAD_FAST               31 (result)
+           2342 LOAD_ATTR               38 (decision_trace)
+           2362 POP_JUMP_IF_FALSE       15 (to 2394)
+
+303        2364 LOAD_FAST               31 (result)
+           2366 LOAD_ATTR               38 (decision_trace)
+           2386 LOAD_FAST               32 (rejected_attempt)
+           2388 LOAD_CONST              35 ('decision_trace')
+           2390 STORE_SUBSCR
+
+304     >> 2394 LOAD_FAST               27 (rejected_splits)
+           2396 LOAD_ATTR              107 (NULL|self + append)
+           2416 LOAD_FAST               32 (rejected_attempt)
+           2418 CALL                     1
+           2426 POP_TOP
+           2428 JUMP_BACKWARD          255 (to 1920)
+
+269     >> 2430 END_FOR
+
+307        2432 LOAD_FAST               25 (exact_day_splits)
+           2434 POP_JUMP_IF_FALSE       15 (to 2466)
+           2436 LOAD_FAST               25 (exact_day_splits)
+           2438 LOAD_CONST              36 (0)
+           2440 BINARY_SUBSCR
+           2444 LOAD_ATTR              108 (weekdays)
+           2464 JUMP_FORWARD            19 (to 2504)
+        >> 2466 LOAD_GLOBAL             57 (NULL + tuple)
+           2476 LOAD_GLOBAL            111 (NULL + range)
+           2486 LOAD_DEREF              38 (requested_days)
+           2488 CALL                     1
+           2496 CALL                     1
+
+306     >> 2504 STORE_FAST              33 (weekdays_fallback)
+
+309        2506 LOAD_GLOBAL            113 (NULL + rank_availability_aware_fallbacks)
+
+310        2516 LOAD_FAST                5 (normalized)
+
+311        2518 LOAD_FAST                7 (eligibility)
+           2520 LOAD_ATTR               34 (eligible)
+
+312        2540 LOAD_FAST                2 (ruleset)
+
+313        2542 LOAD_FAST               33 (weekdays_fallback)
+
+314        2544 LOAD_GLOBAL            115 (NULL + frozenset)
+           2554 LOAD_CONST              37 (<code object <genexpr> at 0x72446e31ac30, file "/home/mohammad/project/fitsho/backend/app/workouts/program_engine/engine.py", line 314>)
+           2556 MAKE_FUNCTION            0
+           2558 LOAD_FAST               25 (exact_day_splits)
+           2560 GET_ITER
+           2562 CALL                     0
+           2570 CALL                     1
+
+315        2578 LOAD_FAST                8 (session_capacity)
+
+309        2580 KW_NAMES                38 (('weekdays', 'excluded_layouts', 'session_capacity'))
+           2582 CALL                     6
+           2590 STORE_FAST              34 (dynamic_splits)
+
+317        2592 LOAD_FAST               34 (dynamic_splits)
+           2594 GET_ITER
+        >> 2596 FOR_ITER               202 (to 3004)
+           2600 STORE_FAST              35 (fallback_split)
+
+318        2602 LOAD_GLOBAL             97 (NULL + _program_for_split)
+
+319        2612 LOAD_FAST                0 (request)
+
+320        2614 LOAD_FAST                5 (normalized)
+
+321        2616 LOAD_FAST                6 (safety)
+           2618 LOAD_ATTR               18 (status)
+
+322        2638 LOAD_FAST                6 (safety)
+           2640 LOAD_ATTR               28 (reason_codes)
+
+323        2660 LOAD_FAST                7 (eligibility)
+           2662 LOAD_ATTR               42 (rejected)
+
+324        2682 LOAD_FAST                7 (eligibility)
+           2684 LOAD_ATTR               34 (eligible)
+
+325        2704 LOAD_FAST                7 (eligibility)
+           2706 LOAD_ATTR               66 (cardio_eligible)
+
+326        2726 LOAD_FAST               35 (fallback_split)
+
+327        2728 LOAD_FAST                2 (ruleset)
+
+328        2730 LOAD_FAST               12 (previous_volume)
+
+329        2732 LOAD_FAST                8 (session_capacity)
+
+330        2734 LOAD_GLOBAL             57 (NULL + tuple)
+           2744 LOAD_FAST               27 (rejected_splits)
+           2746 CALL                     1
+
+331        2754 LOAD_FAST               15 (template_rejection_trace)
+
+332        2756 LOAD_FAST               14 (rejected_slot_candidates)
+
+318        2758 KW_NAMES                33 (('previous_volume', 'session_capacity', 'rejected_splits', 'template_rejection_trace', 'rejected_slot_candidates'))
+           2760 CALL                    14
+           2768 STORE_FAST              31 (result)
+
+334        2770 LOAD_FAST               31 (result)
+           2772 LOAD_ATTR               68 (is_success)
+           2792 POP_JUMP_IF_FALSE        4 (to 2802)
+
+335        2794 LOAD_FAST               31 (result)
+           2796 SWAP                     2
+           2798 POP_TOP
+           2800 RETURN_VALUE
+
+336     >> 2802 LOAD_FAST               26 (collected_errors)
+           2804 LOAD_ATTR               99 (NULL|self + extend)
+           2824 LOAD_FAST               31 (result)
+           2826 LOAD_ATTR               76 (errors)
+           2846 CALL                     1
+           2854 POP_TOP
+
+337        2856 LOAD_FAST               27 (rejected_splits)
+           2858 LOAD_ATTR              107 (NULL|self + append)
+
+339        2878 LOAD_FAST               35 (fallback_split)
+           2880 LOAD_ATTR              100 (split_type)
+           2900 LOAD_ATTR              102 (value)
+
+340        2920 LOAD_FAST               35 (fallback_split)
+           2922 LOAD_ATTR              104 (day_focuses)
+
+341        2942 LOAD_CONST              15 ('rejected')
+
+342        2944 LOAD_FAST               31 (result)
+           2946 LOAD_ATTR               76 (errors)
+
+343        2966 LOAD_FAST               31 (result)
+           2968 LOAD_ATTR               38 (decision_trace)
+
+338        2988 LOAD_CONST              39 (('split', 'day_focuses', 'status', 'reason_codes', 'decision_trace'))
+           2990 BUILD_CONST_KEY_MAP      5
+
+337        2992 CALL                     1
+           3000 POP_TOP
+           3002 JUMP_BACKWARD          204 (to 2596)
+
+317     >> 3004 END_FOR
+
+347        3006 LOAD_CONST              40 ('PROGRAM_CONSTRUCTION_ALTERNATIVES_EXHAUSTED')
+
+348        3008 LOAD_CONST              41 ('EXACT_DAY_SPLIT_ALTERNATIVES_EXHAUSTED')
+
+349        3010 LOAD_CONST              29 ('REQUESTED_TRAINING_DAYS_UNSATISFIED')
+
+346        3012 BUILD_LIST               3
+
+350        3014 LOAD_GLOBAL             57 (NULL + tuple)
+           3024 LOAD_GLOBAL            116 (dict)
+           3034 LOAD_ATTR              119 (NULL|self + fromkeys)
+           3054 LOAD_FAST               26 (collected_errors)
+           3056 CALL                     1
+           3064 CALL                     1
+
+346        3072 LIST_EXTEND              1
+           3074 CALL_INTRINSIC_1         6 (INTRINSIC_LIST_TO_TUPLE)
+           3076 STORE_FAST              36 (errors)
+
+352        3078 LOAD_GLOBAL              3 (NULL + ProgramGenerationResult)
+
+353        3088 LOAD_CONST               0 (None)
+
+354        3090 LOAD_GLOBAL              4 (GenerationErrorCode)
+           3100 LOAD_ATTR              120 (UNSATISFIED_CONSTRAINT)
+
+355        3120 LOAD_FAST               36 (errors)
+
+356        3122 LOAD_FAST                6 (safety)
+           3124 LOAD_ATTR               18 (status)
+
+357        3144 LOAD_FAST                7 (eligibility)
+           3146 LOAD_ATTR               42 (rejected)
+
+360        3166 LOAD_CONST              42 ('construction_recovery')
+
+361        3168 LOAD_CONST              24 ('exhausted')
+
+362        3170 LOAD_GLOBAL             57 (NULL + tuple)
+           3180 LOAD_FAST               27 (rejected_splits)
+           3182 CALL                     1
+
+363        3190 LOAD_FAST               36 (errors)
+
+359        3192 LOAD_CONST              43 (('stage', 'status', 'attempts', 'reason_codes'))
+           3194 BUILD_CONST_KEY_MAP      4
+
+358        3196 BUILD_TUPLE              1
+
+352        3198 KW_NAMES                 8 (('program', 'error_code', 'errors', 'safety_status', 'rejected_candidates', 'decision_trace'))
+           3200 CALL                     6
+           3208 RETURN_VALUE
+        >> 3210 SWAP                     2
+           3212 POP_TOP
+
+147        3214 SWAP                     2
+           3216 STORE_FAST              13 (item)
+           3218 RERAISE                  0
+        >> 3220 PUSH_EXC_INFO
+
+212        3222 LOAD_GLOBAL             86 (TemplateConstructionError)
+           3232 CHECK_EXC_MATCH
+           3234 POP_JUMP_IF_FALSE      132 (to 3500)
+           3236 STORE_FAST              22 (exc)
+
+213        3238 LOAD_CONST              21 ('INITIAL_TEMPLATE_REJECTED_UNFILLABLE')
+           3240 BUILD_LIST               1
+           3242 LOAD_FAST               22 (exc)
+           3244 LOAD_ATTR               28 (reason_codes)
+           3264 LIST_EXTEND              1
+           3266 CALL_INTRINSIC_1         6 (INTRINSIC_LIST_TO_TUPLE)
+           3268 STORE_FAST              23 (reason_codes)
+
+214        3270 LOAD_GLOBAL             75 (NULL + _template_rejection_category)
+           3280 LOAD_FAST               23 (reason_codes)
+           3282 CALL                     1
+           3290 STORE_FAST              20 (rejection_category)
+
+216        3292 LOAD_CONST              14 ('template_reference')
+
+217        3294 LOAD_FAST               16 (ranking)
+           3296 LOAD_ATTR               78 (rank)
+
+218        3316 LOAD_FAST               17 (reference)
+           3318 LOAD_ATTR               80 (slug)
+
+219        3338 LOAD_CONST              15 ('rejected')
+
+220        3340 LOAD_CONST              16 (('days', 'training_level', 'core_slots_resolvable'))
+
+225        3342 LOAD_CONST              17 (False)
+
+226        3344 LOAD_FAST               16 (ranking)
+           3346 LOAD_ATTR               39 (NULL|self + decision_trace)
+           3366 CALL                     0
+           3374 LOAD_CONST              18 ('score')
+           3376 BINARY_SUBSCR
+
+227        3380 LOAD_FAST               16 (ranking)
+           3382 LOAD_ATTR               82 (feasibility)
+           3402 LOAD_ATTR               39 (NULL|self + decision_trace)
+           3422 CALL                     0
+
+228        3430 LOAD_FAST               20 (rejection_category)
+
+229        3432 LOAD_FAST               23 (reason_codes)
+
+215        3434 LOAD_CONST              22 (('stage', 'rank', 'selected', 'status', 'hard_eligibility', 'goal_used_for_exclusion', 'score', 'feasibility', 'rejection_category', 'reason_codes'))
+           3436 BUILD_CONST_KEY_MAP     10
+           3438 STORE_FAST              21 (rejection)
+
+231        3440 LOAD_FAST               15 (template_rejection_trace)
+
+232        3442 LOAD_FAST               21 (rejection)
+
+233        3444 LOAD_GLOBAL             73 (NULL + _template_attempt_trace)
+
+234        3454 LOAD_FAST               16 (ranking)
+
+235        3456 LOAD_CONST              15 ('rejected')
+
+236        3458 LOAD_FAST               20 (rejection_category)
+
+237        3460 LOAD_FAST               23 (reason_codes)
+
+233        3462 KW_NAMES                20 (('status', 'rejection_category', 'reason_codes'))
+           3464 CALL                     4
+
+231        3472 BUILD_TUPLE              2
+           3474 BINARY_OP               13 (+=)
+           3478 STORE_FAST              15 (template_rejection_trace)
+           3480 POP_EXCEPT
+           3482 LOAD_CONST               0 (None)
+           3484 STORE_FAST              22 (exc)
+           3486 DELETE_FAST             22 (exc)
+           3488 EXTENDED_ARG             4
+           3490 JUMP_BACKWARD         1245 (to 1002)
+        >> 3492 LOAD_CONST               0 (None)
+           3494 STORE_FAST              22 (exc)
+           3496 DELETE_FAST             22 (exc)
+           3498 RERAISE                  1
+
+212     >> 3500 RERAISE                  0
+        >> 3502 COPY                     3
+           3504 POP_EXCEPT
+           3506 RERAISE                  1
+ExceptionTable:
+  868 to 926 -> 3210 [2]
+  1036 to 1304 -> 3220 [1]
+  1312 to 1626 -> 3220 [1]
+  3220 to 3236 -> 3502 [2] lasti
+  3238 to 3478 -> 3492 [2] lasti
+  3492 to 3500 -> 3502 [2] lasti
+
+Disassembly of <code object <genexpr> at 0x72446e31a730, file "/home/mohammad/project/fitsho/backend/app/workouts/program_engine/engine.py", line 130>:
+130           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                18 (to 48)
+
+132          12 STORE_FAST               1 (item)
+
+131          14 LOAD_CONST               0 ('EXERCISE_REJECTED_MISSING_EQUIPMENT')
+             16 LOAD_FAST                1 (item)
+             18 LOAD_ATTR                0 (reason_codes)
+             38 CONTAINS_OP              0
+             40 YIELD_VALUE              1
+             42 RESUME                   1
+             44 POP_TOP
+             46 JUMP_BACKWARD           20 (to 8)
+
+130     >>   48 END_FOR
+             50 RETURN_CONST             1 (None)
+        >>   52 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             54 RERAISE                  1
+ExceptionTable:
+  4 to 50 -> 52 [0] lasti
+
+Disassembly of <code object <genexpr> at 0x72446e5605d0, file "/home/mohammad/project/fitsho/backend/app/workouts/program_engine/engine.py", line 148>:
+              0 COPY_FREE_VARS           1
+
+148           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                35 (to 84)
+
+150          14 STORE_FAST               1 (candidate)
+
+151          16 LOAD_FAST                1 (candidate)
+             18 LOAD_ATTR                0 (id)
+             38 LOAD_DEREF               2 (rejected_by_id)
+             40 CONTAINS_OP              0
+             42 POP_JUMP_IF_FALSE       19 (to 82)
+
+149          44 LOAD_FAST                1 (candidate)
+             46 LOAD_DEREF               2 (rejected_by_id)
+             48 LOAD_FAST                1 (candidate)
+             50 LOAD_ATTR                0 (id)
+             70 BINARY_SUBSCR
+             74 BUILD_TUPLE              2
+             76 YIELD_VALUE              1
+             78 RESUME                   1
+             80 POP_TOP
+        >>   82 JUMP_BACKWARD           37 (to 10)
+
+148     >>   84 END_FOR
+             86 RETURN_CONST             0 (None)
+        >>   88 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             90 RERAISE                  1
+ExceptionTable:
+  6 to 86 -> 88 [0] lasti
+
+Disassembly of <code object <genexpr> at 0x72446e3306f0, file "/home/mohammad/project/fitsho/backend/app/workouts/program_engine/engine.py", line 257>:
+              0 COPY_FREE_VARS           1
+
+257           2 RETURN_GENERATOR
+              4 POP_TOP
+              6 RESUME                   0
+              8 LOAD_FAST                0 (.0)
+        >>   10 FOR_ITER                31 (to 76)
+
+258          14 STORE_FAST               1 (candidate)
+             16 LOAD_GLOBAL              1 (NULL + len)
+             26 LOAD_FAST                1 (candidate)
+             28 LOAD_ATTR                2 (day_focuses)
+             48 CALL                     1
+             56 LOAD_DEREF               2 (requested_days)
+             58 COMPARE_OP              40 (==)
+             62 POP_JUMP_IF_TRUE         1 (to 66)
+             64 JUMP_BACKWARD           28 (to 10)
+        >>   66 LOAD_FAST                1 (candidate)
+             68 YIELD_VALUE              1
+             70 RESUME                   1
+             72 POP_TOP
+             74 JUMP_BACKWARD           33 (to 10)
+
+257     >>   76 END_FOR
+             78 RETURN_CONST             0 (None)
+        >>   80 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             82 RERAISE                  1
+ExceptionTable:
+  6 to 62 -> 80 [0] lasti
+  66 to 78 -> 80 [0] lasti
+
+Disassembly of <code object <genexpr> at 0x72446e31ac30, file "/home/mohammad/project/fitsho/backend/app/workouts/program_engine/engine.py", line 314>:
+314           0 RETURN_GENERATOR
+              2 POP_TOP
+              4 RESUME                   0
+              6 LOAD_FAST                0 (.0)
+        >>    8 FOR_ITER                16 (to 44)
+             12 STORE_FAST               1 (candidate)
+             14 LOAD_FAST                1 (candidate)
+             16 LOAD_ATTR                0 (day_focuses)
+             36 YIELD_VALUE              1
+             38 RESUME                   1
+             40 POP_TOP
+             42 JUMP_BACKWARD           18 (to 8)
+        >>   44 END_FOR
+             46 RETURN_CONST             0 (None)
+        >>   48 CALL_INTRINSIC_1         3 (INTRINSIC_STOPITERATION_ERROR)
+             50 RERAISE                  1
+ExceptionTable:
+  4 to 46 -> 48 [0] lasti

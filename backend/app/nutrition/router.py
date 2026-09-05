@@ -75,6 +75,7 @@ from app.nutrition.estimate_service import (
     save_structured_exercise,
 )
 from app.nutrition.exceptions import (
+    DietaryPatternNotSupportedV1Error,
     GoalReselectionRequiredDomainError,
     NutritionEstimateBlockedError,
     NutritionEstimateNotFoundError,
@@ -82,10 +83,12 @@ from app.nutrition.exceptions import (
     NutritionProductModeError,
     NutritionProfileNotFoundError,
     NutritionTargetInfeasibleDomainError,
+    PlanSelectionInvalidError,
     SafetyDecisionNotFoundError,
     SafetyScreenRequiredError,
     SharedProfileRequiredError,
     StructuredExerciseRequiredError,
+    WeeklyPlanBundleNotFoundError,
 )
 from app.nutrition.food_catalogue import (
     list_verified_foods,
@@ -156,6 +159,7 @@ from app.nutrition.plan_service import (
     active_weekly_plan,
     generate_weekly_plan,
     latest_weekly_plan,
+    select_bundle_plan,
     weekly_plan_by_id,
     weekly_plan_history,
 )
@@ -216,6 +220,8 @@ from app.nutrition.schemas import (
     PhysicianReviewQueueItemResponse,
     PhysicianReviewRequirementResponse,
     PhysicianSupplementOrderInput,
+    PlanBundleSelectInput,
+    PlanBundleSelectResponse,
     PlannedMealTrackingInput,
     PreparedRecipePreviewResponse,
     PreparedRecipeWrite,
@@ -1168,6 +1174,14 @@ def update_nutrition_profile(
         raise _domain_error(
             "SAFETY_SCREEN_REQUIRED", "پیش از ادامه، ارزیابی ایمنی را کامل کنید."
         ) from None
+    except DietaryPatternNotSupportedV1Error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "DIETARY_PATTERN_NOT_SUPPORTED_V1",
+                "message": "الگوی تغذیه‌ای گیاه‌خواری یا وگان در نسخه ۱ پشتیبانی نمی‌شود.",
+            },
+        ) from None
     except NutritionOnboardingBlockedError:
         raise _domain_error(
             "NUTRITION_ONBOARDING_BLOCKED",
@@ -1340,6 +1354,41 @@ def generate_plan(
         raise _domain_error(
             "STRUCTURED_EXERCISE_REQUIRED",
             "اطلاعات تمرین برای محاسبه برنامه لازم است.",
+        ) from None
+
+
+@router.post("/plan-bundles/{bundle_id}/select", response_model=PlanBundleSelectResponse)
+def select_plan_in_bundle(
+    bundle_id: str,
+    payload: PlanBundleSelectInput,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> PlanBundleSelectResponse:
+    try:
+        bundle_uuid = UUID(bundle_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "PLAN_BUNDLE_NOT_FOUND", "message": "بسته برنامه غذایی پیدا نشد."},
+        ) from None
+
+    try:
+        return select_bundle_plan(
+            db,
+            user_id=user.id,
+            bundle_id=bundle_uuid,
+            plan_id=payload.plan_id,
+            plan_role=payload.plan_role,
+        )
+    except WeeklyPlanBundleNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "PLAN_BUNDLE_NOT_FOUND", "message": "بسته برنامه غذایی پیدا نشد."},
+        ) from None
+    except PlanSelectionInvalidError as err:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"code": "PLAN_SELECTION_INVALID", "message": str(err)},
         ) from None
 
 

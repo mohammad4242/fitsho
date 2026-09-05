@@ -24,7 +24,11 @@ export function NutritionEstimatePage() {
   const [state, setState] = useState<ViewState>("loading");
   const [estimate, setEstimate] = useState<NutritionEstimate | null>(null);
   const [plan, setPlan] = useState<WeeklyPlan | null>(null);
+  const [budgetPlan, setBudgetPlan] = useState<WeeklyPlan | null>(null);
   const [idealPlan, setIdealPlan] = useState<WeeklyPlan | null>(null);
+  const [bundleId, setBundleId] = useState<string | null>(null);
+  const [selectedPlanRole, setSelectedPlanRole] = useState<"budget" | "ideal">("budget");
+  const [isSelectingPlan, setIsSelectingPlan] = useState(false);
   const [comparison, setComparison] = useState<PlanComparison | null>(null);
   const [tracking, setTracking] = useState<DailyTrackingSummary | null>(null);
   const [planOutcome, setPlanOutcome] = useState<WeeklyPlanGeneration | null>(null);
@@ -64,15 +68,38 @@ export function NutritionEstimatePage() {
       .finally(() => setCalculating(false));
   }
 
+  function handleSelectPlan(role: "budget" | "ideal") {
+    if (!bundleId) return;
+    setIsSelectingPlan(true);
+    void nutritionApi.selectBundlePlan(bundleId, { selected_plan_role: role })
+      .then((resp) => {
+        setSelectedPlanRole(role);
+        setPlan(resp.plan);
+        if (role === "budget") {
+          setBudgetPlan(resp.plan);
+        } else {
+          setIdealPlan(resp.plan);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to select plan:", err);
+      })
+      .finally(() => setIsSelectingPlan(false));
+  }
+
   function generatePlan() {
     setGeneratingPlan(true);
     setPlanOutcome(null);
     void nutritionApi.createWeeklyNutritionPlan()
       .then((result) => {
         setPlanOutcome(result);
+        setBundleId(result.bundle_id ?? null);
+        const resolvedRole = (result.selected_plan_role as "budget" | "ideal") || "budget";
+        setSelectedPlanRole(resolvedRole);
         const resolvedBudgetPlan = result.budget_plan ?? result.plan ?? null;
-        if (resolvedBudgetPlan !== null) setPlan(resolvedBudgetPlan);
+        setBudgetPlan(resolvedBudgetPlan);
         setIdealPlan(result.ideal_plan ?? null);
+        setPlan(result.plan ?? resolvedBudgetPlan);
         setComparison(result.comparison ?? null);
       })
       .catch(() => {
@@ -105,13 +132,18 @@ export function NutritionEstimatePage() {
           <EstimateContent estimate={estimate} language={language} onRefresh={calculate} plan={plan} tracking={tracking} />
           <DoctorSupervision language={language} plan={plan} />
           <PlanArea
+            bundleId={bundleId}
+            budgetPlan={budgetPlan}
             comparison={comparison}
             generating={generatingPlan}
             idealPlan={idealPlan}
+            isSelectingPlan={isSelectingPlan}
             language={language}
             onGenerate={generatePlan}
+            onSelectPlan={handleSelectPlan}
             outcome={planOutcome}
             plan={plan}
+            selectedPlanRole={selectedPlanRole}
           />
         </>
       )}
@@ -120,21 +152,31 @@ export function NutritionEstimatePage() {
 }
 
 function PlanArea({
+  bundleId,
+  budgetPlan,
   comparison,
   generating,
   idealPlan,
+  isSelectingPlan,
   language,
   onGenerate,
+  onSelectPlan,
   outcome,
   plan,
+  selectedPlanRole = "budget",
 }: {
+  bundleId?: string | null;
+  budgetPlan?: WeeklyPlan | null;
   comparison: PlanComparison | null;
   generating: boolean;
   idealPlan: WeeklyPlan | null;
+  isSelectingPlan?: boolean;
   language: "fa" | "en";
   onGenerate: () => void;
+  onSelectPlan?: (role: "budget" | "ideal") => void;
   outcome: WeeklyPlanGeneration | null;
   plan: WeeklyPlan | null;
+  selectedPlanRole?: "budget" | "ideal";
 }) {
   const l = (fa: string, en: string) => language === "en" ? en : fa;
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
@@ -143,27 +185,44 @@ function PlanArea({
 
   if (plan !== null) {
     const isTwoPlan = comparison?.show_ideal_plan && idealPlan !== null;
+    const activeBudgetPlan = budgetPlan ?? plan;
     return (
       <div className="weekly-plan-area-container">
-        {comparison && <PlanComparisonSection comparison={comparison} language={language} />}
+        {comparison && (
+          <PlanComparisonSection
+            bundleId={bundleId}
+            comparison={comparison}
+            isSelectingPlan={isSelectingPlan}
+            language={language}
+            onSelectPlan={onSelectPlan}
+            selectedPlanRole={selectedPlanRole}
+          />
+        )}
         {isTwoPlan ? (
           <div className="weekly-plans-dual-container">
             <details className="weekly-plan-accordion" open>
               <summary className="weekly-plan-accordion__summary">
-                <span>{l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}</span>
+                <span>
+                  {l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}
+                  {selectedPlanRole === "budget" && ` (${l("برنامه فعال شما", "Active Plan")})`}
+                </span>
               </summary>
               <WeeklyNutritionPlan
+                isReferencePlan={selectedPlanRole !== "budget"}
                 language={language}
-                plan={plan}
+                plan={activeBudgetPlan}
                 title={l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}
               />
             </details>
             <details className="weekly-plan-accordion" open>
               <summary className="weekly-plan-accordion__summary">
-                <span>{l("برنامه مرجع", "Reference Plan")}</span>
+                <span>
+                  {l("برنامه مرجع", "Reference Plan")}
+                  {selectedPlanRole === "ideal" && ` (${l("برنامه فعال شما", "Active Plan")})`}
+                </span>
               </summary>
               <WeeklyNutritionPlan
-                isReferencePlan={true}
+                isReferencePlan={selectedPlanRole !== "ideal"}
                 language={language}
                 plan={idealPlan}
                 title={l("برنامه مرجع", "Reference Plan")}
@@ -226,11 +285,19 @@ function formatTomanOrMillion(
 }
 
 function PlanComparisonSection({
+  bundleId,
   comparison,
+  isSelectingPlan,
   language,
+  onSelectPlan,
+  selectedPlanRole = "budget",
 }: {
+  bundleId?: string | null;
   comparison: PlanComparison;
+  isSelectingPlan?: boolean;
   language: "fa" | "en";
+  onSelectPlan?: (role: "budget" | "ideal") => void;
+  selectedPlanRole?: "budget" | "ideal";
 }) {
   const l = (fa: string, en: string) => language === "en" ? en : fa;
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
@@ -316,6 +383,80 @@ function PlanComparisonSection({
                 {comparison.unique_protein_sources_ideal != null ? number.format(comparison.unique_protein_sources_ideal) : "—"}
               </strong>
             </div>
+          </div>
+        </div>
+      )}
+
+      {comparison.show_ideal_plan && Boolean(bundleId) && Boolean(onSelectPlan) && (
+        <div className="nutrition-bundle-selection-cards" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
+          <div
+            className="nutrition-bundle-card"
+            style={{
+              padding: "1rem",
+              borderRadius: "8px",
+              border: selectedPlanRole === "budget" ? "2px solid #16a34a" : "1px solid #cbd5e1",
+              backgroundColor: selectedPlanRole === "budget" ? "#f0fdf4" : "#ffffff",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <h4 style={{ margin: 0 }}>{l("برنامه بودجه‌ای", "Budget Plan")}</h4>
+              {selectedPlanRole === "budget" ? (
+                <span style={{ fontSize: "0.8rem", color: "#166534", fontWeight: "bold" }}>
+                  {l("فعال", "Active")}
+                </span>
+              ) : null}
+            </div>
+            <p style={{ margin: "0.5rem 0", color: "#64748b", fontSize: "0.9rem" }}>
+              {l("هزینه ماهانه: ", "Monthly cost: ")}
+              <strong>
+                {comparison.budget_plan_monthly_cost_irr != null
+                  ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
+                  : "—"}
+              </strong>
+            </p>
+            <button
+              className={selectedPlanRole === "budget" ? "secondary-button is-active" : "primary-button"}
+              disabled={selectedPlanRole === "budget" || isSelectingPlan}
+              onClick={() => onSelectPlan?.("budget")}
+              type="button"
+            >
+              {selectedPlanRole === "budget" ? l("برنامه فعال شما", "Your Active Plan") : l("انتخاب برنامه بودجه‌ای", "Select Budget Plan")}
+            </button>
+          </div>
+
+          <div
+            className="nutrition-bundle-card"
+            style={{
+              padding: "1rem",
+              borderRadius: "8px",
+              border: selectedPlanRole === "ideal" ? "2px solid #16a34a" : "1px solid #cbd5e1",
+              backgroundColor: selectedPlanRole === "ideal" ? "#f0fdf4" : "#ffffff",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <h4 style={{ margin: 0 }}>{l("برنامه مرجع علمی", "Ideal Scientific Plan")}</h4>
+              {selectedPlanRole === "ideal" ? (
+                <span style={{ fontSize: "0.8rem", color: "#166534", fontWeight: "bold" }}>
+                  {l("فعال", "Active")}
+                </span>
+              ) : null}
+            </div>
+            <p style={{ margin: "0.5rem 0", color: "#64748b", fontSize: "0.9rem" }}>
+              {l("هزینه ماهانه: ", "Monthly cost: ")}
+              <strong>
+                {comparison.ideal_plan_monthly_cost_irr != null
+                  ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
+                  : "—"}
+              </strong>
+            </p>
+            <button
+              className={selectedPlanRole === "ideal" ? "secondary-button is-active" : "primary-button"}
+              disabled={selectedPlanRole === "ideal" || isSelectingPlan}
+              onClick={() => onSelectPlan?.("ideal")}
+              type="button"
+            >
+              {selectedPlanRole === "ideal" ? l("برنامه فعال شما", "Your Active Plan") : l("انتخاب برنامه مرجع", "Select Ideal Plan")}
+            </button>
           </div>
         </div>
       )}
