@@ -1,5 +1,6 @@
+import { validatePoseWithGhost } from "./ghostPoseValidator";
 import { mediaPipePoseAssets } from "./mediaPipePoseDetector";
-import type { BodyPhotoView } from "./types";
+import type { BodyPhotoSide, BodyPhotoView } from "./types";
 import type { NormalizedBodyLandmark } from "./processor";
 
 export type LivePoseWarning =
@@ -36,41 +37,83 @@ export type LivePoseAssets = {
   wasmBasePath: string;
 };
 
+export type LivePoseGuideOptions = {
+  ghostScale?: number;
+  sideProfile?: BodyPhotoSide;
+};
+
 export interface LivePoseGuide {
-  check(video: HTMLVideoElement, timestampMs: number): LivePoseGuidance;
+  check(
+    video: HTMLVideoElement,
+    timestampMs: number,
+    options?: LivePoseGuideOptions,
+  ): LivePoseGuidance;
+  setGhostScale?(scale: number): void;
+  setSideProfile?(profile: BodyPhotoSide): void;
   close(): void;
 }
 
-export type LivePoseGuideFactory = (view: BodyPhotoView) => Promise<LivePoseGuide>;
+export type LivePoseGuideFactory = (
+  view: BodyPhotoView,
+  options?: LivePoseGuideOptions,
+) => Promise<LivePoseGuide>;
 
-const poseBoxIndices = [11, 12, 23, 24, 27, 28] as const;
 const lowResolutionWidth = 256;
 
 export class MediaPipeLivePoseGuide implements LivePoseGuide {
   private closed = false;
   private readonly view: BodyPhotoView;
+  private sideProfile: BodyPhotoSide;
+  private ghostScale: number;
   private readonly landmarker: LivePoseLandmarker;
 
   constructor(
     view: BodyPhotoView,
     landmarker: LivePoseLandmarker,
+    options?: LivePoseGuideOptions,
   ) {
     this.view = view;
     this.landmarker = landmarker;
+    this.sideProfile = options?.sideProfile ?? "right";
+    this.ghostScale = options?.ghostScale ?? 1;
   }
 
-  check(video: HTMLVideoElement, timestampMs: number): LivePoseGuidance {
+  setGhostScale(scale: number) {
+    this.ghostScale = scale;
+  }
+
+  setSideProfile(profile: BodyPhotoSide) {
+    this.sideProfile = profile;
+  }
+
+  check(
+    video: HTMLVideoElement,
+    timestampMs: number,
+    options?: LivePoseGuideOptions,
+  ): LivePoseGuidance {
     if (this.closed) {
       return { status: "unavailable", warnings: [] };
     }
     try {
+      const activeScale = options?.ghostScale ?? this.ghostScale;
+      const activeProfile = options?.sideProfile ?? this.sideProfile;
+
       const result = this.landmarker.detectForVideo(
         lowResolutionFrame(video),
         timestampMs,
       );
+
+      const warnings = evaluateLiveGuidance(
+        result.landmarks,
+        this.view,
+        activeProfile,
+        activeScale,
+        video,
+      );
+
       return {
         status: "available",
-        warnings: evaluateGuidance(result.landmarks, this.view, video),
+        warnings,
       };
     } catch {
       return { status: "unavailable", warnings: [] };
@@ -104,8 +147,9 @@ export function createMediaPipeLivePoseLandmarkerLoader(
 export function createMediaPipeLivePoseGuide(
   view: BodyPhotoView,
   loader: LivePoseLandmarkerLoader = createMediaPipeLivePoseLandmarkerLoader(),
+  options?: LivePoseGuideOptions,
 ): Promise<LivePoseGuide> {
-  return loader().then((landmarker) => new MediaPipeLivePoseGuide(view, landmarker));
+  return loader().then((landmarker) => new MediaPipeLivePoseGuide(view, landmarker, options));
 }
 
 type MediaPipeVisionModule = {
@@ -140,48 +184,54 @@ async function loadMediaPipeVision(): Promise<MediaPipeVisionModule> {
   };
 }
 
-function evaluateGuidance(
+function evaluateLiveGuidance(
   poses: NormalizedBodyLandmark[][],
   view: BodyPhotoView,
+  sideProfile: BodyPhotoSide,
+  ghostScale: number,
   video: HTMLVideoElement,
 ): LivePoseWarning[] {
   const warnings: LivePoseWarning[] = [];
-  if (poses.length === 0) warnings.push("person_missing");
-  if (poses.length > 1) warnings.push("multiple_people");
 
-  const landmarks = poses[0];
-  if (landmarks !== undefined) {
-    const points = poseBoxIndices
-      .map((index) => landmarks[index])
-      .filter((point): point is NormalizedBodyLandmark => point !== undefined);
-    if (points.length !== poseBoxIndices.length || points.some((point) => point.visibility < 0.35)) {
-      warnings.push("body_out_of_frame");
-    } else {
-      const top = Math.min(...points.map((point) => point.y));
-      const bottom = Math.max(...points.map((point) => point.y));
-      const left = Math.min(...points.map((point) => point.x));
-      const right = Math.max(...points.map((point) => point.x));
-      if (bottom >= 0.995 || left <= 0.02 || right >= 0.98) {
-        warnings.push("body_out_of_frame");
-      }
-      const bodySpan = bottom - top;
-      if (bodySpan > 0.86) warnings.push("too_close");
-      if (bodySpan < 0.5) warnings.push("too_far");
+  // Run shared Ghost-based pose validator
+  const validation = validatePoseWithGhost({
+    view,
+    sideProfile,
+    ghostScale,
+    poses,
+  });
 
-      const shoulderSpan = Math.abs((landmarks[11]?.x ?? 0) - (landmarks[12]?.x ?? 0));
-      if ((view === "side" && shoulderSpan > 0.25) || (view !== "side" && shoulderSpan < 0.1)) {
-        warnings.push("wrong_view");
-      }
-    }
+  // Map validator outcomes to user-facing live warnings
+  if (validation.warnings.includes("person_missing") || validation.hardRejectCode === "body_not_detected") {
+    warnings.push("person_missing");
+  }
+  if (validation.warnings.includes("multiple_people") || validation.hardRejectCode === "multiple_people_detected") {
+    warnings.push("multiple_people");
+  }
+  if (validation.warnings.includes("body_out_of_frame") || validation.hardRejectCode === "body_out_of_frame") {
+    warnings.push("body_out_of_frame");
+  }
+  if (validation.warnings.includes("too_close")) {
+    warnings.push("too_close");
+  }
+  if (validation.warnings.includes("too_far")) {
+    warnings.push("too_far");
+  }
+  if (validation.warnings.includes("wrong_view") || validation.hardRejectCode === "unexpected_body_view") {
+    warnings.push("wrong_view");
   }
 
+  // Device orientation check
   if (video.videoWidth > 0 && video.videoWidth >= video.videoHeight) {
     warnings.push("phone_orientation");
   }
+
+  // Lighting check
   const brightness = estimateBrightness(video);
   if (brightness !== null && (brightness < 0.12 || brightness > 0.94)) {
     warnings.push("low_lighting");
   }
+
   return [...new Set(warnings)];
 }
 

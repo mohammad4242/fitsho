@@ -13,13 +13,25 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function pose() {
-  return Array.from({ length: 33 }, (_, index) => ({
+function pose(shape: "front" | "side" = "front") {
+  const points = Array.from({ length: 33 }, (_, index) => ({
     x: index % 2 === 0 ? 0.58 : 0.42,
     y: 0.2 + (index / 45),
     z: 0,
     visibility: 0.95,
   }));
+  if (shape === "side") {
+    points[11] = { x: 0.47, y: 0.20, z: 0, visibility: 0.95 };
+    points[12] = { x: 0.53, y: 0.20, z: 0, visibility: 0.95 };
+    points[23] = { x: 0.48, y: 0.48, z: 0, visibility: 0.95 };
+    points[24] = { x: 0.52, y: 0.48, z: 0, visibility: 0.95 };
+  } else {
+    points[11] = { x: 0.38, y: 0.20, z: 0, visibility: 0.95 };
+    points[12] = { x: 0.62, y: 0.20, z: 0, visibility: 0.95 };
+    points[23] = { x: 0.42, y: 0.48, z: 0, visibility: 0.95 };
+    points[24] = { x: 0.58, y: 0.48, z: 0, visibility: 0.95 };
+  }
+  return points;
 }
 
 it("creates a separate VIDEO-mode pose landmarker and uses detectForVideo", async () => {
@@ -80,5 +92,52 @@ describe("MediaPipeLivePoseGuide", () => {
 
     expect(guide.check({ videoWidth: 720, videoHeight: 1280 } as HTMLVideoElement, 10).warnings)
       .not.toContain("body_out_of_frame");
+  });
+
+  it("accepts a side posture with broader athletic shoulders without wrong_view warning", () => {
+    const landmarks = pose("side");
+    // Broader shoulders (span 0.14)
+    landmarks[11] = { x: 0.43, y: 0.20, z: 0, visibility: 0.95 };
+    landmarks[12] = { x: 0.57, y: 0.20, z: 0, visibility: 0.95 };
+
+    const guide = new MediaPipeLivePoseGuide(
+      "side",
+      { detectForVideo: vi.fn().mockReturnValue({ landmarks: [landmarks] }) },
+      { sideProfile: "right", ghostScale: 1.0 },
+    );
+
+    const guidance = guide.check({ videoWidth: 720, videoHeight: 1280 } as HTMLVideoElement, 10);
+    expect(guidance.status).toBe("available");
+    expect(guidance.warnings).not.toContain("wrong_view");
+  });
+
+  it("does not warn body_out_of_frame when one foot landmark has lower visibility", () => {
+    const landmarks = pose("front");
+    landmarks[31]!.visibility = 0.2;
+    landmarks[32]!.visibility = 0.95;
+
+    const guide = new MediaPipeLivePoseGuide(
+      "front",
+      { detectForVideo: vi.fn().mockReturnValue({ landmarks: [landmarks] }) },
+    );
+
+    const guidance = guide.check({ videoWidth: 720, videoHeight: 1280 } as HTMLVideoElement, 10);
+    expect(guidance.warnings).not.toContain("body_out_of_frame");
+  });
+
+  it("uses runtime ghostScale and sideProfile options", () => {
+    const landmarks = pose("side");
+    const guide = new MediaPipeLivePoseGuide(
+      "side",
+      { detectForVideo: vi.fn().mockReturnValue({ landmarks: [landmarks] }) },
+    );
+
+    const guidance = guide.check(
+      { videoWidth: 720, videoHeight: 1280 } as HTMLVideoElement,
+      10,
+      { ghostScale: 0.85, sideProfile: "left" },
+    );
+
+    expect(guidance.status).toBe("available");
   });
 });
