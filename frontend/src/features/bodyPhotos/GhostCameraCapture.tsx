@@ -21,11 +21,16 @@ export type CameraFallbackReason =
 
 type CameraFacingMode = "user" | "environment";
 
+export type CapturedFileContext = {
+  ghostScale?: number;
+  sideProfile?: BodyPhotoSide;
+};
+
 type GhostCameraCaptureProps = {
   sex?: Sex | null;
   sideProfile?: BodyPhotoSide;
   view: BodyPhotoView;
-  onFileCaptured: (file: File) => void | Promise<void>;
+  onFileCaptured: (file: File, context?: CapturedFileContext) => void | Promise<void>;
   onFallback: (reason: CameraFallbackReason) => void;
   onClose: () => void;
   livePoseGuideFactory?: LivePoseGuideFactory;
@@ -68,6 +73,10 @@ export function GhostCameraCapture({
   const [ghostScale, setGhostScale] = useState(1);
   const [liveStatus, setLiveStatus] = useState<"loading" | "available" | "unavailable" | "disabled">("loading");
   const [guidance, setGuidance] = useState<LivePoseGuidance>({ status: "available", warnings: [] });
+  const ghostScaleRef = useRef(ghostScale);
+  ghostScaleRef.current = ghostScale;
+  const sideProfileRef = useRef(sideProfile);
+  sideProfileRef.current = sideProfile;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -220,7 +229,7 @@ export function GhostCameraCapture({
     let timer: number | null = null;
     let liveGuide: Awaited<ReturnType<LivePoseGuideFactory>> | null = null;
     setLiveStatus("loading");
-    void livePoseGuideFactory(view)
+    void livePoseGuideFactory(view, { ghostScale: ghostScaleRef.current, sideProfile })
       .then((createdGuide) => {
         if (!active) {
           createdGuide.close();
@@ -232,7 +241,11 @@ export function GhostCameraCapture({
           if (!active || liveGuide === null) return;
           const video = videoRef.current;
           if (video !== null && video.readyState >= 2) {
-            const nextGuidance = liveGuide.check(video, performance.now());
+            const nextGuidance = liveGuide.check(
+              video,
+              performance.now(),
+              { ghostScale: ghostScaleRef.current, sideProfile: sideProfileRef.current },
+            );
             setGuidance(nextGuidance);
             setLiveStatus(nextGuidance.status === "available" ? "available" : "unavailable");
           }
@@ -249,7 +262,7 @@ export function GhostCameraCapture({
       if (timer !== null) window.clearTimeout(timer);
       liveGuide?.close();
     };
-  }, [livePoseGuideFactory, streamReady, view]);
+  }, [livePoseGuideFactory, sideProfile, streamReady, view]);
 
   function startCountdown() {
     if (!streamReady || capturedFile !== null || countdown !== null || confirming) return;
@@ -268,7 +281,7 @@ export function GhostCameraCapture({
     if (capturedFile === null || confirming) return;
     setConfirming(true);
     try {
-      await onFileCaptured(capturedFile);
+      await onFileCaptured(capturedFile, { ghostScale, sideProfile });
     } catch {
       onFallback("camera_error");
     } finally {

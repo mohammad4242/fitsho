@@ -38,7 +38,7 @@ type GhostPhotoEditorProps = {
   sex?: Sex | null;
   sideProfile?: BodyPhotoSide;
   view: BodyPhotoView;
-  onConfirm: (file: File) => void | Promise<void>;
+  onConfirm: (file: File, context?: { ghostScale?: number; sideProfile?: BodyPhotoSide }) => void | Promise<void>;
   onCancel: () => void;
   renderPhoto?: GhostPhotoRenderer;
 };
@@ -166,7 +166,7 @@ export function GhostPhotoEditor({
     setConfirming(true);
     setError(null);
     void renderPhoto(file, photoTransform, view, ghostScale)
-      .then((editedFile) => onConfirm(editedFile))
+      .then((editedFile) => onConfirm(editedFile, { ghostScale, sideProfile }))
       .catch(() => setError(t("bodyPhotos.editor.renderError")))
       .finally(() => setConfirming(false));
   }

@@ -25,7 +25,13 @@ export function GhostOverlayGuide({
   const mirrored = view === "side" && sideProfile === "left";
   const privacyLine = ghostPrivacyLineGeometry(view, ghostScale, mirrored);
   return (
-    <div className="ghost-overlay" aria-label={t("bodyPhotos.camera.overlayLabel")}>
+    <div
+      className="ghost-overlay"
+      aria-label={t("bodyPhotos.camera.overlayLabel")}
+      data-ghost-view={view}
+      data-ghost-scale={ghostScale}
+      data-ghost-mirrored={mirrored}
+    >
       <div
         className="ghost-overlay__privacy-cut"
         aria-label={t("bodyPhotos.camera.privacyCut")}

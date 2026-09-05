@@ -125,7 +125,7 @@ export function BodyPhotoWizard({
     back: t("bodyPhotos.pose.back"),
   }), [t]);
 
-  async function processFile(file: File) {
+  async function processFile(file: File, context?: { ghostScale?: number; sideProfile?: BodyPhotoSide }) {
     if (busy) return;
     const selectedView = view;
     const selectionToken = ++selectionTokenRef.current;
@@ -133,7 +133,15 @@ export function BodyPhotoWizard({
     setBusy(true);
     setError(null);
     try {
-      const next = await processor.process(file, selectedView);
+      const options = (context?.ghostScale !== undefined || context?.sideProfile !== undefined)
+        ? {
+            ...(context.ghostScale !== undefined ? { ghostScale: context.ghostScale } : {}),
+            ...(context.sideProfile !== undefined ? { sideProfile: context.sideProfile } : {}),
+          }
+        : undefined;
+      const next = options !== undefined
+        ? await processor.process(file, selectedView, options)
+        : await processor.process(file, selectedView);
       if (!mountedRef.current || selectionToken !== selectionTokenRef.current) {
         disposeProcessedPhoto(next);
         return;
@@ -163,9 +171,9 @@ export function BodyPhotoWizard({
     }
   }
 
-  async function handleEditorConfirm(file: File) {
+  async function handleEditorConfirm(file: File, context?: { ghostScale?: number; sideProfile?: BodyPhotoSide }) {
     setEditorFile(null);
-    await processFile(file);
+    await processFile(file, context);
   }
 
   function openCamera() {
@@ -178,9 +186,9 @@ export function BodyPhotoWizard({
     setError(t(`bodyPhotos.cameraFallback.${reason}`));
   }
 
-  function handleCameraFile(file: File) {
+  function handleCameraFile(file: File, context?: { ghostScale?: number; sideProfile?: BodyPhotoSide }) {
     setCaptureMode("upload");
-    void processFile(file);
+    void processFile(file, context);
   }
 
   function retake() {

@@ -11,8 +11,19 @@ export const GHOST_EDITOR_OUTPUT = {
   height: 1800,
 } as const;
 
-export const GHOST_PRIVACY_CUT_RATIO = 0.16;
-export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.08;
+import {
+  GHOST_BACK_PRIVACY_CUT_RATIO,
+  GHOST_PRIVACY_CUT_RATIO,
+  ghostPrivacyCutRatioForView,
+  ghostPrivacyLineGeometry,
+} from "./ghostGeometry";
+
+export {
+  GHOST_BACK_PRIVACY_CUT_RATIO,
+  GHOST_PRIVACY_CUT_RATIO,
+  ghostPrivacyCutRatioForView,
+  ghostPrivacyLineGeometry,
+};
 export const GHOST_EDITOR_TOLERANCE = 0.15;
 
 const minimumPhotoScale = PHOTO_SCALE_MIN;
@@ -31,9 +42,7 @@ export const GHOST_EDITOR_DEFAULT_TRANSFORM: GhostPhotoTransform = {
   rotation: 0,
 };
 
-export function ghostPrivacyCutRatioForView(view: BodyPhotoView): number {
-  return view === "back" ? GHOST_BACK_PRIVACY_CUT_RATIO : GHOST_PRIVACY_CUT_RATIO;
-}
+
 
 export function ghostPercentage(value: number): string {
   return `${formatNumber(value * 100)}%`;
@@ -142,40 +151,7 @@ export function isGhostFramingWithinTolerance(
     && Math.abs(transform.translateY) <= safeTolerance;
 }
 
-export function ghostPrivacyLineGeometry(
-  view: BodyPhotoView,
-  ghostScale = 1,
-  mirrored = false,
-): GhostPrivacyLineGeometry {
-  const safeScale = clamp(ghostScale, GHOST_SCALE_MIN, GHOST_SCALE_MAX);
-  const transformedAnchor = transformGhostGuidePoint(
-    { x: 0.5, y: ghostPrivacyCutRatioForView(view) },
-    safeScale,
-  );
-  // The privacy boundary is a horizontal raster crop. Its row follows the
-  // centered Ghost neck anchor so the visible line and encoded crop agree.
-  const halfLineLength = safeScale / 2;
-  const transformedStart = {
-    x: transformedAnchor.x - halfLineLength,
-    y: transformedAnchor.y,
-  };
-  const transformedEnd = {
-    x: transformedAnchor.x + halfLineLength,
-    y: transformedAnchor.y,
-  };
-  if (mirrored) {
-    return {
-      anchor: mirrorGhostPoint(transformedAnchor),
-      start: mirrorGhostPoint(transformedEnd),
-      end: mirrorGhostPoint(transformedStart),
-    };
-  }
-  return {
-    anchor: transformedAnchor,
-    start: transformedStart,
-    end: transformedEnd,
-  };
-}
+
 
 export function containImageRect(
   container: GhostDisplaySize,
@@ -314,19 +290,6 @@ export async function renderGhostPhoto(
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : 0));
-}
-
-function transformGhostGuidePoint(point: GhostPoint, scale: number): GhostPoint {
-  const relativeX = (point.x - 0.5) * scale;
-  const relativeY = (point.y - 0.5) * scale;
-  return {
-    x: 0.5 + relativeX,
-    y: 0.5 + relativeY,
-  };
-}
-
-function mirrorGhostPoint(point: GhostPoint): GhostPoint {
-  return { x: 1 - point.x, y: point.y };
 }
 
 function formatNumber(value: number): string {

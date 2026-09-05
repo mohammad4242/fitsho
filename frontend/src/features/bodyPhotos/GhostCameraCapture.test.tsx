@@ -207,10 +207,16 @@ it("captures the transformed privacy crop, mirrors the user camera, and returns 
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /use this camera photo/i }));
   });
-  expect(onFileCaptured).toHaveBeenCalledWith(expect.objectContaining({
-    name: expect.stringMatching(/body-camera-front-.*\.jpg/),
-    type: "image/jpeg",
-  }));
+  expect(onFileCaptured).toHaveBeenCalledWith(
+    expect.objectContaining({
+      name: expect.stringMatching(/body-camera-front-.*\.jpg/),
+      type: "image/jpeg",
+    }),
+    expect.objectContaining({
+      ghostScale: 0.95,
+      sideProfile: "right",
+    }),
+  );
   rendered.unmount();
   expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:camera-preview");
 });

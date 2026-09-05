@@ -192,7 +192,10 @@ it("returns the clean rendered file only after confirmation", async () => {
     "front",
     staticGhostScale,
   ));
-  expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ type: "image/jpeg" }));
+  expect(onConfirm).toHaveBeenCalledWith(
+    expect.objectContaining({ type: "image/jpeg" }),
+    expect.objectContaining({ ghostScale: 1 }),
+  );
 });
 
 it("passes the back view to the clean renderer", async () => {
