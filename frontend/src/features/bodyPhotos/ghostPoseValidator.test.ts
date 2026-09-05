@@ -197,4 +197,22 @@ describe("ghostPoseValidator", () => {
     expect(athleticResult.status).toBe("pass");
     expect(athleticResult.hardRejectCode).toBeNull();
   });
+
+  it("passes a side photo with low visibility on far-side landmarks (down to 0.20)", () => {
+    const pose = createPose("side");
+    pose[11] = { x: 0.49, y: 0.20, z: 0, visibility: 0.22 };
+    pose[12] = { x: 0.51, y: 0.20, z: 0, visibility: 0.95 };
+    pose[23] = { x: 0.49, y: 0.48, z: 0, visibility: 0.22 };
+    pose[24] = { x: 0.51, y: 0.48, z: 0, visibility: 0.95 };
+
+    const result = validatePoseWithGhost({
+      view: "side",
+      poses: [pose],
+    });
+
+    expect(result.status).not.toBe("fail");
+    expect(result.hardRejectCode).toBeNull();
+    expect(result.visibleLandmarks).toContain("shoulders");
+    expect(result.visibleLandmarks).toContain("hips");
+  });
 });

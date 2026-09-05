@@ -18,7 +18,7 @@ export type BodyLandmarkDetection = {
 };
 
 export interface BodyLandmarkDetector {
-  detect(image: DecodedBodyPhoto): Promise<BodyLandmarkDetection>;
+  detect(image: DecodedBodyPhoto, view?: BodyPhotoView): Promise<BodyLandmarkDetection>;
 }
 
 export type BodySegmentationMask = {
@@ -199,7 +199,7 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
       validateDecodedImage(image, file.type as AcceptedImageMimeType);
       const quality = this.runtime.measureQuality(image);
       validateQuality(quality);
-      const detection = await this.detect(image);
+      const detection = await this.detect(image, view);
       const pose = validateLandmarks(detection, view, options);
       const mask = await this.segment(image);
       const encoded = await this.runtime.normalizeBackground(image, mask, {
@@ -237,9 +237,9 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
     }
   }
 
-  private async detect(image: DecodedBodyPhoto): Promise<BodyLandmarkDetection> {
+  private async detect(image: DecodedBodyPhoto, view?: BodyPhotoView): Promise<BodyLandmarkDetection> {
     try {
-      return await this.detector.detect(image);
+      return await this.detector.detect(image, view);
     } catch (error) {
       if (error instanceof BodyPhotoProcessingError) throw error;
       throw new BodyPhotoProcessingError("pose_detection_unavailable");

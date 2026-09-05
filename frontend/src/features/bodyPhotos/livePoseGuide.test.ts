@@ -56,6 +56,27 @@ it("creates a separate VIDEO-mode pose landmarker and uses detectForVideo", asyn
   expect(detectForVideo).toHaveBeenCalledWith(video, 1234);
 });
 
+it("uses relaxed confidence thresholds for side view in live video mode", async () => {
+  const createFromOptions = vi.fn().mockResolvedValue({ detectForVideo: vi.fn() });
+  const loader = createMediaPipeLivePoseLandmarkerLoader(
+    { modelAssetPath: "/live-model.task", wasmBasePath: "/live-wasm" },
+    async () => ({
+      FilesetResolver: { forVisionTasks: vi.fn().mockResolvedValue("fileset") },
+      PoseLandmarker: { createFromOptions },
+    }),
+    "side",
+  );
+
+  await loader();
+
+  expect(createFromOptions).toHaveBeenCalledWith("fileset", expect.objectContaining({
+    numPoses: 2,
+    runningMode: "VIDEO",
+    minPoseDetectionConfidence: 0.25,
+    minPosePresenceConfidence: 0.25,
+  }));
+});
+
 describe("MediaPipeLivePoseGuide", () => {
   it("returns advisory warnings without creating a capture block", () => {
     const guide = new MediaPipeLivePoseGuide(

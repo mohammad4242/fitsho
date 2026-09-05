@@ -132,16 +132,18 @@ export function validatePoseWithGhost(
   const maxAnkleVis = Math.max(ankleVisLeft, ankleVisRight);
   const maxFootVis = Math.max(footVisLeft, footVisRight);
 
+  const minVisThreshold = view === "side" ? 0.20 : MIN_LANDMARK_VISIBILITY;
+
   // Critical landmark visibility checks
-  if (maxShoulderVis < MIN_LANDMARK_VISIBILITY) {
+  if (maxShoulderVis < minVisThreshold) {
     return failResult("shoulders_not_visible", ["body_out_of_frame"], geometry, primaryPose);
   }
-  if (maxHipVis < MIN_LANDMARK_VISIBILITY) {
+  if (maxHipVis < minVisThreshold) {
     return failResult("torso_not_visible", ["body_out_of_frame"], geometry, primaryPose);
   }
 
   // Both knees missing or both feet missing means legs/feet not visible
-  if (maxKneeVis < MIN_LANDMARK_VISIBILITY || maxFootVis < MIN_LANDMARK_VISIBILITY) {
+  if (maxKneeVis < minVisThreshold || maxFootVis < minVisThreshold) {
     return failResult("legs_or_feet_not_visible", ["body_out_of_frame"], geometry, primaryPose);
   }
 
@@ -215,7 +217,7 @@ export function validatePoseWithGhost(
   // Calculate body dimensions and span
   const visiblePoints = relevantIndices
     .map((idx) => primaryPose[idx])
-    .filter((pt): pt is NormalizedBodyLandmark => pt !== undefined && pt.visibility >= MIN_LANDMARK_VISIBILITY);
+    .filter((pt): pt is NormalizedBodyLandmark => pt !== undefined && pt.visibility >= minVisThreshold);
 
   const minY = Math.min(...visiblePoints.map((p) => p.y));
   const maxY = Math.max(...visiblePoints.map((p) => p.y));
@@ -237,8 +239,8 @@ export function validatePoseWithGhost(
   const leftHipVis = primaryPose[LANDMARK_INDICES.leftHip]?.visibility ?? 0;
   const rightHipVis = primaryPose[LANDMARK_INDICES.rightHip]?.visibility ?? 0;
 
-  const bothShouldersVisible = leftShoulderVis >= MIN_LANDMARK_VISIBILITY && rightShoulderVis >= MIN_LANDMARK_VISIBILITY;
-  const bothHipsVisible = leftHipVis >= MIN_LANDMARK_VISIBILITY && rightHipVis >= MIN_LANDMARK_VISIBILITY;
+  const bothShouldersVisible = leftShoulderVis >= minVisThreshold && rightShoulderVis >= minVisThreshold;
+  const bothHipsVisible = leftHipVis >= minVisThreshold && rightHipVis >= minVisThreshold;
 
   const shoulderSpan = bothShouldersVisible
     ? Math.abs(
@@ -343,7 +345,7 @@ export function validatePoseWithGhost(
   }
 
   // Visible landmark groups
-  const visibleLandmarks = determineVisibleLandmarks(primaryPose);
+  const visibleLandmarks = determineVisibleLandmarks(primaryPose, view);
 
   // Overall score calculation
   const overallScore = Number((
@@ -436,26 +438,28 @@ function poseCenterX(landmarks: NormalizedBodyLandmark[]): number {
 
 function determineVisibleLandmarks(
   pose: NormalizedBodyLandmark[],
+  view: BodyPhotoView,
 ): Array<"shoulders" | "arms" | "hips" | "knees" | "ankles" | "feet"> {
+  const threshold = view === "side" ? 0.20 : MIN_LANDMARK_VISIBILITY;
   const list: Array<"shoulders" | "arms" | "hips" | "knees" | "ankles" | "feet"> = [];
   const vis = (indices: readonly number[]) => Math.max(...indices.map((idx) => pose[idx]?.visibility ?? 0));
 
-  if (vis([LANDMARK_INDICES.leftShoulder, LANDMARK_INDICES.rightShoulder]) >= MIN_LANDMARK_VISIBILITY) {
+  if (vis([LANDMARK_INDICES.leftShoulder, LANDMARK_INDICES.rightShoulder]) >= threshold) {
     list.push("shoulders");
   }
-  if (vis([LANDMARK_INDICES.leftElbow, LANDMARK_INDICES.rightElbow, LANDMARK_INDICES.leftWrist, LANDMARK_INDICES.rightWrist]) >= MIN_LANDMARK_VISIBILITY) {
+  if (vis([LANDMARK_INDICES.leftElbow, LANDMARK_INDICES.rightElbow, LANDMARK_INDICES.leftWrist, LANDMARK_INDICES.rightWrist]) >= threshold) {
     list.push("arms");
   }
-  if (vis([LANDMARK_INDICES.leftHip, LANDMARK_INDICES.rightHip]) >= MIN_LANDMARK_VISIBILITY) {
+  if (vis([LANDMARK_INDICES.leftHip, LANDMARK_INDICES.rightHip]) >= threshold) {
     list.push("hips");
   }
-  if (vis([LANDMARK_INDICES.leftKnee, LANDMARK_INDICES.rightKnee]) >= MIN_LANDMARK_VISIBILITY) {
+  if (vis([LANDMARK_INDICES.leftKnee, LANDMARK_INDICES.rightKnee]) >= threshold) {
     list.push("knees");
   }
-  if (vis([LANDMARK_INDICES.leftAnkle, LANDMARK_INDICES.rightAnkle]) >= MIN_LANDMARK_VISIBILITY) {
+  if (vis([LANDMARK_INDICES.leftAnkle, LANDMARK_INDICES.rightAnkle]) >= threshold) {
     list.push("ankles");
   }
-  if (vis([LANDMARK_INDICES.leftFoot, LANDMARK_INDICES.rightFoot]) >= MIN_LANDMARK_VISIBILITY) {
+  if (vis([LANDMARK_INDICES.leftFoot, LANDMARK_INDICES.rightFoot]) >= threshold) {
     list.push("feet");
   }
   return list;
@@ -509,7 +513,7 @@ function failResult(
     warnings,
     hardRejectCode: code,
     viewAssessment: "ambiguous",
-    visibleLandmarks: primaryPose ? determineVisibleLandmarks(primaryPose) : [],
+    visibleLandmarks: primaryPose ? determineVisibleLandmarks(primaryPose, geometry.view) : [],
     minimumVisibility: 0,
     primaryPose,
     metrics: {

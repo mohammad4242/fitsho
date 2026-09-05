@@ -1,3 +1,4 @@
+import type { BodyPhotoView } from "./types";
 import type {
   BodyLandmarkDetection,
   BodyLandmarkDetector,
@@ -7,6 +8,7 @@ import type {
 
 type PoseLandmarkerLike = {
   detect(image: CanvasImageSource): { landmarks: NormalizedBodyLandmark[][]; close?: () => void };
+  setOptions?: (options: Record<string, unknown>) => Promise<void> | void;
 };
 
 type PoseLandmarkerLoader = () => Promise<PoseLandmarkerLike>;
@@ -34,8 +36,15 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
     this.loader = loader;
   }
 
-  async detect(image: DecodedBodyPhoto): Promise<BodyLandmarkDetection> {
+  async detect(image: DecodedBodyPhoto, view?: BodyPhotoView): Promise<BodyLandmarkDetection> {
     const detector = await this.getDetector();
+    if (detector.setOptions !== undefined) {
+      const isSide = view === "side";
+      await detector.setOptions({
+        minPoseDetectionConfidence: isSide ? 0.20 : 0.40,
+        minPosePresenceConfidence: isSide ? 0.20 : 0.35,
+      });
+    }
     const result = detector.detect(image.source);
     try {
       return { poses: result.landmarks };
@@ -53,18 +62,18 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
 export function createMediaPipePoseLandmarkerLoader(
   assets = mediaPipePoseAssets,
   loadVision: () => Promise<MediaPipeVisionModule> = loadMediaPipeVision,
+  view?: BodyPhotoView,
 ): PoseLandmarkerLoader {
   return async () => {
     const { FilesetResolver, PoseLandmarker } = await loadVision();
     const fileset = await FilesetResolver.forVisionTasks(assets.wasmBasePath);
+    const isSide = view === "side";
     return PoseLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: assets.modelAssetPath },
       runningMode: "IMAGE",
       numPoses: 2,
-      minPoseDetectionConfidence: 0.4,
-      // Let difficult side profiles reach the domain validator, which still
-      // requires every needed body landmark to be clearly visible.
-      minPosePresenceConfidence: 0.35,
+      minPoseDetectionConfidence: isSide ? 0.20 : 0.40,
+      minPosePresenceConfidence: isSide ? 0.20 : 0.35,
     });
   };
 }
@@ -85,6 +94,7 @@ async function loadMediaPipeVision(): Promise<MediaPipeVisionModule> {
         );
         return {
           detect: (image) => landmarker.detect(image as never),
+          setOptions: (opts) => landmarker.setOptions?.(opts as never),
         };
       },
     },

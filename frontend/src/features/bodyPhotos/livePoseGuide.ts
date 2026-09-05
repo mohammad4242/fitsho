@@ -130,26 +130,29 @@ export class MediaPipeLivePoseGuide implements LivePoseGuide {
 export function createMediaPipeLivePoseLandmarkerLoader(
   assets: LivePoseAssets = mediaPipePoseAssets,
   loadVision: () => Promise<MediaPipeVisionModule> = loadMediaPipeVision,
+  view?: BodyPhotoView,
 ): LivePoseLandmarkerLoader {
   return async () => {
     const { FilesetResolver, PoseLandmarker } = await loadVision();
     const fileset = await FilesetResolver.forVisionTasks(assets.wasmBasePath);
+    const isSide = view === "side";
     return PoseLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: assets.modelAssetPath },
       runningMode: "VIDEO",
       numPoses: 2,
-      minPoseDetectionConfidence: 0.55,
-      minPosePresenceConfidence: 0.55,
+      minPoseDetectionConfidence: isSide ? 0.25 : 0.55,
+      minPosePresenceConfidence: isSide ? 0.25 : 0.55,
     });
   };
 }
 
 export function createMediaPipeLivePoseGuide(
   view: BodyPhotoView,
-  loader: LivePoseLandmarkerLoader = createMediaPipeLivePoseLandmarkerLoader(),
+  loader?: LivePoseLandmarkerLoader,
   options?: LivePoseGuideOptions,
 ): Promise<LivePoseGuide> {
-  return loader().then((landmarker) => new MediaPipeLivePoseGuide(view, landmarker, options));
+  const activeLoader = loader ?? createMediaPipeLivePoseLandmarkerLoader(undefined, undefined, view);
+  return activeLoader().then((landmarker) => new MediaPipeLivePoseGuide(view, landmarker, options));
 }
 
 type MediaPipeVisionModule = {

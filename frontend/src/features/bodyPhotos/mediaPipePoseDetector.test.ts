@@ -69,4 +69,43 @@ describe("MediaPipePoseLandmarkDetector", () => {
       minPosePresenceConfidence: 0.35,
     }));
   });
+
+  it("uses relaxed confidence thresholds specifically for side view", async () => {
+    const createFromOptions = vi.fn().mockResolvedValue({ detect: vi.fn() });
+    const loader = createMediaPipePoseLandmarkerLoader(
+      mediaPipePoseAssets,
+      async () => ({
+        FilesetResolver: { forVisionTasks: vi.fn().mockResolvedValue("fileset") },
+        PoseLandmarker: { createFromOptions },
+      }),
+      "side",
+    );
+
+    await loader();
+
+    expect(createFromOptions).toHaveBeenCalledWith("fileset", expect.objectContaining({
+      numPoses: 2,
+      runningMode: "IMAGE",
+      minPoseDetectionConfidence: 0.2,
+      minPosePresenceConfidence: 0.2,
+    }));
+  });
+
+  it("dynamically configures detector thresholds for side view via setOptions", async () => {
+    const landmarks = pose();
+    const setOptions = vi.fn().mockResolvedValue(undefined);
+    const detect = vi.fn().mockReturnValue({ landmarks: [landmarks] });
+    const detector = new MediaPipePoseLandmarkDetector(async () => ({
+      detect,
+      setOptions,
+    }));
+
+    await detector.detect(image, "side");
+
+    expect(setOptions).toHaveBeenCalledWith({
+      minPoseDetectionConfidence: 0.2,
+      minPosePresenceConfidence: 0.2,
+    });
+    expect(detect).toHaveBeenCalled();
+  });
 });
