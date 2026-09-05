@@ -38,7 +38,7 @@ export function GhostOverlayGuide({
         <span>{t("bodyPhotos.camera.privacyCut")}</span>
       </div>
       <div
-        className={`ghost-overlay__asset-frame ghost-overlay__asset-frame--${view}`}
+        className={`ghost-overlay__asset-frame ghost-overlay__asset-frame--${view} ghost-overlay__asset-frame--${variant}`}
         aria-label={t("bodyPhotos.camera.silhouette", { view: t(`bodyPhotos.views.${view}`) })}
         role="img"
         style={{

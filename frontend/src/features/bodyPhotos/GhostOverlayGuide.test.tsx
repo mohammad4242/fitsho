@@ -116,3 +116,15 @@ it("mirrors only the side Ghost for a left profile", () => {
     transform: ghostGuideTransformStyle(0.95, true),
   });
 });
+
+it("marks the asset frame with the sex variant for view alignment", () => {
+  const { container } = render(
+    <GhostOverlayGuide
+      sex="female"
+      view="front"
+    />,
+  );
+  const frame = container.querySelector(".ghost-overlay__asset-frame");
+  expect(frame).toHaveClass("ghost-overlay__asset-frame--female");
+  expect(frame).toHaveClass("ghost-overlay__asset-frame--front");
+});
