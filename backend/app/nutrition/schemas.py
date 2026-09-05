@@ -38,6 +38,7 @@ from app.nutrition.enums import (
     StructuredExerciseSource,
     StructuredExerciseType,
     Weekday,
+    WeightRateMode,
     main_meal_bucket_from_legacy,
     main_meal_effective_slots,
     snack_bucket_from_legacy,
@@ -163,6 +164,7 @@ class NutritionProfileInput(BaseModel):
     target_weight_change_kg_per_week: Decimal | None = Field(
         default=None, ge=Decimal("0.3"), le=Decimal("2.0")
     )
+    weight_rate_mode: WeightRateMode = WeightRateMode.SAFE
 
     _normalize_optional = field_validator(
         "supplied_meal_source", "work_shift_context", mode="before"

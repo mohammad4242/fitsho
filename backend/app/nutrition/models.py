@@ -83,6 +83,7 @@ from app.nutrition.enums import (
     StructuredExerciseSource,
     StructuredExerciseType,
     Weekday,
+    WeightRateMode,
 )
 from app.profile.enums import TrainingIntensity
 
@@ -443,6 +444,11 @@ class NutritionProfile(Base):
     preferred_check_in_time: Mapped[time | None] = mapped_column(Time)
     target_weight_change_kg_per_week: Mapped[Decimal | None] = mapped_column(
         Numeric(3, 1), nullable=True
+    )
+    weight_rate_mode: Mapped[WeightRateMode] = mapped_column(
+        enum_column(WeightRateMode, "ck_nutrition_profiles_weight_rate_mode_values"),
+        nullable=False,
+        server_default="safe",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -348,6 +348,11 @@ def _estimate_context(db: Session, user_id: UUID) -> EstimateContext:
         fitness_goal=profile.fitness_goal.value,
         structured_exercise=scientific_exercise,
         requested_weight_change_kg_per_week=nutrition_profile.target_weight_change_kg_per_week,
+        weight_rate_mode=(
+            nutrition_profile.weight_rate_mode.value
+            if hasattr(nutrition_profile.weight_rate_mode, "value")
+            else str(nutrition_profile.weight_rate_mode)
+        ),
         training_experience=(
             profile.experience_level.value if profile.experience_level is not None else None
         ),
@@ -369,6 +374,11 @@ def _estimate_context(db: Session, user_id: UUID) -> EstimateContext:
             str(nutrition_profile.target_weight_change_kg_per_week)
             if nutrition_profile.target_weight_change_kg_per_week is not None
             else None
+        ),
+        "weight_rate_mode": (
+            nutrition_profile.weight_rate_mode.value
+            if hasattr(nutrition_profile.weight_rate_mode, "value")
+            else str(nutrition_profile.weight_rate_mode)
         ),
         "structured_exercise": _exercise_snapshot(exercise),
         "safety_decision_id": str(safety.id),

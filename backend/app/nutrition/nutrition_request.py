@@ -38,6 +38,7 @@ class NormalizedNutritionRequest:
     maximum_meal_repetition_per_week: int
     preferred_variety: str
     requested_weight_change_kg_per_week: Decimal | None
+    weight_rate_mode: str = "safe"
     plan_style: str | None = None
     cooking_skill: str | None = None
     maximum_cooking_time_minutes: int | None = None
@@ -109,6 +110,11 @@ def build_normalized_nutrition_request(
         maximum_meal_repetition_per_week=profile.maximum_meal_repetition_per_week,
         preferred_variety=profile.preferred_variety.value,
         requested_weight_change_kg_per_week=profile.target_weight_change_kg_per_week,
+        weight_rate_mode=(
+            profile.weight_rate_mode.value
+            if hasattr(profile.weight_rate_mode, "value")
+            else str(profile.weight_rate_mode)
+        ),
         plan_style=profile.plan_style.value,
         cooking_skill=profile.cooking_skill.value,
         maximum_cooking_time_minutes=profile.maximum_cooking_time_minutes,

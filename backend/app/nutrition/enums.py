@@ -453,3 +453,8 @@ class NutritionPlanRole(StrEnum):
     BUDGET = "budget"
     IDEAL_REFERENCE = "ideal_reference"
     LEGACY = "legacy"
+
+
+class WeightRateMode(StrEnum):
+    SAFE = "safe"
+    USER_OVERRIDE = "user_override"

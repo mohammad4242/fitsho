@@ -35,4 +35,5 @@ def test_normalized_nutrition_request_initialization() -> None:
     assert req.fitness_goal == "lose_weight"
     assert req.body_weight_kg == Decimal("75.0")
     assert req.requested_weight_change_kg_per_week is None
+    assert req.weight_rate_mode == "safe"
     assert req.trains is True

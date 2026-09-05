@@ -87,6 +87,7 @@ class ScientificInputs:
     structured_exercise: StructuredExercise | None
     requested_weight_change_kg_per_week: Decimal | None = None
     training_experience: str | None = None
+    weight_rate_mode: str = "safe"
 
     def __post_init__(self) -> None:
         if not 18 <= self.age <= 100:
@@ -202,6 +203,7 @@ def calculate_targets(inputs: ScientificInputs) -> ScientificResult:
         if inputs.structured_exercise is not None
         else None,
         training_experience=inputs.training_experience,
+        weight_rate_mode=inputs.weight_rate_mode,
     )
     strategy = resolve_goal_strategy(
         strategy_inputs,

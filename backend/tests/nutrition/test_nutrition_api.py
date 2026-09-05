@@ -450,3 +450,34 @@ def test_target_weight_change_rate_flow(client: TestClient) -> None:
     assert "input_snapshot" in est_data
     assert est_data["input_snapshot"]["requested_weight_change_kg_per_week"] == "0.5"
     assert est_data["input_snapshot"]["applied_weight_change_kg_per_week"] is not None
+
+
+def test_target_weight_rate_user_override_flow(client: TestClient) -> None:
+    register(client, "override-flow@example.com")
+    select_nutrition_mode(client)
+    shared = shared_payload()
+    shared["fitness_goal"] = "lose_weight"
+    client.put("/api/v1/profile/shared", headers=ORIGIN, json=shared)
+    client.put("/api/v1/nutrition/safety", headers=ORIGIN, json=standard_safety_payload())
+
+    nut_payload = nutrition_payload()
+    nut_payload["target_weight_change_kg_per_week"] = 1.8
+    nut_payload["weight_rate_mode"] = "user_override"
+    res = client.put("/api/v1/nutrition/profile", headers=ORIGIN, json=nut_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert float(data["target_weight_change_kg_per_week"]) == 1.8
+    assert data["weight_rate_mode"] == "user_override"
+
+    client.put(
+        "/api/v1/nutrition/structured-exercise",
+        headers=ORIGIN,
+        json={"trains": False},
+    )
+
+    est_res = client.post("/api/v1/nutrition/estimates", headers=ORIGIN)
+    assert est_res.status_code == 201
+    est_data = est_res.json()
+    assert est_data["input_snapshot"]["weight_rate_mode"] == "user_override"
+    assert est_data["input_snapshot"]["requested_weight_change_kg_per_week"] == "1.8"
+    assert est_data["input_snapshot"]["applied_weight_change_kg_per_week"] == "1.8"

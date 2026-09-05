@@ -517,6 +517,7 @@ def nutrition_profile_response(snapshot: NutritionSnapshot) -> NutritionProfileR
         daily_check_in_enabled=profile.daily_check_in_enabled,
         preferred_check_in_time=profile.preferred_check_in_time,
         target_weight_change_kg_per_week=profile.target_weight_change_kg_per_week,
+        weight_rate_mode=profile.weight_rate_mode,
         effective_main_meal_slots=profile.effective_main_meal_slots,
         effective_snack_slots=profile.effective_snack_slots,
         created_at=profile.created_at,

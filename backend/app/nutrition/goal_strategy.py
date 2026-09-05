@@ -25,6 +25,7 @@ class GoalStrategyInputs:
     training_days_per_week: int | None
     training_minutes_per_session: int | None
     training_experience: str | None
+    weight_rate_mode: str = "safe"
 
 
 @dataclass(frozen=True)
@@ -127,6 +128,7 @@ def resolve_goal_strategy(
         tdee_kcal=tdee_val,
         requested_kg_per_week=inputs.requested_weight_change_kg_per_week,
         training_experience=inputs.training_experience,
+        rate_mode=inputs.weight_rate_mode,
     )
 
     is_rt = inputs.exercise_type in ("resistance", "mixed") and (

@@ -99,3 +99,32 @@ def test_body_recomposition_ignores_rate() -> None:
     assert res.applied_kg_per_week is None
     assert res.calorie_delta_kcal_per_day == Decimal("0")
     assert "WEIGHT_RATE_NOT_USED_FOR_RECOMPOSITION" in res.warning_codes
+
+
+def test_user_override_mode() -> None:
+    # Safe mode clamps 2.0 kg/week to max deficit
+    res_safe = resolve_weight_rate(
+        goal="lose_weight",
+        body_weight_kg=Decimal("80"),
+        tdee_kcal=Decimal("2400"),
+        requested_kg_per_week=Decimal("2.0"),
+        training_experience="intermediate",
+        rate_mode="safe",
+    )
+    assert res_safe.was_clamped
+    assert res_safe.calorie_delta_kcal_per_day == Decimal("-600")
+
+    # User override mode respects user's 2.0 kg/week request directly
+    res_override = resolve_weight_rate(
+        goal="lose_weight",
+        body_weight_kg=Decimal("80"),
+        tdee_kcal=Decimal("2400"),
+        requested_kg_per_week=Decimal("2.0"),
+        training_experience="intermediate",
+        rate_mode="user_override",
+    )
+    assert not res_override.was_clamped
+    assert res_override.applied_kg_per_week == Decimal("2.0")
+    assert res_override.calorie_delta_kcal_per_day == Decimal("-2200")
+    assert "WEIGHT_RATE_USER_OVERRIDE_APPLIED" in res_override.warning_codes
+    assert "WEIGHT_RATE_ABOVE_RECOMMENDED" in res_override.warning_codes

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.nutrition.enums import WeightRateMode
+
 WEIGHT_RATE_POLICY_VERSION = "nutrition-weight-rate-v1"
 KCAL_PER_KG_ENGINEERING_ESTIMATE = Decimal("7700")
 
@@ -37,6 +39,7 @@ def resolve_weight_rate(
     tdee_kcal: Decimal,
     requested_kg_per_week: Decimal | None,
     training_experience: str | None,
+    rate_mode: str | WeightRateMode = WeightRateMode.SAFE,
 ) -> WeightRateResolution:
     """Resolve recommended, requested, and applied weekly rate and energy delta."""
     normalized_goal = goal.lower()
@@ -102,20 +105,30 @@ def resolve_weight_rate(
         max_deficit_kcal = Decimal("500")
         is_loss = True
 
-    effective_requested = (
-        requested_kg_per_week if requested_kg_per_week is not None else recommended_rate
-    )
-    target_rate = min(effective_requested, max_rate_bw)
-
-    theoretical_delta = requested_rate_delta_kcal_per_day(target_rate)
-
     warnings = []
     was_clamped = False
 
     if requested_kg_per_week is not None and requested_kg_per_week > recommended_rate:
         warnings.append("WEIGHT_RATE_ABOVE_RECOMMENDED")
 
-    if is_loss:
+    is_override = (
+        str(rate_mode).lower() in ("user_override", "override")
+        and requested_kg_per_week is not None
+    )
+
+    if is_override and requested_kg_per_week is not None:
+        # Dual Mode: User override directly applies requested rate
+        applied_rate = requested_kg_per_week
+        applied_delta = requested_rate_delta_kcal_per_day(requested_kg_per_week)
+        calorie_delta = -applied_delta if is_loss else applied_delta
+        was_clamped = False
+        warnings.append("WEIGHT_RATE_USER_OVERRIDE_APPLIED")
+    elif is_loss:
+        effective_requested = (
+            requested_kg_per_week if requested_kg_per_week is not None else recommended_rate
+        )
+        target_rate = min(effective_requested, max_rate_bw)
+        theoretical_delta = requested_rate_delta_kcal_per_day(target_rate)
         applied_delta = min(theoretical_delta, max_deficit_kcal)
         if effective_requested > max_rate_bw or theoretical_delta > max_deficit_kcal:
             was_clamped = True
@@ -125,6 +138,11 @@ def resolve_weight_rate(
         )
         calorie_delta = -applied_delta
     else:
+        effective_requested = (
+            requested_kg_per_week if requested_kg_per_week is not None else recommended_rate
+        )
+        target_rate = min(effective_requested, max_rate_bw)
+        theoretical_delta = requested_rate_delta_kcal_per_day(target_rate)
         applied_delta = min(theoretical_delta, max_surplus_kcal)
         if effective_requested > max_rate_bw or theoretical_delta > max_surplus_kcal:
             was_clamped = True
