@@ -17,6 +17,7 @@ export type PreAccountNutritionBasics = Pick<
   "daily_activity_level" | "individual_monthly_food_budget_irr" | "budget_style" | "plan_style" | "allergies" | "intolerances" | "dietary_pattern"
 > & {
   target_weight_change_kg_per_week?: number | null;
+  weight_rate_mode?: "safe" | "user_override";
 };
 
 export type PendingNutritionSetup = {

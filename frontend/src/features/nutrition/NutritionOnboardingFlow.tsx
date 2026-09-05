@@ -170,6 +170,9 @@ export function NutritionOnboardingFlow({
     }
     return "";
   });
+  const [weightRateMode, setWeightRateMode] = useState<"safe" | "user_override">(
+    () => initialNutritionBasics?.weight_rate_mode ?? "safe"
+  );
   const [mealCount, setMealCount] = useState("3");
   const [snackCount, setSnackCount] = useState("1");
   const [startDay, setStartDay] = useState<NutritionProfileInput["preferred_plan_start_day"]>("saturday");
@@ -248,6 +251,9 @@ export function NutritionOnboardingFlow({
     setBudgetStyle(nutrition.budget_style);
     if (nutrition.target_weight_change_kg_per_week != null) {
       setTargetWeightChangeRate(String(nutrition.target_weight_change_kg_per_week));
+    }
+    if (nutrition.weight_rate_mode) {
+      setWeightRateMode(nutrition.weight_rate_mode);
     }
     setMealCount(String(nutrition.effective_main_meal_slots ?? nutrition.meals_per_day));
     setSnackCount(String(nutrition.effective_snack_slots ?? nutrition.snacks_per_day));
@@ -363,6 +369,7 @@ export function NutritionOnboardingFlow({
     return {
       daily_activity_level: dailyActivityLevel,
       target_weight_change_kg_per_week: effectiveRate,
+      weight_rate_mode: weightRateMode,
       individual_monthly_food_budget_irr: tomanToIrr(budget),
       budget_style: budgetStyle,
       main_meal_count_bucket: mealCount === "2" ? "two_main_meals" : mealCount === "3" ? "three_main_meals" : "four_or_more_main_meals",
@@ -380,7 +387,7 @@ export function NutritionOnboardingFlow({
       daily_check_in_enabled: foods.checkIn,
       preferred_check_in_time: foods.checkIn ? `${foods.checkInTime}:00` : null,
     };
-  }, [budget, budgetStyle, dailyActivityLevel, foods, isWeightChangeGoal, isWeightLoss, mealCount, snackCount, startDay, targetWeightChangeRate]);
+  }, [budget, budgetStyle, dailyActivityLevel, foods, isWeightChangeGoal, isWeightLoss, mealCount, snackCount, startDay, targetWeightChangeRate, weightRateMode]);
 
   function finish(event: FormEvent) {
     event.preventDefault();
@@ -465,6 +472,7 @@ export function NutritionOnboardingFlow({
         snackCount={snackCount}
         startDay={startDay}
         targetWeightChangeRate={targetWeightChangeRate}
+        weightRateMode={weightRateMode}
         fitnessGoal={values.fitness_goal}
         foods={foods}
         saved={detailsSaved}
@@ -476,6 +484,7 @@ export function NutritionOnboardingFlow({
         onSnackCount={setSnackCount}
         onStartDay={setStartDay}
         onTargetWeightChangeRate={setTargetWeightChangeRate}
+        onWeightRateMode={setWeightRateMode}
         onFoods={setFoods}
         onBack={onBack}
         onSave={() => {
@@ -565,11 +574,13 @@ export function NutritionOnboardingFlow({
           busy={busy} budget={budget} budgetStyle={budgetStyle} mealCount={mealCount}
           snackCount={snackCount} startDay={startDay}
           targetWeightChangeRate={targetWeightChangeRate}
+          weightRateMode={weightRateMode}
           fitnessGoal={values.fitness_goal}
           onBudget={(value) => setBudget(formatTomanInput(value))}
           onBudgetStyle={setBudgetStyle} onMealCount={setMealCount} onSnackCount={setSnackCount}
           onStartDay={setStartDay}
           onTargetWeightChangeRate={setTargetWeightChangeRate}
+          onWeightRateMode={setWeightRateMode}
           onBack={() => setStep(productMode === "nutrition" || !trainingProfileExists ? "training" : "safety")}
           onNext={() => setStep("review")}
         />
@@ -597,6 +608,89 @@ export function NutritionOnboardingFlow({
   );
 }
 
+function WeightRateSettingBox(props: {
+  isLoss: boolean;
+  rate: string;
+  mode: "safe" | "user_override";
+  rateOptions: Array<{ value: string; label: string; isHigh: boolean }>;
+  onRate: (value: string) => void;
+  onMode: (mode: "safe" | "user_override") => void;
+  l: (fa: string, en: string) => string;
+}) {
+  const { isLoss, rate, mode, rateOptions, onRate, onMode, l } = props;
+  const currentRateNum = Number(rate || (isLoss ? "0.5" : "0.3"));
+  const isHigh = currentRateNum > 1.0;
+
+  return (
+    <div className="nutrition-rate-setting-box">
+      <div className="nutrition-rate-setting-box__header">
+        <div className="nutrition-rate-setting-box__title">
+          <span className="profile-field__icon-badge" aria-hidden="true">
+            <AppIcon name="target" />
+          </span>
+          <span>
+            {isLoss
+              ? l("نرخ کاهش وزن هفتگی", "Weekly weight loss rate")
+              : l("نرخ افزایش وزن هفتگی", "Weekly weight gain rate")}
+          </span>
+        </div>
+        <select
+          className="nutrition-rate-setting-box__select"
+          value={rate || (isLoss ? "0.5" : "0.3")}
+          onChange={(event) => onRate(event.target.value)}
+        >
+          {rateOptions.map((opt) => (
+            <option
+              key={opt.value}
+              value={opt.value}
+              style={opt.isHigh ? { color: "#dc2626", fontWeight: 600 } : undefined}
+            >
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="nutrition-rate-setting-box__modes">
+        <button
+          type="button"
+          className={`nutrition-rate-mode-option ${mode !== "user_override" ? "is-selected" : ""}`}
+          onClick={() => onMode("safe")}
+        >
+          <div className="nutrition-rate-mode-option__head">
+            <span className="nutrition-rate-mode-option__radio" aria-hidden="true" />
+            <strong>{l("تنظیم ایمن پیشنهادی", "Safe Recommended")}</strong>
+          </div>
+          <p>{l("تنظیم ایمن کالری برای حفظ عضله و سلامت متابولیک", "Smart deficit adjustment to protect muscle and health")}</p>
+        </button>
+        <button
+          type="button"
+          className={`nutrition-rate-mode-option ${mode === "user_override" ? "is-selected is-override" : ""}`}
+          onClick={() => onMode("user_override")}
+        >
+          <div className="nutrition-rate-mode-option__head">
+            <span className="nutrition-rate-mode-option__radio" aria-hidden="true" />
+            <strong>{l("اعمال نرخ دلخواه من", "Custom Override")}</strong>
+          </div>
+          <p>{l("اعمال مستقیم نرخ انتخابی با رعایت حداقل‌های بقا", "Directly applies your rate within biological floor")}</p>
+        </button>
+      </div>
+
+      {isHigh && mode === "user_override" && (
+        <div className="nutrition-rate-override-notice">
+          <span>⚠️</span>
+          <span>{l("نرخ بالای ۱.۰ کیلوگرم با انتخاب مستقیم شما اعمال می‌شود.", "Rates above 1.0 kg/week are applied per your choice.")}</span>
+        </div>
+      )}
+      {isHigh && mode === "safe" && (
+        <small style={{ color: "#ef4444", display: "block", fontSize: "0.74rem" }}>
+          {l("نرخ بالای ۱.۰ کیلوگرم در هفته پیشنهاد نمی‌شود.", "Rates above 1.0 kg/week are not recommended.")}
+        </small>
+      )}
+    </div>
+  );
+}
+
 function PostAccountNutritionDetails(props: {
   language: "fa" | "en";
   busy: boolean;
@@ -607,6 +701,7 @@ function PostAccountNutritionDetails(props: {
   snackCount: string;
   startDay: NutritionProfileInput["preferred_plan_start_day"];
   targetWeightChangeRate: string;
+  weightRateMode: "safe" | "user_override";
   fitnessGoal: string;
   foods: FoodsState;
   saved: boolean;
@@ -618,6 +713,7 @@ function PostAccountNutritionDetails(props: {
   onSnackCount: (value: string) => void;
   onStartDay: (value: NutritionProfileInput["preferred_plan_start_day"]) => void;
   onTargetWeightChangeRate: (value: string) => void;
+  onWeightRateMode: (value: "safe" | "user_override") => void;
   onFoods: (value: FoodsState) => void;
   onBack?: () => void;
   onSave: () => void;
@@ -658,39 +754,15 @@ function PostAccountNutritionDetails(props: {
           <LabeledInput icon="wallet" label={l("بودجه ماهانه غذا (تومان)", "Monthly food budget (Toman)")} inputMode="numeric" required value={props.budget} onChange={props.onBudget} />
           <SelectField icon="target" label={l("نوع بودجه", "Budget style")} value={props.budgetStyle} onChange={(value) => props.onBudgetStyle(value as NutritionProfileInput["budget_style"])} options={[["strict", l("سخت‌گیرانه", "Strict")], ["flexible", l("انعطاف‌پذیر", "Flexible")]]} />
           {isWeightChangeGoal && (
-            <div className="profile-field">
-              <label className="profile-field-wrapped-label">
-                <span className="profile-field__title">
-                  <span className="profile-field__icon-badge" aria-hidden="true">
-                    <AppIcon name="target" />
-                  </span>
-                  <span>
-                    {isLoss
-                      ? l("نرخ کاهش وزن هفتگی", "Weekly weight loss rate")
-                      : l("نرخ افزایش وزن هفتگی", "Weekly weight gain rate")}
-                  </span>
-                </span>
-                <select
-                  value={props.targetWeightChangeRate || (isLoss ? "0.5" : "0.3")}
-                  onChange={(event) => props.onTargetWeightChangeRate(event.target.value)}
-                >
-                  {rateOptions.map((opt) => (
-                    <option
-                      key={opt.value}
-                      value={opt.value}
-                      style={opt.isHigh ? { color: "#dc2626", fontWeight: 600 } : undefined}
-                    >
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {Number(props.targetWeightChangeRate || (isLoss ? "0.5" : "0.3")) > 1.0 && (
-                <small style={{ color: "#ef4444", display: "block", marginTop: "0.35rem" }}>
-                  {l("نرخ بالای ۱.۰ کیلوگرم در هفته پیشنهاد نمی‌شود.", "Rates above 1.0 kg/week are not recommended.")}
-                </small>
-              )}
-            </div>
+            <WeightRateSettingBox
+              isLoss={isLoss}
+              rate={props.targetWeightChangeRate}
+              mode={props.weightRateMode}
+              rateOptions={rateOptions}
+              onRate={props.onTargetWeightChangeRate}
+              onMode={props.onWeightRateMode}
+              l={l}
+            />
           )}
           {isRecomp && (
             <p style={{ color: "var(--fitsho-aqua)", fontSize: "0.85rem", margin: "0.25rem 0" }}>
@@ -1011,6 +1083,7 @@ function BudgetForm(props: {
   snackCount: string;
   startDay: NutritionProfileInput["preferred_plan_start_day"];
   targetWeightChangeRate: string;
+  weightRateMode: "safe" | "user_override";
   fitnessGoal: string;
   onBudget: (value: string) => void;
   onBudgetStyle: (value: "strict" | "flexible") => void;
@@ -1018,6 +1091,7 @@ function BudgetForm(props: {
   onSnackCount: (value: string) => void;
   onStartDay: (value: NutritionProfileInput["preferred_plan_start_day"]) => void;
   onTargetWeightChangeRate: (value: string) => void;
+  onWeightRateMode: (value: "safe" | "user_override") => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -1100,32 +1174,15 @@ function BudgetForm(props: {
         />
       )}
       {currentQ.id === "weight_rate" && (
-        <div className="profile-field">
-          <label className="profile-field-wrapped-label">
-            <span className="profile-field__title">
-              <span>{currentQ.title}</span>
-            </span>
-            <select
-              value={props.targetWeightChangeRate || (isLoss ? "0.5" : "0.3")}
-              onChange={(event) => props.onTargetWeightChangeRate(event.target.value)}
-            >
-              {rateOptions.map((opt) => (
-                <option
-                  key={opt.value}
-                  value={opt.value}
-                  style={opt.isHigh ? { color: "#dc2626", fontWeight: 600 } : undefined}
-                >
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {Number(props.targetWeightChangeRate || (isLoss ? "0.5" : "0.3")) > 1.0 && (
-            <small style={{ color: "#ef4444", display: "block", marginTop: "0.35rem" }}>
-              {l("نرخ بالای ۱.۰ کیلوگرم در هفته پیشنهاد نمی‌شود.", "Rates above 1.0 kg/week are not recommended.")}
-            </small>
-          )}
-        </div>
+        <WeightRateSettingBox
+          isLoss={isLoss}
+          rate={props.targetWeightChangeRate}
+          mode={props.weightRateMode}
+          rateOptions={rateOptions}
+          onRate={props.onTargetWeightChangeRate}
+          onMode={props.onWeightRateMode}
+          l={l}
+        />
       )}
       {currentQ.id === "meals" && (
         <SelectField

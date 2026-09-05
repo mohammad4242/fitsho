@@ -818,7 +818,7 @@ function EstimateContent({ estimate, language, onRefresh, plan, tracking }: { es
       </div>
     </section>
 
-    <WeightRateCard estimate={estimate} language={language} />
+    <WeightRateCard estimate={estimate} language={language} onRefresh={onRefresh} />
 
     {todayPlan && <section className="nutrition-meal-summary" aria-label={l("وعده‌های امروز", "Today's meals")}>
       <header><h2>{l("وعده‌های امروز", "Today's meals")}</h2><Link to="/nutrition-tracking">{l("ثبت وعده", "Track meal")}</Link></header>
@@ -884,10 +884,13 @@ function formatRange(target: NutritionTarget | undefined, number: Intl.NumberFor
 function WeightRateCard({
   estimate,
   language,
+  onRefresh,
 }: {
   estimate: NutritionEstimate;
   language: "fa" | "en";
+  onRefresh?: () => void;
 }) {
+  const [switching, setSwitching] = useState(false);
   const l = (fa: string, en: string) => (language === "en" ? en : fa);
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
     maximumFractionDigits: 1,
@@ -909,19 +912,74 @@ function WeightRateCard({
     return null;
   }
 
-  const isClamped = estimate.confidence_reasons.includes(
-    "WEIGHT_RATE_CLAMPED_FOR_AUTOMATIC_SAFETY",
-  );
+  const rateMode: "safe" | "user_override" =
+    snapshot["weight_rate_mode"] === "user_override" ? "user_override" : "safe";
+  const isOverride =
+    rateMode === "user_override" ||
+    estimate.confidence_reasons.includes("WEIGHT_RATE_USER_OVERRIDE_APPLIED");
+  const isClamped =
+    !isOverride &&
+    estimate.confidence_reasons.includes("WEIGHT_RATE_CLAMPED_FOR_AUTOMATIC_SAFETY");
+
+  async function handleSwitchMode(newMode: "safe" | "user_override") {
+    if (newMode === rateMode || switching) return;
+    setSwitching(true);
+    try {
+      const profile = await nutritionApi.getNutritionProfile();
+      if (profile) {
+        await nutritionApi.saveNutritionProfile({
+          ...profile,
+          weight_rate_mode: newMode,
+        });
+        await nutritionApi.createNutritionEstimate();
+        onRefresh?.();
+      }
+    } catch (err) {
+      console.error("Failed to switch weight rate mode", err);
+    } finally {
+      setSwitching(false);
+    }
+  }
 
   return (
     <section className="nutrition-weight-rate-card" aria-label={l("نرخ تغییر وزن هفتگی", "Weekly weight change rate")}>
       <header>
-        <h3>{l("نرخ تغییر وزن هفتگی", "Weekly Weight Change Rate")}</h3>
-        {isClamped && (
-          <span className="nutrition-rate-badge--clamped">
-            {l("تنظیم‌شده برای ایمنی خودکار", "Adjusted for automatic safety")}
-          </span>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <h3>{l("نرخ تغییر وزن هفتگی", "Weekly Weight Change Rate")}</h3>
+          {isOverride ? (
+            <span className="nutrition-rate-badge--override">
+              {l("نرخ دلخواه من", "User Override")}
+            </span>
+          ) : isClamped ? (
+            <span className="nutrition-rate-badge--clamped">
+              {l("تنظیم‌شده برای ایمنی خودکار", "Adjusted for safety")}
+            </span>
+          ) : (
+            <span className="nutrition-rate-badge--safe">
+              {l("تنظیم ایمن پیشنهادی", "Safe Recommended")}
+            </span>
+          )}
+        </div>
+        <div className="nutrition-weight-rate-modes">
+          <button
+            type="button"
+            className={`nutrition-weight-rate-mode-btn ${rateMode === "safe" ? "is-active" : ""}`}
+            onClick={() => void handleSwitchMode("safe")}
+            disabled={switching}
+          >
+            <span>🛡️</span>
+            <span>{l("تنظیم ایمن پیشنهادی", "Safe")}</span>
+          </button>
+          <button
+            type="button"
+            className={`nutrition-weight-rate-mode-btn ${rateMode === "user_override" ? "is-active is-override" : ""}`}
+            onClick={() => void handleSwitchMode("user_override")}
+            disabled={switching}
+          >
+            <span>⚡</span>
+            <span>{l("اعمال نرخ دلخواه من", "Override")}</span>
+          </button>
+        </div>
       </header>
       <div className="nutrition-weight-rate-grid">
         <div className="nutrition-weight-rate-item">
@@ -936,11 +994,21 @@ function WeightRateCard({
             {recommended != null ? `${number.format(recommended)} ${l("کیلوگرم/هفته", "kg/week")}` : "—"}
           </strong>
         </div>
-        <div className={`nutrition-weight-rate-item ${isClamped ? "nutrition-weight-rate-item--clamped" : ""}`}>
+        <div
+          className={`nutrition-weight-rate-item ${
+            isOverride
+              ? "nutrition-weight-rate-item--override"
+              : isClamped
+                ? "nutrition-weight-rate-item--clamped"
+                : ""
+          }`}
+        >
           <span className="nutrition-weight-rate-label">
-            {isClamped
-              ? l("مقدار اعمال‌شده (تنظیم ایمنی)", "Applied (safety clamped)")
-              : l("مقدار اعمال‌شده", "Applied")}
+            {isOverride
+              ? l("مقدار اعمال‌شده (نرخ مستقیم)", "Applied (user override)")
+              : isClamped
+                ? l("مقدار اعمال‌شده (تنظیم ایمنی)", "Applied (safety clamped)")
+                : l("مقدار اعمال‌شده", "Applied")}
           </span>
           <strong className="nutrition-weight-rate-val">
             {applied != null ? `${number.format(applied)} ${l("کیلوگرم/هفته", "kg/week")}` : "—"}

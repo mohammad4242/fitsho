@@ -650,6 +650,29 @@ it("renders weekly weight rate card with requested, recommended, and applied rat
   expect(screen.getByText("۰٫۸ کیلوگرم/هفته")).toBeInTheDocument();
 });
 
+it("renders weight rate card in user override mode with override badge", async () => {
+  await i18n.changeLanguage("fa");
+  const overrideEstimate: NutritionEstimate = {
+    ...estimate,
+    confidence_reasons: ["complete_anthropometrics", "WEIGHT_RATE_USER_OVERRIDE_APPLIED"],
+    input_snapshot: {
+      requested_weight_change_kg_per_week: "1.8",
+      recommended_weight_change_kg_per_week: "0.5",
+      applied_weight_change_kg_per_week: "1.8",
+      weight_rate_mode: "user_override",
+    },
+  };
+  vi.mocked(nutritionApi.getCurrentNutritionEstimate).mockResolvedValue(overrideEstimate);
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(null);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  expect(await screen.findByRole("heading", { name: "تغذیه" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "نرخ تغییر وزن هفتگی" })).toBeInTheDocument();
+  expect(screen.getByText("نرخ دلخواه من")).toBeInTheDocument();
+  expect(screen.getByText("مقدار اعمال‌شده (نرخ مستقیم)")).toBeInTheDocument();
+});
+
 it("shows only one plan when cost gap is below 1M Toman (< 10M IRR)", async () => {
   await i18n.changeLanguage("fa");
   const budgetPlan = { ...weeklyPlan, id: "plan-budget" };

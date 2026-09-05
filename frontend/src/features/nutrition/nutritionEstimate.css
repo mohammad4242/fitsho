@@ -23,16 +23,51 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-confidence-card p { color: rgb(234 244 241 / 70%); line-height: 1.8; }
 .nutrition-target-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; padding-block: .75rem; }
 .nutrition-target-grid--secondary { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.nutrition-weight-rate-card { width: min(100% - 2rem, 72rem); margin-inline: auto; margin-block: .75rem; padding: 1.25rem 1.5rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
-.nutrition-weight-rate-card header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.nutrition-weight-rate-card h3 { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--fitsho-mist); }
-.nutrition-rate-badge--clamped { display: inline-block; padding: .25rem .6rem; border-radius: 99rem; background: rgb(239 68 68 / 15%); color: #f87171; font-size: .8rem; font-weight: 600; }
-.nutrition-weight-rate-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
-.nutrition-weight-rate-item { display: flex; flex-direction: column; gap: .35rem; padding: .85rem 1rem; border-radius: .85rem; background: rgb(255 255 255 / 4%); }
-.nutrition-weight-rate-item--clamped { border: 1px solid rgb(239 68 68 / 30%); background: rgb(239 68 68 / 8%); }
-.nutrition-weight-rate-label { color: rgb(234 244 241 / 65%); font-size: .8rem; }
-.nutrition-weight-rate-val { font-family: "Sora Variable", sans-serif; font-size: 1.25rem; color: var(--fitsho-aqua); }
+.nutrition-weight-rate-card { width: min(100% - 2rem, 72rem); margin-inline: auto; margin-block: .45rem; padding: .85rem 1.15rem; border: 1px solid rgb(234 244 241 / 10%); border-radius: var(--fitsho-radius-card); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
+.nutrition-weight-rate-card header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .6rem; flex-wrap: wrap; gap: .5rem; }
+.nutrition-weight-rate-card h3 { margin: 0; font-size: .92rem; font-weight: 700; color: var(--fitsho-mist); }
+.nutrition-weight-rate-header-right { display: flex; align-items: center; gap: .5rem; }
+.nutrition-rate-badge--clamped { display: inline-block; padding: .18rem .55rem; border-radius: 99rem; background: rgb(239 68 68 / 15%); color: #f87171; font-size: .72rem; font-weight: 600; }
+.nutrition-rate-badge--override { display: inline-block; padding: .18rem .55rem; border-radius: 99rem; background: rgb(245 158 11 / 16%); color: #fbbf24; font-size: .72rem; font-weight: 600; border: 1px solid rgb(245 158 11 / 30%); }
+.nutrition-rate-badge--safe { display: inline-block; padding: .18rem .55rem; border-radius: 99rem; background: rgb(80 223 206 / 12%); color: var(--fitsho-aqua); font-size: .72rem; font-weight: 600; }
+
+.nutrition-weight-rate-modes { display: inline-flex; background: rgb(0 0 0 / 25%); padding: .2rem; border-radius: .65rem; border: 1px solid rgb(234 244 241 / 8%); gap: .25rem; }
+.nutrition-weight-rate-mode-btn { padding: .25rem .65rem; border-radius: .45rem; border: none; background: transparent; color: rgb(234 244 241 / 60%); font-size: .72rem; font-weight: 600; cursor: pointer; transition: all .2s ease; display: inline-flex; align-items: center; gap: .3rem; font-family: inherit; }
+.nutrition-weight-rate-mode-btn:hover:not(:disabled) { color: var(--fitsho-ink); background: rgb(255 255 255 / 6%); }
+.nutrition-weight-rate-mode-btn.is-active { background: var(--fitsho-aqua); color: #03211f; font-weight: 750; box-shadow: 0 1px 3px rgb(0 0 0 / 25%); }
+.nutrition-weight-rate-mode-btn.is-active.is-override { background: #f59e0b; color: #1e1002; }
+.nutrition-weight-rate-mode-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.nutrition-weight-rate-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.nutrition-weight-rate-item { display: flex; flex-direction: column; gap: .2rem; padding: .45rem .75rem; border-radius: .65rem; background: rgb(255 255 255 / 3%); border: 1px solid rgb(234 244 241 / 6%); }
+.nutrition-weight-rate-item--clamped { border: 1px solid rgb(239 68 68 / 25%); background: rgb(239 68 68 / 6%); }
+.nutrition-weight-rate-item--override { border: 1px solid rgb(245 158 11 / 25%); background: rgb(245 158 11 / 6%); }
+.nutrition-weight-rate-label { color: rgb(234 244 241 / 55%); font-size: .72rem; }
+.nutrition-weight-rate-val { font-family: "Sora Variable", sans-serif; font-size: 1.05rem; color: var(--fitsho-aqua); }
 .nutrition-weight-rate-item--clamped .nutrition-weight-rate-val { color: #f87171; }
+.nutrition-weight-rate-item--override .nutrition-weight-rate-val { color: #fbbf24; }
+
+/* Onboarding & Settings Rate Card */
+.nutrition-rate-setting-box { padding: .75rem .9rem; background: rgb(255 255 255 / 3%); border: 1px solid rgb(234 244 241 / 10%); border-radius: .85rem; display: flex; flex-direction: column; gap: .6rem; margin-bottom: .6rem; }
+.nutrition-rate-setting-box__header { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.nutrition-rate-setting-box__title { display: flex; align-items: center; gap: .5rem; font-size: .88rem; font-weight: 600; color: var(--fitsho-mist); }
+.nutrition-rate-setting-box__select { max-width: 14rem; padding: .4rem .65rem; border-radius: .6rem; border: 1px solid var(--fitsho-line); background: var(--fitsho-canvas); color: var(--fitsho-ink); font-size: .82rem; }
+.nutrition-rate-setting-box__modes { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+@media (max-width: 520px) { .nutrition-rate-setting-box__modes { grid-template-columns: 1fr; } }
+.nutrition-rate-mode-option { padding: .55rem .75rem; border-radius: .65rem; text-align: start; cursor: pointer; border: 1px solid rgb(234 244 241 / 8%); background: rgb(0 0 0 / 20%); transition: all .2s ease; display: flex; flex-direction: column; gap: .2rem; font-family: inherit; }
+.nutrition-rate-mode-option:hover { background: rgb(255 255 255 / 4%); border-color: rgb(234 244 241 / 18%); }
+.nutrition-rate-mode-option.is-selected { border-color: var(--fitsho-aqua); background: rgb(80 223 206 / 8%); }
+.nutrition-rate-mode-option.is-selected.is-override { border-color: #f59e0b; background: rgb(245 158 11 / 8%); }
+.nutrition-rate-mode-option__head { display: flex; align-items: center; gap: .4rem; }
+.nutrition-rate-mode-option__radio { width: .85rem; height: .85rem; border-radius: 50%; border: 1.5px solid rgb(234 244 241 / 35%); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.nutrition-rate-mode-option.is-selected .nutrition-rate-mode-option__radio { border-color: var(--fitsho-aqua); }
+.nutrition-rate-mode-option.is-selected .nutrition-rate-mode-option__radio::after { content: ""; width: .45rem; height: .45rem; border-radius: 50%; background: var(--fitsho-aqua); }
+.nutrition-rate-mode-option.is-selected.is-override .nutrition-rate-mode-option__radio { border-color: #f59e0b; }
+.nutrition-rate-mode-option.is-selected.is-override .nutrition-rate-mode-option__radio::after { background: #f59e0b; }
+.nutrition-rate-mode-option strong { font-size: .8rem; color: var(--fitsho-ink); font-weight: 700; }
+.nutrition-rate-mode-option p { margin: 0; font-size: .7rem; color: rgb(234 244 241 / 55%); line-height: 1.35; }
+.nutrition-rate-override-notice { display: flex; align-items: center; gap: .4rem; padding: .35rem .6rem; border-radius: .5rem; background: rgb(245 158 11 / 10%); border: 1px solid rgb(245 158 11 / 25%); color: #fbbf24; font-size: .72rem; }
+
 .nutrition-target-card { min-height: 9rem; display: flex; flex-direction: column; justify-content: space-between; padding: 1.2rem; }
 .nutrition-target-card span, .nutrition-target-card small { color: rgb(234 244 241 / 66%); }
 .nutrition-target-card strong { font-family: "Sora Variable", sans-serif; font-size: clamp(1.3rem, 2.5vw, 2rem); }
