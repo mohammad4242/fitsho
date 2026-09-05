@@ -36,13 +36,20 @@
   display: inline-flex;
   min-height: 2.75rem;
   align-items: center;
-  padding: .45rem .8rem;
+  padding: .45rem .85rem;
   color: var(--fitsho-muted);
-  border: 1px solid rgb(234 244 241 / 14%);
-  border-radius: 999px;
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-pill);
   text-decoration: none;
   font-size: .78rem;
-  font-weight: 800;
+  font-weight: 750;
+  transition: border-color var(--fitsho-duration-fast) var(--fitsho-ease), color var(--fitsho-duration-fast) var(--fitsho-ease), background var(--fitsho-duration-fast) var(--fitsho-ease);
+}
+
+.food-catalogue-back:hover {
+  border-color: var(--fitsho-line-strong);
+  color: var(--fitsho-aqua);
+  background: rgb(80 223 206 / 6%);
 }
 
 .food-catalogue-toolbar {

@@ -14,7 +14,7 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-catalogue-entry small { color: rgb(234 244 241 / 56%); font-size: .62rem; }
 .nutrition-estimate-state { padding: 2rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: rgb(3 28 27 / 70%); }
 .nutrition-estimate-summary { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(16rem, .65fr); gap: .75rem; }
-.nutrition-calorie-card, .nutrition-confidence-card, .nutrition-target-card, .nutrition-estimate-notes { border: 1px solid rgb(234 244 241 / 12%); border-radius: var(--fitsho-radius-card); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
+.nutrition-calorie-card, .nutrition-confidence-card, .nutrition-target-card, .nutrition-estimate-notes { border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-card); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-card); }
 .nutrition-calorie-card { position: relative; min-height: 14rem; display: flex; flex-direction: column; justify-content: center; overflow: hidden; padding: clamp(1.5rem, 5vw, 3rem); border-color: var(--fitsho-line-strong); background: linear-gradient(135deg, rgb(80 223 206 / 16%), rgb(80 223 206 / 4%)), var(--fitsho-surface); color: var(--fitsho-mist); box-shadow: var(--fitsho-shadow-focus); }
 .nutrition-calorie-card::before { position: absolute; inset-block: 1.25rem; inset-inline-start: 0; width: .22rem; border-radius: 99rem; background: var(--fitsho-aqua); content: ""; }
 .nutrition-calorie-card strong { margin: .45rem 0; color: var(--fitsho-aqua); font-family: "Sora Variable", sans-serif; font-size: clamp(2.3rem, 5.5vw, 4.5rem); line-height: 1.05; }
@@ -23,7 +23,7 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-confidence-card p { color: rgb(234 244 241 / 70%); line-height: 1.8; }
 .nutrition-target-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; padding-block: .75rem; }
 .nutrition-target-grid--secondary { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.nutrition-weight-rate-card { width: min(100% - 2rem, 72rem); margin-inline: auto; margin-block: .45rem; padding: .85rem 1.15rem; border: 1px solid rgb(234 244 241 / 10%); border-radius: var(--fitsho-radius-card); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
+.nutrition-weight-rate-card { width: min(100% - 2rem, 72rem); margin-inline: auto; margin-block: .45rem; padding: .85rem 1.15rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-card); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-card); }
 .nutrition-weight-rate-card header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .6rem; flex-wrap: wrap; gap: .5rem; }
 .nutrition-weight-rate-card h3 { margin: 0; font-size: .92rem; font-weight: 700; color: var(--fitsho-mist); }
 .nutrition-weight-rate-header-right { display: flex; align-items: center; gap: .5rem; }
