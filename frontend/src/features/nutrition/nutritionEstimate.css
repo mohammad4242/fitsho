@@ -923,3 +923,207 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* ── Weekly Plan Regenerate Action ──────────────────────────────────────── */
+.nutrition-plan-regenerate {
+  width: min(100% - 2rem, 76rem);
+  margin: 1.5rem auto 5rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--fitsho-line, rgb(234 244 241 / 12%));
+  border-radius: var(--fitsho-radius-card, 1.2rem);
+  background: var(--fitsho-surface, rgb(3 28 27 / 60%));
+  box-shadow: var(--fitsho-shadow-soft, 0 4px 20px rgb(0 0 0 / 15%));
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.nutrition-plan-regenerate__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.nutrition-plan-regenerate__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+
+.nutrition-plan-regenerate__icon-wrap {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: rgb(80 223 206 / 10%);
+  color: var(--fitsho-aqua, #50dfce);
+  border: 1px solid rgb(80 223 206 / 20%);
+}
+
+.nutrition-plan-regenerate__icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--fitsho-aqua, #50dfce);
+}
+
+.nutrition-plan-regenerate__text {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+  min-width: 0;
+}
+
+.nutrition-plan-regenerate__text h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 750;
+  color: var(--fitsho-mist, #eaf4f1);
+}
+
+.nutrition-plan-regenerate__text p {
+  margin: 0;
+  color: rgb(234 244 241 / 68%);
+  font-size: .84rem;
+  line-height: 1.6;
+}
+
+.nutrition-plan-regenerate__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  min-height: 2.75rem;
+  padding: .65rem 1.25rem;
+  border: 1px solid var(--fitsho-line-strong, #31d0aa);
+  border-radius: var(--fitsho-radius-button, .85rem);
+  background: rgb(80 223 206 / 10%);
+  color: var(--fitsho-aqua, #50dfce);
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--fitsho-duration-fast, .15s) ease,
+              border-color var(--fitsho-duration-fast, .15s) ease,
+              color var(--fitsho-duration-fast, .15s) ease,
+              transform var(--fitsho-duration-fast, .15s) ease;
+}
+
+.nutrition-plan-regenerate__button:hover:not(:disabled) {
+  background: rgb(80 223 206 / 20%);
+  border-color: var(--fitsho-aqua, #50dfce);
+}
+
+.nutrition-plan-regenerate__button:active:not(:disabled) {
+  transform: scale(.98);
+}
+
+.nutrition-plan-regenerate__button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.nutrition-plan-regenerate__button:focus-visible {
+  outline: .18rem solid #fff;
+  outline-offset: .15rem;
+}
+
+.nutrition-plan-regenerate__btn-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+
+@keyframes nutrition-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.nutrition-plan-regenerate .is-spinning,
+.nutrition-plan-regenerate__btn-icon.is-spinning {
+  animation: nutrition-spin 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nutrition-plan-regenerate .is-spinning,
+  .nutrition-plan-regenerate__btn-icon.is-spinning {
+    animation: none !important;
+  }
+  .nutrition-plan-regenerate__button {
+    transition: none !important;
+  }
+}
+
+.nutrition-plan-regenerate__feedback {
+  margin: 0;
+  padding: .65rem .95rem;
+  border: 1px solid rgb(80 223 206 / 30%);
+  border-radius: .75rem;
+  background: rgb(80 223 206 / 10%);
+  color: var(--fitsho-aqua, #50dfce);
+  font-size: .84rem;
+  line-height: 1.5;
+}
+
+.nutrition-plan-regenerate__error {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  padding: .85rem 1rem;
+  border: 1px solid rgb(255 177 70 / 30%);
+  border-radius: .75rem;
+  background: rgb(255 177 70 / 8%);
+  color: #ffd798;
+}
+
+.nutrition-plan-regenerate__error-notice {
+  margin: 0;
+  font-weight: 700;
+  font-size: .86rem;
+  color: #ffd798;
+}
+
+.nutrition-plan-regenerate__error-message {
+  margin: 0;
+  font-size: .82rem;
+  color: rgb(234 244 241 / 80%);
+  line-height: 1.6;
+}
+
+.nutrition-plan-regenerate__reasons {
+  margin: .25rem 0 0;
+  padding-inline-start: 1.25rem;
+  font-size: .8rem;
+  color: rgb(234 244 241 / 75%);
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .nutrition-plan-regenerate {
+    width: min(100% - 1.5rem, 76rem);
+    padding: 1.1rem;
+    margin-bottom: 4rem;
+  }
+  .nutrition-plan-regenerate__content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  .nutrition-plan-regenerate__header {
+    flex: 1 1 auto;
+  }
+  .nutrition-plan-regenerate__button {
+    width: 100%;
+  }
+}
+

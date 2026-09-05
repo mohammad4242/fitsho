@@ -1004,3 +1004,180 @@ it("allows selecting between budget and ideal plan in bundle and persists choice
   });
 });
 
+it("renders initial build button and does not render rebuild button when no plan exists", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(null);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  expect(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /ساخت مجدد/ })).not.toBeInTheDocument();
+  expect(screen.queryByText("ساخت مجدد برنامه غذایی")).not.toBeInTheDocument();
+});
+
+it("renders current plan and rebuild action at the bottom when plan exists", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  expect(await screen.findByText("LU01 — جوجه کباب + برنج + گوجه کبابی")).toBeInTheDocument();
+  expect(screen.getByText("ساخت مجدد برنامه غذایی")).toBeInTheDocument();
+  expect(screen.getByText("اگر اطلاعاتت را تغییر داده‌ای، برنامه با اطلاعات جدیدت دوباره ساخته می‌شود.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "ساخت مجدد برنامه" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "ساخت برنامه تغذیه هفتگی" })).not.toBeInTheDocument();
+});
+
+it("calls createWeeklyNutritionPlan once and enters disabled loading state while keeping old plan visible", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+
+  let resolvePlanPromise!: (val: WeeklyPlanGeneration) => void;
+  const pendingPromise = new Promise<WeeklyPlanGeneration>((resolve) => {
+    resolvePlanPromise = resolve;
+  });
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockReturnValue(pendingPromise);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+
+  const rebuildBtn = await screen.findByRole("button", { name: "ساخت مجدد برنامه" });
+  await user.click(rebuildBtn);
+
+  expect(nutritionApi.createWeeklyNutritionPlan).toHaveBeenCalledTimes(1);
+
+  // During pending request:
+  // 1. Old plan remains visible
+  expect(screen.getByText("LU01 — جوجه کباب + برنج + گوجه کبابی")).toBeInTheDocument();
+  // 2. Button is disabled
+  expect(rebuildBtn).toBeDisabled();
+  // 3. Loading text is displayed
+  expect(screen.getByText("در حال ساخت مجدد برنامه…")).toBeInTheDocument();
+
+  await act(async () => {
+    resolvePlanPromise({
+      generation_id: "gen-2",
+      outcome: "success",
+      reason_codes: [],
+      warning_codes: [],
+      plan: weeklyPlan,
+    });
+  });
+});
+
+it("replaces existing plan with new plan, updates idealPlan/comparison, refetches estimate, and shows success feedback", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+
+  const newPlan: WeeklyPlan = {
+    ...weeklyPlan,
+    id: "plan-rebuilt-2",
+    days: weeklyPlan.days.map((day, idx) => ({
+      ...day,
+      meals: [{
+        ...day.meals[0],
+        name_fa: "خوراک بوقلمون با سبزیجات بخارپز",
+        meal_code: `TU0${idx + 1}`,
+      }],
+    })),
+  };
+
+  const updatedEstimate: NutritionEstimate = {
+    ...estimate,
+    revision: 3,
+    targets: {
+      ...estimate.targets,
+      goal_calories: target("kcal/day", { preferred: 2350 }),
+    },
+  };
+
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
+    generation_id: "gen-rebuild-success",
+    bundle_id: "bundle-rebuild-1",
+    selected_plan_id: "plan-rebuilt-2",
+    selected_plan_role: "budget",
+    outcome: "success",
+    reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED"],
+    warning_codes: [],
+    plan: newPlan,
+    budget_plan: newPlan,
+    ideal_plan: null,
+    comparison: null,
+  });
+
+  vi.mocked(nutritionApi.getCurrentNutritionEstimate)
+    .mockResolvedValueOnce(estimate)
+    .mockResolvedValueOnce(updatedEstimate);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+
+  const rebuildBtn = await screen.findByRole("button", { name: "ساخت مجدد برنامه" });
+  await user.click(rebuildBtn);
+
+  // New plan is rendered
+  expect(await screen.findByText("TU01 — خوراک بوقلمون با سبزیجات بخارپز")).toBeInTheDocument();
+  // Old meal is replaced
+  expect(screen.queryByText("LU01 — جوجه کباب + برنج + گوجه کبابی")).not.toBeInTheDocument();
+  // Success feedback message is displayed
+  expect(screen.getByText("برنامه با اطلاعات جدیدت ساخته شد.")).toBeInTheDocument();
+  // Estimate refetch was called
+  expect(nutritionApi.getCurrentNutritionEstimate).toHaveBeenCalledTimes(2);
+});
+
+it("preserves old plan and comparison on failure, displays error, and re-enables rebuild button", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockRejectedValue(new Error("Network disconnect"));
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+
+  const rebuildBtn = await screen.findByRole("button", { name: "ساخت مجدد برنامه" });
+  await user.click(rebuildBtn);
+
+  // Old plan still displayed
+  expect(await screen.findByText("LU01 — جوجه کباب + برنج + گوجه کبابی")).toBeInTheDocument();
+  // Error message displayed
+  expect(screen.getByText("ساخت برنامه جدید کامل نشد؛ برنامه فعلی شما تغییری نکرد.")).toBeInTheDocument();
+  expect(screen.getByText("درخواست ساخت برنامه انجام نشد. اتصال یا سرویس را بررسی کن و دوباره تلاش کن.")).toBeInTheDocument();
+  // Rebuild button re-enabled
+  expect(rebuildBtn).toBeEnabled();
+  expect(screen.getByText("ساخت مجدد برنامه")).toBeInTheDocument();
+});
+
+it("prevents double submission when clicked multiple times rapidly", async () => {
+  await i18n.changeLanguage("fa");
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
+
+  let resolvePlanPromise!: (val: WeeklyPlanGeneration) => void;
+  const pendingPromise = new Promise<WeeklyPlanGeneration>((resolve) => {
+    resolvePlanPromise = resolve;
+  });
+  vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockReturnValue(pendingPromise);
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+
+  const rebuildBtn = await screen.findByRole("button", { name: "ساخت مجدد برنامه" });
+  // Fire clicks
+  await Promise.all([
+    user.click(rebuildBtn),
+    user.click(rebuildBtn),
+  ]);
+
+  expect(nutritionApi.createWeeklyNutritionPlan).toHaveBeenCalledTimes(1);
+
+  await act(async () => {
+    resolvePlanPromise({
+      generation_id: "gen-double-click",
+      outcome: "success",
+      reason_codes: [],
+      warning_codes: [],
+      plan: weeklyPlan,
+    });
+  });
+});
+
+

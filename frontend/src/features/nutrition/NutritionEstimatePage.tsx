@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import { AppIcon } from "../../shared/AppIcon";
 import { ProgressRing } from "../../shared/ProgressRing";
 import * as nutritionApi from "./api";
 import type {
@@ -34,6 +35,7 @@ export function NutritionEstimatePage() {
   const [planOutcome, setPlanOutcome] = useState<WeeklyPlanGeneration | null>(null);
   const [calculating, setCalculating] = useState(false);
   const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const l = (fa: string, en: string) => language === "en" ? en : fa;
 
   useEffect(() => {
@@ -88,19 +90,31 @@ export function NutritionEstimatePage() {
   }
 
   function generatePlan() {
+    if (generatingPlan) return;
     setGeneratingPlan(true);
     setPlanOutcome(null);
+    setFeedbackMessage(null);
     void nutritionApi.createWeeklyNutritionPlan()
       .then((result) => {
         setPlanOutcome(result);
-        setBundleId(result.bundle_id ?? null);
-        const resolvedRole = (result.selected_plan_role as "budget" | "ideal") || "budget";
-        setSelectedPlanRole(resolvedRole);
-        const resolvedBudgetPlan = result.budget_plan ?? result.plan ?? null;
-        setBudgetPlan(resolvedBudgetPlan);
-        setIdealPlan(result.ideal_plan ?? null);
-        setPlan(result.plan ?? resolvedBudgetPlan);
-        setComparison(result.comparison ?? null);
+        const resolvedPlan = result.budget_plan ?? result.plan ?? null;
+        if (result.outcome === "success" && resolvedPlan !== null) {
+          setBundleId(result.bundle_id ?? null);
+          const resolvedRole = (result.selected_plan_role as "budget" | "ideal") || "budget";
+          setSelectedPlanRole(resolvedRole);
+          setBudgetPlan(result.budget_plan ?? result.plan ?? null);
+          setIdealPlan(result.ideal_plan ?? null);
+          setPlan(result.plan ?? resolvedPlan);
+          setComparison(result.comparison ?? null);
+          setFeedbackMessage(l("برنامه با اطلاعات جدیدت ساخته شد.", "Plan rebuilt with your latest details."));
+          void nutritionApi.getCurrentNutritionEstimate()
+            .then((updatedEstimate) => {
+              if (updatedEstimate !== null) {
+                setEstimate(updatedEstimate);
+              }
+            })
+            .catch(() => {});
+        }
       })
       .catch(() => {
         setPlanOutcome({
@@ -135,6 +149,7 @@ export function NutritionEstimatePage() {
             bundleId={bundleId}
             budgetPlan={budgetPlan}
             comparison={comparison}
+            feedbackMessage={feedbackMessage}
             generating={generatingPlan}
             idealPlan={idealPlan}
             isSelectingPlan={isSelectingPlan}
@@ -155,6 +170,7 @@ function PlanArea({
   bundleId,
   budgetPlan,
   comparison,
+  feedbackMessage,
   generating,
   idealPlan,
   isSelectingPlan,
@@ -168,6 +184,7 @@ function PlanArea({
   bundleId?: string | null;
   budgetPlan?: WeeklyPlan | null;
   comparison: PlanComparison | null;
+  feedbackMessage?: string | null;
   generating: boolean;
   idealPlan: WeeklyPlan | null;
   isSelectingPlan?: boolean;
@@ -236,6 +253,13 @@ function PlanArea({
             title={comparison ? l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget") : undefined}
           />
         )}
+        <PlanRegenerateAction
+          feedbackMessage={feedbackMessage}
+          generating={generating}
+          language={language}
+          onGenerate={onGenerate}
+          outcome={outcome}
+        />
       </div>
     );
   }
@@ -266,6 +290,97 @@ function PlanArea({
       <button className="primary-button" disabled={generating} onClick={onGenerate} type="button">
         {generating ? l("در حال ساخت برنامه…", "Building plan…") : l("ساخت برنامه تغذیه هفتگی", "Build weekly nutrition plan")}
       </button>
+    </section>
+  );
+}
+
+function PlanRegenerateAction({
+  feedbackMessage,
+  generating,
+  language,
+  onGenerate,
+  outcome,
+}: {
+  feedbackMessage?: string | null;
+  generating: boolean;
+  language: "fa" | "en";
+  onGenerate: () => void;
+  outcome: WeeklyPlanGeneration | null;
+}) {
+  const l = (fa: string, en: string) => (language === "en" ? en : fa);
+  const isFailed = outcome !== null && outcome.outcome !== "success";
+  const failureInfo = isFailed
+    ? generationMessage(outcome.outcome, outcome.reason_codes, language)
+    : null;
+
+  return (
+    <section
+      className="nutrition-plan-regenerate"
+      aria-label={l("ساخت مجدد برنامه غذایی", "Rebuild weekly nutrition plan")}
+    >
+      <div className="nutrition-plan-regenerate__content">
+        <div className="nutrition-plan-regenerate__header">
+          <span className="nutrition-plan-regenerate__icon-wrap" aria-hidden="true">
+            <AppIcon
+              name="refresh"
+              className={`nutrition-plan-regenerate__icon ${generating ? "is-spinning" : ""}`}
+            />
+          </span>
+          <div className="nutrition-plan-regenerate__text">
+            <h3>{l("ساخت مجدد برنامه غذایی", "Rebuild weekly nutrition plan")}</h3>
+            <p>
+              {l(
+                "اگر اطلاعاتت را تغییر داده‌ای، برنامه با اطلاعات جدیدت دوباره ساخته می‌شود.",
+                "If you updated your details, the plan will be rebuilt with your latest information.",
+              )}
+            </p>
+          </div>
+        </div>
+        <button
+          className={`nutrition-plan-regenerate__button ${generating ? "is-loading" : ""}`}
+          disabled={generating}
+          onClick={onGenerate}
+          type="button"
+          aria-busy={generating}
+        >
+          <AppIcon
+            name="refresh"
+            className={`nutrition-plan-regenerate__btn-icon ${generating ? "is-spinning" : ""}`}
+          />
+          <span>
+            {generating
+              ? l("در حال ساخت مجدد برنامه…", "Rebuilding plan…")
+              : l("ساخت مجدد برنامه", "Rebuild plan")}
+          </span>
+        </button>
+      </div>
+
+      {feedbackMessage && (
+        <p className="nutrition-plan-regenerate__feedback" role="status">
+          {feedbackMessage}
+        </p>
+      )}
+
+      {isFailed && (
+        <div className="nutrition-plan-regenerate__error" role="alert">
+          <p className="nutrition-plan-regenerate__error-notice">
+            {l(
+              "ساخت برنامه جدید کامل نشد؛ برنامه فعلی شما تغییری نکرد.",
+              "Could not complete new plan; your current plan remains unchanged.",
+            )}
+          </p>
+          {failureInfo?.message && (
+            <p className="nutrition-plan-regenerate__error-message">{failureInfo.message}</p>
+          )}
+          {failureInfo && failureInfo.reasons.length > 0 && (
+            <ul className="nutrition-plan-regenerate__reasons">
+              {failureInfo.reasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </section>
   );
 }
