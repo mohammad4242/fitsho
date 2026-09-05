@@ -139,4 +139,47 @@ describe("Ghost validation baseline: failing cases under legacy rules", () => {
     });
   });
 
+  it("accepts a side photo with left profile orientation", async () => {
+    const pose = createValidPose("side");
+    // Left profile: nose pointing left (x < 0.5)
+    pose[0] = { x: 0.44, y: 0.12, z: 0, visibility: 0.9 };
+    const { processor } = setupProcessor(pose);
+    await expect(
+      processor.process(createInputFile(), "side", { sideProfile: "left" }),
+    ).resolves.toMatchObject({
+      validation: { expectedView: "side", isValid: true },
+    });
+  });
+
+  it("accepts a back photo with one weak knee landmark", async () => {
+    const pose = createValidPose("front");
+    pose[25]!.visibility = 0.25; // Left knee weak
+    const { processor } = setupProcessor(pose);
+    await expect(processor.process(createInputFile(), "back")).resolves.toMatchObject({
+      validation: { expectedView: "back", isValid: true },
+    });
+  });
+
+  it("validates accurately when user resizes the ghost to 0.85", async () => {
+    // Scaled down body
+    const pose = createValidPose("front").map((p) => ({
+      ...p,
+      y: 0.5 + (p.y - 0.5) * 0.85,
+    }));
+    const { processor } = setupProcessor(pose);
+    await expect(
+      processor.process(createInputFile(), "front", { ghostScale: 0.85 }),
+    ).resolves.toMatchObject({
+      validation: { expectedView: "front", isValid: true },
+    });
+  });
+
+  it("hard rejects when an inverted / upside-down pose is detected", async () => {
+    const pose = createValidPose("front").map((p) => ({
+      ...p,
+      y: 1 - p.y, // upside down
+    }));
+    const { processor } = setupProcessor(pose);
+    await expect(processor.process(createInputFile(), "front")).rejects.toThrow();
+  });
 });

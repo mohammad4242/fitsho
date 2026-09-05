@@ -145,6 +145,23 @@ export function validatePoseWithGhost(
     return failResult("legs_or_feet_not_visible", ["body_out_of_frame"], geometry, primaryPose);
   }
 
+  // Upright orientation check: shoulders must be above hips, and hips above ankles
+  const validShoulderY = [primaryPose[LANDMARK_INDICES.leftShoulder]?.y, primaryPose[LANDMARK_INDICES.rightShoulder]?.y]
+    .filter((y): y is number => y !== undefined);
+  const validHipY = [primaryPose[LANDMARK_INDICES.leftHip]?.y, primaryPose[LANDMARK_INDICES.rightHip]?.y]
+    .filter((y): y is number => y !== undefined);
+  const validAnkleY = [primaryPose[LANDMARK_INDICES.leftAnkle]?.y, primaryPose[LANDMARK_INDICES.rightAnkle]?.y]
+    .filter((y): y is number => y !== undefined);
+
+  if (validShoulderY.length > 0 && validHipY.length > 0 && validAnkleY.length > 0) {
+    const avgShoulderY = validShoulderY.reduce((a, b) => a + b, 0) / validShoulderY.length;
+    const avgHipY = validHipY.reduce((a, b) => a + b, 0) / validHipY.length;
+    const avgAnkleY = validAnkleY.reduce((a, b) => a + b, 0) / validAnkleY.length;
+    if (avgShoulderY >= avgHipY || avgHipY >= avgAnkleY) {
+      return failResult("unexpected_body_view", ["wrong_view"], geometry, primaryPose);
+    }
+  }
+
   // Evaluate boundaries and out of frame
   const relevantIndices = [
     LANDMARK_INDICES.leftShoulder, LANDMARK_INDICES.rightShoulder,
