@@ -140,8 +140,8 @@ export function createMediaPipeLivePoseLandmarkerLoader(
       baseOptions: { modelAssetPath: assets.modelAssetPath },
       runningMode: "VIDEO",
       numPoses: 2,
-      minPoseDetectionConfidence: isSide ? 0.25 : 0.55,
-      minPosePresenceConfidence: isSide ? 0.25 : 0.55,
+      minPoseDetectionConfidence: isSide ? 0.15 : 0.55,
+      minPosePresenceConfidence: isSide ? 0.15 : 0.55,
     });
   };
 }

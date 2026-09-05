@@ -150,7 +150,7 @@ describe("ghost photo transform", () => {
   it.each(["front", "side", "back"] as const)(
     "maps the visible %s privacy line to the source crop",
     (view) => {
-      const expectedSourceY = view === "back" ? 192 : 384;
+      const expectedSourceY = view === "front" ? 384 : 192;
 
       expect(privacyCropSourceYForView(
         view,

@@ -285,6 +285,9 @@ function validateLandmarks(
   });
 
   if (result.status === "fail" && result.hardRejectCode) {
+    console.warn(
+      `[BodyPhotoProcessor] validateLandmarks rejected view="${expectedView}" with "${result.hardRejectCode}" (poses detected: ${detection.poses?.length ?? 0}, score: ${result.overallScore}, warnings: ${result.warnings.join(", ")})`,
+    );
     throw new BodyPhotoProcessingError(result.hardRejectCode);
   }
 

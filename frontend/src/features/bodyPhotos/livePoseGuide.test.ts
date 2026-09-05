@@ -72,8 +72,8 @@ it("uses relaxed confidence thresholds for side view in live video mode", async 
   expect(createFromOptions).toHaveBeenCalledWith("fileset", expect.objectContaining({
     numPoses: 2,
     runningMode: "VIDEO",
-    minPoseDetectionConfidence: 0.25,
-    minPosePresenceConfidence: 0.25,
+    minPoseDetectionConfidence: 0.15,
+    minPosePresenceConfidence: 0.15,
   }));
 });
 

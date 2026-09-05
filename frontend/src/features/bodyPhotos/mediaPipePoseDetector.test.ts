@@ -86,8 +86,8 @@ describe("MediaPipePoseLandmarkDetector", () => {
     expect(createFromOptions).toHaveBeenCalledWith("fileset", expect.objectContaining({
       numPoses: 2,
       runningMode: "IMAGE",
-      minPoseDetectionConfidence: 0.2,
-      minPosePresenceConfidence: 0.2,
+      minPoseDetectionConfidence: 0.1,
+      minPosePresenceConfidence: 0.1,
     }));
   });
 
@@ -103,8 +103,8 @@ describe("MediaPipePoseLandmarkDetector", () => {
     await detector.detect(image, "side");
 
     expect(setOptions).toHaveBeenCalledWith({
-      minPoseDetectionConfidence: 0.2,
-      minPosePresenceConfidence: 0.2,
+      minPoseDetectionConfidence: 0.1,
+      minPosePresenceConfidence: 0.1,
     });
     expect(detect).toHaveBeenCalled();
   });

@@ -154,6 +154,7 @@ export function BodyPhotoWizard({
         return updated;
       });
     } catch (processingError) {
+      console.error("[BodyPhotoWizard] Failed to process body photo for view:", selectedView, processingError);
       if (mountedRef.current && selectionToken === selectionTokenRef.current) {
         setError(processingErrorMessage(processingError, t));
       }

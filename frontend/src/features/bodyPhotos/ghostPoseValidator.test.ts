@@ -215,4 +215,21 @@ describe("ghostPoseValidator", () => {
     expect(result.visibleLandmarks).toContain("shoulders");
     expect(result.visibleLandmarks).toContain("hips");
   });
+
+  it("tolerates very weak shoulder visibility in side view as long as torso/legs are visible", () => {
+    const pose = createPose("side");
+    // Shoulders heavily degraded due to privacy cut
+    pose[11] = { x: 0.49, y: 0.20, z: 0, visibility: 0.11 };
+    pose[12] = { x: 0.51, y: 0.20, z: 0, visibility: 0.11 };
+    pose[23] = { x: 0.49, y: 0.48, z: 0, visibility: 0.85 };
+    pose[24] = { x: 0.51, y: 0.48, z: 0, visibility: 0.85 };
+
+    const result = validatePoseWithGhost({
+      view: "side",
+      poses: [pose],
+    });
+
+    expect(result.status).not.toBe("fail");
+    expect(result.hardRejectCode).toBeNull();
+  });
 });

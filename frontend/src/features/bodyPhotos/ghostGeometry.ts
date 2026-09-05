@@ -2,6 +2,7 @@ import { GHOST_SCALE_MAX, GHOST_SCALE_MIN } from "./ghostScale";
 import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 export const GHOST_PRIVACY_CUT_RATIO = 0.16;
+export const GHOST_SIDE_PRIVACY_CUT_RATIO = 0.08;
 export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.08;
 
 export type GhostPoint = {
@@ -66,7 +67,9 @@ export function clampGhostScale(scale: number): number {
 }
 
 export function ghostPrivacyCutRatioForView(view: BodyPhotoView): number {
-  return view === "back" ? GHOST_BACK_PRIVACY_CUT_RATIO : GHOST_PRIVACY_CUT_RATIO;
+  if (view === "back") return GHOST_BACK_PRIVACY_CUT_RATIO;
+  if (view === "side") return GHOST_SIDE_PRIVACY_CUT_RATIO;
+  return GHOST_PRIVACY_CUT_RATIO;
 }
 
 export function transformGhostPoint(
@@ -157,22 +160,22 @@ const BASE_FRONT_ZONES = {
 };
 
 const BASE_SIDE_ZONES = {
-  bodyBounds: { minX: 0.20, maxX: 0.80, minY: 0.14, maxY: 0.99 },
-  shoulders: { minX: 0.32, maxX: 0.68, minY: 0.12, maxY: 0.30 },
-  leftShoulder: { minX: 0.32, maxX: 0.68, minY: 0.12, maxY: 0.30 },
-  rightShoulder: { minX: 0.32, maxX: 0.68, minY: 0.12, maxY: 0.30 },
-  hips: { minX: 0.32, maxX: 0.68, minY: 0.40, maxY: 0.60 },
-  leftHip: { minX: 0.32, maxX: 0.68, minY: 0.40, maxY: 0.60 },
-  rightHip: { minX: 0.32, maxX: 0.68, minY: 0.40, maxY: 0.60 },
-  knees: { minX: 0.32, maxX: 0.68, minY: 0.58, maxY: 0.78 },
-  leftKnee: { minX: 0.32, maxX: 0.68, minY: 0.58, maxY: 0.78 },
-  rightKnee: { minX: 0.32, maxX: 0.68, minY: 0.58, maxY: 0.78 },
-  ankles: { minX: 0.30, maxX: 0.70, minY: 0.78, maxY: 0.97 },
-  leftAnkle: { minX: 0.30, maxX: 0.70, minY: 0.78, maxY: 0.97 },
-  rightAnkle: { minX: 0.30, maxX: 0.70, minY: 0.78, maxY: 0.97 },
-  feet: { minX: 0.28, maxX: 0.72, minY: 0.82, maxY: 1.00 },
-  leftFoot: { minX: 0.28, maxX: 0.72, minY: 0.82, maxY: 1.00 },
-  rightFoot: { minX: 0.28, maxX: 0.72, minY: 0.82, maxY: 1.00 },
+  bodyBounds: { minX: 0.18, maxX: 0.82, minY: 0.07, maxY: 0.99 },
+  shoulders: { minX: 0.25, maxX: 0.75, minY: 0.07, maxY: 0.35 },
+  leftShoulder: { minX: 0.25, maxX: 0.75, minY: 0.07, maxY: 0.35 },
+  rightShoulder: { minX: 0.25, maxX: 0.75, minY: 0.07, maxY: 0.35 },
+  hips: { minX: 0.28, maxX: 0.72, minY: 0.38, maxY: 0.62 },
+  leftHip: { minX: 0.28, maxX: 0.72, minY: 0.38, maxY: 0.62 },
+  rightHip: { minX: 0.28, maxX: 0.72, minY: 0.38, maxY: 0.62 },
+  knees: { minX: 0.28, maxX: 0.72, minY: 0.55, maxY: 0.80 },
+  leftKnee: { minX: 0.28, maxX: 0.72, minY: 0.55, maxY: 0.80 },
+  rightKnee: { minX: 0.28, maxX: 0.72, minY: 0.55, maxY: 0.80 },
+  ankles: { minX: 0.26, maxX: 0.74, minY: 0.75, maxY: 0.98 },
+  leftAnkle: { minX: 0.26, maxX: 0.74, minY: 0.75, maxY: 0.98 },
+  rightAnkle: { minX: 0.26, maxX: 0.74, minY: 0.75, maxY: 0.98 },
+  feet: { minX: 0.24, maxX: 0.76, minY: 0.80, maxY: 1.00 },
+  leftFoot: { minX: 0.24, maxX: 0.76, minY: 0.80, maxY: 1.00 },
+  rightFoot: { minX: 0.24, maxX: 0.76, minY: 0.80, maxY: 1.00 },
 };
 
 export function getGhostGeometry(options: {

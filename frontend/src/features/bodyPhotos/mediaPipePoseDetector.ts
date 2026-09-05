@@ -11,7 +11,7 @@ type PoseLandmarkerLike = {
   setOptions?: (options: Record<string, unknown>) => Promise<void> | void;
 };
 
-type PoseLandmarkerLoader = () => Promise<PoseLandmarkerLike>;
+export type PoseLandmarkerLoader = (view?: BodyPhotoView) => Promise<PoseLandmarkerLike>;
 
 type MediaPipeVisionModule = {
   FilesetResolver: { forVisionTasks(basePath: string): Promise<unknown> };
@@ -30,19 +30,20 @@ export const mediaPipePoseAssets = {
 
 export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
   private readonly loader: PoseLandmarkerLoader;
-  private detectorPromise: Promise<PoseLandmarkerLike> | null = null;
+  private standardDetectorPromise: Promise<PoseLandmarkerLike> | null = null;
+  private sideDetectorPromise: Promise<PoseLandmarkerLike> | null = null;
 
   constructor(loader: PoseLandmarkerLoader = loadMediaPipePoseLandmarker) {
     this.loader = loader;
   }
 
   async detect(image: DecodedBodyPhoto, view?: BodyPhotoView): Promise<BodyLandmarkDetection> {
-    const detector = await this.getDetector();
+    const isSide = view === "side";
+    const detector = await this.getDetector(view);
     if (detector.setOptions !== undefined) {
-      const isSide = view === "side";
       await detector.setOptions({
-        minPoseDetectionConfidence: isSide ? 0.20 : 0.40,
-        minPosePresenceConfidence: isSide ? 0.20 : 0.35,
+        minPoseDetectionConfidence: isSide ? 0.10 : 0.40,
+        minPosePresenceConfidence: isSide ? 0.10 : 0.35,
       });
     }
     const result = detector.detect(image.source);
@@ -53,33 +54,38 @@ export class MediaPipePoseLandmarkDetector implements BodyLandmarkDetector {
     }
   }
 
-  private getDetector(): Promise<PoseLandmarkerLike> {
-    this.detectorPromise ??= this.loader();
-    return this.detectorPromise;
+  private getDetector(view?: BodyPhotoView): Promise<PoseLandmarkerLike> {
+    if (view === "side") {
+      this.sideDetectorPromise ??= this.loader("side");
+      return this.sideDetectorPromise;
+    }
+    this.standardDetectorPromise ??= this.loader(view);
+    return this.standardDetectorPromise;
   }
 }
 
 export function createMediaPipePoseLandmarkerLoader(
   assets = mediaPipePoseAssets,
   loadVision: () => Promise<MediaPipeVisionModule> = loadMediaPipeVision,
-  view?: BodyPhotoView,
+  defaultView?: BodyPhotoView,
 ): PoseLandmarkerLoader {
-  return async () => {
+  return async (view?: BodyPhotoView) => {
+    const activeView = view ?? defaultView;
     const { FilesetResolver, PoseLandmarker } = await loadVision();
     const fileset = await FilesetResolver.forVisionTasks(assets.wasmBasePath);
-    const isSide = view === "side";
+    const isSide = activeView === "side";
     return PoseLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: assets.modelAssetPath },
       runningMode: "IMAGE",
       numPoses: 2,
-      minPoseDetectionConfidence: isSide ? 0.20 : 0.40,
-      minPosePresenceConfidence: isSide ? 0.20 : 0.35,
+      minPoseDetectionConfidence: isSide ? 0.10 : 0.40,
+      minPosePresenceConfidence: isSide ? 0.10 : 0.35,
     });
   };
 }
 
-async function loadMediaPipePoseLandmarker(): Promise<PoseLandmarkerLike> {
-  return createMediaPipePoseLandmarkerLoader()();
+async function loadMediaPipePoseLandmarker(view?: BodyPhotoView): Promise<PoseLandmarkerLike> {
+  return createMediaPipePoseLandmarkerLoader()(view);
 }
 
 async function loadMediaPipeVision(): Promise<MediaPipeVisionModule> {
