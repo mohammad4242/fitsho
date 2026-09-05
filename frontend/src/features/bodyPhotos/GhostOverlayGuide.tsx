@@ -31,6 +31,7 @@ export function GhostOverlayGuide({
       data-ghost-view={view}
       data-ghost-scale={ghostScale}
       data-ghost-mirrored={mirrored}
+      data-ghost-variant={variant}
     >
       <div
         className="ghost-overlay__privacy-cut"

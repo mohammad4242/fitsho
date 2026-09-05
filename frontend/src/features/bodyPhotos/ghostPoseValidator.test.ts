@@ -169,4 +169,32 @@ describe("ghostPoseValidator", () => {
     expect(resultSmall.hardRejectCode).toBeNull();
     expect(resultSmall.componentScores.scaleFit).toBeGreaterThan(0.7);
   });
+
+  it("tolerates different body shapes (wide hips / pear, broad shoulders / athletic) without sex-specific dependencies", () => {
+    const pearPose = createPose("front");
+    pearPose[11] = { x: 0.41, y: 0.20, z: 0, visibility: 0.95 };
+    pearPose[12] = { x: 0.59, y: 0.20, z: 0, visibility: 0.95 };
+    pearPose[23] = { x: 0.35, y: 0.48, z: 0, visibility: 0.95 };
+    pearPose[24] = { x: 0.65, y: 0.48, z: 0, visibility: 0.95 };
+
+    const pearResult = validatePoseWithGhost({
+      view: "front",
+      poses: [pearPose],
+    });
+    expect(pearResult.status).toBe("pass");
+    expect(pearResult.hardRejectCode).toBeNull();
+
+    const athleticPose = createPose("front");
+    athleticPose[11] = { x: 0.34, y: 0.20, z: 0, visibility: 0.95 };
+    athleticPose[12] = { x: 0.66, y: 0.20, z: 0, visibility: 0.95 };
+    athleticPose[23] = { x: 0.42, y: 0.48, z: 0, visibility: 0.95 };
+    athleticPose[24] = { x: 0.58, y: 0.48, z: 0, visibility: 0.95 };
+
+    const athleticResult = validatePoseWithGhost({
+      view: "front",
+      poses: [athleticPose],
+    });
+    expect(athleticResult.status).toBe("pass");
+    expect(athleticResult.hardRejectCode).toBeNull();
+  });
 });
