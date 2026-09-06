@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import femaleHeroArtwork from "../../assets/body1/female-hero.png";
+import femaleSideArtwork from "../../assets/body1/female-side.png";
+import femaleBackArtwork from "../../assets/body1/female-back.png";
 import maleHeroArtwork from "../../assets/body1/male-hero.png";
+import maleSideArtwork from "../../assets/body1/male-side.png";
+import maleBackArtwork from "../../assets/body1/male-back.png";
 import type { BodyAnalysisExperienceV4 } from "./types";
 
 type OverviewView = "front" | "side" | "back";
@@ -24,7 +28,10 @@ export function BodyScanOverview({
   const [showBmiInfo, setShowBmiInfo] = useState(false);
 
   const sex = experience.input_snapshot.sex;
-  const heroImage = sex === "female" ? femaleHeroArtwork : maleHeroArtwork;
+  const heroImages = sex === "female"
+    ? { front: femaleHeroArtwork, side: femaleSideArtwork, back: femaleBackArtwork }
+    : { front: maleHeroArtwork, side: maleSideArtwork, back: maleBackArtwork };
+  const heroImage = heroImages[activeView];
 
   const bodyComp = experience.body_composition;
   const bodyFat = bodyComp?.estimated_body_fat_percent;

@@ -76,7 +76,7 @@ it("renders male hero image for male user and female for female user", () => {
   expect(img).toHaveAttribute("src", expect.stringContaining("female-hero.png"));
 });
 
-it("toggles view buttons and shows view labels", async () => {
+it("toggles view buttons and shows view labels and updates image", async () => {
   const user = userEvent.setup();
   render(
     <BodyScanOverview
@@ -86,15 +86,21 @@ it("toggles view buttons and shows view labels", async () => {
     />,
   );
 
+  const img = screen.getByRole("img", { name: /fitsho physique scan visual/i });
   const front = screen.getByRole("button", { name: /^front$/i });
   const side = screen.getByRole("button", { name: /^side$/i });
   const back = screen.getByRole("button", { name: /^back$/i });
 
   expect(front).toHaveAttribute("aria-pressed", "true");
+  expect(img).toHaveAttribute("src", expect.stringContaining("male-hero.png"));
+
   await user.click(side);
   expect(side).toHaveAttribute("aria-pressed", "true");
+  expect(img).toHaveAttribute("src", expect.stringContaining("male-side.png"));
+
   await user.click(back);
   expect(back).toHaveAttribute("aria-pressed", "true");
+  expect(img).toHaveAttribute("src", expect.stringContaining("male-back.png"));
 });
 
 it("toggles info notes for body fat and BMI", async () => {
