@@ -101,6 +101,29 @@ it("keeps the privacy line attached when the Ghost is scaled", () => {
   });
 });
 
+it("places the side privacy cut line on the ghost neck and scales dynamically", () => {
+  const defaultScale = render(<GhostOverlayGuide sex="female" view="side" ghostScale={1} />);
+  expect(defaultScale.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
+    top: "28%",
+  });
+  defaultScale.unmount();
+
+  const scaledDown = render(<GhostOverlayGuide sex="female" view="side" ghostScale={0.8} />);
+  expect(scaledDown.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
+    top: "32.4%",
+    left: "10%",
+    width: "80%",
+  });
+  scaledDown.unmount();
+
+  const scaledUp = render(<GhostOverlayGuide sex="female" view="side" ghostScale={1.15} />);
+  expect(scaledUp.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
+    top: "24.7%",
+    left: "-7.5%",
+    width: "115%",
+  });
+});
+
 it("mirrors only the side Ghost for a left profile", () => {
   const { container } = render(
     <GhostOverlayGuide

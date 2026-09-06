@@ -2,7 +2,7 @@ import { GHOST_SCALE_MAX, GHOST_SCALE_MIN } from "./ghostScale";
 import type { BodyPhotoSide, BodyPhotoView } from "./types";
 
 export const GHOST_PRIVACY_CUT_RATIO = 0.16;
-export const GHOST_SIDE_PRIVACY_CUT_RATIO = 0.08;
+export const GHOST_SIDE_PRIVACY_CUT_RATIO = 0.28;
 export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.08;
 
 export type GhostPoint = {
