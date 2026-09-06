@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.body_analysis.body_composition import BodyCompositionMetrics
 from app.body_analysis.enums import (
     BodyAnalysisResultSource,
     BodyAnalysisReviewDecision,
@@ -75,6 +76,7 @@ class BodyAnalysisExperienceIndicators(BaseModel):
 
     upper_lower_balance: BodyAnalysisExperienceIndicator
     visible_symmetry: BodyAnalysisExperienceIndicator
+    muscle_balance: BodyAnalysisExperienceIndicator
     body_shape: BodyAnalysisExperienceIndicator
 
 
@@ -101,6 +103,7 @@ class BodyAnalysisExperienceV4(BaseModel):
     presentation_version: Literal["body-analysis-experience-v2"]
     assessment_status: Literal["complete", "partial"]
     input_snapshot: BodyAnalysisInputSnapshotResponse
+    body_composition: BodyCompositionMetrics
     first_impression: BodyAnalysisExperienceMessage
     direction: BodyAnalysisExperienceDirection
     indicators: BodyAnalysisExperienceIndicators
