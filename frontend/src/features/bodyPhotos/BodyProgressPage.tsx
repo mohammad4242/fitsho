@@ -74,32 +74,120 @@ export function BodyProgressPage() {
     }
   }
 
+  const isFa = !i18n.resolvedLanguage?.startsWith("en");
+
   return (
     <main className="body-analysis-home fitsho-page">
       <header className="body-analysis-home__header">
+        <div className="body-analysis-home__badge">
+          <span className="body-analysis-home__badge-dot" aria-hidden="true" />
+          <span>{isFa ? "آنالیز هوشمند ترکیب و فرم بدن" : "AI Body Biometrics & Composition"}</span>
+        </div>
         <h1 dir="ltr">Body Analysis</h1>
-        <p>{t("bodyPhotos.optionalIntro")}</p>
+        <p className="body-analysis-home__subtitle">
+          {isFa
+            ? "پایش دقیق روند تغییرات فیزیکی، دورسنجی‌ها و ثبت بصری پیشرفت بدن"
+            : "Track visual progress, body circumferences, and physical transformation over time"}
+        </p>
+        <p className="body-analysis-home__intro">{t("bodyPhotos.optionalIntro")}</p>
+
+        <div className="body-analysis-home__features" aria-label={isFa ? "امکانات آنالیز بدن" : "Features"}>
+          <div className="body-analysis-feature-chip">
+            <span className="body-analysis-feature-chip__icon" aria-hidden="true">🔒</span>
+            <div className="body-analysis-feature-chip__text">
+              <strong>{isFa ? "حفظ ۱۰۰٪ حریم خصوصی" : "Privacy First"}</strong>
+              <small>{isFa ? "برش خودکار چهره روی گوشی پیش از بارگذاری" : "On-device automatic face crop"}</small>
+            </div>
+          </div>
+          <div className="body-analysis-feature-chip">
+            <span className="body-analysis-feature-chip__icon" aria-hidden="true">📐</span>
+            <div className="body-analysis-feature-chip__text">
+              <strong>{isFa ? "راهنمای استاندارد Ghost" : "Ghost Alignment"}</strong>
+              <small>{isFa ? "عکاسی دقیق در ۳ زاویه روبه‌رو، نیمرخ و پشت" : "Standardized 3-view body angles"}</small>
+            </div>
+          </div>
+          <div className="body-analysis-feature-chip">
+            <span className="body-analysis-feature-chip__icon" aria-hidden="true">📊</span>
+            <div className="body-analysis-feature-chip__text">
+              <strong>{isFa ? "دورسنجی و تحلیل روند" : "Biometric Tracking"}</strong>
+              <small>{isFa ? "پایش دور کمر، باسن، شانه و اسلایدر قبل/بعد" : "Waist, hips, shoulders & before/after slider"}</small>
+            </div>
+          </div>
+        </div>
       </header>
 
       {timeline === null && !failed && (
-        <p className="body-analysis-home__status" role="status">{t("bodyPhotos.loading")}</p>
+        <div className="body-analysis-home__status-box">
+          <span className="body-analysis-home__status-spinner" aria-hidden="true" />
+          <p className="body-analysis-home__status" role="status">{t("bodyPhotos.loading")}</p>
+        </div>
       )}
       {failed && <p className="form-error body-analysis-home__status" role="alert">{t("bodyPhotos.errors.load")}</p>}
 
       {timeline?.items.length === 0 && (
         <section className="body-analysis-empty" aria-labelledby="body-analysis-empty-title">
-          <span className="body-analysis-empty__icon" aria-hidden="true"><AppIcon name="camera" /></span>
+          <div className="body-analysis-empty__hud" aria-hidden="true">
+            <div className="body-analysis-empty__reticle">
+              <span className="body-analysis-empty__reticle-ring body-analysis-empty__reticle-ring--outer" />
+              <span className="body-analysis-empty__reticle-ring body-analysis-empty__reticle-ring--inner" />
+              <span className="body-analysis-empty__reticle-pulse" />
+              <span className="body-analysis-empty__icon">
+                <AppIcon name="camera" />
+              </span>
+            </div>
+          </div>
           <h2 id="body-analysis-empty-title">{t("bodyPhotos.emptyTitle")}</h2>
           <p>{t("bodyPhotos.emptyBody")}</p>
-          <Link className="primary-button" to="/body-progress/new">{t("bodyPhotos.emptyAction")}</Link>
+
+          <div className="body-analysis-empty__steps" aria-label={isFa ? "مراحل ثبت" : "Steps"}>
+            <div className="body-analysis-empty__step">
+              <span className="body-analysis-empty__step-badge">۱</span>
+              <div className="body-analysis-empty__step-info">
+                <strong>{isFa ? "عکاسی ۳ زاویه" : "3 Standard Angles"}</strong>
+                <small>{isFa ? "روبه‌رو، نیمرخ، پشت" : "Front, Side, Back"}</small>
+              </div>
+            </div>
+            <div className="body-analysis-empty__step">
+              <span className="body-analysis-empty__step-badge">۲</span>
+              <div className="body-analysis-empty__step-info">
+                <strong>{isFa ? "برش امن چهره" : "Face-Safe Crop"}</strong>
+                <small>{isFa ? "کاملاً محرمانه در گوشی" : "100% On-device privacy"}</small>
+              </div>
+            </div>
+            <div className="body-analysis-empty__step">
+              <span className="body-analysis-empty__step-badge">۳</span>
+              <div className="body-analysis-empty__step-info">
+                <strong>{isFa ? "تحلیل و دورسنجی" : "Biometric Report"}</strong>
+                <small>{isFa ? "نمودار و روند پیشرفت" : "Progress comparison"}</small>
+              </div>
+            </div>
+          </div>
+
+          <Link className="primary-button body-analysis-empty__action" to="/body-progress/new">
+            {t("bodyPhotos.emptyAction")}
+          </Link>
         </section>
       )}
 
       {timeline !== null && timeline.items.length > 0 && (
-        <>
-          <Link className="primary-button body-analysis-home__start" to="/body-progress/new">{t("bodyPhotos.start")}</Link>
+        <div className="body-analysis-home__timeline-container">
+          <div className="body-analysis-home__toolbar">
+            <div className="body-analysis-home__summary-chips">
+              <span className="body-analysis-stat-pill">
+                <span className="body-analysis-stat-pill__dot" aria-hidden="true" />
+                <span>
+                  {isFa
+                    ? `${timeline.items.length} جلسه تحلیل ثبت‌شده`
+                    : `${timeline.items.length} total sessions`}
+                </span>
+              </span>
+            </div>
+            <Link className="primary-button body-analysis-home__start" to="/body-progress/new">
+              {t("bodyPhotos.start")}
+            </Link>
+          </div>
           <BodyTimeline items={timeline.items} onDelete={openDeleteDialog} />
-        </>
+        </div>
       )}
 
       {deleteTarget !== null && (
