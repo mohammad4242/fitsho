@@ -1,3 +1,4 @@
+import io
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Literal
@@ -132,6 +133,7 @@ from app.nutrition.models import (
     NutritionPriceProvider,
     NutritionSupplementCatalogue,
 )
+from app.nutrition.pdf import render_nutrition_plan_pdf
 from app.nutrition.plan_editing import (
     PlanEditError,
     confirm_remove_meal,
@@ -1454,6 +1456,36 @@ def read_plan_revision(
                 "message": "نسخه برنامه غذایی پیدا نشد.",
             },
         ) from None
+
+
+@router.get(
+    "/plans/{plan_id}/pdf",
+    responses={status.HTTP_200_OK: {"content": {"application/pdf": {}}}},
+)
+def download_nutrition_plan_pdf(
+    plan_id: str,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> StreamingResponse:
+    try:
+        plan = weekly_plan_by_id(db, user.id, UUID(plan_id))
+    except (ValueError, WeeklyPlanNotFoundError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "NUTRITION_PLAN_NOT_FOUND",
+                "message": "نسخه برنامه غذایی پیدا نشد.",
+            },
+        ) from None
+
+    content = render_nutrition_plan_pdf(plan)
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="fitsho-nutrition-plan-{plan.id}.pdf"'
+        },
+    )
 
 
 def _plan_edit_error(error: PlanEditError) -> HTTPException:

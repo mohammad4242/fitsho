@@ -635,3 +635,23 @@ def test_safety_block_is_persisted_without_creating_a_plan(client: TestClient, d
     assert response.json()["plan"] is None
     assert db.scalar(select(NutritionPlanGeneration)) is not None
     assert db.scalar(select(NutritionWeeklyPlan)) is None
+
+
+def test_download_nutrition_plan_pdf(client: TestClient, db: Session) -> None:
+    _register_and_estimate(client, "weekly-plan-pdf@example.com", meals=2, snacks=1)
+    _seed_foods_and_prices(db)
+
+    post_resp = client.post("/api/v1/nutrition/plans", headers=ORIGIN)
+    assert post_resp.status_code == 201
+    plan_id = post_resp.json()["plan"]["id"]
+
+    pdf_resp = client.get(f"/api/v1/nutrition/plans/{plan_id}/pdf")
+    assert pdf_resp.status_code == 200
+    assert pdf_resp.headers["content-type"] == "application/pdf"
+    assert (
+        f'filename="fitsho-nutrition-plan-{plan_id}.pdf"' in pdf_resp.headers["content-disposition"]
+    )
+    assert pdf_resp.content.startswith(b"%PDF-")
+
+    missing_resp = client.get("/api/v1/nutrition/plans/018f0000-0000-7000-8000-000000000000/pdf")
+    assert missing_resp.status_code == 404
