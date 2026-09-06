@@ -1309,6 +1309,11 @@ def select_bundle_plan(
     if target_plan.lifecycle_status == NutritionPlanLifecycleStatus.GENERATED:
         target_plan.lifecycle_status = NutritionPlanLifecycleStatus.PENDING_PHYSICIAN_REVIEW
 
+    for other_plan, _ in plans_with_role:
+        if other_plan.id != target_plan.id:
+            other_plan.is_user_visible = False
+            other_plan.lifecycle_status = NutritionPlanLifecycleStatus.ARCHIVED
+
     now = datetime.now(UTC)
     bundle.selected_plan_id = target_plan.id
     bundle.selected_plan_role = target_role
@@ -1325,6 +1330,70 @@ def select_bundle_plan(
         selected_plan_role=target_role,
         selected_at=now,
         plan=weekly_plan_response(loaded_plan),
+    )
+
+
+def latest_plan_bundle(db: Session, user_id: UUID) -> WeeklyPlanGenerationResponse | None:
+    bundle = db.scalar(
+        select(NutritionPlanBundle)
+        .where(NutritionPlanBundle.user_id == user_id)
+        .order_by(NutritionPlanBundle.created_at.desc())
+        .limit(1)
+        .options(selectinload(NutritionPlanBundle.generations))
+    )
+    if bundle is None:
+        return None
+
+    budget_plan_resp: WeeklyPlanResponse | None = None
+    ideal_plan_resp: WeeklyPlanResponse | None = None
+    generation_id: UUID | None = None
+    reason_codes: list[str] = []
+    warning_codes: list[str] = []
+
+    for gen in bundle.generations:
+        if generation_id is None:
+            generation_id = gen.id
+        reason_codes.extend(gen.reason_codes or [])
+        warning_codes.extend(gen.warning_codes or [])
+        plan_model = db.scalar(
+            _plan_query().where(NutritionWeeklyPlan.generation_id == gen.id)
+        )
+        if plan_model is not None:
+            if gen.plan_role == NutritionPlanRole.BUDGET.value:
+                budget_plan_resp = weekly_plan_response(plan_model)
+            elif gen.plan_role == NutritionPlanRole.IDEAL_REFERENCE.value:
+                ideal_plan_resp = weekly_plan_response(plan_model)
+
+    if generation_id is None:
+        return None
+
+    comparison_dict = bundle.comparison_snapshot or {}
+    comparison_response: PlanComparisonResponse | None = None
+    if comparison_dict:
+        try:
+            comparison_response = PlanComparisonResponse.model_validate(comparison_dict)
+        except Exception:
+            comparison_response = None
+
+    selected_resp = None
+    if bundle.selected_plan_id:
+        if budget_plan_resp and budget_plan_resp.id == bundle.selected_plan_id:
+            selected_resp = budget_plan_resp
+        elif ideal_plan_resp and ideal_plan_resp.id == bundle.selected_plan_id:
+            selected_resp = ideal_plan_resp
+
+    return WeeklyPlanGenerationResponse(
+        generation_id=generation_id,
+        bundle_id=bundle.id,
+        selected_plan_id=bundle.selected_plan_id,
+        selected_plan_role=bundle.selected_plan_role,
+        outcome="success",
+        reason_codes=list(dict.fromkeys(reason_codes)),
+        warning_codes=list(dict.fromkeys(warning_codes)),
+        plan=selected_resp or budget_plan_resp or ideal_plan_resp,
+        budget_plan=budget_plan_resp,
+        ideal_plan=ideal_plan_resp,
+        comparison=comparison_response,
     )
 
 
@@ -2101,6 +2170,7 @@ def _plan_query() -> Select[tuple[NutritionWeeklyPlan]]:
     return select(NutritionWeeklyPlan).options(
         selectinload(NutritionWeeklyPlan.review),
         selectinload(NutritionWeeklyPlan.nutrients),
+        selectinload(NutritionWeeklyPlan.generation),
         selectinload(NutritionWeeklyPlan.days)
         .selectinload(NutritionWeeklyPlanDay.meals)
         .selectinload(NutritionWeeklyPlanMeal.foods),
@@ -2119,11 +2189,13 @@ def _load_plan(db: Session, plan_id: UUID) -> NutritionWeeklyPlan:
 
 def weekly_plan_response(plan: NutritionWeeklyPlan) -> WeeklyPlanResponse:
     review_status = plan.review.status.value if plan.review else "missing"
+    plan_role = plan.generation.plan_role if plan.generation else None
     return WeeklyPlanResponse(
         id=plan.id,
         revision=plan.revision,
         lifecycle_status=plan.lifecycle_status.value,
         is_user_visible=plan.is_user_visible,
+        plan_role=plan_role,
         physician_approved=(
             plan.lifecycle_status
             in {

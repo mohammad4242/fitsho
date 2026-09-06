@@ -158,6 +158,7 @@ from app.nutrition.plan_service import (
     WeeklyPlanNotFoundError,
     active_weekly_plan,
     generate_weekly_plan,
+    latest_plan_bundle,
     latest_weekly_plan,
     select_bundle_plan,
     weekly_plan_by_id,
@@ -1390,6 +1391,13 @@ def select_plan_in_bundle(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"code": "PLAN_SELECTION_INVALID", "message": str(err)},
         ) from None
+
+
+@router.get("/plan-bundles/latest", response_model=WeeklyPlanGenerationResponse | None)
+def read_latest_plan_bundle(
+    db: DatabaseSession, user: CurrentUser
+) -> WeeklyPlanGenerationResponse | None:
+    return latest_plan_bundle(db, user.id)
 
 
 @router.get("/plans/latest", response_model=WeeklyPlanResponse)

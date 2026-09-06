@@ -45,12 +45,30 @@ export function NutritionEstimatePage() {
       nutritionApi.getCurrentNutritionEstimate(),
       nutritionApi.getLatestWeeklyNutritionPlan(),
       nutritionApi.getDailyTracking(new Date().toISOString().slice(0, 10)).catch(() => null),
+      nutritionApi.getLatestPlanBundle().catch(() => null),
     ])
-      .then(([result, latestPlan, dailyTracking]) => {
+      .then(([result, latestPlan, dailyTracking, latestBundle]) => {
         if (!active) return;
         setEstimate(result);
-        setPlan(latestPlan);
         setTracking(dailyTracking);
+
+        if (
+          latestBundle &&
+          latestBundle.bundle_id &&
+          !latestBundle.selected_plan_id &&
+          latestBundle.comparison?.show_ideal_plan &&
+          latestBundle.ideal_plan &&
+          latestBundle.budget_plan
+        ) {
+          setBundleId(latestBundle.bundle_id);
+          setBudgetPlan(latestBundle.budget_plan);
+          setIdealPlan(latestBundle.ideal_plan);
+          setComparison(latestBundle.comparison);
+          setSelectedPlanRole(null);
+          setPlan(latestBundle.budget_plan);
+        } else {
+          setPlan(latestPlan);
+        }
         setState(result === null ? "empty" : "ready");
       })
       .catch(() => {
@@ -78,11 +96,14 @@ export function NutritionEstimatePage() {
       .then((resp) => {
         setSelectedPlanRole(role);
         setPlan(resp.plan);
-        if (role === "budget") {
-          setBudgetPlan(resp.plan);
-        } else {
-          setIdealPlan(resp.plan);
-        }
+        setComparison(null);
+        setBudgetPlan(null);
+        setIdealPlan(null);
+        setFeedbackMessage(
+          role === "ideal"
+            ? l("برنامه ایده‌آل برای شما فعال و اجرا شد.", "Ideal plan activated and set as your active plan.")
+            : l("برنامه با بودجه شما فعال و اجرا شد.", "Budget plan activated and set as your active plan.")
+        );
       })
       .catch((err) => {
         console.error("Failed to select plan:", err);
@@ -237,7 +258,7 @@ function PlanArea({
             <details className="weekly-plan-accordion" open={selectedPlanRole === "ideal"}>
               <summary className="weekly-plan-accordion__summary">
                 <span>
-                  {l("برنامه مرجع", "Reference Plan")}
+                  {l("برنامه ایده‌آل", "Ideal Plan")}
                   {selectedPlanRole === "ideal" && ` (${l("برنامه فعال شما", "Active Plan")})`}
                 </span>
                 <span className="weekly-plan-accordion__chevron" aria-hidden="true">▾</span>
@@ -246,7 +267,7 @@ function PlanArea({
                 isReferencePlan={selectedPlanRole !== "ideal"}
                 language={language}
                 plan={idealPlan}
-                title={l("برنامه مرجع", "Reference Plan")}
+                title={l("برنامه ایده‌آل", "Ideal Plan")}
               />
             </details>
           </div>
@@ -254,7 +275,7 @@ function PlanArea({
           <WeeklyNutritionPlan
             language={language}
             plan={plan}
-            title={comparison ? l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget") : undefined}
+            title={plan.plan_role === "ideal" ? l("برنامه ایده‌آل", "Ideal Plan") : (comparison ? l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget") : undefined)}
           />
         )}
         <PlanRegenerateAction
@@ -514,7 +535,7 @@ function PlanComparisonSection({
             >
               <div className="nutrition-bundle-card__header">
                 <div className="nutrition-bundle-card__title-group">
-                  <h4 className="nutrition-bundle-card__title">{l("برنامه مرجع", "Reference Plan")}</h4>
+                  <h4 className="nutrition-bundle-card__title">{l("برنامه ایده‌آل", "Ideal Plan")}</h4>
                   <p className="nutrition-bundle-card__subtitle">
                     {l("پروتئین بالاتر، تنوع بیشتر، هدف‌محور", "Higher protein, more variety, goal-first")}
                   </p>
@@ -576,7 +597,7 @@ function PlanComparisonSection({
                   <th scope="col">{l("شاخص", "Metric")}</th>
                   <th scope="col">{l("هدف / بودجه شما", "Your Target / Budget")}</th>
                   <th scope="col">{l("برنامه با بودجه شما", "Plan with Your Budget")}</th>
-                  <th scope="col">{l("برنامه ایده‌آل (مرجع)", "Ideal Plan (Reference)")}</th>
+                  <th scope="col">{l("برنامه ایده‌آل", "Ideal Plan")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -757,8 +778,8 @@ function PlanComparisonSection({
             {comparison.monthly_cost_gap_irr != null && comparison.monthly_cost_gap_irr < 10_000_000 ? (
               <p className="plan-comparison-explanation__body">
                 {l(
-                  "بودجه شما با برنامه مرجع فاصله کمی دارد؛ یک برنامه نمایش داده می‌شود.",
-                  "Your budget is close to the reference plan cost — only one plan shown.",
+                  "بودجه شما با برنامه ایده‌آل فاصله کمی دارد؛ یک برنامه نمایش داده می‌شود.",
+                  "Your budget is close to the ideal plan cost — only one plan shown.",
                 )}
               </p>
             ) : (

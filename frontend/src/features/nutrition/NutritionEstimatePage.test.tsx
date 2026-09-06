@@ -118,6 +118,7 @@ beforeEach(() => {
   vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
   vi.mocked(nutritionApi.getCurrentNutritionEstimate).mockResolvedValue(estimate);
   vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(null);
+  vi.mocked(nutritionApi.getLatestPlanBundle).mockResolvedValue(null);
   vi.mocked(nutritionApi.getDailyTracking).mockResolvedValue({
     entry_date: "2026-08-11",
     check_in_status: "not_recorded",
@@ -744,8 +745,8 @@ it("shows only one plan when cost gap is below 1M Toman (< 10M IRR)", async () =
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
 
   expect(await screen.findByRole("heading", { name: "برنامه پیشنهادی با بودجه شما" })).toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "برنامه مرجع" })).not.toBeInTheDocument();
-  expect(screen.getByText(/بودجه شما با برنامه مرجع فاصله کمی دارد/)).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "برنامه ایده‌آل" })).not.toBeInTheDocument();
+  expect(screen.getByText(/بودجه شما با برنامه ایده‌آل فاصله کمی دارد/)).toBeInTheDocument();
 });
 
 it("shows two plans when cost gap >= 1M Toman and improvement is meaningful", async () => {
@@ -789,8 +790,8 @@ it("shows two plans when cost gap >= 1M Toman and improvement is meaningful", as
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
 
   expect(await screen.findByRole("heading", { name: "برنامه پیشنهادی با بودجه شما" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "برنامه مرجع" })).toBeInTheDocument();
-  expect(screen.getByText("برنامه مرجع برای مقایسه است و برنامه فعال شما نیست.")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "برنامه ایده‌آل" })).toBeInTheDocument();
+  expect(screen.getByText("این نسخه برای مقایسه است و برنامه فعال شما نیست.")).toBeInTheDocument();
 });
 
 it("shows only one plan when cost gap >= 1M Toman but quality improvement is not meaningful", async () => {
@@ -828,7 +829,7 @@ it("shows only one plan when cost gap >= 1M Toman but quality improvement is not
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
 
   expect(await screen.findByRole("heading", { name: "برنامه پیشنهادی با بودجه شما" })).toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "برنامه مرجع" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "برنامه ایده‌آل" })).not.toBeInTheDocument();
   expect(screen.getByText(/اختلاف کیفیت چشمگیر نبود/)).toBeInTheDocument();
 });
 
@@ -987,7 +988,7 @@ it("ensures ideal reference plan displays reference badge and disables edit cont
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
 
-  expect(await screen.findByText("برنامه مرجع برای مقایسه است و برنامه فعال شما نیست.")).toBeInTheDocument();
+  expect(await screen.findByText("این نسخه برای مقایسه است و برنامه فعال شما نیست.")).toBeInTheDocument();
 });
 
 it("keeps full backward compatibility when plan is generated without comparison object", async () => {
@@ -1064,7 +1065,67 @@ it("allows selecting between budget and ideal plan in bundle and persists choice
   expect(nutritionApi.selectBundlePlan).toHaveBeenCalledWith("bundle-uuid-1", {
     selected_plan_role: "ideal",
   });
-  expect(await screen.findByText("برنامه فعال شما")).toBeInTheDocument();
+  expect(await screen.findByText("برنامه ایده‌آل برای شما فعال و اجرا شد.")).toBeInTheDocument();
+  expect(screen.queryByText(/دو نسخه برنامه برای شما آماده شده است/)).not.toBeInTheDocument();
+});
+
+it("restores unselected bundle on mount and allows selecting ideal plan", async () => {
+  await i18n.changeLanguage("fa");
+  const budgetPlan = { ...weeklyPlan, id: "plan-budget" };
+  const idealPlan = { ...weeklyPlan, id: "plan-ideal", plan_role: "ideal" };
+
+  vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(budgetPlan);
+  vi.mocked(nutritionApi.getLatestPlanBundle).mockResolvedValue({
+    generation_id: "gen-bundle-restore",
+    bundle_id: "bundle-restore-id",
+    selected_plan_id: null,
+    selected_plan_role: null,
+    outcome: "success",
+    reason_codes: [],
+    warning_codes: [],
+    plan: budgetPlan,
+    budget_plan: budgetPlan,
+    ideal_plan: idealPlan,
+    comparison: {
+      user_monthly_budget_irr: 150_000_000,
+      budget_plan_monthly_cost_irr: 140_000_000,
+      ideal_plan_monthly_cost_irr: 170_000_000,
+      minimum_feasible_monthly_cost_irr: null,
+      monthly_cost_gap_irr: 30_000_000,
+      meaningful_quality_improvement: true,
+      show_ideal_plan: true,
+      reason_codes: ["IDEAL_PLAN_SHOWN_MEANINGFUL_GAIN"],
+      policy_version: "nutrition-plan-comparison-v1",
+      micronutrient_gaps_improved: [],
+      unique_meal_count_budget: 12,
+      unique_meal_count_ideal: 16,
+      unique_protein_sources_budget: 3,
+      unique_protein_sources_ideal: 5,
+    },
+  });
+
+  vi.mocked(nutritionApi.selectBundlePlan).mockResolvedValue({
+    bundle_id: "bundle-restore-id",
+    selected_plan_id: "plan-ideal",
+    selected_plan_role: "ideal",
+    selected_at: "2026-09-05T00:00:00Z",
+    plan: idealPlan,
+  });
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+  const user = userEvent.setup();
+
+  expect(await screen.findByText(/دو نسخه برنامه برای شما آماده شده است/)).toBeInTheDocument();
+  const selectButtons = screen.getAllByRole("button", { name: "انتخاب این برنامه" });
+  expect(selectButtons).toHaveLength(2);
+
+  await user.click(selectButtons[1]);
+
+  expect(nutritionApi.selectBundlePlan).toHaveBeenCalledWith("bundle-restore-id", {
+    selected_plan_role: "ideal",
+  });
+  expect(await screen.findByText("برنامه ایده‌آل برای شما فعال و اجرا شد.")).toBeInTheDocument();
+  expect(screen.queryByText(/دو نسخه برنامه برای شما آماده شده است/)).not.toBeInTheDocument();
 });
 
 it("renders initial build button and does not render rebuild button when no plan exists", async () => {

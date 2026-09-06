@@ -340,6 +340,15 @@ export function selectBundlePlan(
   });
 }
 
+export async function getLatestPlanBundle(): Promise<WeeklyPlanGeneration | null> {
+  try {
+    return await request<WeeklyPlanGeneration>(`${nutritionPath}/plan-bundles/latest`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 export function getShoppingList(planId: string): Promise<ShoppingList> {
   return request(`${nutritionPath}/plans/${planId}/shopping-list`);
 }

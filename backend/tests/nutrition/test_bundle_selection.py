@@ -288,3 +288,43 @@ def test_select_bundle_plan_api_endpoint(client: TestClient, db: Session) -> Non
     )
     assert resp.status_code == 422
     assert resp.json()["detail"]["code"] == "PLAN_SELECTION_INVALID"
+
+
+def test_select_bundle_plan_archives_unselected_plan(client: TestClient, db: Session) -> None:
+    user, bundle, budget_plan, ideal_plan = _seed_test_bundle(client, db)
+
+    # Select ideal_plan
+    select_bundle_plan(
+        db,
+        user_id=user.id,
+        bundle_id=bundle.id,
+        plan_id=ideal_plan.id,
+    )
+
+    db.refresh(ideal_plan)
+    db.refresh(budget_plan)
+
+    assert ideal_plan.is_user_visible is True
+    assert ideal_plan.lifecycle_status == NutritionPlanLifecycleStatus.PENDING_PHYSICIAN_REVIEW
+
+    # Budget plan should be archived and hidden from user
+    assert budget_plan.is_user_visible is False
+    assert budget_plan.lifecycle_status == NutritionPlanLifecycleStatus.ARCHIVED
+
+
+def test_get_latest_plan_bundle_endpoint(client: TestClient, db: Session) -> None:
+    user, bundle, budget_plan, ideal_plan = _seed_test_bundle(client, db)
+    origin = {"Origin": "http://localhost:5173"}
+
+    resp = client.get("/api/v1/nutrition/plan-bundles/latest", headers=origin)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data is not None
+    assert data["bundle_id"] == str(bundle.id)
+    assert data["budget_plan"] is not None
+    assert data["budget_plan"]["id"] == str(budget_plan.id)
+    assert data["budget_plan"]["plan_role"] == NutritionPlanRole.BUDGET.value
+    assert data["ideal_plan"] is not None
+    assert data["ideal_plan"]["id"] == str(ideal_plan.id)
+    assert data["ideal_plan"]["plan_role"] == NutritionPlanRole.IDEAL_REFERENCE.value
+

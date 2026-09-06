@@ -182,15 +182,15 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
     <section className="weekly-plan" aria-labelledby="weekly-plan-title">
       <div className="weekly-plan__heading">
         <div>
-          <p className="eyebrow eyebrow--accent">{isReferencePlan ? l("برنامه مرجع", "Reference plan") : l("برنامه هفتگی", "Weekly plan")}</p>
-          <h2 id="weekly-plan-title">{title ?? l("برنامه غذایی تو", "Your nutrition plan")}</h2>
+          <p className="eyebrow eyebrow--accent">{isReferencePlan ? l("برنامه ایده‌آل", "Ideal plan") : l("برنامه هفتگی", "Weekly plan")}</p>
+          <h2 id="weekly-plan-title">{title ?? (currentPlan.plan_role === "ideal" ? l("برنامه ایده‌آل", "Ideal Plan") : l("برنامه غذایی تو", "Your nutrition plan"))}</h2>
         </div>
         {isReferencePlan ? (
           <div className="weekly-plan__reference-badge" role="status">
             <strong>
               {l(
-                "برنامه مرجع برای مقایسه است و برنامه فعال شما نیست.",
-                "Reference plan is for comparison and is not your active plan.",
+                "این نسخه برای مقایسه است و برنامه فعال شما نیست.",
+                "This version is for comparison and is not your active plan.",
               )}
             </strong>
           </div>

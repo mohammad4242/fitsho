@@ -151,6 +151,7 @@ export type WeeklyPlan = {
   revision: number;
   lifecycle_status: string;
   is_user_visible: boolean;
+  plan_role?: "budget" | "ideal" | string | null;
   physician_approved: boolean;
   review_status: string;
   physician_approved_at: string | null;
