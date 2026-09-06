@@ -94,13 +94,20 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan { margin-block: 1rem 6rem; }
 .weekly-plan__heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, .65fr); gap: 1rem; align-items: end; }
 .weekly-plan__heading h2 { margin: .35rem 0 0; font-size: clamp(2.2rem, 5vw, 4.8rem); }
-.weekly-plan__review { display: flex; flex-direction: column; gap: .35rem; padding: 1.2rem; border-radius: 1.2rem; border: 1px solid rgb(255 215 152 / 22%); background: rgb(255 177 70 / 8%); }
+.weekly-plan__review { display: flex; flex-direction: column; gap: .35rem; padding: 1.1rem 1.25rem; border-radius: 1.2rem; border: 1px solid rgb(255 215 152 / 22%); background: rgb(255 177 70 / 8%); backdrop-filter: blur(8px); }
 .weekly-plan__review.is-pending strong { color: #ffd798; }
 .weekly-plan__review.is-approved { border-color: rgb(128 255 190 / 26%); background: rgb(64 220 139 / 10%); }
 .weekly-plan__review.is-approved strong { color: #8ff3bb; }
-.weekly-plan__review span { color: rgb(234 244 241 / 66%); font-size: .82rem; line-height: 1.6; }
-.weekly-plan__meta { display: flex; flex-wrap: wrap; gap: .7rem 1.2rem; align-items: center; margin-top: 1rem; color: rgb(234 244 241 / 65%); }
-.weekly-plan__meta strong { color: var(--fitsho-aqua); }
+.weekly-plan__review span { color: rgb(234 244 241 / 70%); font-size: .82rem; line-height: 1.5; }
+.weekly-plan__review-badge { display: flex; align-items: center; gap: .85rem; }
+.weekly-plan__doctor-avatar { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: 50%; background: rgb(255 215 152 / 16%); border: 1px solid rgb(255 215 152 / 32%); font-size: 1.45rem; line-height: 1; flex-shrink: 0; box-shadow: 0 4px 12px rgb(0 0 0 / 25%); }
+.weekly-plan__review.is-approved .weekly-plan__doctor-avatar { background: rgb(64 220 139 / 16%); border-color: rgb(128 255 190 / 32%); }
+.weekly-plan__review-content { display: flex; flex-direction: column; gap: .25rem; }
+.weekly-plan__meta { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-top: 1.1rem; }
+.weekly-plan__meta-chip { display: inline-flex; align-items: center; gap: .45rem; padding: .42rem .8rem; border-radius: 999px; background: rgb(255 255 255 / 4%); border: 1px solid rgb(234 244 241 / 11%); color: rgb(234 244 241 / 82%); font-size: .82rem; backdrop-filter: blur(6px); }
+.weekly-plan__meta-chip strong { color: var(--fitsho-aqua); font-weight: 700; }
+.weekly-plan__meta-icon { font-size: .95rem; line-height: 1; }
+.weekly-plan__meta-tag { display: inline-block; padding: .1rem .45rem; border-radius: 999px; background: rgb(128 255 232 / 12%); color: var(--fitsho-aqua); font-size: .72rem; font-weight: 600; }
 .weekly-plan__notice, .weekly-plan__confirm, .weekly-plan__shopping, .weekly-plan__history { margin-top: 1rem; padding: 1.2rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: 1.2rem; background: rgb(3 28 27 / 64%); }
 .weekly-plan__notice p { margin-bottom: 0; color: rgb(234 244 241 / 72%); }
 .weekly-plan__error, .weekly-plan__warning { color: #ffd798; }
@@ -1234,11 +1241,35 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 }
 
 /* Plan Selection Cards */
+.nutrition-bundle-selection-area {
+  display: flex;
+  flex-direction: column;
+  gap: .65rem;
+  margin-block: 0 .65rem;
+}
+
+.nutrition-bundle-selection-prompt {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .65rem 1rem;
+  border-radius: .75rem;
+  background: linear-gradient(135deg, rgb(80 223 206 / 15%), rgb(8 18 17 / 95%));
+  border: 1.5px solid rgb(80 223 206 / 45%);
+  color: var(--fitsho-mist);
+  font-size: .86rem;
+  box-shadow: 0 0 16px rgb(80 223 206 / 15%);
+}
+
+.nutrition-bundle-selection-prompt__icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
 .nutrition-bundle-selection-cards {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: .65rem;
-  margin-block: 0 .65rem;
 }
 
 @media (max-width: 640px) {

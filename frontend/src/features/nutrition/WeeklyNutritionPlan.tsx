@@ -182,7 +182,7 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
     <section className="weekly-plan" aria-labelledby="weekly-plan-title">
       <div className="weekly-plan__heading">
         <div>
-          <p className="eyebrow eyebrow--accent">{isReferencePlan ? l("برنامه مرجع", "Reference plan") : l("نسخه هفتگی", "Weekly draft")}</p>
+          <p className="eyebrow eyebrow--accent">{isReferencePlan ? l("برنامه مرجع", "Reference plan") : l("برنامه هفتگی", "Weekly plan")}</p>
           <h2 id="weekly-plan-title">{title ?? l("برنامه غذایی تو", "Your nutrition plan")}</h2>
         </div>
         {isReferencePlan ? (
@@ -196,32 +196,45 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
           </div>
         ) : (
           <div className={`weekly-plan__review ${statusClass}`} role="status">
-            <strong>
-              {currentPlan.physician_approved
-                ? l("تأییدشده توسط پزشک", "Physician approved")
-                : l("در انتظار بررسی پزشک", "Pending physician review")}
-            </strong>
-            {!currentPlan.physician_approved && (
-              <span>
-                {l(
-                  "این پیش‌نویس قابل مشاهده است اما هنوز برنامه فعال پزشکی نیست.",
-                  "This draft is visible, but it is not yet an active approved plan.",
+            <div className="weekly-plan__review-badge">
+              <span className="weekly-plan__doctor-avatar" aria-hidden="true">🧑‍⚕️</span>
+              <div className="weekly-plan__review-content">
+                <strong>
+                  {currentPlan.physician_approved
+                    ? l("تأییدشده توسط پزشک", "Physician approved")
+                    : l("در انتظار بررسی پزشک", "Pending physician review")}
+                </strong>
+                {!currentPlan.physician_approved && (
+                  <span>
+                    {l(
+                      "پیش‌نویس موقت؛ نیازمند بررسی پزشک",
+                      "Draft plan; pending physician review",
+                    )}
+                  </span>
                 )}
-              </span>
-            )}
-            {currentPlan.physician_approved && currentPlan.physician_approved_at && (
-              <span>{l("تاریخ تأیید", "Approved")} {new Intl.DateTimeFormat(language === "en" ? "en-US" : "fa-IR").format(new Date(currentPlan.physician_approved_at))}</span>
-            )}
+                {currentPlan.physician_approved && currentPlan.physician_approved_at && (
+                  <span>{l("تاریخ تأیید:", "Approved:")} {new Intl.DateTimeFormat(language === "en" ? "en-US" : "fa-IR").format(new Date(currentPlan.physician_approved_at))}</span>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       <div className="weekly-plan__meta">
-        <strong>{l("نسخه", "Revision")} {number.format(currentPlan.revision)}</strong>
-        <span>{lifecycleLabel(currentPlan.lifecycle_status, language)}</span>
-        <span>{l("قیمت‌های همین نسخه ثابت و قابل ردیابی‌اند.", "Prices are pinned to this exact revision.")}</span>
-        <span>{l("وضعیت قیمت", "Price status")}: {currentPlan.price_snapshot.references ? l("قیمت معتبر ثبت‌شده", "Accepted price snapshot") : l("ناموجود", "Unavailable")}</span>
-        <span>{l("چیدمان روزانه", "Daily structure")}: {String(currentPlan.input_snapshot.main_meals_per_day ?? "—")} {l("وعده اصلی", "main meals")} + {String(currentPlan.input_snapshot.snacks_per_day ?? "—")} {l("میان‌وعده", "snacks")}</span>
+        <div className="weekly-plan__meta-chip">
+          <span className="weekly-plan__meta-icon" aria-hidden="true">📋</span>
+          <strong>{l("نسخه", "Revision")} {number.format(currentPlan.revision)}</strong>
+          <span className="weekly-plan__meta-tag">{lifecycleLabel(currentPlan.lifecycle_status, language)}</span>
+        </div>
+        <div className="weekly-plan__meta-chip">
+          <span className="weekly-plan__meta-icon" aria-hidden="true">🏷️</span>
+          <span>{currentPlan.price_snapshot.references ? l("قیمت‌ها به‌روز و معتبر", "Prices updated & verified") : l("استعلام قیمت", "Price check required")}</span>
+        </div>
+        <div className="weekly-plan__meta-chip">
+          <span className="weekly-plan__meta-icon" aria-hidden="true">🍽️</span>
+          <span>{l("چیدمان:", "Structure:")} {String(currentPlan.input_snapshot.main_meals_per_day ?? "—")} {l("وعده اصلی", "main meals")} + {String(currentPlan.input_snapshot.snacks_per_day ?? "—")} {l("میان‌وعده", "snacks")}</span>
+        </div>
       </div>
       {currentPlan.physician_user_visible_notes && <aside className="weekly-plan__notice"><strong>{l("یادداشت پزشک", "Physician note")}</strong><p>{currentPlan.physician_user_visible_notes}</p></aside>}
       {currentPlan.physician_change_summary.length > 0 && <aside className="weekly-plan__notice"><strong>{l("خلاصه تغییرات پزشک", "Physician change summary")}</strong><ul>{currentPlan.physician_change_summary.map((change, index) => <li key={index}>{String(change.operation ?? change.action ?? l("تغییر برنامه", "Plan change"))}</li>)}</ul></aside>}
