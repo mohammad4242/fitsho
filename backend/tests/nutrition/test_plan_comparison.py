@@ -5,6 +5,7 @@ from app.nutrition.plan_comparison import (
 )
 from app.nutrition.planner_engine import (
     GenerationOutcome,
+    NutrientComparison,
     PlannedDay,
     PlannedFood,
     PlannedMeal,
@@ -22,6 +23,7 @@ def _make_dummy_plan(
     daily_fibre: Decimal = Decimal("25"),
     food_slugs: tuple[str, ...] = ("chicken-breast", "rice"),
     protein_slugs: tuple[str, ...] = ("chicken-breast",),
+    nutrient_comparisons: dict[str, NutrientComparison] | None = None,
 ) -> PlannerResult:
     foods = tuple(
         PlannedFood(
@@ -85,6 +87,7 @@ def _make_dummy_plan(
         if outcome == GenerationOutcome.SUCCESS
         else Decimal("0"),
         reason_codes=(),
+        nutrient_comparisons=nutrient_comparisons,
     )
 
 
@@ -171,3 +174,40 @@ def test_compare_plans_does_not_show_ideal_if_no_meaningful_improvement() -> Non
 
     assert report.meaningful_quality_improvement is False
     assert report.show_ideal_plan is False
+
+
+def test_compare_plans_includes_target_values() -> None:
+    protein_comparison = NutrientComparison(
+        preferred=Decimal("131"),
+        minimum_or_maximum=Decimal("100"),
+        planned=Decimal("115"),
+        difference_from_preferred=Decimal("-16"),
+        difference_from_limit=Decimal("15"),
+        status="below_preferred_but_acceptable",
+        reason_codes=("ACCEPTABLE_LOWER_BOUND",),
+        data_confidence="high",
+    )
+    budget_plan = _make_dummy_plan(
+        weekly_cost_irr=700_000,
+        daily_protein=Decimal("115"),
+        nutrient_comparisons={"protein": protein_comparison},
+    )
+    ideal_plan = _make_dummy_plan(
+        weekly_cost_irr=3_500_000,
+        daily_protein=Decimal("131"),
+        food_slugs=("salmon", "beef"),
+        protein_slugs=("salmon", "beef"),
+    )
+
+    report = compare_plans(
+        user_monthly_budget_irr=3_000_000,
+        budget_plan_result=budget_plan,
+        ideal_plan_result=ideal_plan,
+    )
+
+    assert report.protein_gap is not None
+    assert report.protein_gap.budget_value == 115.0
+    assert report.protein_gap.ideal_value == 131.0
+    assert report.protein_gap.difference == 16.0
+    assert report.protein_gap.target_value == 131.0
+

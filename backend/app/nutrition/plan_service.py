@@ -779,6 +779,7 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             ideal_value=getattr(m, "ideal_value", None),
             difference=getattr(m, "difference", None),
             unit=getattr(m, "unit", ""),
+            target_value=getattr(m, "target_value", None),
         )
 
     comparison_response = PlanComparisonResponse(

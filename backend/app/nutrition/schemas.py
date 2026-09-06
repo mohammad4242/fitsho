@@ -938,6 +938,7 @@ class PlanComparisonMetricResponse(BaseModel):
     ideal_value: float | int | None = None
     difference: float | int | None = None
     unit: str
+    target_value: float | int | None = None
 
 
 class PlanComparisonResponse(BaseModel):

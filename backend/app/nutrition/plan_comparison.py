@@ -21,6 +21,7 @@ class PlanComparisonMetric:
     ideal_value: float | int | None
     difference: float | int | None
     unit: str
+    target_value: float | int | None = None
 
     def to_snapshot(self) -> dict[str, Any]:
         return {
@@ -28,6 +29,7 @@ class PlanComparisonMetric:
             "ideal_value": self.ideal_value,
             "difference": self.difference,
             "unit": self.unit,
+            "target_value": self.target_value,
         }
 
 
@@ -183,6 +185,8 @@ def compare_plans(
 
     budget_nutrients: dict[str, Decimal] = {}
     ideal_nutrients: dict[str, Decimal] = {}
+    b_comps = budget_plan_result.nutrient_comparisons or {} if budget_plan_result else {}
+    i_comps = ideal_plan_result.nutrient_comparisons or {} if ideal_plan_result else {}
 
     if budget_plan_result is None or not budget_plan_result.is_successful:
         reason_codes.append("NO_BUDGET_FEASIBLE_PLAN_FOUND")
@@ -300,24 +304,35 @@ def compare_plans(
         b_key: str,
         gap_val: Decimal | None,
         unit: str,
+        comp_key: str | None = None,
     ) -> PlanComparisonMetric | None:
         if gap_val is None and not budget_nutrients and not ideal_nutrients:
             return None
         b_val = round(float(budget_nutrients.get(b_key, 0)), 1) if budget_nutrients else None
         i_val = round(float(ideal_nutrients.get(b_key, 0)), 1) if ideal_nutrients else None
         d_val = round(float(gap_val), 1) if gap_val is not None else None
+        t_val: float | int | None = None
+        if comp_key:
+            target = None
+            if comp_key in b_comps and b_comps[comp_key].preferred is not None:
+                target = b_comps[comp_key].preferred
+            elif comp_key in i_comps and i_comps[comp_key].preferred is not None:
+                target = i_comps[comp_key].preferred
+            if target is not None:
+                t_val = round(float(target), 1)
         return PlanComparisonMetric(
             budget_value=b_val,
             ideal_value=i_val,
             difference=d_val,
             unit=unit,
+            target_value=t_val,
         )
 
-    metric_calorie = _make_metric("energy_kcal", calorie_gap, "kcal/day")
-    metric_protein = _make_metric("protein_g", protein_gap, "g/day")
-    metric_carb = _make_metric("carbohydrate_g", carb_gap, "g/day")
-    metric_fat = _make_metric("total_fat_g", fat_gap, "g/day")
-    metric_fibre = _make_metric("fibre_g", fibre_gap, "g/day")
+    metric_calorie = _make_metric("energy_kcal", calorie_gap, "kcal/day", "goal_calories")
+    metric_protein = _make_metric("protein_g", protein_gap, "g/day", "protein")
+    metric_carb = _make_metric("carbohydrate_g", carb_gap, "g/day", "carbohydrate")
+    metric_fat = _make_metric("total_fat_g", fat_gap, "g/day", "total_fat")
+    metric_fibre = _make_metric("fibre_g", fibre_gap, "g/day", "fibre")
 
     return PlanComparisonReport(
         user_monthly_budget_irr=user_monthly_budget_irr,
