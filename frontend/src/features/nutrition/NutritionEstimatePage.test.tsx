@@ -730,7 +730,7 @@ it("shows only one plan when cost gap is below 1M Toman (< 10M IRR)", async () =
 
   expect(await screen.findByRole("heading", { name: "برنامه پیشنهادی با بودجه شما" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "برنامه مرجع" })).not.toBeInTheDocument();
-  expect(screen.getByText(/بودجه شما به هزینه برنامه مرجع بسیار نزدیک است/)).toBeInTheDocument();
+  expect(screen.getByText(/بودجه شما با برنامه مرجع فاصله کمی دارد/)).toBeInTheDocument();
 });
 
 it("shows two plans when cost gap >= 1M Toman and improvement is meaningful", async () => {
@@ -814,7 +814,7 @@ it("shows only one plan when cost gap >= 1M Toman but quality improvement is not
 
   expect(await screen.findByRole("heading", { name: "برنامه پیشنهادی با بودجه شما" })).toBeInTheDocument();
   expect(screen.queryByRole("heading", { name: "برنامه مرجع" })).not.toBeInTheDocument();
-  expect(screen.getByText(/اختلاف کیفیت برنامه مرجع با برنامه بودجه‌ای چشمگیر نبود/)).toBeInTheDocument();
+  expect(screen.getByText(/اختلاف کیفیت چشمگیر نبود/)).toBeInTheDocument();
 });
 
 it("renders protein gap correctly in the plan comparison summary", async () => {
@@ -1038,7 +1038,7 @@ it("allows selecting between budget and ideal plan in bundle and persists choice
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
 
   expect(await screen.findByText("برنامه فعال شما")).toBeInTheDocument();
-  const selectIdealBtn = screen.getByRole("button", { name: "انتخاب برنامه مرجع" });
+  const selectIdealBtn = screen.getByRole("button", { name: "انتخاب" });
   expect(selectIdealBtn).toBeInTheDocument();
 
   await user.click(selectIdealBtn);

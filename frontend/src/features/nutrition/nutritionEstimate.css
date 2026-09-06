@@ -1294,9 +1294,10 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 
 .nutrition-bundle-card__subtitle {
   margin: 0;
-  font-size: .7rem;
-  color: rgb(234 244 241 / 60%);
-  line-height: 1.35;
+  font-size: .73rem;
+  color: rgb(234 244 241 / 55%);
+  line-height: 1.4;
+  letter-spacing: .01em;
 }
 
 .nutrition-bundle-card__badge {
@@ -1473,8 +1474,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 
 .plan-comparison-explanation__body {
   margin: 0;
-  font-size: .78rem;
-  line-height: 1.6;
+  font-size: .82rem;
+  line-height: 1.65;
   color: rgb(234 244 241 / 85%);
 }
 

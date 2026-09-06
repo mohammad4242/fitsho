@@ -450,7 +450,7 @@ function PlanComparisonSection({
               <div className="nutrition-bundle-card__title-group">
                 <h4 className="nutrition-bundle-card__title">{l("برنامه بودجه‌ای", "Budget Plan")}</h4>
                 <p className="nutrition-bundle-card__subtitle">
-                  {l("سازگار دقیق با سقف بودجه شما", "Tailored to fit within your budget")}
+                  {l("بهترین کیفیت در محدوده بودجه شما", "Best quality within your budget")}
                 </p>
               </div>
               {selectedPlanRole === "budget" ? (
@@ -476,7 +476,7 @@ function PlanComparisonSection({
               )}
               {comparison.unique_meal_count_budget != null && (
                 <span className="nutrition-bundle-card__pill">
-                  {number.format(comparison.unique_meal_count_budget)} {l("وعده متنوع", "meals")}
+                  {number.format(comparison.unique_meal_count_budget)} {l("وعده", "meals")}
                 </span>
               )}
               {comparison.unique_protein_sources_budget != null && (
@@ -491,7 +491,7 @@ function PlanComparisonSection({
               onClick={() => onSelectPlan?.("budget")}
               type="button"
             >
-              {selectedPlanRole === "budget" ? l("برنامه فعال شما", "Your Active Plan") : l("انتخاب برنامه بودجه‌ای", "Select Budget Plan")}
+              {selectedPlanRole === "budget" ? l("برنامه فعال شما", "Active Plan") : l("انتخاب", "Select")}
             </button>
           </div>
 
@@ -500,9 +500,9 @@ function PlanComparisonSection({
           >
             <div className="nutrition-bundle-card__header">
               <div className="nutrition-bundle-card__title-group">
-                <h4 className="nutrition-bundle-card__title">{l("برنامه مرجع علمی", "Ideal Scientific Plan")}</h4>
+                <h4 className="nutrition-bundle-card__title">{l("برنامه مرجع", "Reference Plan")}</h4>
                 <p className="nutrition-bundle-card__subtitle">
-                  {l("پروتئین بهینه علمی و بالاترین تنوع غذایی", "Optimal scientific protein & maximum variety")}
+                  {l("پروتئین بالاتر، تنوع بیشتر، هدف‌محور", "Higher protein, more variety, goal-first")}
                 </p>
               </div>
               {selectedPlanRole === "ideal" ? (
@@ -528,7 +528,7 @@ function PlanComparisonSection({
               )}
               {comparison.unique_meal_count_ideal != null && (
                 <span className="nutrition-bundle-card__pill">
-                  {number.format(comparison.unique_meal_count_ideal)} {l("وعده متنوع", "meals")}
+                  {number.format(comparison.unique_meal_count_ideal)} {l("وعده", "meals")}
                 </span>
               )}
               {comparison.unique_protein_sources_ideal != null && (
@@ -543,7 +543,7 @@ function PlanComparisonSection({
               onClick={() => onSelectPlan?.("ideal")}
               type="button"
             >
-              {selectedPlanRole === "ideal" ? l("برنامه فعال شما", "Your Active Plan") : l("انتخاب برنامه مرجع", "Select Ideal Plan")}
+              {selectedPlanRole === "ideal" ? l("برنامه فعال شما", "Active Plan") : l("انتخاب", "Select")}
             </button>
           </div>
         </div>
@@ -619,28 +619,28 @@ function PlanComparisonSection({
 
         <div className="plan-comparison-explanation">
           <div className="plan-comparison-explanation__header">
-            <span className="plan-comparison-explanation__icon" aria-hidden="true">💡</span>
-            <h4>{l("چرا این دو برنامه متفاوتند؟", "Why they differ")}</h4>
+            <span className="plan-comparison-explanation__icon" aria-hidden="true">⚡</span>
+            <h4>{l("تفاوت برنامه‌ها", "Plan difference")}</h4>
           </div>
           {comparison.show_ideal_plan ? (
             <p className="plan-comparison-explanation__body">
               {l(
-                `بودجه ماهانه شما ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} است. برنامه پیشنهادی با بودجه شما حدود ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. برنامه مرجع متناسب با هدف شما حدود ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. نسخه بودجه‌ای حداقل‌های تعیین‌شده را رعایت می‌کند، اما نسبت به هدف ترجیحی حدود ${number.format(Math.abs(proteinDifference ?? 0))} گرم پروتئین در روز کمتر دارد و تنوع منابع پروتئینی پایین‌تر است.`,
-                `Your monthly budget is ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}. The recommended budget plan costs about ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)}. The reference plan costs about ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)}. The budget version satisfies required minimums, but has about ${number.format(Math.abs(proteinDifference ?? 0))} g less protein per day than your preferred target and lower protein source variety.`,
+                `برنامه بودجه‌ای داخل سقف ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} شما می‌ماند.${proteinDifference != null && proteinDifference > 0 ? ` برنامه مرجع حدود ${number.format(Math.abs(proteinDifference))} g پروتئین بیشتر در روز دارد.` : ""}`,
+                `Budget plan stays within your ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} limit.${proteinDifference != null && proteinDifference > 0 ? ` Reference plan adds ~${number.format(Math.abs(proteinDifference))} g more protein per day.` : ""}`,
               )}
             </p>
           ) : comparison.monthly_cost_gap_irr != null && comparison.monthly_cost_gap_irr < 10_000_000 ? (
             <p className="plan-comparison-explanation__body">
               {l(
-                "بودجه شما به هزینه برنامه مرجع بسیار نزدیک است؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
-                "Your budget is very close to the cost of the reference plan; therefore, only the recommended budget plan is displayed.",
+                "بودجه شما با برنامه مرجع فاصله کمی دارد؛ یک برنامه نمایش داده می‌شود.",
+                "Your budget is close to the reference plan cost — only one plan shown.",
               )}
             </p>
           ) : (
             <p className="plan-comparison-explanation__body">
               {l(
-                "اختلاف کیفیت برنامه مرجع با برنامه بودجه‌ای چشمگیر نبود؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
-                "The reference plan did not offer a meaningful quality improvement; therefore, only the recommended budget plan is displayed.",
+                "اختلاف کیفیت چشمگیر نبود؛ بهترین گزینه با بودجه شما نمایش داده می‌شود.",
+                "No meaningful quality gap — the best option within your budget is shown.",
               )}
             </p>
           )}
