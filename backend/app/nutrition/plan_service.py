@@ -188,6 +188,155 @@ def _estimate_goal_contract_codes(
     return tuple(sorted(codes & _GOAL_WARNING_CODES)), tuple(sorted(codes))
 
 
+def _to_metric_response(m: object) -> PlanComparisonMetricResponse | None:
+    if m is None:
+        return None
+    return PlanComparisonMetricResponse(
+        budget_value=getattr(m, "budget_value", None),
+        ideal_value=getattr(m, "ideal_value", None),
+        difference=getattr(m, "difference", None),
+        unit=getattr(m, "unit", ""),
+        target_value=getattr(m, "target_value", None),
+    )
+
+
+def _extract_plan_metric(plan_resp: WeeklyPlanResponse | None, code: str) -> float | None:
+    if plan_resp is None:
+        return None
+    if plan_resp.days:
+        total = sum(day.nutrient_totals.get(code, 0.0) for day in plan_resp.days)
+        return round(total / len(plan_resp.days), 1)
+    nutrient = plan_resp.nutrients.get(code)
+    if nutrient and nutrient.planned is not None:
+        return round(nutrient.planned, 1)
+    return None
+
+
+def _backfill_comparison_metrics(
+    comp: PlanComparisonResponse,
+    b_resp: WeeklyPlanResponse | None,
+    i_resp: WeeklyPlanResponse | None,
+) -> PlanComparisonResponse:
+
+    # Protein
+    b_prot = _extract_plan_metric(b_resp, "protein_g")
+    i_prot = _extract_plan_metric(i_resp, "protein_g")
+    t_prot = None
+    if i_resp and "protein" in i_resp.nutrients and i_resp.nutrients["protein"].preferred:
+        t_prot = round(float(i_resp.nutrients["protein"].preferred), 1)
+    elif b_resp and "protein" in b_resp.nutrients and b_resp.nutrients["protein"].preferred:
+        t_prot = round(float(b_resp.nutrients["protein"].preferred), 1)
+
+    if comp.protein_gap is None:
+        diff_p = round(i_prot - b_prot, 1) if (i_prot is not None and b_prot is not None) else None
+        comp.protein_gap = PlanComparisonMetricResponse(
+            budget_value=b_prot,
+            ideal_value=i_prot,
+            difference=diff_p,
+            unit="g/day",
+            target_value=t_prot,
+        )
+    else:
+        if comp.protein_gap.budget_value is None and b_prot is not None:
+            comp.protein_gap.budget_value = b_prot
+        if comp.protein_gap.ideal_value is None and i_prot is not None:
+            comp.protein_gap.ideal_value = i_prot
+        if comp.protein_gap.target_value is None and t_prot is not None:
+            comp.protein_gap.target_value = t_prot
+
+    # Calorie
+    b_cal = _extract_plan_metric(b_resp, "energy_kcal")
+    i_cal = _extract_plan_metric(i_resp, "energy_kcal")
+    t_cal = None
+    i_cal_target = (
+        i_resp.nutrients.get("goal_calories") if i_resp and i_resp.nutrients else None
+    )
+    b_cal_target = (
+        b_resp.nutrients.get("goal_calories") if b_resp and b_resp.nutrients else None
+    )
+    if i_cal_target and i_cal_target.preferred:
+        t_cal = round(float(i_cal_target.preferred), 1)
+    elif b_cal_target and b_cal_target.preferred:
+        t_cal = round(float(b_cal_target.preferred), 1)
+
+    if comp.calorie_gap is None:
+        diff_c = round(i_cal - b_cal, 1) if (i_cal is not None and b_cal is not None) else None
+        comp.calorie_gap = PlanComparisonMetricResponse(
+            budget_value=b_cal,
+            ideal_value=i_cal,
+            difference=diff_c,
+            unit="kcal/day",
+            target_value=t_cal,
+        )
+    else:
+        if comp.calorie_gap.budget_value is None and b_cal is not None:
+            comp.calorie_gap.budget_value = b_cal
+        if comp.calorie_gap.ideal_value is None and i_cal is not None:
+            comp.calorie_gap.ideal_value = i_cal
+        if comp.calorie_gap.target_value is None and t_cal is not None:
+            comp.calorie_gap.target_value = t_cal
+
+    # Carbohydrate
+    b_carb = _extract_plan_metric(b_resp, "carbohydrate_g")
+    i_carb = _extract_plan_metric(i_resp, "carbohydrate_g")
+    t_carb = None
+    i_carb_target = (
+        i_resp.nutrients.get("carbohydrate") if i_resp and i_resp.nutrients else None
+    )
+    b_carb_target = (
+        b_resp.nutrients.get("carbohydrate") if b_resp and b_resp.nutrients else None
+    )
+    if i_carb_target and i_carb_target.preferred:
+        t_carb = round(float(i_carb_target.preferred), 1)
+    elif b_carb_target and b_carb_target.preferred:
+        t_carb = round(float(b_carb_target.preferred), 1)
+
+    if comp.carbohydrate_gap is None:
+        diff_cb = round(i_carb - b_carb, 1) if (i_carb is not None and b_carb is not None) else None
+        comp.carbohydrate_gap = PlanComparisonMetricResponse(
+            budget_value=b_carb,
+            ideal_value=i_carb,
+            difference=diff_cb,
+            unit="g/day",
+            target_value=t_carb,
+        )
+    else:
+        if comp.carbohydrate_gap.budget_value is None and b_carb is not None:
+            comp.carbohydrate_gap.budget_value = b_carb
+        if comp.carbohydrate_gap.ideal_value is None and i_carb is not None:
+            comp.carbohydrate_gap.ideal_value = i_carb
+        if comp.carbohydrate_gap.target_value is None and t_carb is not None:
+            comp.carbohydrate_gap.target_value = t_carb
+
+    # Fat
+    b_fat = _extract_plan_metric(b_resp, "total_fat_g")
+    i_fat = _extract_plan_metric(i_resp, "total_fat_g")
+    t_fat = None
+    if i_resp and "total_fat" in i_resp.nutrients and i_resp.nutrients["total_fat"].preferred:
+        t_fat = round(float(i_resp.nutrients["total_fat"].preferred), 1)
+    elif b_resp and "total_fat" in b_resp.nutrients and b_resp.nutrients["total_fat"].preferred:
+        t_fat = round(float(b_resp.nutrients["total_fat"].preferred), 1)
+
+    if comp.fat_gap is None:
+        diff_f = round(i_fat - b_fat, 1) if (i_fat is not None and b_fat is not None) else None
+        comp.fat_gap = PlanComparisonMetricResponse(
+            budget_value=b_fat,
+            ideal_value=i_fat,
+            difference=diff_f,
+            unit="g/day",
+            target_value=t_fat,
+        )
+    else:
+        if comp.fat_gap.budget_value is None and b_fat is not None:
+            comp.fat_gap.budget_value = b_fat
+        if comp.fat_gap.ideal_value is None and i_fat is not None:
+            comp.fat_gap.ideal_value = i_fat
+        if comp.fat_gap.target_value is None and t_fat is not None:
+            comp.fat_gap.target_value = t_fat
+
+    return comp
+
+
 def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResponse:
     safety = current_safety_decision(db, user_id)
     profile = db.get(NutritionProfile, user_id)
@@ -779,17 +928,6 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
     loaded_budget_plan = _load_plan(db, budget_plan_model.id) if budget_plan_model else None
     loaded_ideal_plan = _load_plan(db, ideal_plan_model.id) if ideal_plan_model else None
 
-    def _to_metric_response(m: object) -> PlanComparisonMetricResponse | None:
-        if m is None:
-            return None
-        return PlanComparisonMetricResponse(
-            budget_value=getattr(m, "budget_value", None),
-            ideal_value=getattr(m, "ideal_value", None),
-            difference=getattr(m, "difference", None),
-            unit=getattr(m, "unit", ""),
-            target_value=getattr(m, "target_value", None),
-        )
-
     comparison_response = PlanComparisonResponse(
         user_monthly_budget_irr=comparison_report.user_monthly_budget_irr,
         budget_plan_monthly_cost_irr=comparison_report.budget_plan_monthly_cost_irr,
@@ -819,6 +957,9 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
 
     budget_plan_resp = weekly_plan_response(loaded_budget_plan) if loaded_budget_plan else None
     ideal_plan_resp = weekly_plan_response(loaded_ideal_plan) if loaded_ideal_plan else None
+    comparison_response = _backfill_comparison_metrics(
+        comparison_response, budget_plan_resp, ideal_plan_resp
+    )
 
     response_outcome = (
         NutritionPlanGenerationOutcome.SUCCESS.value
@@ -1289,6 +1430,15 @@ def select_bundle_plan(
         )
     ).all()
 
+    target_role_norm = None
+    if plan_role:
+        clean = plan_role.strip().lower()
+        if clean in ("ideal", "ideal_reference", NutritionPlanRole.IDEAL_REFERENCE.value):
+            target_role_norm = NutritionPlanRole.IDEAL_REFERENCE.value
+        elif clean in ("budget", NutritionPlanRole.BUDGET.value):
+            target_role_norm = NutritionPlanRole.BUDGET.value
+        else:
+            target_role_norm = plan_role
     target_plan: NutritionWeeklyPlan | None = None
     target_role: str | None = None
 
@@ -1297,7 +1447,13 @@ def select_bundle_plan(
             target_plan = plan
             target_role = role
             break
-        if plan_role is not None and role == plan_role:
+        if target_role_norm is not None and (
+            role == target_role_norm
+            or (
+                target_role_norm == NutritionPlanRole.IDEAL_REFERENCE.value
+                and role in ("ideal", "ideal_reference")
+            )
+        ):
             target_plan = plan
             target_role = role
             break
@@ -1374,6 +1530,11 @@ def latest_plan_bundle(db: Session, user_id: UUID) -> WeeklyPlanGenerationRespon
             comparison_response = PlanComparisonResponse.model_validate(comparison_dict)
         except Exception:
             comparison_response = None
+
+    if comparison_response is not None:
+        comparison_response = _backfill_comparison_metrics(
+            comparison_response, budget_plan_resp, ideal_plan_resp
+        )
 
     selected_resp = None
     if bundle.selected_plan_id:

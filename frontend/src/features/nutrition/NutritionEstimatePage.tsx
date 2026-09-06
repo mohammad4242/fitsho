@@ -56,7 +56,6 @@ export function NutritionEstimatePage() {
         if (
           latestBundle &&
           latestBundle.bundle_id &&
-          !latestBundle.selected_plan_id &&
           latestBundle.comparison?.show_ideal_plan &&
           latestBundle.ideal_plan &&
           latestBundle.budget_plan
@@ -65,8 +64,20 @@ export function NutritionEstimatePage() {
           setBudgetPlan(latestBundle.budget_plan);
           setIdealPlan(latestBundle.ideal_plan);
           setComparison(latestBundle.comparison);
-          setSelectedPlanRole(null);
-          setPlan(latestBundle.budget_plan);
+          const resolvedRole: "budget" | "ideal" | null =
+            latestBundle.selected_plan_role === "ideal" || latestBundle.selected_plan_role === "ideal_reference"
+              ? "ideal"
+              : latestBundle.selected_plan_role === "budget"
+                ? "budget"
+                : latestBundle.selected_plan_id
+                  ? (latestBundle.selected_plan_id === latestBundle.ideal_plan.id ? "ideal" : "budget")
+                  : null;
+          setSelectedPlanRole(resolvedRole);
+          setPlan(
+            resolvedRole === "ideal"
+              ? latestBundle.ideal_plan
+              : (latestBundle.budget_plan ?? latestPlan)
+          );
         } else {
           setPlan(latestPlan);
         }
@@ -93,13 +104,12 @@ export function NutritionEstimatePage() {
   function handleSelectPlan(role: "budget" | "ideal") {
     if (!bundleId) return;
     setIsSelectingPlan(true);
-    void nutritionApi.selectBundlePlan(bundleId, { selected_plan_role: role })
+    void nutritionApi.selectBundlePlan(bundleId, {
+      selected_plan_role: role,
+    })
       .then((resp) => {
         setSelectedPlanRole(role);
         setPlan(resp.plan);
-        setComparison(null);
-        setBudgetPlan(null);
-        setIdealPlan(null);
         setFeedbackMessage(
           role === "ideal"
             ? l("برنامه ایده‌آل برای شما فعال و اجرا شد.", "Ideal plan activated and set as your active plan.")
@@ -231,8 +241,10 @@ function PlanArea({
       <div className="weekly-plan-area-container">
         {comparison && (
           <PlanComparisonSection
+            budgetPlan={activeBudgetPlan}
             bundleId={bundleId}
             comparison={comparison}
+            idealPlan={idealPlan}
             isSelectingPlan={isSelectingPlan}
             language={language}
             onSelectPlan={onSelectPlan}
@@ -425,16 +437,68 @@ function formatTomanOrMillion(
   return language === "en" ? `${numberFormatter.format(toman)} Toman` : `${numberFormatter.format(toman)} تومان`;
 }
 
+function extractPlanMacroAverages(plan?: WeeklyPlan | null) {
+  if (!plan) return null;
+  let calories = 0;
+  let protein = 0;
+  let carbs = 0;
+  let fat = 0;
+  let daysCount = 0;
+
+  if (plan.days && plan.days.length > 0) {
+    daysCount = plan.days.length;
+    for (const day of plan.days) {
+      calories += day.nutrient_totals?.energy_kcal ?? 0;
+      protein += day.nutrient_totals?.protein_g ?? 0;
+      carbs += day.nutrient_totals?.carbohydrate_g ?? 0;
+      fat += day.nutrient_totals?.total_fat_g ?? (day.nutrient_totals?.fat_g ?? 0);
+    }
+  }
+
+  const nutrientCal = plan.nutrients?.energy_kcal?.planned ?? plan.nutrients?.goal_calories?.planned;
+  const nutrientProt = plan.nutrients?.protein_g?.planned ?? plan.nutrients?.protein?.planned;
+  const nutrientCarb = plan.nutrients?.carbohydrate_g?.planned ?? plan.nutrients?.carbohydrate?.planned;
+  const nutrientFat = plan.nutrients?.total_fat_g?.planned ?? plan.nutrients?.total_fat?.planned;
+
+  const avgCalories =
+    daysCount > 0 && calories > 0
+      ? Math.round(calories / daysCount)
+      : (nutrientCal != null ? Math.round(nutrientCal) : null);
+  const avgProtein =
+    daysCount > 0 && protein > 0
+      ? Math.round((protein / daysCount) * 10) / 10
+      : (nutrientProt != null ? Math.round(nutrientProt * 10) / 10 : null);
+  const avgCarbs =
+    daysCount > 0 && carbs > 0
+      ? Math.round(carbs / daysCount)
+      : (nutrientCarb != null ? Math.round(nutrientCarb * 10) / 10 : null);
+  const avgFat =
+    daysCount > 0 && fat > 0
+      ? Math.round(fat / daysCount)
+      : (nutrientFat != null ? Math.round(nutrientFat * 10) / 10 : null);
+
+  return {
+    calories: avgCalories,
+    protein: avgProtein,
+    carbs: avgCarbs,
+    fat: avgFat,
+  };
+}
+
 function PlanComparisonSection({
+  budgetPlan,
   bundleId,
   comparison,
+  idealPlan,
   isSelectingPlan,
   language,
   onSelectPlan,
   selectedPlanRole = null,
 }: {
+  budgetPlan?: WeeklyPlan | null;
   bundleId?: string | null;
   comparison: PlanComparison;
+  idealPlan?: WeeklyPlan | null;
   isSelectingPlan?: boolean;
   language: "fa" | "en";
   onSelectPlan?: (role: "budget" | "ideal") => void;
@@ -445,18 +509,66 @@ function PlanComparisonSection({
     maximumFractionDigits: 1,
   });
 
-  const proteinDifference = comparison.protein_gap?.difference
-    ?? (comparison.protein_gap_g_per_day != null ? Number(comparison.protein_gap_g_per_day) : null);
-  const proteinBudgetVal = comparison.protein_gap?.budget_value;
-  const proteinIdealVal = comparison.protein_gap?.ideal_value;
-  const proteinTargetVal = comparison.protein_gap?.target_value;
+  const budgetMacros = extractPlanMacroAverages(budgetPlan);
+  const idealMacros = extractPlanMacroAverages(idealPlan);
+
+  const proteinBudgetVal = comparison.protein_gap?.budget_value ?? budgetMacros?.protein ?? null;
+  const proteinIdealVal = comparison.protein_gap?.ideal_value ?? idealMacros?.protein ?? null;
+  const proteinTargetVal =
+    comparison.protein_gap?.target_value ??
+    proteinIdealVal ??
+    idealPlan?.nutrients?.protein?.preferred ??
+    budgetPlan?.nutrients?.protein?.preferred ??
+    null;
+  const proteinDifference =
+    comparison.protein_gap?.difference ??
+    (proteinIdealVal != null && proteinBudgetVal != null ? proteinIdealVal - proteinBudgetVal : null);
+
+  const calorieBudgetVal = comparison.calorie_gap?.budget_value ?? budgetMacros?.calories ?? null;
+  const calorieIdealVal = comparison.calorie_gap?.ideal_value ?? idealMacros?.calories ?? null;
+  const calorieTargetVal =
+    comparison.calorie_gap?.target_value ??
+    idealPlan?.nutrients?.goal_calories?.preferred ??
+    budgetPlan?.nutrients?.goal_calories?.preferred ??
+    null;
+
+  const carbBudgetVal = comparison.carbohydrate_gap?.budget_value ?? budgetMacros?.carbs ?? null;
+  const carbIdealVal = comparison.carbohydrate_gap?.ideal_value ?? idealMacros?.carbs ?? null;
+  const carbTargetVal =
+    comparison.carbohydrate_gap?.target_value ??
+    idealPlan?.nutrients?.carbohydrate?.preferred ??
+    budgetPlan?.nutrients?.carbohydrate?.preferred ??
+    null;
+
+  const fatBudgetVal = comparison.fat_gap?.budget_value ?? budgetMacros?.fat ?? null;
+  const fatIdealVal = comparison.fat_gap?.ideal_value ?? idealMacros?.fat ?? null;
+  const fatTargetVal =
+    comparison.fat_gap?.target_value ??
+    idealPlan?.nutrients?.total_fat?.preferred ??
+    budgetPlan?.nutrients?.total_fat?.preferred ??
+    null;
+
+  const budgetMonthlyCost =
+    comparison.budget_plan_monthly_cost_irr ??
+    (budgetPlan?.weekly_cost_irr ? Math.round((budgetPlan.weekly_cost_irr * 30) / 7) : null);
+  const idealMonthlyCost =
+    comparison.ideal_plan_monthly_cost_irr ??
+    (idealPlan?.weekly_cost_irr ? Math.round((idealPlan.weekly_cost_irr * 30) / 7) : null);
 
   return (
-    <section className="nutrition-plan-comparison-card" aria-label={l("مقایسه برنامه‌ها", "Plan comparison")}>
+    <section className="nutrition-plan-comparison-card" aria-label={l("مقایسه و انتخاب برنامه‌ها", "Plan comparison and selection")}>
       <header className="nutrition-plan-comparison-header">
         <div className="nutrition-plan-comparison-title-wrap">
           <span className="nutrition-plan-comparison-icon" aria-hidden="true">📊</span>
-          <h3>{l("خلاصه بودجه و مقایسه", "Budget summary and comparison")}</h3>
+          <div>
+            <h3>{l("مقایسه و انتخاب برنامه تغذیه", "Nutrition Plan Comparison & Selection")}</h3>
+            <p className="nutrition-plan-comparison-subtitle">
+              {l(
+                "تفاوت هزینه، کالری و پروتئین بین دو برنامه را بررسی کرده و برنامه دلخواهتان را برای اجرا انتخاب کنید.",
+                "Review differences in cost, calories, and protein between both plans and select your active plan."
+              )}
+            </p>
+          </div>
         </div>
         {comparison.show_ideal_plan && (
           <span className="nutrition-plan-comparison-badge">
@@ -478,108 +590,177 @@ function PlanComparisonSection({
               </strong>
             </div>
           )}
+
           <div className="nutrition-bundle-selection-cards">
+            {/* Card 1: Budget Plan */}
             <div
-              className={`nutrition-bundle-card ${selectedPlanRole === "budget" ? "is-selected" : ""}`}
+              className={`nutrition-bundle-card nutrition-bundle-card--budget ${selectedPlanRole === "budget" ? "is-selected" : ""}`}
             >
-              <div className="nutrition-bundle-card__header">
-                <div className="nutrition-bundle-card__title-group">
-                  <h4 className="nutrition-bundle-card__title">{l("برنامه بودجه‌ای", "Budget Plan")}</h4>
-                  <p className="nutrition-bundle-card__subtitle">
-                    {l("بهترین کیفیت در محدوده بودجه شما", "Best quality within your budget")}
-                  </p>
-                </div>
-                {selectedPlanRole === "budget" ? (
+              <div className="nutrition-bundle-card__top-bar">
+                <span className="nutrition-bundle-card__tag nutrition-bundle-card__tag--budget">
+                  {l("متناسب با جیب شما", "Matches Your Budget")}
+                </span>
+                {selectedPlanRole === "budget" && (
                   <span className="nutrition-bundle-card__badge">
                     <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
-                    {l("فعال", "Active")}
+                    {l("برنامه فعال شما", "Active Plan")}
                   </span>
-                ) : null}
+                )}
               </div>
-              <div className="nutrition-bundle-card__cost-row">
-                <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهانه: ", "Monthly cost: ")}</span>
+
+              <div className="nutrition-bundle-card__header">
+                <div className="nutrition-bundle-card__title-group">
+                  <h4 className="nutrition-bundle-card__title">{l("برنامه با بودجه شما", "Plan with Your Budget")}</h4>
+                  <p className="nutrition-bundle-card__subtitle">
+                    {l("بهترین کیفیت و رعایت کف علمی دقیقاً داخل سقف بودجه شما", "Best quality meeting scientific baseline within your budget")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="nutrition-bundle-card__cost-block">
+                <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهیانه:", "Monthly cost:")}</span>
                 <strong className="nutrition-bundle-card__cost-val">
-                  {comparison.budget_plan_monthly_cost_irr != null
-                    ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
+                  {budgetMonthlyCost != null
+                    ? formatTomanOrMillion(budgetMonthlyCost, language, number)
                     : "—"}
                 </strong>
+                <span className="nutrition-bundle-card__cost-sub">
+                  {l("کاملاً داخل سقف بودجه تعیین‌شده", "Strictly within your monthly budget")}
+                </span>
               </div>
-              <div className="nutrition-bundle-card__pills">
-                {proteinBudgetVal != null && (
-                  <span className="nutrition-bundle-card__pill">
-                    {number.format(proteinBudgetVal)} g {l("پروتئین/روز", "protein/day")}
-                  </span>
-                )}
-                {comparison.unique_meal_count_budget != null && (
-                  <span className="nutrition-bundle-card__pill">
-                    {number.format(comparison.unique_meal_count_budget)} {l("وعده", "meals")}
-                  </span>
-                )}
-                {comparison.unique_protein_sources_budget != null && (
-                  <span className="nutrition-bundle-card__pill">
-                    {number.format(comparison.unique_protein_sources_budget)} {l("منبع پروتئین", "protein sources")}
-                  </span>
-                )}
+
+              <div className="nutrition-bundle-card__macros">
+                <div className="nutrition-bundle-card__macro-box nutrition-bundle-card__macro-box--protein">
+                  <span className="macro-box-label">🥩 {l("پروتئین روزانه", "Daily Protein")}</span>
+                  <strong className="macro-box-val">
+                    {proteinBudgetVal != null ? `${number.format(proteinBudgetVal)} g` : "—"}
+                  </strong>
+                  <span className="macro-box-note">{l("کف استاندارد سلامت", "Scientific baseline")}</span>
+                </div>
+                <div className="nutrition-bundle-card__macro-box">
+                  <span className="macro-box-label">🔥 {l("کالری روزانه", "Calories")}</span>
+                  <strong className="macro-box-val">
+                    {calorieBudgetVal != null ? `${number.format(calorieBudgetVal)} kcal` : "—"}
+                  </strong>
+                  <span className="macro-box-note">{l("نیاز پایه بدن", "Baseline demand")}</span>
+                </div>
+                <div className="nutrition-bundle-card__macro-box">
+                  <span className="macro-box-label">🌾 {l("کربوهیدرات", "Carbs")}</span>
+                  <strong className="macro-box-val">
+                    {carbBudgetVal != null ? `${number.format(carbBudgetVal)} g` : "—"}
+                  </strong>
+                  <span className="macro-box-note">{l("تأمین انرژی", "Energy supply")}</span>
+                </div>
+                <div className="nutrition-bundle-card__macro-box">
+                  <span className="macro-box-label">🥑 {l("چربی مفید", "Fat")}</span>
+                  <strong className="macro-box-val">
+                    {fatBudgetVal != null ? `${number.format(fatBudgetVal)} g` : "—"}
+                  </strong>
+                  <span className="macro-box-note">{l("سلامت هورمونی", "Hormonal health")}</span>
+                </div>
               </div>
+
+              <ul className="nutrition-bundle-card__features" aria-label={l("مزایای برنامه بودجه‌ای", "Budget plan advantages")}>
+                <li>✔️ {l("رعایت ۱۰۰٪ حداقل‌های بیولوژیک و کف ایمنی سلامت", "100% compliant with metabolic & safety floors")}</li>
+                <li>✔️ {l("مدیریت دقیق هزینه‌ها بدون ایجاد هرگونه فشار مالی", "Strict cost management with zero financial pressure")}</li>
+                <li>✔️ {l("استفاده از به‌صرفه‌ترین مواد غذایی غنی از ریزمغذی‌ها", "Most cost-effective nutrient-dense whole foods")}</li>
+              </ul>
+
               <button
                 className={selectedPlanRole === "budget" ? "secondary-button is-active nutrition-bundle-card__action" : "primary-button nutrition-bundle-card__action"}
                 disabled={selectedPlanRole === "budget" || isSelectingPlan}
                 onClick={() => onSelectPlan?.("budget")}
                 type="button"
               >
-                {selectedPlanRole === "budget" ? l("برنامه فعال شما", "Active Plan") : l("انتخاب این برنامه", "Select this plan")}
+                {selectedPlanRole === "budget" ? `✓ ${l("برنامه فعال شما", "Active Plan")}` : l("انتخاب این برنامه", "Select this plan")}
               </button>
             </div>
 
+            {/* Card 2: Ideal Plan */}
             <div
-              className={`nutrition-bundle-card ${selectedPlanRole === "ideal" ? "is-selected" : ""}`}
+              className={`nutrition-bundle-card nutrition-bundle-card--ideal ${selectedPlanRole === "ideal" ? "is-selected" : ""}`}
             >
+              <div className="nutrition-bundle-card__top-bar">
+                <span className="nutrition-bundle-card__tag nutrition-bundle-card__tag--ideal">
+                  {l("پیشنهاد حرفه‌ای ورزشی", "Athletic & Performance")}
+                </span>
+                {selectedPlanRole === "ideal" && (
+                  <span className="nutrition-bundle-card__badge">
+                    <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
+                    {l("برنامه فعال شما", "Active Plan")}
+                  </span>
+                )}
+              </div>
+
               <div className="nutrition-bundle-card__header">
                 <div className="nutrition-bundle-card__title-group">
                   <h4 className="nutrition-bundle-card__title">{l("برنامه ایده‌آل", "Ideal Plan")}</h4>
                   <p className="nutrition-bundle-card__subtitle">
-                    {l("پروتئین بالاتر، تنوع بیشتر، هدف‌محور", "Higher protein, more variety, goal-first")}
+                    {l("پروتئین بالاتر، تنوع بیشتر و تطابق کامل با اهداف ورزشی", "Higher protein, greater variety, optimal goal attainment")}
                   </p>
                 </div>
-                {selectedPlanRole === "ideal" ? (
-                  <span className="nutrition-bundle-card__badge">
-                    <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
-                    {l("فعال", "Active")}
-                  </span>
-                ) : null}
               </div>
-              <div className="nutrition-bundle-card__cost-row">
-                <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهانه: ", "Monthly cost: ")}</span>
-                <strong className="nutrition-bundle-card__cost-val">
-                  {comparison.ideal_plan_monthly_cost_irr != null
-                    ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
+
+              <div className="nutrition-bundle-card__cost-block">
+                <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهیانه:", "Monthly cost:")}</span>
+                <strong className="nutrition-bundle-card__cost-val nutrition-bundle-card__cost-val--ideal">
+                  {idealMonthlyCost != null
+                    ? formatTomanOrMillion(idealMonthlyCost, language, number)
                     : "—"}
                 </strong>
+                <span className="nutrition-bundle-card__cost-sub">
+                  {comparison.monthly_cost_gap_irr != null
+                    ? `+${formatTomanOrMillion(comparison.monthly_cost_gap_irr, language, number)} ${l("بیشتر از بودجه ماهانه", "above monthly budget")}`
+                    : l("سرمایه‌گذاری روی تناسب‌اندام", "Investment in your physique")}
+                </span>
               </div>
-              <div className="nutrition-bundle-card__pills">
-                {proteinIdealVal != null && (
-                  <span className="nutrition-bundle-card__pill">
-                    {number.format(proteinIdealVal)} g {l("پروتئین/روز", "protein/day")}
+
+              <div className="nutrition-bundle-card__macros">
+                <div className="nutrition-bundle-card__macro-box nutrition-bundle-card__macro-box--protein nutrition-bundle-card__macro-box--ideal">
+                  <span className="macro-box-label">🥩 {l("پروتئین روزانه", "Daily Protein")}</span>
+                  <strong className="macro-box-val">
+                    {proteinIdealVal != null ? `${number.format(proteinIdealVal)} g` : "—"}
+                  </strong>
+                  <span className="macro-box-note">
+                    {proteinTargetVal != null ? `${l("پوشش هدف", "Goal met")} (${number.format(proteinTargetVal)} g)` : l("پروتئین حداکثری", "Max protein")}
                   </span>
-                )}
-                {comparison.unique_meal_count_ideal != null && (
-                  <span className="nutrition-bundle-card__pill">
-                    {number.format(comparison.unique_meal_count_ideal)} {l("وعده", "meals")}
-                  </span>
-                )}
-                {comparison.unique_protein_sources_ideal != null && (
-                  <span className="nutrition-bundle-card__pill">
-                    {number.format(comparison.unique_protein_sources_ideal)} {l("منبع پروتئین", "protein sources")}
-                  </span>
-                )}
+                </div>
+                <div className="nutrition-bundle-card__macro-box">
+                  <span className="macro-box-label">🔥 {l("کالری روزانه", "Calories")}</span>
+                  <strong className="macro-box-val">
+                    {calorieIdealVal != null ? `${number.format(calorieIdealVal)} kcal` : "—"}
+                  </strong>
+                  <span className="macro-box-note">{l("هدف ایده‌آل", "Target")}</span>
+                </div>
+                <div className="nutrition-bundle-card__macro-box">
+                  <span className="macro-box-label">🌾 {l("کربوهیدرات", "Carbs")}</span>
+                  <strong className="macro-box-val">
+                    {carbIdealVal != null ? `${number.format(carbIdealVal)} g` : "—"}
+                  </strong>
+                  <span className="macro-box-note">{l("سوخت تمرین", "Workout fuel")}</span>
+                </div>
+                <div className="nutrition-bundle-card__macro-box">
+                  <span className="macro-box-label">🥑 {l("چربی مفید", "Fat")}</span>
+                  <strong className="macro-box-val">
+                    {fatIdealVal != null ? `${number.format(fatIdealVal)} g` : "—"}
+                  </strong>
+                  <span className="macro-box-note">{l("کیفیت بالاتر", "Higher quality")}</span>
+                </div>
               </div>
+
+              <ul className="nutrition-bundle-card__features" aria-label={l("مزایای برنامه ایده‌آل", "Ideal plan advantages")}>
+                <li>🚀 {l("پروتئین بالاتر برای ریکاوری سریع‌تر و عضله‌سازی بهتر", "Higher protein for faster muscular recovery & hypertrophy")}</li>
+                <li>🥗 {l("تنوع غذایی بیشتر و استفاده از منابع پروتئینی مرغوب‌تر", "Greater meal variety & premium protein selections")}</li>
+                <li>🎯 {l("دستیابی کامل به اهداف ورزشی بدون محدودیت بودجه", "Full goal attainment with zero financial compromise")}</li>
+              </ul>
+
               <button
                 className={selectedPlanRole === "ideal" ? "secondary-button is-active nutrition-bundle-card__action" : "primary-button nutrition-bundle-card__action"}
                 disabled={selectedPlanRole === "ideal" || isSelectingPlan}
                 onClick={() => onSelectPlan?.("ideal")}
                 type="button"
               >
-                {selectedPlanRole === "ideal" ? l("برنامه فعال شما", "Active Plan") : l("انتخاب این برنامه", "Select this plan")}
+                {selectedPlanRole === "ideal" ? `✓ ${l("برنامه فعال شما", "Active Plan")}` : l("انتخاب این برنامه", "Select this plan")}
               </button>
             </div>
           </div>
@@ -590,7 +771,7 @@ function PlanComparisonSection({
         <div className="nutrition-plan-comparison-dual-content">
           <div className="nutrition-plan-comparison-table-wrap">
             <h4 className="nutrition-plan-comparison-section-subtitle">
-              {l("جدول مقایسه برنامه‌ها", "Plan Comparison Table")}
+              {l("جدول مقایسه دقیق شاخص‌ها", "Detailed Metric Comparison Table")}
             </h4>
             <table className="nutrition-plan-comparison-table">
               <thead>
@@ -615,28 +796,28 @@ function PlanComparisonSection({
                   </td>
                   <td>
                     <strong className="comparison-table__val">
-                      {comparison.budget_plan_monthly_cost_irr != null
-                        ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
+                      {budgetMonthlyCost != null
+                        ? formatTomanOrMillion(budgetMonthlyCost, language, number)
                         : "—"}
                     </strong>
                   </td>
                   <td>
                     <strong className="comparison-table__val comparison-table__val--ideal">
-                      {comparison.ideal_plan_monthly_cost_irr != null
-                        ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
+                      {idealMonthlyCost != null
+                        ? formatTomanOrMillion(idealMonthlyCost, language, number)
                         : "—"}
                     </strong>
                   </td>
                 </tr>
 
-                {/* Row 2: Daily Protein */}
-                <tr>
+                {/* Row 2: Daily Protein (Highlighted) */}
+                <tr className="nutrition-comparison-table__row--protein">
                   <td className="nutrition-comparison-table__metric-cell">
                     <span className="metric-icon" aria-hidden="true">🥩</span>
-                    <span>{l("پروتئین روزانه", "Daily Protein")}</span>
+                    <strong>{l("پروتئین روزانه", "Daily Protein")}</strong>
                   </td>
                   <td>
-                    <span className="comparison-table__target-badge">
+                    <span className="comparison-table__target-badge comparison-table__target-badge--protein">
                       {proteinTargetVal != null
                         ? `${number.format(proteinTargetVal)} ${l("گرم/روز", "g/day")}`
                         : (proteinIdealVal != null ? `${number.format(proteinIdealVal)} ${l("گرم/روز", "g/day")}` : "—")}
@@ -654,7 +835,82 @@ function PlanComparisonSection({
                   </td>
                 </tr>
 
-                {/* Row 3: Meal Variety (if available) */}
+                {/* Row 3: Daily Calories */}
+                <tr>
+                  <td className="nutrition-comparison-table__metric-cell">
+                    <span className="metric-icon" aria-hidden="true">🔥</span>
+                    <span>{l("کالری روزانه", "Daily Calories")}</span>
+                  </td>
+                  <td>
+                    <span className="comparison-table__target-badge">
+                      {calorieTargetVal != null
+                        ? `${number.format(calorieTargetVal)} ${l("کیلوکالری", "kcal")}`
+                        : "—"}
+                    </span>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val">
+                      {calorieBudgetVal != null ? `${number.format(calorieBudgetVal)} ${l("کیلوکالری", "kcal")}` : "—"}
+                    </strong>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val comparison-table__val--ideal">
+                      {calorieIdealVal != null ? `${number.format(calorieIdealVal)} ${l("کیلوکالری", "kcal")}` : "—"}
+                    </strong>
+                  </td>
+                </tr>
+
+                {/* Row 4: Daily Carbohydrate */}
+                <tr>
+                  <td className="nutrition-comparison-table__metric-cell">
+                    <span className="metric-icon" aria-hidden="true">🌾</span>
+                    <span>{l("کربوهیدرات روزانه", "Daily Carbs")}</span>
+                  </td>
+                  <td>
+                    <span className="comparison-table__target-badge">
+                      {carbTargetVal != null
+                        ? `${number.format(carbTargetVal)} ${l("گرم/روز", "g/day")}`
+                        : "—"}
+                    </span>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val">
+                      {carbBudgetVal != null ? `${number.format(carbBudgetVal)} ${l("گرم/روز", "g/day")}` : "—"}
+                    </strong>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val comparison-table__val--ideal">
+                      {carbIdealVal != null ? `${number.format(carbIdealVal)} ${l("گرم/روز", "g/day")}` : "—"}
+                    </strong>
+                  </td>
+                </tr>
+
+                {/* Row 5: Daily Fat */}
+                <tr>
+                  <td className="nutrition-comparison-table__metric-cell">
+                    <span className="metric-icon" aria-hidden="true">🥑</span>
+                    <span>{l("چربی روزانه", "Daily Fat")}</span>
+                  </td>
+                  <td>
+                    <span className="comparison-table__target-badge">
+                      {fatTargetVal != null
+                        ? `${number.format(fatTargetVal)} ${l("گرم/روز", "g/day")}`
+                        : "—"}
+                    </span>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val">
+                      {fatBudgetVal != null ? `${number.format(fatBudgetVal)} ${l("گرم/روز", "g/day")}` : "—"}
+                    </strong>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val comparison-table__val--ideal">
+                      {fatIdealVal != null ? `${number.format(fatIdealVal)} ${l("گرم/روز", "g/day")}` : "—"}
+                    </strong>
+                  </td>
+                </tr>
+
+                {/* Row 6: Meal Variety (if available) */}
                 {(comparison.unique_meal_count_budget != null || comparison.unique_meal_count_ideal != null) && (
                   <tr>
                     <td className="nutrition-comparison-table__metric-cell">
@@ -681,7 +937,7 @@ function PlanComparisonSection({
                   </tr>
                 )}
 
-                {/* Row 4: Protein Sources (if available) */}
+                {/* Row 7: Protein Sources (if available) */}
                 {(comparison.unique_protein_sources_budget != null || comparison.unique_protein_sources_ideal != null) && (
                   <tr>
                     <td className="nutrition-comparison-table__metric-cell">

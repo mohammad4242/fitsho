@@ -1373,13 +1373,16 @@ def select_plan_in_bundle(
             detail={"code": "PLAN_BUNDLE_NOT_FOUND", "message": "بسته برنامه غذایی پیدا نشد."},
         ) from None
 
+    chosen_plan_id = payload.plan_id or payload.selected_plan_id
+    chosen_role = payload.plan_role or payload.selected_plan_role
+
     try:
         return select_bundle_plan(
             db,
             user_id=user.id,
             bundle_id=bundle_uuid,
-            plan_id=payload.plan_id,
-            plan_role=payload.plan_role,
+            plan_id=chosen_plan_id,
+            plan_role=chosen_role,
         )
     except WeeklyPlanBundleNotFoundError:
         raise HTTPException(

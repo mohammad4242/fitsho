@@ -328,3 +328,29 @@ def test_get_latest_plan_bundle_endpoint(client: TestClient, db: Session) -> Non
     assert data["ideal_plan"]["id"] == str(ideal_plan.id)
     assert data["ideal_plan"]["plan_role"] == NutritionPlanRole.IDEAL_REFERENCE.value
 
+
+def test_select_bundle_plan_by_frontend_payload_format(client: TestClient, db: Session) -> None:
+    user, bundle, budget_plan, ideal_plan = _seed_test_bundle(client, db)
+    origin = {"Origin": "http://localhost:5173"}
+
+    # Frontend payload with selected_plan_role="ideal"
+    resp = client.post(
+        f"/api/v1/nutrition/plan-bundles/{bundle.id}/select",
+        json={"selected_plan_role": "ideal"},
+        headers=origin,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["selected_plan_id"] == str(ideal_plan.id)
+
+    # Frontend payload with selected_plan_role="budget" and selected_plan_id
+    resp = client.post(
+        f"/api/v1/nutrition/plan-bundles/{bundle.id}/select",
+        json={"selected_plan_id": str(budget_plan.id), "selected_plan_role": "budget"},
+        headers=origin,
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["selected_plan_id"] == str(budget_plan.id)
+
+

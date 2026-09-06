@@ -988,8 +988,11 @@ class WeeklyPlanGenerationResponse(BaseModel):
 
 
 class PlanBundleSelectInput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     plan_id: UUID | None = None
+    selected_plan_id: UUID | None = None
     plan_role: str | None = None
+    selected_plan_role: str | None = None
 
 
 class PlanBundleSelectResponse(BaseModel):
