@@ -65,6 +65,17 @@
 
 .fitsho-progress-ring strong { color: var(--fitsho-ink); font: 800 0.82rem "Sora Variable", sans-serif; }
 
+.fitsho-progress-ring--dual {
+  background:
+    radial-gradient(circle, var(--fitsho-surface) 61%, transparent 63%),
+    conic-gradient(
+      var(--fitsho-blue, #3b82f6) 0deg var(--ring-deg-1, 0deg),
+      var(--fitsho-aqua) var(--ring-deg-1, 0deg) var(--ring-deg-2, 0deg),
+      rgb(255 255 255 / 8%) var(--ring-deg-2, 0deg) 360deg
+    );
+  box-shadow: 0 0 1.25rem rgb(59 130 246 / 12%);
+}
+
 .fitsho-card--interactive {
   transition:
     border-color var(--fitsho-duration-fast) var(--fitsho-ease),
