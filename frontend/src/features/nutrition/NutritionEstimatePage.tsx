@@ -218,7 +218,7 @@ function PlanArea({
         )}
         {isTwoPlan ? (
           <div className="weekly-plans-dual-container">
-            <details className="weekly-plan-accordion" open>
+            <details className="weekly-plan-accordion" open={selectedPlanRole === "budget"}>
               <summary className="weekly-plan-accordion__summary">
                 <span>
                   {l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}
@@ -233,7 +233,7 @@ function PlanArea({
                 title={l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}
               />
             </details>
-            <details className="weekly-plan-accordion" open>
+            <details className="weekly-plan-accordion" open={selectedPlanRole === "ideal"}>
               <summary className="weekly-plan-accordion__summary">
                 <span>
                   {l("برنامه مرجع", "Reference Plan")}
@@ -441,78 +441,6 @@ function PlanComparisonSection({
         )}
       </header>
 
-      <div className="nutrition-plan-comparison-grid">
-        <div className="nutrition-plan-comparison-item">
-          <span className="comparison-item-label">{l("بودجه ماهانه شما", "Your monthly budget")}</span>
-          <strong className="comparison-item-val">{formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}</strong>
-        </div>
-        <div className="nutrition-plan-comparison-item">
-          <span className="comparison-item-label">{l("هزینه تقریبی برنامه", "Estimated plan cost")}</span>
-          <strong className="comparison-item-val">
-            {comparison.budget_plan_monthly_cost_irr != null
-              ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
-              : "—"}
-          </strong>
-        </div>
-        {comparison.show_ideal_plan && (
-          <>
-            <div className="nutrition-plan-comparison-item">
-              <span className="comparison-item-label">{l("برنامه مرجع", "Reference plan")}</span>
-              <strong className="comparison-item-val">
-                {comparison.ideal_plan_monthly_cost_irr != null
-                  ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
-                  : "—"}
-              </strong>
-            </div>
-            <div className="nutrition-plan-comparison-item">
-              <span className="comparison-item-label">{l("اختلاف هزینه ماهانه", "Monthly cost gap")}</span>
-              <strong className="comparison-item-val">
-                {comparison.monthly_cost_gap_irr != null
-                  ? formatTomanOrMillion(comparison.monthly_cost_gap_irr, language, number)
-                  : "—"}
-              </strong>
-            </div>
-          </>
-        )}
-      </div>
-
-      {comparison.show_ideal_plan && (
-        <div className="nutrition-plan-comparison-metrics">
-          <div className="nutrition-plan-comparison-grid">
-            <div className="nutrition-plan-comparison-item">
-              <span className="comparison-item-label">{l("پروتئین روزانه", "Daily protein")}</span>
-              <strong className="comparison-item-val">
-                {proteinBudgetVal != null ? `${number.format(proteinBudgetVal)} g` : "—"}
-                {" → "}
-                {proteinIdealVal != null ? `${number.format(proteinIdealVal)} g` : "—"}
-              </strong>
-              {proteinDifference != null && (
-                <small>
-                  {l("اختلاف با هدف ترجیحی", "Difference from preferred")}:{" "}
-                  {number.format(proteinDifference)} {comparison.protein_gap?.unit || "g/day"}
-                </small>
-              )}
-            </div>
-            <div className="nutrition-plan-comparison-item">
-              <span className="comparison-item-label">{l("تنوع وعده‌ها", "Meal variety")}</span>
-              <strong className="comparison-item-val">
-                {comparison.unique_meal_count_budget != null ? number.format(comparison.unique_meal_count_budget) : "—"}
-                {" → "}
-                {comparison.unique_meal_count_ideal != null ? number.format(comparison.unique_meal_count_ideal) : "—"}
-              </strong>
-            </div>
-            <div className="nutrition-plan-comparison-item">
-              <span className="comparison-item-label">{l("تنوع منابع پروتئینی", "Protein source variety")}</span>
-              <strong className="comparison-item-val">
-                {comparison.unique_protein_sources_budget != null ? number.format(comparison.unique_protein_sources_budget) : "—"}
-                {" → "}
-                {comparison.unique_protein_sources_ideal != null ? number.format(comparison.unique_protein_sources_ideal) : "—"}
-              </strong>
-            </div>
-          </div>
-        </div>
-      )}
-
       {comparison.show_ideal_plan && Boolean(bundleId) && Boolean(onSelectPlan) && (
         <div className="nutrition-bundle-selection-cards">
           <div
@@ -621,33 +549,102 @@ function PlanComparisonSection({
         </div>
       )}
 
-      <div className="plan-comparison-explanation">
-        <div className="plan-comparison-explanation__header">
-          <span className="plan-comparison-explanation__icon" aria-hidden="true">💡</span>
-          <h4>{l("چرا این دو برنامه متفاوتند؟", "Why they differ")}</h4>
+      <div className="nutrition-plan-comparison-bottom-row">
+        <div className="nutrition-plan-comparison-metrics-col">
+          <div className="nutrition-plan-comparison-grid">
+            <div className="nutrition-plan-comparison-item">
+              <span className="comparison-item-label">{l("بودجه ماهانه شما", "Your monthly budget")}</span>
+              <strong className="comparison-item-val">{formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}</strong>
+            </div>
+            <div className="nutrition-plan-comparison-item">
+              <span className="comparison-item-label">{l("هزینه تقریبی برنامه", "Estimated plan cost")}</span>
+              <strong className="comparison-item-val">
+                {comparison.budget_plan_monthly_cost_irr != null
+                  ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
+                  : "—"}
+              </strong>
+            </div>
+            {comparison.show_ideal_plan && (
+              <>
+                <div className="nutrition-plan-comparison-item">
+                  <span className="comparison-item-label">{l("برنامه مرجع", "Reference plan")}</span>
+                  <strong className="comparison-item-val">
+                    {comparison.ideal_plan_monthly_cost_irr != null
+                      ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
+                      : "—"}
+                  </strong>
+                </div>
+                <div className="nutrition-plan-comparison-item">
+                  <span className="comparison-item-label">{l("اختلاف هزینه ماهانه", "Monthly cost gap")}</span>
+                  <strong className="comparison-item-val">
+                    {comparison.monthly_cost_gap_irr != null
+                      ? formatTomanOrMillion(comparison.monthly_cost_gap_irr, language, number)
+                      : "—"}
+                  </strong>
+                </div>
+                <div className="nutrition-plan-comparison-item">
+                  <span className="comparison-item-label">{l("پروتئین روزانه", "Daily protein")}</span>
+                  <strong className="comparison-item-val">
+                    {proteinBudgetVal != null ? `${number.format(proteinBudgetVal)} g` : "—"}
+                    {" → "}
+                    {proteinIdealVal != null ? `${number.format(proteinIdealVal)} g` : "—"}
+                  </strong>
+                  {proteinDifference != null && (
+                    <small>
+                      {l("اختلاف با هدف ترجیحی", "Difference from preferred")}:{" "}
+                      {number.format(proteinDifference)} {comparison.protein_gap?.unit || "g/day"}
+                    </small>
+                  )}
+                </div>
+                <div className="nutrition-plan-comparison-item">
+                  <span className="comparison-item-label">{l("تنوع وعده‌ها", "Meal variety")}</span>
+                  <strong className="comparison-item-val">
+                    {comparison.unique_meal_count_budget != null ? number.format(comparison.unique_meal_count_budget) : "—"}
+                    {" → "}
+                    {comparison.unique_meal_count_ideal != null ? number.format(comparison.unique_meal_count_ideal) : "—"}
+                  </strong>
+                </div>
+                <div className="nutrition-plan-comparison-item">
+                  <span className="comparison-item-label">{l("تنوع منابع پروتئینی", "Protein source variety")}</span>
+                  <strong className="comparison-item-val">
+                    {comparison.unique_protein_sources_budget != null ? number.format(comparison.unique_protein_sources_budget) : "—"}
+                    {" → "}
+                    {comparison.unique_protein_sources_ideal != null ? number.format(comparison.unique_protein_sources_ideal) : "—"}
+                  </strong>
+                </div>
+              </>
+            )}
+          </div>
         </div>
-        {comparison.show_ideal_plan ? (
-          <p className="plan-comparison-explanation__body">
-            {l(
-              `بودجه ماهانه شما ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} است. برنامه پیشنهادی با بودجه شما حدود ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. برنامه مرجع متناسب با هدف شما حدود ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. نسخه بودجه‌ای حداقل‌های تعیین‌شده را رعایت می‌کند، اما نسبت به هدف ترجیحی حدود ${number.format(Math.abs(proteinDifference ?? 0))} گرم پروتئین در روز کمتر دارد و تنوع منابع پروتئینی پایین‌تر است.`,
-              `Your monthly budget is ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}. The recommended budget plan costs about ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)}. The reference plan costs about ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)}. The budget version satisfies required minimums, but has about ${number.format(Math.abs(proteinDifference ?? 0))} g less protein per day than your preferred target and lower protein source variety.`,
-            )}
-          </p>
-        ) : comparison.monthly_cost_gap_irr != null && comparison.monthly_cost_gap_irr < 10_000_000 ? (
-          <p className="plan-comparison-explanation__body">
-            {l(
-              "بودجه شما به هزینه برنامه مرجع بسیار نزدیک است؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
-              "Your budget is very close to the cost of the reference plan; therefore, only the recommended budget plan is displayed.",
-            )}
-          </p>
-        ) : (
-          <p className="plan-comparison-explanation__body">
-            {l(
-              "اختلاف کیفیت برنامه مرجع با برنامه بودجه‌ای چشمگیر نبود؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
-              "The reference plan did not offer a meaningful quality improvement; therefore, only the recommended budget plan is displayed.",
-            )}
-          </p>
-        )}
+
+        <div className="plan-comparison-explanation">
+          <div className="plan-comparison-explanation__header">
+            <span className="plan-comparison-explanation__icon" aria-hidden="true">💡</span>
+            <h4>{l("چرا این دو برنامه متفاوتند؟", "Why they differ")}</h4>
+          </div>
+          {comparison.show_ideal_plan ? (
+            <p className="plan-comparison-explanation__body">
+              {l(
+                `بودجه ماهانه شما ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} است. برنامه پیشنهادی با بودجه شما حدود ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. برنامه مرجع متناسب با هدف شما حدود ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. نسخه بودجه‌ای حداقل‌های تعیین‌شده را رعایت می‌کند، اما نسبت به هدف ترجیحی حدود ${number.format(Math.abs(proteinDifference ?? 0))} گرم پروتئین در روز کمتر دارد و تنوع منابع پروتئینی پایین‌تر است.`,
+                `Your monthly budget is ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}. The recommended budget plan costs about ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)}. The reference plan costs about ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)}. The budget version satisfies required minimums, but has about ${number.format(Math.abs(proteinDifference ?? 0))} g less protein per day than your preferred target and lower protein source variety.`,
+              )}
+            </p>
+          ) : comparison.monthly_cost_gap_irr != null && comparison.monthly_cost_gap_irr < 10_000_000 ? (
+            <p className="plan-comparison-explanation__body">
+              {l(
+                "بودجه شما به هزینه برنامه مرجع بسیار نزدیک است؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
+                "Your budget is very close to the cost of the reference plan; therefore, only the recommended budget plan is displayed.",
+              )}
+            </p>
+          ) : (
+            <p className="plan-comparison-explanation__body">
+              {l(
+                "اختلاف کیفیت برنامه مرجع با برنامه بودجه‌ای چشمگیر نبود؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
+                "The reference plan did not offer a meaningful quality improvement; therefore, only the recommended budget plan is displayed.",
+              )}
+            </p>
+          )}
+        </div>
       </div>
     </section>
   );
