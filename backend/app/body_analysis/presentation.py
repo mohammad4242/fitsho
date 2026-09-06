@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from app.body_analysis.api_schemas import (
     BodyAnalysisExperienceDirection,
     BodyAnalysisExperienceIndicator,
@@ -9,6 +11,7 @@ from app.body_analysis.api_schemas import (
     BodyAnalysisExperienceV4,
     BodyAnalysisInputSnapshotResponse,
 )
+from app.body_analysis.body_composition import calculate_body_composition
 from app.body_analysis.enums import BodyAnalysisClassification, BodyArea
 from app.body_analysis.schemas import BodyAnalysisEvidenceV4Payload, NormalizedBodyAnalysis
 from app.body_analysis.service import BodyAnalysisInputSnapshot
@@ -27,6 +30,31 @@ _V4_REGION_ORDER = (
     BodyArea.HAMSTRINGS,
     BodyArea.CALVES,
 )
+
+_UPPER_BODY_AREAS = (
+    BodyArea.SHOULDERS,
+    BodyArea.CHEST,
+    BodyArea.BACK,
+    BodyArea.LATS,
+    BodyArea.ARMS,
+    BodyArea.FOREARMS,
+)
+
+_LOWER_BODY_AREAS = (
+    BodyArea.GLUTES,
+    BodyArea.QUADS,
+    BodyArea.HAMSTRINGS,
+    BodyArea.CALVES,
+)
+
+_MUSCLE_AREAS = _UPPER_BODY_AREAS + _LOWER_BODY_AREAS
+
+_ORDINAL_CLASSIFICATION = {
+    BodyAnalysisClassification.STRENGTH: 3,
+    BodyAnalysisClassification.NEUTRAL: 2,
+    BodyAnalysisClassification.MILD_LAG: 1,
+    BodyAnalysisClassification.CLEAR_LAG: 0,
+}
 
 _DISPLAY_CLASSIFICATION = {
     BodyAnalysisClassification.STRENGTH: "stronger",
@@ -68,9 +96,13 @@ def build_body_analysis_experience_v4(
 
     findings_by_area = {finding.body_area: finding for finding in normalized_result.findings}
     regions = tuple(
-        _region(findings_by_area[area])
-        for area in _V4_REGION_ORDER
-        if area in findings_by_area
+        _region(findings_by_area[area]) for area in _V4_REGION_ORDER if area in findings_by_area
+    )
+    body_comp = calculate_body_composition(
+        sex=snapshot.sex,
+        height_cm=snapshot.height_cm,
+        weight_kg=snapshot.weight_kg,
+        waist_circumference_cm=snapshot.waist_circumference_cm,
     )
     return BodyAnalysisExperienceV4(
         schema_version="4.0",
@@ -79,6 +111,7 @@ def build_body_analysis_experience_v4(
         input_snapshot=BodyAnalysisInputSnapshotResponse.model_validate(
             snapshot.model_dump(mode="json", exclude={"photo_versions"})
         ),
+        body_composition=body_comp,
         first_impression=_first_impression(normalized_result),
         direction=_direction(snapshot),
         indicators=_indicators(normalized_result, evidence, snapshot),
@@ -98,9 +131,7 @@ def _region(finding: object) -> BodyAnalysisExperienceRegion:
         area=finding.body_area,
         display_classification=display_classification,
         insight_key=insight_key,
-        insight_parameters=(
-            {"area": finding.body_area.value} if insight_key is not None else {}
-        ),
+        insight_parameters=({"area": finding.body_area.value} if insight_key is not None else {}),
         supporting_views=finding.supporting_views,
     )
 
@@ -130,9 +161,7 @@ def _direction(snapshot: BodyAnalysisInputSnapshot) -> BodyAnalysisExperienceDir
     height_m = snapshot.height_cm / 100
     bmi = snapshot.weight_kg / (height_m**2) if height_m > 0 else None
     waist_to_height = (
-        snapshot.waist_circumference_cm / snapshot.height_cm
-        if snapshot.height_cm > 0
-        else None
+        snapshot.waist_circumference_cm / snapshot.height_cm if snapshot.height_cm > 0 else None
     )
     if bmi is not None and bmi < 18.5:
         return BodyAnalysisExperienceDirection(
@@ -140,12 +169,7 @@ def _direction(snapshot: BodyAnalysisInputSnapshot) -> BodyAnalysisExperienceDir
             goal=FitnessGoal.GAIN_WEIGHT,
             reason_codes=("low_body_mass_gain_priority",),
         )
-    if (
-        bmi is not None
-        and bmi >= 30
-        and waist_to_height is not None
-        and waist_to_height >= 0.55
-    ):
+    if bmi is not None and bmi >= 30 and waist_to_height is not None and waist_to_height >= 0.55:
         return BodyAnalysisExperienceDirection(
             status="aligned_with_current_goal",
             goal=FitnessGoal.LOSE_WEIGHT,
@@ -185,11 +209,8 @@ def _indicators(
         evidence.visible_symmetry.evidence_strength,
         _SYMMETRY_SCORES,
     )
-    upper_lower_score = _display_score(
-        upper_lower_state,
-        evidence.upper_lower_balance.evidence_strength,
-        _UPPER_LOWER_SCORES,
-    )
+    upper_lower_score = _upper_lower_balance_score(result, evidence)
+    muscle_balance_score = _muscle_balance_score(result)
     body_shape_score = _body_shape_score(result)
     return BodyAnalysisExperienceIndicators(
         upper_lower_balance=BodyAnalysisExperienceIndicator(
@@ -204,12 +225,62 @@ def _indicators(
             parameters={"state": symmetry_state},
             score_percent=symmetry_score,
         ),
+        muscle_balance=BodyAnalysisExperienceIndicator(
+            status="available" if muscle_balance_score is not None else "uncertain",
+            message_key="body_analysis.indicators.muscle_balance",
+            score_percent=muscle_balance_score,
+        ),
         body_shape=BodyAnalysisExperienceIndicator(
             status="available" if body_shape_score is not None else "uncertain",
             message_key="body_analysis.indicators.body_shape",
             score_percent=body_shape_score,
         ),
     )
+
+
+def _muscle_balance_score(result: NormalizedBodyAnalysis) -> int | None:
+    values = [
+        _ORDINAL_CLASSIFICATION[finding.classification]
+        for finding in result.findings
+        if finding.body_area in _MUSCLE_AREAS and finding.classification in _ORDINAL_CLASSIFICATION
+    ]
+    if len(values) < 4:
+        return None
+    mean = sum(values) / len(values)
+    variance = sum((x - mean) ** 2 for x in values) / len(values)
+    sigma = math.sqrt(variance)
+    return round(max(0.0, min(100.0, 100.0 * (1.0 - (sigma / 1.5)))))
+
+
+def _upper_lower_balance_score(
+    result: NormalizedBodyAnalysis,
+    evidence: BodyAnalysisEvidenceV4Payload,
+) -> int | None:
+    if (
+        evidence.upper_lower_balance.evidence_strength == "low"
+        or evidence.upper_lower_balance.state == "uncertain"
+    ):
+        return None
+
+    upper_values = [
+        _ORDINAL_CLASSIFICATION[finding.classification]
+        for finding in result.findings
+        if finding.body_area in _UPPER_BODY_AREAS
+        and finding.classification in _ORDINAL_CLASSIFICATION
+    ]
+    lower_values = [
+        _ORDINAL_CLASSIFICATION[finding.classification]
+        for finding in result.findings
+        if finding.body_area in _LOWER_BODY_AREAS
+        and finding.classification in _ORDINAL_CLASSIFICATION
+    ]
+    if len(upper_values) < 2 or len(lower_values) < 2:
+        return None
+
+    upper_mean = sum(upper_values) / len(upper_values)
+    lower_mean = sum(lower_values) / len(lower_values)
+    diff = abs(upper_mean - lower_mean)
+    return round(max(0.0, min(100.0, 100.0 * (1.0 - (diff / 3.0)))))
 
 
 def _displayable_areas(areas: tuple[BodyArea, ...]) -> tuple[BodyArea, ...]:

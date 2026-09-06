@@ -72,16 +72,22 @@ def test_v4_presentation_v2_uses_three_scores_and_balanced_insights() -> None:
 
     assert experience.schema_version == "4.0"
     assert experience.presentation_version == "body-analysis-experience-v2"
+    assert experience.body_composition is not None
+    assert experience.body_composition.bmi == 26.0
+    assert experience.body_composition.estimated_body_fat_percent == 21.6
+    assert experience.body_composition.body_fat_estimation_method == "rfm"
     assert experience.first_impression.message_key.startswith("body_analysis.")
     assert experience.direction.status == "aligned_with_current_goal"
     assert experience.direction.goal is FitnessGoal.BUILD_MUSCLE
     assert set(experience.indicators.model_dump()) == {
         "upper_lower_balance",
         "visible_symmetry",
+        "muscle_balance",
         "body_shape",
     }
-    assert experience.indicators.upper_lower_balance.score_percent == 90
+    assert experience.indicators.upper_lower_balance.score_percent == 100
     assert experience.indicators.visible_symmetry.score_percent == 90
+    assert experience.indicators.muscle_balance.score_percent == 100
     assert experience.indicators.body_shape.score_percent == 85
     assert all(
         indicator["score_percent"] is None
@@ -229,6 +235,7 @@ def test_v4_presentation_uses_null_scores_for_uncertain_or_insufficient_evidence
 
     assert experience.indicators.upper_lower_balance.score_percent is None
     assert experience.indicators.visible_symmetry.score_percent is None
+    assert experience.indicators.muscle_balance.score_percent is None
     assert experience.indicators.body_shape.score_percent is None
 
 
