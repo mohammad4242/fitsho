@@ -1204,9 +1204,10 @@ function WeightRateCard({
 
   return (
     <section className="nutrition-weight-rate-card" aria-label={l("نرخ تغییر وزن هفتگی", "Weekly weight change rate")}>
-      <header>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <h3>{l("نرخ تغییر وزن هفتگی", "Weekly Weight Change Rate")}</h3>
+      <header className="nutrition-weight-rate-card__header">
+        <div className="nutrition-weight-rate-card__title-group">
+          <span className="nutrition-weight-rate-card__icon" aria-hidden="true">⚖️</span>
+          <h3 className="nutrition-weight-rate-card__title">{l("نرخ تغییر وزن هفتگی", "Weekly Weight Change Rate")}</h3>
           {isOverride ? (
             <span className="nutrition-rate-badge--override">
               {l("نرخ دلخواه من", "User Override")}
@@ -1243,20 +1244,20 @@ function WeightRateCard({
         </div>
       </header>
       <div className="nutrition-weight-rate-grid">
-        <div className="nutrition-weight-rate-item">
+        <div className="nutrition-weight-rate-item nutrition-weight-rate-item--requested">
           <span className="nutrition-weight-rate-label">{l("درخواست شما", "Your request")}</span>
           <strong className="nutrition-weight-rate-val">
             {requested != null ? `${number.format(requested)} ${l("کیلوگرم/هفته", "kg/week")}` : "—"}
           </strong>
         </div>
-        <div className="nutrition-weight-rate-item">
+        <div className="nutrition-weight-rate-item nutrition-weight-rate-item--recommended">
           <span className="nutrition-weight-rate-label">{l("مقدار پیشنهادی", "Recommended")}</span>
           <strong className="nutrition-weight-rate-val">
             {recommended != null ? `${number.format(recommended)} ${l("کیلوگرم/هفته", "kg/week")}` : "—"}
           </strong>
         </div>
         <div
-          className={`nutrition-weight-rate-item ${
+          className={`nutrition-weight-rate-item nutrition-weight-rate-item--applied ${
             isOverride
               ? "nutrition-weight-rate-item--override"
               : isClamped
