@@ -4,6 +4,7 @@ import {
   createNutritionEstimate,
   createWeeklyNutritionPlan,
   deleteCatalogueFood,
+  downloadNutritionPlanPdf,
   getCurrentNutritionEstimate,
   getLatestWeeklyNutritionPlan,
   getMealFeedback,
@@ -150,4 +151,21 @@ it("fetches persisted feedback and explicit replacement candidates", async () =>
   expect(fetch).toHaveBeenNthCalledWith(1, "/api/v1/nutrition/plans/plan-1/feedback", expect.objectContaining({ credentials: "include" }));
   expect(fetch).toHaveBeenNthCalledWith(2, "/api/v1/nutrition/plans/plan-1/meal-replacement-options?meal_id=meal-1", expect.objectContaining({ credentials: "include" }));
   expect(fetch).toHaveBeenNthCalledWith(3, "/api/v1/nutrition/plans/plan-1/food-replacement-options?meal_id=meal-1&food_id=food-1", expect.objectContaining({ credentials: "include" }));
+});
+
+it("downloads nutrition plan PDF blob", async () => {
+  const fakeBlob = new Blob(["%PDF-mock"], { type: "application/pdf" });
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+    new Response(fakeBlob, {
+      headers: { "Content-Type": "application/pdf" },
+    }),
+  );
+
+  const result = await downloadNutritionPlanPdf("plan-999");
+
+  expect(result.type).toBe("application/pdf");
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/nutrition/plans/plan-999/pdf",
+    expect.objectContaining({ credentials: "include" }),
+  );
 });

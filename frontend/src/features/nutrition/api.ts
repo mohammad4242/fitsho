@@ -1,4 +1,4 @@
-import { ApiError, request } from "../../shared/apiClient";
+import { ApiError, request, requestBlob } from "../../shared/apiClient";
 import type {
   NutritionProfile,
   NutritionProfileInput,
@@ -324,6 +324,10 @@ export async function getLatestWeeklyNutritionPlan(): Promise<WeeklyPlan | null>
 
 export function getWeeklyNutritionPlan(planId: string): Promise<WeeklyPlan> {
   return request(`${nutritionPath}/plans/${planId}`);
+}
+
+export function downloadNutritionPlanPdf(planId: string): Promise<Blob> {
+  return requestBlob(`${nutritionPath}/plans/${planId}/pdf`);
 }
 
 export function listWeeklyNutritionPlans(): Promise<WeeklyPlanHistoryItem[]> {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../../shared/apiClient";
+import { AppIcon } from "../../shared/AppIcon";
 import { MealThumbnail } from "../../shared/MealThumbnail";
 import * as api from "./api";
 import { irrToRoundedToman, roundToTenThousandToman } from "./money";
@@ -37,6 +38,8 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [selector, setSelector] = useState<ReplacementSelector | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState(false);
   useEffect(() => { setCurrentPlan(plan); }, [plan]);
   useEffect(() => {
     if (isReferencePlan) return;
@@ -177,6 +180,28 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
     setBusyAction({ mealId: "regenerate", action: "regenerate" }); setActionError(null);
     try { setCurrentPlan(await api.partialRegeneratePlan(currentPlan.id, [selectedDay])); setSelectedDay(0); }
     catch (error: unknown) { runError(error); } finally { setBusyAction(null); }
+  }
+
+  function downloadPdf() {
+    if (downloadingPdf) return;
+    setDownloadingPdf(true);
+    setPdfError(false);
+    void api.downloadNutritionPlanPdf(currentPlan.id)
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        try {
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = `fitsho-nutrition-plan-${currentPlan.id}.pdf`;
+          document.body.append(anchor);
+          anchor.click();
+          anchor.remove();
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      })
+      .catch(() => setPdfError(true))
+      .finally(() => setDownloadingPdf(false));
   }
 
   return (
@@ -436,6 +461,34 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
           </div>
         </details>
       )}
+
+      <div className="weekly-plan__pdf-section">
+        <button
+          className="weekly-plan__pdf-button"
+          type="button"
+          disabled={downloadingPdf}
+          aria-busy={downloadingPdf}
+          aria-label={l("دانلود PDF برنامه غذایی", "Download nutrition plan PDF")}
+          onClick={downloadPdf}
+        >
+          <span className="weekly-plan__pdf-icon" aria-hidden="true">
+            <AppIcon name="document" />
+          </span>
+          <div className="weekly-plan__pdf-content">
+            <strong>{l("دانلود نسخه PDF برنامه غذایی", "Download nutrition plan PDF")}</strong>
+            <small>
+              {downloadingPdf
+                ? l("در حال آماده‌سازی PDF…", "Preparing PDF…")
+                : l("دریافت فایل چاپی کامل با روزها، عکس غذاها و جدول ماکروها", "Get full printable PDF with days, meal photos & macros")}
+            </small>
+          </div>
+        </button>
+        {pdfError && (
+          <p className="weekly-plan__error" role="alert">
+            {l("دانلود PDF انجام نشد. لطفاً دوباره تلاش کن.", "Could not download PDF. Please try again.")}
+          </p>
+        )}
+      </div>
 
     </section>
   );

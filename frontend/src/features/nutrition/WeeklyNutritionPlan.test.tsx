@@ -238,3 +238,38 @@ it("disables plan-defining controls for locked meals and restores them after unl
   await user.click(screen.getByRole("button", { name: "Unlock" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Remove meal" })).not.toBeDisabled());
 });
+
+it("downloads nutrition plan PDF when clicking download button", async () => {
+  let resolveDownload: ((value: Blob) => void) | undefined;
+  vi.mocked(nutritionApi.downloadNutritionPlanPdf).mockReturnValue(
+    new Promise((resolve) => {
+      resolveDownload = resolve;
+    }),
+  );
+  const user = userEvent.setup();
+  render(<MemoryRouter><WeeklyNutritionPlan language="fa" plan={plan()} /></MemoryRouter>);
+
+  const button = screen.getByRole("button", { name: "دانلود PDF برنامه غذایی" });
+  await user.click(button);
+
+  expect(button).toBeDisabled();
+  expect(screen.getByText("در حال آماده‌سازی PDF…")).toBeInTheDocument();
+  expect(nutritionApi.downloadNutritionPlanPdf).toHaveBeenCalledWith("plan-1");
+
+  resolveDownload?.(new Blob(["%PDF-mock"], { type: "application/pdf" }));
+  await waitFor(() => expect(button).toBeEnabled());
+});
+
+it("shows an error message when PDF download fails", async () => {
+  vi.mocked(nutritionApi.downloadNutritionPlanPdf).mockRejectedValue(new Error("PDF failed"));
+  const user = userEvent.setup();
+  render(<MemoryRouter><WeeklyNutritionPlan language="fa" plan={plan()} /></MemoryRouter>);
+
+  const button = screen.getByRole("button", { name: "دانلود PDF برنامه غذایی" });
+  await user.click(button);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "دانلود PDF انجام نشد. لطفاً دوباره تلاش کن.",
+  );
+});
+

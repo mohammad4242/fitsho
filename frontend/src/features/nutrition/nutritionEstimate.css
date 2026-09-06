@@ -446,6 +446,17 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan__nutrients article { display: flex; flex-direction: column; gap: .35rem; padding: .9rem; border-radius: .9rem; background: rgb(3 28 27 / 52%); }
 .weekly-plan__nutrients span, .weekly-plan__nutrients small { color: rgb(234 244 241 / 58%); font-size: .75rem; }
 .weekly-plan__nutrients small[data-status="data_incomplete"], .weekly-plan__nutrients small[data-status="above_applicable_limit"] { color: #ffd798; }
+.weekly-plan__pdf-section { margin-top: 1.5rem; }
+.weekly-plan__pdf-button { width: 100%; min-height: 4.8rem; display: flex; align-items: center; gap: 1.1rem; padding: 1rem 1.35rem; border: 1px solid rgb(80 223 206 / 24%); border-radius: 1.2rem; background: linear-gradient(135deg, rgb(9 54 51 / 75%) 0%, rgb(3 28 27 / 85%) 100%); color: var(--fitsho-ink, #eaf4f1); font: inherit; text-align: right; cursor: pointer; transition: all .2s ease; box-shadow: 0 4px 16px rgb(0 0 0 / 20%); }
+[dir="ltr"] .weekly-plan__pdf-button { text-align: left; }
+.weekly-plan__pdf-button:hover:not(:disabled) { border-color: var(--fitsho-aqua); background: linear-gradient(135deg, rgb(12 68 64 / 85%) 0%, rgb(5 38 36 / 90%) 100%); transform: translateY(-2px); box-shadow: 0 6px 20px rgb(80 223 206 / 15%); }
+.weekly-plan__pdf-button:focus-visible { outline: 2px solid var(--fitsho-aqua); outline-offset: 2px; }
+.weekly-plan__pdf-button:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.weekly-plan__pdf-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: .85rem; background: rgb(80 223 206 / 15%); border: 1px solid rgb(80 223 206 / 30%); color: var(--fitsho-aqua, #50dfce); flex-shrink: 0; }
+.weekly-plan__pdf-icon svg { width: 1.4rem; height: 1.4rem; }
+.weekly-plan__pdf-content { display: flex; flex-direction: column; gap: .25rem; }
+.weekly-plan__pdf-content strong { font-size: 1rem; color: #ffffff; font-weight: 700; }
+.weekly-plan__pdf-content small { font-size: .8rem; color: rgb(234 244 241 / 70%); }
 @media (max-width: 800px) { .nutrition-estimate-summary { grid-template-columns: 1fr; } .nutrition-target-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 @media (max-width: 600px) {
