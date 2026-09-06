@@ -753,7 +753,15 @@ def generate_weekly_plan(db: Session, user_id: UUID) -> WeeklyPlanGenerationResp
             program_id=budget_program,
         )
 
-    if budget_plan_model is not None:
+    if (
+        comparison_report.show_ideal_plan
+        and budget_plan_model is not None
+        and ideal_plan_model is not None
+    ):
+        bundle.selected_plan_id = None
+        bundle.selected_plan_role = None
+        bundle.selected_at = None
+    elif budget_plan_model is not None:
         bundle.selected_plan_id = budget_plan_model.id
         bundle.selected_plan_role = NutritionPlanRole.BUDGET.value
         bundle.selected_at = datetime.now(UTC)

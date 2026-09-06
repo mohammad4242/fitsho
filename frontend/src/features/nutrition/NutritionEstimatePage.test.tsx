@@ -1000,8 +1000,8 @@ it("allows selecting between budget and ideal plan in bundle and persists choice
   vi.mocked(nutritionApi.createWeeklyNutritionPlan).mockResolvedValue({
     generation_id: "gen-bundle-1",
     bundle_id: "bundle-uuid-1",
-    selected_plan_id: "plan-budget",
-    selected_plan_role: "budget",
+    selected_plan_id: null,
+    selected_plan_role: null,
     outcome: "success",
     reason_codes: ["SAFE_FEASIBLE_DRAFT_GENERATED"],
     warning_codes: [],
@@ -1038,15 +1038,18 @@ it("allows selecting between budget and ideal plan in bundle and persists choice
   const user = userEvent.setup();
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
 
-  expect(await screen.findByText("برنامه فعال شما")).toBeInTheDocument();
-  const selectIdealBtn = screen.getByRole("button", { name: "انتخاب" });
-  expect(selectIdealBtn).toBeInTheDocument();
+  expect(await screen.findByText(/دو نسخه برنامه برای شما آماده شده است/)).toBeInTheDocument();
+  expect(screen.queryByText("برنامه فعال شما")).not.toBeInTheDocument();
 
-  await user.click(selectIdealBtn);
+  const selectButtons = screen.getAllByRole("button", { name: "انتخاب این برنامه" });
+  expect(selectButtons).toHaveLength(2);
+
+  await user.click(selectButtons[1]);
 
   expect(nutritionApi.selectBundlePlan).toHaveBeenCalledWith("bundle-uuid-1", {
     selected_plan_role: "ideal",
   });
+  expect(await screen.findByText("برنامه فعال شما")).toBeInTheDocument();
 });
 
 it("renders initial build button and does not render rebuild button when no plan exists", async () => {

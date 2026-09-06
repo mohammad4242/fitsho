@@ -29,7 +29,7 @@ export function NutritionEstimatePage() {
   const [budgetPlan, setBudgetPlan] = useState<WeeklyPlan | null>(null);
   const [idealPlan, setIdealPlan] = useState<WeeklyPlan | null>(null);
   const [bundleId, setBundleId] = useState<string | null>(null);
-  const [selectedPlanRole, setSelectedPlanRole] = useState<"budget" | "ideal">("budget");
+  const [selectedPlanRole, setSelectedPlanRole] = useState<"budget" | "ideal" | null>(null);
   const [isSelectingPlan, setIsSelectingPlan] = useState(false);
   const [comparison, setComparison] = useState<PlanComparison | null>(null);
   const [tracking, setTracking] = useState<DailyTrackingSummary | null>(null);
@@ -101,7 +101,8 @@ export function NutritionEstimatePage() {
         const resolvedPlan = result.budget_plan ?? result.plan ?? null;
         if (result.outcome === "success" && resolvedPlan !== null) {
           setBundleId(result.bundle_id ?? null);
-          const resolvedRole = (result.selected_plan_role as "budget" | "ideal") || "budget";
+          const isTwoPlan = Boolean(result.comparison?.show_ideal_plan && result.ideal_plan);
+          const resolvedRole = (result.selected_plan_role as "budget" | "ideal" | null) ?? (isTwoPlan ? null : "budget");
           setSelectedPlanRole(resolvedRole);
           setBudgetPlan(result.budget_plan ?? result.plan ?? null);
           setIdealPlan(result.ideal_plan ?? null);
@@ -180,7 +181,7 @@ function PlanArea({
   onSelectPlan,
   outcome,
   plan,
-  selectedPlanRole = "budget",
+  selectedPlanRole = null,
 }: {
   bundleId?: string | null;
   budgetPlan?: WeeklyPlan | null;
@@ -194,7 +195,7 @@ function PlanArea({
   onSelectPlan?: (role: "budget" | "ideal") => void;
   outcome: WeeklyPlanGeneration | null;
   plan: WeeklyPlan | null;
-  selectedPlanRole?: "budget" | "ideal";
+  selectedPlanRole?: "budget" | "ideal" | null;
 }) {
   const l = (fa: string, en: string) => language === "en" ? en : fa;
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
@@ -218,7 +219,7 @@ function PlanArea({
         )}
         {isTwoPlan ? (
           <div className="weekly-plans-dual-container">
-            <details className="weekly-plan-accordion" open={selectedPlanRole === "budget"}>
+            <details className="weekly-plan-accordion" open={selectedPlanRole === "budget" || selectedPlanRole === null}>
               <summary className="weekly-plan-accordion__summary">
                 <span>
                   {l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}
@@ -227,7 +228,7 @@ function PlanArea({
                 <span className="weekly-plan-accordion__chevron" aria-hidden="true">▾</span>
               </summary>
               <WeeklyNutritionPlan
-                isReferencePlan={selectedPlanRole !== "budget"}
+                isReferencePlan={selectedPlanRole === "ideal"}
                 language={language}
                 plan={activeBudgetPlan}
                 title={l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}
@@ -408,14 +409,14 @@ function PlanComparisonSection({
   isSelectingPlan,
   language,
   onSelectPlan,
-  selectedPlanRole = "budget",
+  selectedPlanRole = null,
 }: {
   bundleId?: string | null;
   comparison: PlanComparison;
   isSelectingPlan?: boolean;
   language: "fa" | "en";
   onSelectPlan?: (role: "budget" | "ideal") => void;
-  selectedPlanRole?: "budget" | "ideal";
+  selectedPlanRole?: "budget" | "ideal" | null;
 }) {
   const l = (fa: string, en: string) => language === "en" ? en : fa;
   const number = new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR", {
@@ -443,109 +444,122 @@ function PlanComparisonSection({
       </header>
 
       {comparison.show_ideal_plan && Boolean(bundleId) && Boolean(onSelectPlan) && (
-        <div className="nutrition-bundle-selection-cards">
-          <div
-            className={`nutrition-bundle-card ${selectedPlanRole === "budget" ? "is-selected" : ""}`}
-          >
-            <div className="nutrition-bundle-card__header">
-              <div className="nutrition-bundle-card__title-group">
-                <h4 className="nutrition-bundle-card__title">{l("برنامه بودجه‌ای", "Budget Plan")}</h4>
-                <p className="nutrition-bundle-card__subtitle">
-                  {l("بهترین کیفیت در محدوده بودجه شما", "Best quality within your budget")}
-                </p>
-              </div>
-              {selectedPlanRole === "budget" ? (
-                <span className="nutrition-bundle-card__badge">
-                  <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
-                  {l("فعال", "Active")}
-                </span>
-              ) : null}
-            </div>
-            <div className="nutrition-bundle-card__cost-row">
-              <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهانه: ", "Monthly cost: ")}</span>
-              <strong className="nutrition-bundle-card__cost-val">
-                {comparison.budget_plan_monthly_cost_irr != null
-                  ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
-                  : "—"}
+        <div className="nutrition-bundle-selection-area">
+          {selectedPlanRole === null && (
+            <div className="nutrition-bundle-selection-prompt" role="status">
+              <span className="nutrition-bundle-selection-prompt__icon" aria-hidden="true">👉</span>
+              <strong>
+                {l(
+                  "دو نسخه برنامه برای شما آماده شده است؛ لطفاً یکی از دو گزینه زیر را برای فعال‌سازی انتخاب کنید:",
+                  "Two plan versions are ready. Please select one of the options below to activate it:"
+                )}
               </strong>
             </div>
-            <div className="nutrition-bundle-card__pills">
-              {proteinBudgetVal != null && (
-                <span className="nutrition-bundle-card__pill">
-                  {number.format(proteinBudgetVal)} g {l("پروتئین/روز", "protein/day")}
-                </span>
-              )}
-              {comparison.unique_meal_count_budget != null && (
-                <span className="nutrition-bundle-card__pill">
-                  {number.format(comparison.unique_meal_count_budget)} {l("وعده", "meals")}
-                </span>
-              )}
-              {comparison.unique_protein_sources_budget != null && (
-                <span className="nutrition-bundle-card__pill">
-                  {number.format(comparison.unique_protein_sources_budget)} {l("منبع پروتئین", "protein sources")}
-                </span>
-              )}
-            </div>
-            <button
-              className={selectedPlanRole === "budget" ? "secondary-button is-active nutrition-bundle-card__action" : "primary-button nutrition-bundle-card__action"}
-              disabled={selectedPlanRole === "budget" || isSelectingPlan}
-              onClick={() => onSelectPlan?.("budget")}
-              type="button"
+          )}
+          <div className="nutrition-bundle-selection-cards">
+            <div
+              className={`nutrition-bundle-card ${selectedPlanRole === "budget" ? "is-selected" : ""}`}
             >
-              {selectedPlanRole === "budget" ? l("برنامه فعال شما", "Active Plan") : l("انتخاب", "Select")}
-            </button>
-          </div>
+              <div className="nutrition-bundle-card__header">
+                <div className="nutrition-bundle-card__title-group">
+                  <h4 className="nutrition-bundle-card__title">{l("برنامه بودجه‌ای", "Budget Plan")}</h4>
+                  <p className="nutrition-bundle-card__subtitle">
+                    {l("بهترین کیفیت در محدوده بودجه شما", "Best quality within your budget")}
+                  </p>
+                </div>
+                {selectedPlanRole === "budget" ? (
+                  <span className="nutrition-bundle-card__badge">
+                    <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
+                    {l("فعال", "Active")}
+                  </span>
+                ) : null}
+              </div>
+              <div className="nutrition-bundle-card__cost-row">
+                <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهانه: ", "Monthly cost: ")}</span>
+                <strong className="nutrition-bundle-card__cost-val">
+                  {comparison.budget_plan_monthly_cost_irr != null
+                    ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
+                    : "—"}
+                </strong>
+              </div>
+              <div className="nutrition-bundle-card__pills">
+                {proteinBudgetVal != null && (
+                  <span className="nutrition-bundle-card__pill">
+                    {number.format(proteinBudgetVal)} g {l("پروتئین/روز", "protein/day")}
+                  </span>
+                )}
+                {comparison.unique_meal_count_budget != null && (
+                  <span className="nutrition-bundle-card__pill">
+                    {number.format(comparison.unique_meal_count_budget)} {l("وعده", "meals")}
+                  </span>
+                )}
+                {comparison.unique_protein_sources_budget != null && (
+                  <span className="nutrition-bundle-card__pill">
+                    {number.format(comparison.unique_protein_sources_budget)} {l("منبع پروتئین", "protein sources")}
+                  </span>
+                )}
+              </div>
+              <button
+                className={selectedPlanRole === "budget" ? "secondary-button is-active nutrition-bundle-card__action" : "primary-button nutrition-bundle-card__action"}
+                disabled={selectedPlanRole === "budget" || isSelectingPlan}
+                onClick={() => onSelectPlan?.("budget")}
+                type="button"
+              >
+                {selectedPlanRole === "budget" ? l("برنامه فعال شما", "Active Plan") : l("انتخاب این برنامه", "Select this plan")}
+              </button>
+            </div>
 
-          <div
-            className={`nutrition-bundle-card ${selectedPlanRole === "ideal" ? "is-selected" : ""}`}
-          >
-            <div className="nutrition-bundle-card__header">
-              <div className="nutrition-bundle-card__title-group">
-                <h4 className="nutrition-bundle-card__title">{l("برنامه مرجع", "Reference Plan")}</h4>
-                <p className="nutrition-bundle-card__subtitle">
-                  {l("پروتئین بالاتر، تنوع بیشتر، هدف‌محور", "Higher protein, more variety, goal-first")}
-                </p>
-              </div>
-              {selectedPlanRole === "ideal" ? (
-                <span className="nutrition-bundle-card__badge">
-                  <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
-                  {l("فعال", "Active")}
-                </span>
-              ) : null}
-            </div>
-            <div className="nutrition-bundle-card__cost-row">
-              <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهانه: ", "Monthly cost: ")}</span>
-              <strong className="nutrition-bundle-card__cost-val">
-                {comparison.ideal_plan_monthly_cost_irr != null
-                  ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
-                  : "—"}
-              </strong>
-            </div>
-            <div className="nutrition-bundle-card__pills">
-              {proteinIdealVal != null && (
-                <span className="nutrition-bundle-card__pill">
-                  {number.format(proteinIdealVal)} g {l("پروتئین/روز", "protein/day")}
-                </span>
-              )}
-              {comparison.unique_meal_count_ideal != null && (
-                <span className="nutrition-bundle-card__pill">
-                  {number.format(comparison.unique_meal_count_ideal)} {l("وعده", "meals")}
-                </span>
-              )}
-              {comparison.unique_protein_sources_ideal != null && (
-                <span className="nutrition-bundle-card__pill">
-                  {number.format(comparison.unique_protein_sources_ideal)} {l("منبع پروتئین", "protein sources")}
-                </span>
-              )}
-            </div>
-            <button
-              className={selectedPlanRole === "ideal" ? "secondary-button is-active nutrition-bundle-card__action" : "primary-button nutrition-bundle-card__action"}
-              disabled={selectedPlanRole === "ideal" || isSelectingPlan}
-              onClick={() => onSelectPlan?.("ideal")}
-              type="button"
+            <div
+              className={`nutrition-bundle-card ${selectedPlanRole === "ideal" ? "is-selected" : ""}`}
             >
-              {selectedPlanRole === "ideal" ? l("برنامه فعال شما", "Active Plan") : l("انتخاب", "Select")}
-            </button>
+              <div className="nutrition-bundle-card__header">
+                <div className="nutrition-bundle-card__title-group">
+                  <h4 className="nutrition-bundle-card__title">{l("برنامه مرجع", "Reference Plan")}</h4>
+                  <p className="nutrition-bundle-card__subtitle">
+                    {l("پروتئین بالاتر، تنوع بیشتر، هدف‌محور", "Higher protein, more variety, goal-first")}
+                  </p>
+                </div>
+                {selectedPlanRole === "ideal" ? (
+                  <span className="nutrition-bundle-card__badge">
+                    <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
+                    {l("فعال", "Active")}
+                  </span>
+                ) : null}
+              </div>
+              <div className="nutrition-bundle-card__cost-row">
+                <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهانه: ", "Monthly cost: ")}</span>
+                <strong className="nutrition-bundle-card__cost-val">
+                  {comparison.ideal_plan_monthly_cost_irr != null
+                    ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
+                    : "—"}
+                </strong>
+              </div>
+              <div className="nutrition-bundle-card__pills">
+                {proteinIdealVal != null && (
+                  <span className="nutrition-bundle-card__pill">
+                    {number.format(proteinIdealVal)} g {l("پروتئین/روز", "protein/day")}
+                  </span>
+                )}
+                {comparison.unique_meal_count_ideal != null && (
+                  <span className="nutrition-bundle-card__pill">
+                    {number.format(comparison.unique_meal_count_ideal)} {l("وعده", "meals")}
+                  </span>
+                )}
+                {comparison.unique_protein_sources_ideal != null && (
+                  <span className="nutrition-bundle-card__pill">
+                    {number.format(comparison.unique_protein_sources_ideal)} {l("منبع پروتئین", "protein sources")}
+                  </span>
+                )}
+              </div>
+              <button
+                className={selectedPlanRole === "ideal" ? "secondary-button is-active nutrition-bundle-card__action" : "primary-button nutrition-bundle-card__action"}
+                disabled={selectedPlanRole === "ideal" || isSelectingPlan}
+                onClick={() => onSelectPlan?.("ideal")}
+                type="button"
+              >
+                {selectedPlanRole === "ideal" ? l("برنامه فعال شما", "Active Plan") : l("انتخاب این برنامه", "Select this plan")}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -798,10 +812,21 @@ function DoctorSupervision({ language, plan }: { language: "fa" | "en"; plan: We
         {isPending && <span className="nutrition-doctor-header-status"><i />{l("در انتظار پزشک", "Pending physician")}</span>}
       </header>
       <div className="nutrition-doctor-grid">
-        <Link className="nutrition-doctor-item nutrition-doctor-item--link" to="/nutrition-supplements">
-          <span className="nutrition-doctor-item__symbol" aria-hidden="true">✦</span>
-          <span><strong>{l("مکمل‌های من", "My supplements")}</strong><small>{l("دستورها و پیگیری مکمل‌ها", "Supplement orders and tracking")}</small></span>
-          <b aria-hidden="true">‹</b>
+        <Link className="nutrition-doctor-item nutrition-doctor-item--link nutrition-doctor-item--supplements" to="/nutrition-supplements">
+          <span className="nutrition-doctor-item__symbol nutrition-doctor-item__symbol--supplements" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
+              <path d="m8.5 8.5 7 7" />
+            </svg>
+          </span>
+          <span className="nutrition-doctor-item__content">
+            <span className="nutrition-doctor-item__header-row">
+              <strong>{l("مکمل‌های من", "My supplements")}</strong>
+              <span className="nutrition-doctor-item__tag">{l("تجویز و پیگیری", "Prescription")}</span>
+            </span>
+            <small>{l("دستورها و پیگیری مکمل‌ها", "Supplement orders and tracking")}</small>
+          </span>
+          <b className="nutrition-doctor-item__chevron" aria-hidden="true">‹</b>
         </Link>
         <Link className="nutrition-doctor-item nutrition-doctor-item--link" to="/nutrition-labs">
           <span className="nutrition-doctor-item__symbol" aria-hidden="true">⌁</span>
