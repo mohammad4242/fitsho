@@ -1479,6 +1479,177 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   color: rgb(234 244 241 / 85%);
 }
 
+/* Dual Content: Table + Detailed Explanations */
+.nutrition-plan-comparison-dual-content {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+  margin-top: .5rem;
+}
+
+.nutrition-plan-comparison-section-subtitle {
+  margin: 0 0 .5rem;
+  font-size: .88rem;
+  font-weight: 800;
+  color: var(--fitsho-mist);
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+/* Comparison Table */
+.nutrition-plan-comparison-table-wrap {
+  background: rgb(255 255 255 / 2.5%);
+  border: 1px solid rgb(234 244 241 / 8%);
+  border-radius: .85rem;
+  padding: .75rem .95rem;
+  overflow-x: auto;
+  backdrop-filter: blur(6px);
+}
+
+.nutrition-plan-comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .84rem;
+  text-align: start;
+}
+
+.nutrition-plan-comparison-table th {
+  padding: .5rem .75rem;
+  font-size: .74rem;
+  font-weight: 700;
+  color: rgb(234 244 241 / 65%);
+  border-bottom: 1px solid rgb(234 244 241 / 12%);
+  white-space: nowrap;
+}
+
+.nutrition-plan-comparison-table td {
+  padding: .65rem .75rem;
+  border-bottom: 1px solid rgb(234 244 241 / 5%);
+  vertical-align: middle;
+}
+
+.nutrition-plan-comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+.nutrition-comparison-table__metric-cell {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-weight: 650;
+  color: var(--fitsho-mist);
+}
+
+.nutrition-comparison-table__metric-cell .metric-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.comparison-table__target-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: .2rem .55rem;
+  border-radius: var(--fitsho-radius-pill);
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid rgb(234 244 241 / 12%);
+  font-size: .78rem;
+  font-weight: 700;
+  color: rgb(234 244 241 / 90%);
+}
+
+.comparison-table__val {
+  font-size: .92rem;
+  font-family: "Sora Variable", sans-serif;
+  font-weight: 750;
+  color: rgb(234 244 241 / 95%);
+}
+
+.comparison-table__val--ideal {
+  color: var(--fitsho-aqua);
+}
+
+.comparison-table__muted {
+  color: rgb(234 244 241 / 35%);
+}
+
+/* Detailed Explanation Cards */
+.nutrition-comparison-detailed-explanation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .65rem;
+}
+
+@media (max-width: 860px) {
+  .nutrition-comparison-detailed-explanation {
+    grid-template-columns: 1fr;
+  }
+}
+
+.comparison-detail-card {
+  padding: .75rem .9rem;
+  border-radius: .8rem;
+  background: rgb(255 255 255 / 3%);
+  border: 1px solid rgb(234 244 241 / 8%);
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  backdrop-filter: blur(8px);
+}
+
+.comparison-detail-card--budget {
+  border-color: rgb(80 223 206 / 25%);
+  background: linear-gradient(145deg, rgb(80 223 206 / 7%), rgb(8 18 17 / 60%));
+}
+
+.comparison-detail-card--ideal {
+  border-color: rgb(123 162 255 / 25%);
+  background: linear-gradient(145deg, rgb(123 162 255 / 7%), rgb(8 18 17 / 60%));
+}
+
+.comparison-detail-card--guidance {
+  border-color: rgb(255 215 152 / 25%);
+  background: linear-gradient(145deg, rgb(255 215 152 / 7%), rgb(8 18 17 / 60%));
+}
+
+.comparison-detail-card__header {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.comparison-detail-card__icon {
+  font-size: .95rem;
+  line-height: 1;
+}
+
+.comparison-detail-card h4 {
+  margin: 0;
+  font-size: .83rem;
+  font-weight: 800;
+  color: var(--fitsho-mist);
+  line-height: 1.35;
+}
+
+.comparison-detail-card--budget h4 {
+  color: var(--fitsho-aqua);
+}
+
+.comparison-detail-card--ideal h4 {
+  color: rgb(158 190 255);
+}
+
+.comparison-detail-card--guidance h4 {
+  color: #ffd798;
+}
+
+.comparison-detail-card p {
+  margin: 0;
+  font-size: .78rem;
+  line-height: 1.65;
+  color: rgb(234 244 241 / 85%);
+}
+
 /* Accordion Dual Plans */
 .weekly-plans-dual-container {
   width: min(100% - 2rem, 76rem);

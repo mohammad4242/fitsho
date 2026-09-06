@@ -858,8 +858,9 @@ it("renders protein gap correctly in the plan comparison summary", async () => {
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه تغذیه هفتگی" }));
 
   expect(await screen.findByText("پروتئین روزانه")).toBeInTheDocument();
-  expect(screen.getByText(/۱۱۲ g → ۱۳۰ g/)).toBeInTheDocument();
-  expect(screen.getByText(/اختلاف با هدف ترجیحی: ۱۸ g\/day/)).toBeInTheDocument();
+  expect(screen.getByText(/۱۱۲ گرم\/روز/)).toBeInTheDocument();
+  expect(screen.getAllByText(/۱۳۰ گرم\/روز/)).toHaveLength(2);
+  expect(screen.getByText(/حدود ۱۸ گرم بیشتر از برنامه بودجه‌ای/)).toBeInTheDocument();
 });
 
 it("renders budget-insufficient message with known minimum feasible cost", async () => {

@@ -426,6 +426,7 @@ function PlanComparisonSection({
     ?? (comparison.protein_gap_g_per_day != null ? Number(comparison.protein_gap_g_per_day) : null);
   const proteinBudgetVal = comparison.protein_gap?.budget_value;
   const proteinIdealVal = comparison.protein_gap?.ideal_value;
+  const proteinTargetVal = comparison.protein_gap?.target_value;
 
   return (
     <section className="nutrition-plan-comparison-card" aria-label={l("مقایسه برنامه‌ها", "Plan comparison")}>
@@ -549,103 +550,214 @@ function PlanComparisonSection({
         </div>
       )}
 
-      <div className="nutrition-plan-comparison-bottom-row">
-        <div className="nutrition-plan-comparison-metrics-col">
-          <div className="nutrition-plan-comparison-grid">
-            <div className="nutrition-plan-comparison-item">
-              <span className="comparison-item-label">{l("بودجه ماهانه شما", "Your monthly budget")}</span>
-              <strong className="comparison-item-val">{formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}</strong>
+      {comparison.show_ideal_plan ? (
+        <div className="nutrition-plan-comparison-dual-content">
+          <div className="nutrition-plan-comparison-table-wrap">
+            <h4 className="nutrition-plan-comparison-section-subtitle">
+              {l("جدول مقایسه برنامه‌ها", "Plan Comparison Table")}
+            </h4>
+            <table className="nutrition-plan-comparison-table">
+              <thead>
+                <tr>
+                  <th scope="col">{l("شاخص", "Metric")}</th>
+                  <th scope="col">{l("هدف / بودجه شما", "Your Target / Budget")}</th>
+                  <th scope="col">{l("برنامه با بودجه شما", "Plan with Your Budget")}</th>
+                  <th scope="col">{l("برنامه ایده‌آل (مرجع)", "Ideal Plan (Reference)")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Row 1: Monthly Cost */}
+                <tr>
+                  <td className="nutrition-comparison-table__metric-cell">
+                    <span className="metric-icon" aria-hidden="true">💰</span>
+                    <span>{l("هزینه ماهیانه", "Monthly Cost")}</span>
+                  </td>
+                  <td>
+                    <span className="comparison-table__target-badge">
+                      {formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}
+                    </span>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val">
+                      {comparison.budget_plan_monthly_cost_irr != null
+                        ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
+                        : "—"}
+                    </strong>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val comparison-table__val--ideal">
+                      {comparison.ideal_plan_monthly_cost_irr != null
+                        ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
+                        : "—"}
+                    </strong>
+                  </td>
+                </tr>
+
+                {/* Row 2: Daily Protein */}
+                <tr>
+                  <td className="nutrition-comparison-table__metric-cell">
+                    <span className="metric-icon" aria-hidden="true">🥩</span>
+                    <span>{l("پروتئین روزانه", "Daily Protein")}</span>
+                  </td>
+                  <td>
+                    <span className="comparison-table__target-badge">
+                      {proteinTargetVal != null
+                        ? `${number.format(proteinTargetVal)} ${l("گرم/روز", "g/day")}`
+                        : (proteinIdealVal != null ? `${number.format(proteinIdealVal)} ${l("گرم/روز", "g/day")}` : "—")}
+                    </span>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val">
+                      {proteinBudgetVal != null ? `${number.format(proteinBudgetVal)} ${l("گرم/روز", "g/day")}` : "—"}
+                    </strong>
+                  </td>
+                  <td>
+                    <strong className="comparison-table__val comparison-table__val--ideal">
+                      {proteinIdealVal != null ? `${number.format(proteinIdealVal)} ${l("گرم/روز", "g/day")}` : "—"}
+                    </strong>
+                  </td>
+                </tr>
+
+                {/* Row 3: Meal Variety (if available) */}
+                {(comparison.unique_meal_count_budget != null || comparison.unique_meal_count_ideal != null) && (
+                  <tr>
+                    <td className="nutrition-comparison-table__metric-cell">
+                      <span className="metric-icon" aria-hidden="true">🥗</span>
+                      <span>{l("تنوع وعده‌ها", "Meal Variety")}</span>
+                    </td>
+                    <td>
+                      <span className="comparison-table__muted">—</span>
+                    </td>
+                    <td>
+                      <strong className="comparison-table__val">
+                        {comparison.unique_meal_count_budget != null
+                          ? `${number.format(comparison.unique_meal_count_budget)} ${l("وعده", "meals")}`
+                          : "—"}
+                      </strong>
+                    </td>
+                    <td>
+                      <strong className="comparison-table__val comparison-table__val--ideal">
+                        {comparison.unique_meal_count_ideal != null
+                          ? `${number.format(comparison.unique_meal_count_ideal)} ${l("وعده", "meals")}`
+                          : "—"}
+                      </strong>
+                    </td>
+                  </tr>
+                )}
+
+                {/* Row 4: Protein Sources (if available) */}
+                {(comparison.unique_protein_sources_budget != null || comparison.unique_protein_sources_ideal != null) && (
+                  <tr>
+                    <td className="nutrition-comparison-table__metric-cell">
+                      <span className="metric-icon" aria-hidden="true">🐟</span>
+                      <span>{l("منابع پروتئینی", "Protein Sources")}</span>
+                    </td>
+                    <td>
+                      <span className="comparison-table__muted">—</span>
+                    </td>
+                    <td>
+                      <strong className="comparison-table__val">
+                        {comparison.unique_protein_sources_budget != null
+                          ? `${number.format(comparison.unique_protein_sources_budget)} ${l("منبع", "sources")}`
+                          : "—"}
+                      </strong>
+                    </td>
+                    <td>
+                      <strong className="comparison-table__val comparison-table__val--ideal">
+                        {comparison.unique_protein_sources_ideal != null
+                          ? `${number.format(comparison.unique_protein_sources_ideal)} ${l("منبع", "sources")}`
+                          : "—"}
+                      </strong>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="nutrition-comparison-detailed-explanation">
+            <div className="comparison-detail-card comparison-detail-card--budget">
+              <div className="comparison-detail-card__header">
+                <span className="comparison-detail-card__icon" aria-hidden="true">🛡️</span>
+                <h4>{l("رعایت استانداردها و حداقل‌های علمی در برنامه بودجه‌ای", "Safety Baselines & Minimums in Budget Plan")}</h4>
+              </div>
+              <p>
+                {l(
+                  `برنامه با بودجه با دقت داخل سقف ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} شما بهینه شده است. در این برنامه تمامی حداقل‌های علمی و بیولوژیک ضروری (شامل کف استاندارد پروتئین روزانه${proteinBudgetVal != null ? ` به میزان ${number.format(proteinBudgetVal)} گرم` : ""}، کالری مورد نیاز پایه و نیازهای ضروری سوخت‌وساز) کاملاً رعایت شده‌اند تا بدون هرگونه ریسک سلامتی یا افت کیفیت بیولوژیک، برنامه‌ای سالم، پایدار و اقتصادی داشته باشید.`,
+                  `The budget plan is precisely optimized within your ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} ceiling. All essential scientific baselines—including the required daily protein floor${proteinBudgetVal != null ? ` of ${number.format(proteinBudgetVal)} g` : ""}, baseline caloric demand, and metabolic safety needs—are strictly satisfied, ensuring a healthy, sustainable, and risk-free nutritional foundation without financial strain.`
+                )}
+              </p>
             </div>
-            <div className="nutrition-plan-comparison-item">
-              <span className="comparison-item-label">{l("هزینه تقریبی برنامه", "Estimated plan cost")}</span>
-              <strong className="comparison-item-val">
-                {comparison.budget_plan_monthly_cost_irr != null
-                  ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
-                  : "—"}
-              </strong>
+
+            <div className="comparison-detail-card comparison-detail-card--ideal">
+              <div className="comparison-detail-card__header">
+                <span className="comparison-detail-card__icon" aria-hidden="true">🚀</span>
+                <h4>{l("تفاوت‌ها و مزیت‌های برنامه ایده‌آل (مرجع)", "Advantages & Differences in Ideal Plan")}</h4>
+              </div>
+              <p>
+                {l(
+                  `برنامه ایده‌آل با هزینه ماهانه حدود ${comparison.ideal_plan_monthly_cost_irr != null ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number) : "—"} (حدود ${comparison.monthly_cost_gap_irr != null ? formatTomanOrMillion(comparison.monthly_cost_gap_irr, language, number) : "—"} تفاوت با بودجه شما)، روی اوج بهره‌وری و شتاب ورزشی تمرکز دارد. این برنامه پروتئین روزانه را به ${proteinIdealVal != null ? `${number.format(proteinIdealVal)} گرم` : "—"}${proteinTargetVal != null ? ` (منطبق بر هدف کامل ${number.format(proteinTargetVal)} گرم)` : ""}${proteinDifference != null && proteinDifference > 0 ? ` و حدود ${number.format(proteinDifference)} گرم بیشتر از برنامه بودجه‌ای` : ""} می‌رساند و با بهره‌گیری از منابع پروتئینی مرغوب‌تر و تنوع بیشتر وعده‌ها، مسیر دستیابی به هدف را سریع‌تر و پایبندی غذایی را لذت‌بخش‌تر می‌کند.`,
+                  `The ideal reference plan costs ~${comparison.ideal_plan_monthly_cost_irr != null ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number) : "—"} (a ~${comparison.monthly_cost_gap_irr != null ? formatTomanOrMillion(comparison.monthly_cost_gap_irr, language, number) : "—"} monthly difference), focusing on optimal athletic velocity. It lifts daily protein intake to ${proteinIdealVal != null ? `${number.format(proteinIdealVal)} g` : "—"}${proteinTargetVal != null ? ` (fully matching your target of ${number.format(proteinTargetVal)} g)` : ""}${proteinDifference != null && proteinDifference > 0 ? ` (~${number.format(proteinDifference)} g more than budget plan)` : ""}, using premium protein sources and broader variety to accelerate recovery and make long-term consistency effortless.`
+                )}
+              </p>
             </div>
-            {comparison.show_ideal_plan && (
-              <>
-                <div className="nutrition-plan-comparison-item">
-                  <span className="comparison-item-label">{l("برنامه مرجع", "Reference plan")}</span>
-                  <strong className="comparison-item-val">
-                    {comparison.ideal_plan_monthly_cost_irr != null
-                      ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
-                      : "—"}
-                  </strong>
-                </div>
-                <div className="nutrition-plan-comparison-item">
-                  <span className="comparison-item-label">{l("اختلاف هزینه ماهانه", "Monthly cost gap")}</span>
-                  <strong className="comparison-item-val">
-                    {comparison.monthly_cost_gap_irr != null
-                      ? formatTomanOrMillion(comparison.monthly_cost_gap_irr, language, number)
-                      : "—"}
-                  </strong>
-                </div>
-                <div className="nutrition-plan-comparison-item">
-                  <span className="comparison-item-label">{l("پروتئین روزانه", "Daily protein")}</span>
-                  <strong className="comparison-item-val">
-                    {proteinBudgetVal != null ? `${number.format(proteinBudgetVal)} g` : "—"}
-                    {" → "}
-                    {proteinIdealVal != null ? `${number.format(proteinIdealVal)} g` : "—"}
-                  </strong>
-                  {proteinDifference != null && (
-                    <small>
-                      {l("اختلاف با هدف ترجیحی", "Difference from preferred")}:{" "}
-                      {number.format(proteinDifference)} {comparison.protein_gap?.unit || "g/day"}
-                    </small>
-                  )}
-                </div>
-                <div className="nutrition-plan-comparison-item">
-                  <span className="comparison-item-label">{l("تنوع وعده‌ها", "Meal variety")}</span>
-                  <strong className="comparison-item-val">
-                    {comparison.unique_meal_count_budget != null ? number.format(comparison.unique_meal_count_budget) : "—"}
-                    {" → "}
-                    {comparison.unique_meal_count_ideal != null ? number.format(comparison.unique_meal_count_ideal) : "—"}
-                  </strong>
-                </div>
-                <div className="nutrition-plan-comparison-item">
-                  <span className="comparison-item-label">{l("تنوع منابع پروتئینی", "Protein source variety")}</span>
-                  <strong className="comparison-item-val">
-                    {comparison.unique_protein_sources_budget != null ? number.format(comparison.unique_protein_sources_budget) : "—"}
-                    {" → "}
-                    {comparison.unique_protein_sources_ideal != null ? number.format(comparison.unique_protein_sources_ideal) : "—"}
-                  </strong>
-                </div>
-              </>
+
+            <div className="comparison-detail-card comparison-detail-card--guidance">
+              <div className="comparison-detail-card__header">
+                <span className="comparison-detail-card__icon" aria-hidden="true">💡</span>
+                <h4>{l("راهنمای انتخاب برای شما", "Decision Guidance for You")}</h4>
+              </div>
+              <p>
+                {l(
+                  "اگر حفظ دقیق سقف بودجه اولویت اصلی شماست، برنامه با بودجه کاملاً پاسخگوی نیازهای فیزیکی و ورزشی شما خواهد بود و جای نگرانی ندارد. در صورتی که امکان افزایش بودجه را دارید و به دنبال ریکاوری سریع‌تر، حداکثر رشد عضلانی و تنوع بالاتر غذایی هستید، می‌توانید برنامه ایده‌آل را انتخاب نمایید.",
+                  "If budget predictability is your primary priority, the budget plan completely satisfies your physiological and training requirements. If your financial leeway allows higher investment and you aim for accelerated recovery, maximal muscle synthesis, and richer variety, you can choose the ideal plan with confidence."
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="nutrition-plan-comparison-bottom-row">
+          <div className="nutrition-plan-comparison-metrics-col">
+            <div className="nutrition-plan-comparison-grid">
+              <div className="nutrition-plan-comparison-item">
+                <span className="comparison-item-label">{l("بودجه ماهانه شما", "Your monthly budget")}</span>
+                <strong className="comparison-item-val">{formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}</strong>
+              </div>
+              <div className="nutrition-plan-comparison-item">
+                <span className="comparison-item-label">{l("هزینه تقریبی برنامه", "Estimated plan cost")}</span>
+                <strong className="comparison-item-val">
+                  {comparison.budget_plan_monthly_cost_irr != null
+                    ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
+                    : "—"}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="plan-comparison-explanation">
+            <div className="plan-comparison-explanation__header">
+              <span className="plan-comparison-explanation__icon" aria-hidden="true">⚡</span>
+              <h4>{l("تفاوت برنامه‌ها", "Plan difference")}</h4>
+            </div>
+            {comparison.monthly_cost_gap_irr != null && comparison.monthly_cost_gap_irr < 10_000_000 ? (
+              <p className="plan-comparison-explanation__body">
+                {l(
+                  "بودجه شما با برنامه مرجع فاصله کمی دارد؛ یک برنامه نمایش داده می‌شود.",
+                  "Your budget is close to the reference plan cost — only one plan shown.",
+                )}
+              </p>
+            ) : (
+              <p className="plan-comparison-explanation__body">
+                {l(
+                  "اختلاف کیفیت چشمگیر نبود؛ بهترین گزینه با بودجه شما نمایش داده می‌شود.",
+                  "No meaningful quality gap — the best option within your budget is shown.",
+                )}
+              </p>
             )}
           </div>
         </div>
-
-        <div className="plan-comparison-explanation">
-          <div className="plan-comparison-explanation__header">
-            <span className="plan-comparison-explanation__icon" aria-hidden="true">⚡</span>
-            <h4>{l("تفاوت برنامه‌ها", "Plan difference")}</h4>
-          </div>
-          {comparison.show_ideal_plan ? (
-            <p className="plan-comparison-explanation__body">
-              {l(
-                `برنامه بودجه‌ای داخل سقف ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} شما می‌ماند.${proteinDifference != null && proteinDifference > 0 ? ` برنامه مرجع حدود ${number.format(Math.abs(proteinDifference))} g پروتئین بیشتر در روز دارد.` : ""}`,
-                `Budget plan stays within your ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} limit.${proteinDifference != null && proteinDifference > 0 ? ` Reference plan adds ~${number.format(Math.abs(proteinDifference))} g more protein per day.` : ""}`,
-              )}
-            </p>
-          ) : comparison.monthly_cost_gap_irr != null && comparison.monthly_cost_gap_irr < 10_000_000 ? (
-            <p className="plan-comparison-explanation__body">
-              {l(
-                "بودجه شما با برنامه مرجع فاصله کمی دارد؛ یک برنامه نمایش داده می‌شود.",
-                "Your budget is close to the reference plan cost — only one plan shown.",
-              )}
-            </p>
-          ) : (
-            <p className="plan-comparison-explanation__body">
-              {l(
-                "اختلاف کیفیت چشمگیر نبود؛ بهترین گزینه با بودجه شما نمایش داده می‌شود.",
-                "No meaningful quality gap — the best option within your budget is shown.",
-              )}
-            </p>
-          )}
-        </div>
-      </div>
+      )}
     </section>
   );
 }

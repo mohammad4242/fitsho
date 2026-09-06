@@ -222,6 +222,7 @@ export type PlanComparisonMetric = {
   ideal_value: number | null;
   difference: number | null;
   unit: string;
+  target_value?: number | null;
 };
 
 export type PlanComparison = {
