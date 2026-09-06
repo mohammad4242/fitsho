@@ -797,51 +797,95 @@ function DoctorSupervision({ language, plan }: { language: "fa" | "en"; plan: We
 
   return (
     <section className="nutrition-doctor-supervision" aria-labelledby="nutrition-doctor-title">
-      <header>
-        <span className="nutrition-doctor-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="7" r="3" />
-            <path d="M7 21v-3a5 5 0 0 1 10 0v3M4 13v3a3 3 0 0 0 6 0v-3M4 13V9M10 13V9M18 13v3" />
-            <circle cx="18" cy="18" r="2" />
-          </svg>
-        </span>
-        <div>
-          <h2 id="nutrition-doctor-title">{l("تحت نظر پزشک", "Doctor supervision")}</h2>
-          <p>{l("خدمات و وضعیت بررسی پزشکی در یک نگاه", "Medical services and review status at a glance")}</p>
-        </div>
-        {isPending && <span className="nutrition-doctor-header-status"><i />{l("در انتظار پزشک", "Pending physician")}</span>}
-      </header>
-      <div className="nutrition-doctor-grid">
-        <Link className="nutrition-doctor-item nutrition-doctor-item--link nutrition-doctor-item--supplements" to="/nutrition-supplements">
-          <span className="nutrition-doctor-item__symbol nutrition-doctor-item__symbol--supplements" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
-              <path d="m8.5 8.5 7 7" />
-            </svg>
-          </span>
-          <span className="nutrition-doctor-item__content">
-            <span className="nutrition-doctor-item__header-row">
-              <strong>{l("مکمل‌های من", "My supplements")}</strong>
-              <span className="nutrition-doctor-item__tag">{l("تجویز و پیگیری", "Prescription")}</span>
+      <details className="nutrition-doctor-accordion">
+        <summary className="nutrition-doctor-accordion__summary">
+          <div className="nutrition-doctor-accordion__lead">
+            <span className="nutrition-doctor-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="7" r="3" />
+                <path d="M7 21v-3a5 5 0 0 1 10 0v3M4 13v3a3 3 0 0 0 6 0v-3M4 13V9M10 13V9M18 13v3" />
+                <circle cx="18" cy="18" r="2" />
+              </svg>
             </span>
-            <small>{l("دستورها و پیگیری مکمل‌ها", "Supplement orders and tracking")}</small>
-          </span>
-          <b className="nutrition-doctor-item__chevron" aria-hidden="true">‹</b>
-        </Link>
-        <Link className="nutrition-doctor-item nutrition-doctor-item--link" to="/nutrition-labs">
-          <span className="nutrition-doctor-item__symbol" aria-hidden="true">⌁</span>
-          <span><strong>{l("آزمایشات من", "My lab tests")}</strong><small>{l("نتایج و سابقه بررسی", "Results and review history")}</small></span>
-          <b aria-hidden="true">‹</b>
-        </Link>
-        <article className="nutrition-doctor-item">
-          <span className="nutrition-doctor-item__symbol" aria-hidden="true">✓</span>
-          <span><strong>{l("تأیید برنامه غذایی", "Nutrition plan approval")}</strong><small className={isPending ? "nutrition-doctor-status--pending" : undefined}>{isPending && <i />}{approvalCopy}</small></span>
-        </article>
-        <article className="nutrition-doctor-item">
-          <span className="nutrition-doctor-item__symbol" aria-hidden="true">•••</span>
-          <span><strong>{l("راهنمایی‌های پزشک", "Physician guidance")}</strong><small>{guidanceCopy}</small></span>
-        </article>
-      </div>
+            <div className="nutrition-doctor-accordion__titles">
+              <h2 id="nutrition-doctor-title">{l("تحت نظر پزشک", "Doctor supervision")}</h2>
+              <p>{l("خدمات و وضعیت بررسی پزشکی در یک نگاه", "Medical services and review status at a glance")}</p>
+            </div>
+          </div>
+          <div className="nutrition-doctor-accordion__trailing">
+            {isPending && (
+              <span className="nutrition-doctor-header-status">
+                <i />{l("در انتظار پزشک", "Pending physician")}
+              </span>
+            )}
+            <span className="nutrition-doctor-accordion__chevron" aria-hidden="true">▾</span>
+          </div>
+        </summary>
+        <div className="nutrition-doctor-grid">
+          <Link className="nutrition-doctor-item nutrition-doctor-item--link nutrition-doctor-item--supplements" to="/nutrition-supplements">
+            <span className="nutrition-doctor-item__symbol nutrition-doctor-item__symbol--supplements" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
+                <path d="m8.5 8.5 7 7" />
+              </svg>
+            </span>
+            <span className="nutrition-doctor-item__content">
+              <span className="nutrition-doctor-item__header-row">
+                <strong>{l("مکمل‌های من", "My supplements")}</strong>
+                <span className="nutrition-doctor-item__tag">{l("تجویز و پیگیری", "Prescription")}</span>
+              </span>
+              <small>{l("دستورها و پیگیری مکمل‌ها", "Supplement orders and tracking")}</small>
+            </span>
+            <b className="nutrition-doctor-item__chevron" aria-hidden="true">‹</b>
+          </Link>
+
+          <article className="nutrition-doctor-item">
+            <span className="nutrition-doctor-item__symbol nutrition-doctor-item__symbol--approved" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+            <span className="nutrition-doctor-item__content">
+              <strong>{l("تأیید برنامه غذایی", "Nutrition plan approval")}</strong>
+              <small className={isPending ? "nutrition-doctor-status--pending" : undefined}>
+                {isPending && <i />}
+                {approvalCopy}
+              </small>
+            </span>
+          </article>
+
+          <Link className="nutrition-doctor-item nutrition-doctor-item--link" to="/nutrition-labs">
+            <span className="nutrition-doctor-item__symbol nutrition-doctor-item__symbol--labs" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 2v7.31a2 2 0 0 1-.37 1.17l-4.26 6.39A2 2 0 0 0 7 20h10a2 2 0 0 0 1.63-3.13l-4.26-6.39A2 2 0 0 1 14 9.31V2" />
+                <path d="M8.5 2h7" />
+                <path d="M7 16h10" />
+              </svg>
+            </span>
+            <span className="nutrition-doctor-item__content">
+              <strong>{l("آزمایشات من", "My lab tests")}</strong>
+              <small>{l("نتایج و سابقه بررسی", "Results and review history")}</small>
+            </span>
+            <b className="nutrition-doctor-item__chevron" aria-hidden="true">‹</b>
+          </Link>
+
+          <article className="nutrition-doctor-item">
+            <span className="nutrition-doctor-item__symbol nutrition-doctor-item__symbol--guidance" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M16 13H8" />
+                <path d="M16 17H8" />
+                <path d="M10 9H8" />
+              </svg>
+            </span>
+            <span className="nutrition-doctor-item__content">
+              <strong>{l("راهنمایی‌های پزشک", "Physician guidance")}</strong>
+              <small>{guidanceCopy}</small>
+            </span>
+          </article>
+        </div>
+      </details>
     </section>
   );
 }

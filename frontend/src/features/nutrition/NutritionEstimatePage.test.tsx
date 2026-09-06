@@ -304,6 +304,21 @@ it("shows doctor supervision tools without inventing a pending plan", async () =
   expect(within(supervision!).queryByText("در انتظار تأیید پزشک")).not.toBeInTheDocument();
 });
 
+it("renders doctor supervision as collapsible accordion and reveals its cards when toggled", async () => {
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  const supervision = (await screen.findByRole("heading", { name: "تحت نظر پزشک" })).closest("section");
+  expect(supervision).not.toBeNull();
+  const accordion = supervision!.querySelector(".nutrition-doctor-accordion");
+  expect(accordion).not.toBeNull();
+  expect(accordion).not.toHaveAttribute("open");
+
+  const user = userEvent.setup();
+  await user.click(screen.getByText("تحت نظر پزشک"));
+  expect(accordion).toHaveAttribute("open");
+  expect(within(supervision!).getByRole("link", { name: /مکمل‌های من/ })).toBeInTheDocument();
+});
+
 it("keeps the red pending status for a plan awaiting physician approval", async () => {
   await i18n.changeLanguage("fa");
   vi.mocked(nutritionApi.getLatestWeeklyNutritionPlan).mockResolvedValue(weeklyPlan);
