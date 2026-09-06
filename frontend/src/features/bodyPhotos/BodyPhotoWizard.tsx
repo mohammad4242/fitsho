@@ -425,21 +425,6 @@ export function BodyPhotoWizard({
             </span>
             <h2 id={`body-photo-${view}`}>{t("bodyPhotos.captureTitle", { view: t(`bodyPhotos.views.${view}`) })}</h2>
           </div>
-          {view === "side" && (
-            <button
-              className="secondary-button body-photo-side-toggle"
-              type="button"
-              aria-label={t("bodyPhotos.sideProfile.toggleLabel", {
-                side: t(`bodyPhotos.sideProfile.${sideProfile}`),
-              })}
-              aria-pressed={sideProfile === "left"}
-              onClick={() => setSideProfile((current) => current === "right" ? "left" : "right")}
-              disabled={busy || sessionLoading}
-            >
-              <AppIcon name="refresh" className="body-photo-btn-icon" />
-              <span>{t(`bodyPhotos.sideProfile.${sideProfile}`)}</span>
-            </button>
-          )}
         </div>
         <p>{instructions[view]}</p>
         <p className="body-photo-muted">{t("bodyPhotos.cameraGuidance")}</p>
@@ -456,6 +441,26 @@ export function BodyPhotoWizard({
         ) : (
           <>
             {captureMode === "upload" && <HeadlessPhotoGuide />}
+            {view === "side" && (
+              <div className="body-photo-stage-toolbar">
+                <span className="body-photo-stage-toolbar__label" aria-hidden="true">
+                  جهت عکاسی نیمرخ:
+                </span>
+                <button
+                  className="secondary-button body-photo-side-toggle"
+                  type="button"
+                  aria-label={t("bodyPhotos.sideProfile.toggleLabel", {
+                    side: t(`bodyPhotos.sideProfile.${sideProfile}`),
+                  })}
+                  aria-pressed={sideProfile === "left"}
+                  onClick={() => setSideProfile((current) => current === "right" ? "left" : "right")}
+                  disabled={busy || sessionLoading}
+                >
+                  <AppIcon name="refresh" className="body-photo-btn-icon" />
+                  <span>{t(`bodyPhotos.sideProfile.${sideProfile}`)}</span>
+                </button>
+              </div>
+            )}
             <div className="body-photo-hud-stage">
               <div className="body-photo-hud-stage__corners" aria-hidden="true">
                 <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tl" />
@@ -484,11 +489,14 @@ export function BodyPhotoWizard({
                     <img
                       src={ghostSilhouetteUrl}
                       alt=""
-                      className="body-photo-hud-stage__silhouette"
+                      className={`body-photo-hud-stage__silhouette ${view === "side" && sideProfile === "left" ? "body-photo-hud-stage__silhouette--mirrored" : ""}`}
+                      style={view === "side" && sideProfile === "left" ? { transform: "scaleX(-1) scale(0.9)" } : undefined}
                     />
                     <span className="body-photo-hud-stage__guide-chip">
                       <AppIcon name="target" className="body-photo-btn-icon" />
-                      ALIGNMENT TARGET // {view.toUpperCase()}
+                      {view === "side"
+                        ? (sideProfile === "left" ? "LEFT PROFILE // نیمرخ چپ" : "RIGHT PROFILE // نیمرخ راست")
+                        : `ALIGNMENT TARGET // ${view.toUpperCase()}`}
                     </span>
                   </div>
 

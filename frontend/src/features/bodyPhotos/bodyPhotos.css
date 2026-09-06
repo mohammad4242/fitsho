@@ -179,23 +179,41 @@
   text-transform: uppercase;
   margin-bottom: .25rem;
 }
+.body-photo-stage-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .65rem 1rem;
+  border-radius: var(--fitsho-radius-md);
+  border: 1px solid var(--fitsho-line-strong);
+  background: linear-gradient(135deg, rgb(80 223 206 / 8%), var(--fitsho-surface-raised));
+  box-shadow: 0 .25rem 1rem rgb(0 0 0 / 25%);
+}
+.body-photo-stage-toolbar__label {
+  color: var(--fitsho-ink);
+  font-size: .86rem;
+  font-weight: 800;
+}
 .body-photo-side-toggle {
   display: inline-flex;
   align-items: center;
   gap: .5rem;
-  padding: .5rem 1rem;
+  padding: .5rem 1.1rem;
   border-radius: var(--fitsho-radius-pill);
   font-size: .85rem;
-  font-weight: 800;
-  border: 1px solid var(--fitsho-line-strong);
-  background: var(--fitsho-surface-raised);
-  color: var(--fitsho-ink);
+  font-weight: 850;
+  border: 1px solid var(--fitsho-aqua);
+  background: var(--fitsho-surface);
+  color: var(--fitsho-aqua);
   cursor: pointer;
   transition: all var(--fitsho-duration-fast);
+  box-shadow: 0 0 .8rem rgb(80 223 206 / 15%);
 }
 .body-photo-side-toggle:hover {
-  border-color: var(--fitsho-aqua);
-  color: var(--fitsho-aqua);
+  background: var(--fitsho-aqua);
+  color: #020607;
+  box-shadow: 0 0 1.2rem var(--fitsho-aqua);
 }
 
 .body-photo-headless-guide {
