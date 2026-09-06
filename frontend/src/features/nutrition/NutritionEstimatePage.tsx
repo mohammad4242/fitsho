@@ -224,6 +224,7 @@ function PlanArea({
                   {l("برنامه پیشنهادی با بودجه شما", "Recommended Plan with Your Budget")}
                   {selectedPlanRole === "budget" && ` (${l("برنامه فعال شما", "Active Plan")})`}
                 </span>
+                <span className="weekly-plan-accordion__chevron" aria-hidden="true">▾</span>
               </summary>
               <WeeklyNutritionPlan
                 isReferencePlan={selectedPlanRole !== "budget"}
@@ -238,6 +239,7 @@ function PlanArea({
                   {l("برنامه مرجع", "Reference Plan")}
                   {selectedPlanRole === "ideal" && ` (${l("برنامه فعال شما", "Active Plan")})`}
                 </span>
+                <span className="weekly-plan-accordion__chevron" aria-hidden="true">▾</span>
               </summary>
               <WeeklyNutritionPlan
                 isReferencePlan={selectedPlanRole !== "ideal"}
@@ -427,8 +429,16 @@ function PlanComparisonSection({
 
   return (
     <section className="nutrition-plan-comparison-card" aria-label={l("مقایسه برنامه‌ها", "Plan comparison")}>
-      <header>
-        <h3>{l("خلاصه بودجه و مقایسه", "Budget summary and comparison")}</h3>
+      <header className="nutrition-plan-comparison-header">
+        <div className="nutrition-plan-comparison-title-wrap">
+          <span className="nutrition-plan-comparison-icon" aria-hidden="true">📊</span>
+          <h3>{l("خلاصه بودجه و مقایسه", "Budget summary and comparison")}</h3>
+        </div>
+        {comparison.show_ideal_plan && (
+          <span className="nutrition-plan-comparison-badge">
+            {l("۲ برنامه محاسبه‌شده", "2 Computed Plans")}
+          </span>
+        )}
       </header>
 
       <div className="nutrition-plan-comparison-grid">
@@ -504,34 +514,51 @@ function PlanComparisonSection({
       )}
 
       {comparison.show_ideal_plan && Boolean(bundleId) && Boolean(onSelectPlan) && (
-        <div className="nutrition-bundle-selection-cards" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem", marginTop: "1rem" }}>
+        <div className="nutrition-bundle-selection-cards">
           <div
-            className="nutrition-bundle-card"
-            style={{
-              padding: "1rem",
-              borderRadius: "8px",
-              border: selectedPlanRole === "budget" ? "2px solid #16a34a" : "1px solid #cbd5e1",
-              backgroundColor: selectedPlanRole === "budget" ? "#f0fdf4" : "#ffffff",
-            }}
+            className={`nutrition-bundle-card ${selectedPlanRole === "budget" ? "is-selected" : ""}`}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <h4 style={{ margin: 0 }}>{l("برنامه بودجه‌ای", "Budget Plan")}</h4>
+            <div className="nutrition-bundle-card__header">
+              <div className="nutrition-bundle-card__title-group">
+                <h4 className="nutrition-bundle-card__title">{l("برنامه بودجه‌ای", "Budget Plan")}</h4>
+                <p className="nutrition-bundle-card__subtitle">
+                  {l("سازگار دقیق با سقف بودجه شما", "Tailored to fit within your budget")}
+                </p>
+              </div>
               {selectedPlanRole === "budget" ? (
-                <span style={{ fontSize: "0.8rem", color: "#166534", fontWeight: "bold" }}>
+                <span className="nutrition-bundle-card__badge">
+                  <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
                   {l("فعال", "Active")}
                 </span>
               ) : null}
             </div>
-            <p style={{ margin: "0.5rem 0", color: "#64748b", fontSize: "0.9rem" }}>
-              {l("هزینه ماهانه: ", "Monthly cost: ")}
-              <strong>
+            <div className="nutrition-bundle-card__cost-row">
+              <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهانه: ", "Monthly cost: ")}</span>
+              <strong className="nutrition-bundle-card__cost-val">
                 {comparison.budget_plan_monthly_cost_irr != null
                   ? formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr, language, number)
                   : "—"}
               </strong>
-            </p>
+            </div>
+            <div className="nutrition-bundle-card__pills">
+              {proteinBudgetVal != null && (
+                <span className="nutrition-bundle-card__pill">
+                  {number.format(proteinBudgetVal)} g {l("پروتئین/روز", "protein/day")}
+                </span>
+              )}
+              {comparison.unique_meal_count_budget != null && (
+                <span className="nutrition-bundle-card__pill">
+                  {number.format(comparison.unique_meal_count_budget)} {l("وعده متنوع", "meals")}
+                </span>
+              )}
+              {comparison.unique_protein_sources_budget != null && (
+                <span className="nutrition-bundle-card__pill">
+                  {number.format(comparison.unique_protein_sources_budget)} {l("منبع پروتئین", "protein sources")}
+                </span>
+              )}
+            </div>
             <button
-              className={selectedPlanRole === "budget" ? "secondary-button is-active" : "primary-button"}
+              className={selectedPlanRole === "budget" ? "secondary-button is-active nutrition-bundle-card__action" : "primary-button nutrition-bundle-card__action"}
               disabled={selectedPlanRole === "budget" || isSelectingPlan}
               onClick={() => onSelectPlan?.("budget")}
               type="button"
@@ -541,32 +568,49 @@ function PlanComparisonSection({
           </div>
 
           <div
-            className="nutrition-bundle-card"
-            style={{
-              padding: "1rem",
-              borderRadius: "8px",
-              border: selectedPlanRole === "ideal" ? "2px solid #16a34a" : "1px solid #cbd5e1",
-              backgroundColor: selectedPlanRole === "ideal" ? "#f0fdf4" : "#ffffff",
-            }}
+            className={`nutrition-bundle-card ${selectedPlanRole === "ideal" ? "is-selected" : ""}`}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <h4 style={{ margin: 0 }}>{l("برنامه مرجع علمی", "Ideal Scientific Plan")}</h4>
+            <div className="nutrition-bundle-card__header">
+              <div className="nutrition-bundle-card__title-group">
+                <h4 className="nutrition-bundle-card__title">{l("برنامه مرجع علمی", "Ideal Scientific Plan")}</h4>
+                <p className="nutrition-bundle-card__subtitle">
+                  {l("پروتئین بهینه علمی و بالاترین تنوع غذایی", "Optimal scientific protein & maximum variety")}
+                </p>
+              </div>
               {selectedPlanRole === "ideal" ? (
-                <span style={{ fontSize: "0.8rem", color: "#166534", fontWeight: "bold" }}>
+                <span className="nutrition-bundle-card__badge">
+                  <span className="nutrition-bundle-card__badge-dot" aria-hidden="true" />
                   {l("فعال", "Active")}
                 </span>
               ) : null}
             </div>
-            <p style={{ margin: "0.5rem 0", color: "#64748b", fontSize: "0.9rem" }}>
-              {l("هزینه ماهانه: ", "Monthly cost: ")}
-              <strong>
+            <div className="nutrition-bundle-card__cost-row">
+              <span className="nutrition-bundle-card__cost-label">{l("هزینه ماهانه: ", "Monthly cost: ")}</span>
+              <strong className="nutrition-bundle-card__cost-val">
                 {comparison.ideal_plan_monthly_cost_irr != null
                   ? formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr, language, number)
                   : "—"}
               </strong>
-            </p>
+            </div>
+            <div className="nutrition-bundle-card__pills">
+              {proteinIdealVal != null && (
+                <span className="nutrition-bundle-card__pill">
+                  {number.format(proteinIdealVal)} g {l("پروتئین/روز", "protein/day")}
+                </span>
+              )}
+              {comparison.unique_meal_count_ideal != null && (
+                <span className="nutrition-bundle-card__pill">
+                  {number.format(comparison.unique_meal_count_ideal)} {l("وعده متنوع", "meals")}
+                </span>
+              )}
+              {comparison.unique_protein_sources_ideal != null && (
+                <span className="nutrition-bundle-card__pill">
+                  {number.format(comparison.unique_protein_sources_ideal)} {l("منبع پروتئین", "protein sources")}
+                </span>
+              )}
+            </div>
             <button
-              className={selectedPlanRole === "ideal" ? "secondary-button is-active" : "primary-button"}
+              className={selectedPlanRole === "ideal" ? "secondary-button is-active nutrition-bundle-card__action" : "primary-button nutrition-bundle-card__action"}
               disabled={selectedPlanRole === "ideal" || isSelectingPlan}
               onClick={() => onSelectPlan?.("ideal")}
               type="button"
@@ -578,23 +622,26 @@ function PlanComparisonSection({
       )}
 
       <div className="plan-comparison-explanation">
-        <h4>{l("چرا این دو برنامه متفاوتند؟", "Why they differ")}</h4>
+        <div className="plan-comparison-explanation__header">
+          <span className="plan-comparison-explanation__icon" aria-hidden="true">💡</span>
+          <h4>{l("چرا این دو برنامه متفاوتند؟", "Why they differ")}</h4>
+        </div>
         {comparison.show_ideal_plan ? (
-          <p>
+          <p className="plan-comparison-explanation__body">
             {l(
               `بودجه ماهانه شما ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)} است. برنامه پیشنهادی با بودجه شما حدود ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. برنامه مرجع متناسب با هدف شما حدود ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)} هزینه دارد. نسخه بودجه‌ای حداقل‌های تعیین‌شده را رعایت می‌کند، اما نسبت به هدف ترجیحی حدود ${number.format(Math.abs(proteinDifference ?? 0))} گرم پروتئین در روز کمتر دارد و تنوع منابع پروتئینی پایین‌تر است.`,
               `Your monthly budget is ${formatTomanOrMillion(comparison.user_monthly_budget_irr, language, number)}. The recommended budget plan costs about ${formatTomanOrMillion(comparison.budget_plan_monthly_cost_irr ?? 0, language, number)}. The reference plan costs about ${formatTomanOrMillion(comparison.ideal_plan_monthly_cost_irr ?? 0, language, number)}. The budget version satisfies required minimums, but has about ${number.format(Math.abs(proteinDifference ?? 0))} g less protein per day than your preferred target and lower protein source variety.`,
             )}
           </p>
         ) : comparison.monthly_cost_gap_irr != null && comparison.monthly_cost_gap_irr < 10_000_000 ? (
-          <p>
+          <p className="plan-comparison-explanation__body">
             {l(
               "بودجه شما به هزینه برنامه مرجع بسیار نزدیک است؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
               "Your budget is very close to the cost of the reference plan; therefore, only the recommended budget plan is displayed.",
             )}
           </p>
         ) : (
-          <p>
+          <p className="plan-comparison-explanation__body">
             {l(
               "اختلاف کیفیت برنامه مرجع با برنامه بودجه‌ای چشمگیر نبود؛ بنابراین همان برنامه پیشنهادی با بودجه شما نمایش داده می‌شود.",
               "The reference plan did not offer a meaningful quality improvement; therefore, only the recommended budget plan is displayed.",
