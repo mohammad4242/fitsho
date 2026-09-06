@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ApiError } from "../../shared/apiClient";
 import { MealThumbnail } from "../../shared/MealThumbnail";
 import * as api from "./api";
+import { irrToRoundedToman, roundToTenThousandToman } from "./money";
 import type { MealFeedbackType, ShoppingList, WeeklyPlan, WeeklyPlanHistoryItem, WeeklyPlanFood } from "./types";
 
 type Props = {
@@ -247,17 +248,28 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
         </summary>
         <div className="weekly-plan__section-content">
       <div className="weekly-plan__ledger" aria-label={l("بودجه برنامه", "Plan budget")}>
-        <div>
-          <span>{l("هزینه برآوردی هفته", "Estimated weekly cost")}</span>
-          <strong>{number.format(Math.floor(currentPlan.weekly_cost_irr / 10))} {l("تومان", "Toman")}</strong>
+        <div className="weekly-plan__ledger-item weekly-plan__ledger-item--cost">
+          <span className="weekly-plan__ledger-icon" aria-hidden="true">🏷️</span>
+          <div className="weekly-plan__ledger-content">
+            <span className="weekly-plan__ledger-label">{l("هزینه برآوردی هفته", "Estimated weekly cost")}</span>
+            <strong className="weekly-plan__ledger-value">{number.format(irrToRoundedToman(currentPlan.weekly_cost_irr))} {l("تومان", "Toman")}</strong>
+          </div>
         </div>
-        <div>
-          <span>{l("بودجه هفتگی", "Weekly budget")}</span>
-          <strong>{number.format(Math.floor(currentPlan.weekly_budget_irr / 10))} {l("تومان", "Toman")}</strong>
+        <div className="weekly-plan__ledger-item weekly-plan__ledger-item--budget">
+          <span className="weekly-plan__ledger-icon" aria-hidden="true">👛</span>
+          <div className="weekly-plan__ledger-content">
+            <span className="weekly-plan__ledger-label">{l("بودجه هفتگی", "Weekly budget")}</span>
+            <strong className="weekly-plan__ledger-value">{number.format(irrToRoundedToman(currentPlan.weekly_budget_irr))} {l("تومان", "Toman")}</strong>
+          </div>
         </div>
-        <div>
-          <span>{l("وضعیت بودجه", "Budget status")}</span>
-          <strong>{budgetLabel(currentPlan.budget_status, language)}</strong>
+        <div className={`weekly-plan__ledger-item weekly-plan__ledger-item--status weekly-plan__ledger-item--${currentPlan.budget_status}`}>
+          <span className="weekly-plan__ledger-icon" aria-hidden="true">
+            {currentPlan.budget_status === "within_budget" ? "✅" : currentPlan.budget_status === "over_budget" ? "⚠️" : "📊"}
+          </span>
+          <div className="weekly-plan__ledger-content">
+            <span className="weekly-plan__ledger-label">{l("وضعیت بودجه", "Budget status")}</span>
+            <strong className="weekly-plan__ledger-value">{budgetLabel(currentPlan.budget_status, language)}</strong>
+          </div>
         </div>
       </div>
 
@@ -278,7 +290,7 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
       </div>
 
       {day && (
-        <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(Math.floor(day.cost_irr / 10))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div>{!isReferencePlan && <div className="weekly-plan__day-actions"><button disabled={isBusy("regenerate", "regenerate") || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div>}<div className="weekly-plan__meals" role="tabpanel">
+        <><div className="weekly-plan__daily-summary"><strong>{l("جمع روز", "Daily total")}: {number.format(day.nutrient_totals.energy_kcal ?? 0)} {l("کیلوکالری", "kcal")}</strong><span>{number.format(irrToRoundedToman(day.cost_irr))} {l("تومان", "Toman")}</span><span>{l("پروتئین", "Protein")}: {number.format(day.nutrient_totals.protein_g ?? 0)} g</span><span>{l("کربوهیدرات", "Carbohydrate")}: {number.format(day.nutrient_totals.carbohydrate_g ?? 0)} g</span></div>{!isReferencePlan && <div className="weekly-plan__day-actions"><button disabled={isBusy("regenerate", "regenerate") || day.meals.every((meal) => meal.is_locked)} type="button" onClick={() => void regenerateDay()}>{l("بازسازی وعده‌های باز این روز", "Regenerate unlocked meals for this day")}</button></div>}<div className="weekly-plan__meals" role="tabpanel">
           {day.meals.map((meal) => (
             meal.slot_role === "free_meal" ? <FreeMealCard key={meal.id} meal={meal} entryDate={day.plan_date} language={language} /> : <details className="weekly-plan__meal" key={meal.id}>
               <summary className="weekly-plan__meal-summary">
@@ -296,7 +308,7 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
                 </div>
                 <div className="weekly-plan__meal-summary-metrics">
                   <span>{number.format(meal.nutrient_totals.energy_kcal ?? 0)} kcal</span>
-                  <span>{number.format(Math.floor(meal.cost_irr / 10))} {l("تومان", "Toman")}</span>
+                  <span>{number.format(irrToRoundedToman(meal.cost_irr))} {l("تومان", "Toman")}</span>
                   <span aria-hidden="true" className="weekly-plan__meal-chevron" />
                 </div>
               </summary>
@@ -381,7 +393,7 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
             {selector.options === null ? <p role="status">{l("در حال دریافت گزینه‌ها…", "Loading options…")}</p> : selector.options.length === 0 ? <p>{l("گزینه سازگار دیگری در این نسخه وجود ندارد.", "No other compatible meal exists in this revision.")}</p> : <div className="weekly-plan__replacement-options">
               {selector.options.map((option) => <button aria-pressed={selector.selectedId === option.id} className={selector.selectedId === option.id ? "is-selected" : undefined} key={option.id} type="button" onClick={() => setSelector({ ...selector, selectedId: option.id })}>
                 <MealThumbnail alt={language === "en" ? option.name_en : option.name_fa} className="weekly-plan__replacement-image" fallbackLabel={l("تصویر وعده جایگزین", "Replacement meal placeholder")} imageUrl={option.image_url} />
-                <span><strong>{option.meal_code ? `${option.meal_code} — ` : ""}{language === "en" ? option.name_en : option.name_fa}</strong><small>{number.format(option.nutrient_totals.energy_kcal ?? 0)} kcal · {l("پروتئین", "Protein")} {number.format(option.nutrient_totals.protein_g ?? 0)} g · {number.format(Math.floor(option.cost_irr / 10))} {l("تومان", "Toman")}</small></span>
+                <span><strong>{option.meal_code ? `${option.meal_code} — ` : ""}{language === "en" ? option.name_en : option.name_fa}</strong><small>{number.format(option.nutrient_totals.energy_kcal ?? 0)} kcal · {l("پروتئین", "Protein")} {number.format(option.nutrient_totals.protein_g ?? 0)} g · {number.format(irrToRoundedToman(option.cost_irr))} {l("تومان", "Toman")}</small></span>
               </button>)}
             </div>}
             <div className="weekly-plan__modal-actions"><button className="primary-button" disabled={!selector.selectedId || isBusy(selector.mealId, "meal-replacement-preview")} type="button" onClick={() => void chooseMealReplacement()}>{l("پیش‌نمایش تعویض وعده", "Preview meal replacement")}</button><button type="button" onClick={() => setSelector(null)}>{l("انصراف", "Cancel")}</button></div>
@@ -390,7 +402,7 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
             {(() => { const targetMeal = findMeal(currentPlan, selector.mealId); return targetMeal ? <>
               <p>{l("ابتدا ماده غذایی موردنظر را انتخاب کن.", "First choose the ingredient you want to replace.")}</p>
               <div className="weekly-plan__food-targets">{targetMeal.foods.filter((food) => food.food_id !== null).map((food) => <button aria-pressed={selector.targetFoodId === food.food_id} className={selector.targetFoodId === food.food_id ? "is-selected" : undefined} key={food.food_id} type="button" onClick={() => void chooseFoodTarget(food.food_id!)}>{language === "en" ? food.name_en : food.name_fa} — {number.format(food.grams)} {l("گرم", "g")}</button>)}</div>
-              {selector.targetFoodId && <><h4>{l("جایگزین‌های قابل انتخاب", "Eligible replacements")}</h4>{selector.options === null ? <p role="status">{l("در حال دریافت گزینه‌ها…", "Loading options…")}</p> : selector.options.length === 0 ? <p>{l("گزینه سازگار دیگری در این نسخه وجود ندارد.", "No other compatible ingredient exists in this revision.")}</p> : <div className="weekly-plan__replacement-options">{selector.options.map((option) => <button aria-pressed={selector.selectedId === option.food_id} className={selector.selectedId === option.food_id ? "is-selected" : undefined} key={option.food_id} type="button" onClick={() => setSelector({ ...selector, selectedId: option.food_id })}><MealThumbnail alt={language === "en" ? option.name_en : option.name_fa} className="weekly-plan__replacement-image" fallbackLabel={l("تصویر ماده غذایی جایگزین", "Replacement ingredient placeholder")} imageUrl={option.image_url} /><span><strong>{language === "en" ? option.name_en : option.name_fa}</strong><small>{number.format(option.grams)} {l("گرم", "g")} · {number.format(option.nutrients.energy_kcal ?? 0)} kcal · {l("پروتئین", "Protein")} {number.format(option.nutrients.protein_g ?? 0)} g · {number.format(Math.floor(option.cost_irr / 10))} {l("تومان", "Toman")}</small></span></button>)}</div>}</>}
+              {selector.targetFoodId && <><h4>{l("جایگزین‌های قابل انتخاب", "Eligible replacements")}</h4>{selector.options === null ? <p role="status">{l("در حال دریافت گزینه‌ها…", "Loading options…")}</p> : selector.options.length === 0 ? <p>{l("گزینه سازگار دیگری در این نسخه وجود ندارد.", "No other compatible ingredient exists in this revision.")}</p> : <div className="weekly-plan__replacement-options">{selector.options.map((option) => <button aria-pressed={selector.selectedId === option.food_id} className={selector.selectedId === option.food_id ? "is-selected" : undefined} key={option.food_id} type="button" onClick={() => setSelector({ ...selector, selectedId: option.food_id })}><MealThumbnail alt={language === "en" ? option.name_en : option.name_fa} className="weekly-plan__replacement-image" fallbackLabel={l("تصویر ماده غذایی جایگزین", "Replacement ingredient placeholder")} imageUrl={option.image_url} /><span><strong>{language === "en" ? option.name_en : option.name_fa}</strong><small>{number.format(option.grams)} {l("گرم", "g")} · {number.format(option.nutrients.energy_kcal ?? 0)} kcal · {l("پروتئین", "Protein")} {number.format(option.nutrients.protein_g ?? 0)} g · {number.format(irrToRoundedToman(option.cost_irr))} {l("تومان", "Toman")}</small></span></button>)}</div>}</>}
               <div className="weekly-plan__modal-actions"><button className="primary-button" disabled={!selector.targetFoodId || !selector.selectedId || isBusy(selector.mealId, "food-replacement-preview")} type="button" onClick={() => void chooseFoodReplacement()}>{l("پیش‌نمایش تعویض ماده غذایی", "Preview ingredient replacement")}</button><button type="button" onClick={() => setSelector(null)}>{l("انصراف", "Cancel")}</button></div>
             </> : null; })()}
           </>}
@@ -406,7 +418,7 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
           {preview.kind === "meal" && <p><strong>{l("وعده جدید", "New meal")}: </strong>{preview.replacement.meal_code ? `${preview.replacement.meal_code} — ` : ""}{language === "en" ? preview.replacement.name_en : preview.replacement.name_fa}</p>}
           {preview.kind === "food" && <><p><strong>{l("ماده قدیمی", "Old ingredient")}: </strong>{language === "en" ? preview.food.name_en : preview.food.name_fa} — {number.format(preview.food.grams)} {l("گرم", "g")}</p><p><strong>{l("ماده جدید", "New ingredient")}: </strong>{language === "en" ? preview.replacement.name_en : preview.replacement.name_fa} — {number.format(preview.replacement.grams)} {l("گرم", "g")}</p></>}
           {previewImpact(preview.data, language, number).length > 0 && <ul className="weekly-plan__preview-impact">{previewImpact(preview.data, language, number).map((item) => <li key={item.label}>{item.label}: {item.value}</li>)}</ul>}
-          <p>{l("تغییر هزینه", "Cost change")}: {number.format(Math.floor(editPreviewCost(preview.data) / 10))} {l("تومان", "Toman")}</p>
+          <p>{l("تغییر هزینه", "Cost change")}: {number.format(roundToTenThousandToman(Math.floor(editPreviewCost(preview.data) / 10)))} {l("تومان", "Toman")}</p>
           <p className="weekly-plan__warning">{l("این عملیات هنوز اعمال نشده است. تأیید آن یک نسخه جدید می‌سازد و بررسی پزشک دوباره لازم خواهد بود.", "This operation has not been applied. Confirming creates a new revision and requires physician review again.")}</p>
           <div className="weekly-plan__modal-actions"><button className="primary-button" disabled={isBusy(preview.data.meal_id, "confirm")} type="button" onClick={() => void confirmPlanEdit()}>{l("ساخت نسخه جدید", "Create new revision")}</button><button type="button" onClick={() => setPreview(null)}>{l("انصراف", "Cancel")}</button></div>
         </div>
@@ -420,7 +432,7 @@ export function WeeklyNutritionPlan({ plan, language, isReferencePlan = false, t
           </summary>
           <div className="weekly-plan__section-content">
             {!currentPlan.physician_approved && <p className="weekly-plan__warning">{l("تا تأیید پزشک، خرید نهایی را انجام نده.", "Wait for physician approval before making final purchases.")}</p>}
-            {shopping === null ? <p role="status">{l("در حال دریافت…", "Loading…")}</p> : <><ul>{shopping.items.map((item) => <li key={item.food_id}><span>{language === "en" ? item.name_en : item.name_fa}</span><strong>{number.format(item.required_quantity)} {item.canonical_unit}</strong><small>{number.format(Math.floor(item.cost_irr / 10))} {l("تومان", "Toman")}</small></li>)}</ul><strong>{l("جمع", "Total")}: {number.format(Math.floor(shopping.total_cost_irr / 10))} {l("تومان", "Toman")}</strong></>}
+            {shopping === null ? <p role="status">{l("در حال دریافت…", "Loading…")}</p> : <><ul>{shopping.items.map((item) => <li key={item.food_id}><span>{language === "en" ? item.name_en : item.name_fa}</span><strong>{number.format(item.required_quantity)} {item.canonical_unit}</strong><small>{number.format(irrToRoundedToman(item.cost_irr))} {l("تومان", "Toman")}</small></li>)}</ul><strong>{l("جمع", "Total")}: {number.format(irrToRoundedToman(shopping.total_cost_irr))} {l("تومان", "Toman")}</strong></>}
           </div>
         </details>
       )}
@@ -480,7 +492,7 @@ function FreeMealCard({ meal, entryDate, language }: { meal: WeeklyPlan["days"][
       </div>
       <div className="weekly-plan__meal-summary-metrics">
         <span>{plannedCalories === undefined ? "—" : new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR").format(plannedCalories)} kcal</span>
-        <span>{new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR").format(Math.floor(meal.cost_irr / 10))} {l("تومان", "Toman")}</span>
+        <span>{new Intl.NumberFormat(language === "en" ? "en-US" : "fa-IR").format(irrToRoundedToman(meal.cost_irr))} {l("تومان", "Toman")}</span>
         <span aria-hidden="true" className="weekly-plan__meal-chevron" />
       </div>
     </summary>

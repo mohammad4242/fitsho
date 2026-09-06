@@ -301,10 +301,84 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan__notice, .weekly-plan__confirm, .weekly-plan__shopping, .weekly-plan__history { margin-top: 1rem; padding: 1.2rem; border: 1px solid rgb(234 244 241 / 12%); border-radius: 1.2rem; background: rgb(3 28 27 / 64%); }
 .weekly-plan__notice p { margin-bottom: 0; color: rgb(234 244 241 / 72%); }
 .weekly-plan__error, .weekly-plan__warning { color: #ffd798; }
-.weekly-plan__ledger { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-block: 1.5rem; border-block: 1px solid rgb(234 244 241 / 12%); }
-.weekly-plan__ledger > div { display: flex; flex-direction: column; gap: .4rem; padding: 1.2rem; }
-.weekly-plan__ledger > div + div { border-inline-start: 1px solid rgb(234 244 241 / 12%); }
-.weekly-plan__ledger span { color: rgb(234 244 241 / 58%); font-size: .78rem; }
+.weekly-plan__ledger {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .45rem;
+  margin-block: .4rem .75rem;
+  border-block: none;
+}
+.weekly-plan__section-content > .weekly-plan__ledger {
+  margin: 0 0 .75rem;
+}
+.weekly-plan__ledger > div,
+.weekly-plan__ledger-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: .45rem;
+  padding: .4rem .65rem;
+  border-radius: .6rem;
+  background: rgb(255 255 255 / 2.5%);
+  border: 1px solid rgb(234 244 241 / 8%);
+  transition: all .18s ease;
+  min-width: 0;
+}
+.weekly-plan__ledger > div + div {
+  border-inline-start: 1px solid rgb(234 244 241 / 8%);
+}
+.weekly-plan__ledger-item:hover {
+  background: rgb(255 255 255 / 4.5%);
+}
+.weekly-plan__ledger-icon {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.weekly-plan__ledger-content {
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  min-width: 0;
+}
+.weekly-plan__ledger span,
+.weekly-plan__ledger-label {
+  color: rgb(234 244 241 / 55%);
+  font-size: .66rem;
+  font-weight: 550;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.weekly-plan__ledger strong,
+.weekly-plan__ledger-value {
+  color: var(--fitsho-mist);
+  font-size: .86rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.weekly-plan__ledger-item--cost strong {
+  color: var(--fitsho-aqua);
+}
+.weekly-plan__ledger-item--budget strong {
+  color: rgb(234 244 241 / 92%);
+}
+.weekly-plan__ledger-item--within_budget strong {
+  color: #8ff3bb;
+}
+.weekly-plan__ledger-item--over_budget strong {
+  color: #f87171;
+}
+.weekly-plan__ledger-item--flexible_overage strong {
+  color: #ffd798;
+}
 .weekly-plan__days { display: grid; grid-template-columns: repeat(7, minmax(5rem, 1fr)); gap: .45rem; overflow-x: auto; padding-bottom: .7rem; }
 .weekly-plan__days button { min-width: 5rem; padding: .9rem .5rem; color: rgb(234 244 241 / 72%); border: 1px solid rgb(234 244 241 / 10%); border-radius: 1rem; background: rgb(9 54 51 / 55%); cursor: pointer; }
 .weekly-plan__days button span, .weekly-plan__days button small { display: block; }
@@ -381,7 +455,7 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   .nutrition-estimate-back, .nutrition-catalogue-entry { grid-column: 1 / -1; }
 }
 @media (max-width: 800px) { .weekly-plan__heading, .weekly-plan__meals { grid-template-columns: 1fr; } .weekly-plan__nutrient-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .nutrition-target-grid, .nutrition-estimate-notes dl, .nutrition-micronutrient-grid, .weekly-plan__ledger, .weekly-plan__nutrient-grid, .weekly-plan__shopping ul { grid-template-columns: 1fr; } .weekly-plan__meal-totals, .weekly-plan__prepared-recipe dl { grid-template-columns: repeat(2, 1fr); } .weekly-plan__ledger > div + div { border-inline-start: 0; border-top: 1px solid rgb(234 244 241 / 12%); } .nutrition-calorie-card { min-height: 12rem; border-radius: 1.2rem; } }
+@media (max-width: 520px) { .nutrition-target-grid, .nutrition-estimate-notes dl, .nutrition-micronutrient-grid, .weekly-plan__ledger, .weekly-plan__nutrient-grid, .weekly-plan__shopping ul { grid-template-columns: 1fr; } .weekly-plan__meal-totals, .weekly-plan__prepared-recipe dl { grid-template-columns: repeat(2, 1fr); } .weekly-plan__ledger > div + div { border-inline-start: 1px solid rgb(234 244 241 / 8%); } .nutrition-calorie-card { min-height: 12rem; border-radius: 1.2rem; } }
 .nutrition-adherence-chart { display: grid; gap: .75rem; margin-top: 1rem; }
 .nutrition-adherence-chart article { display: grid; grid-template-columns: 5rem 1fr 1fr; gap: .65rem; align-items: center; padding: .8rem; border: 1px solid rgb(255 255 255 / 10%); border-radius: 1rem; }
 .nutrition-adherence-chart label { display: grid; gap: .3rem; font-size: .8rem; }

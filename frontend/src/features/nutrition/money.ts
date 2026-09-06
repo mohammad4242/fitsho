@@ -14,3 +14,13 @@ export function tomanToIrr(value: string): number {
 export function irrToToman(value: number): string {
   return formatTomanInput(String(Math.floor(value / 10)));
 }
+
+export function roundToTenThousandToman(toman: number): number {
+  if (toman <= 0) return 0;
+  const rounded = Math.round(toman / 10_000) * 10_000;
+  return rounded === 0 ? 10_000 : rounded;
+}
+
+export function irrToRoundedToman(irr: number): number {
+  return roundToTenThousandToman(Math.floor(irr / 10));
+}

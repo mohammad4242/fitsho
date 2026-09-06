@@ -15,6 +15,7 @@ import type {
   WeeklyPlanGeneration,
 } from "./types";
 import { useSynchronizedProgress } from "./useSynchronizedProgress";
+import { irrToRoundedToman } from "./money";
 import { WeeklyNutritionPlan } from "./WeeklyNutritionPlan";
 import "./nutritionEstimate.css";
 
@@ -415,7 +416,7 @@ function formatTomanOrMillion(
   language: "fa" | "en",
   numberFormatter: Intl.NumberFormat,
 ): string {
-  const toman = irr / 10;
+  const toman = irrToRoundedToman(irr);
   if (toman >= 1_000_000) {
     const millions = toman / 1_000_000;
     const formatted = numberFormatter.format(millions);
