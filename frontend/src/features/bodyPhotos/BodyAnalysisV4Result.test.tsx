@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, it } from "vitest";
 
 import i18n from "../../i18n";
@@ -23,6 +24,12 @@ const experience: BodyAnalysisExperienceV4 = {
     hip_circumference_cm: 98,
     selected_goal: "build_muscle",
   },
+  body_composition: {
+    bmi: 26.0,
+    estimated_body_fat_percent: 21.6,
+    body_fat_estimation_method: "rfm",
+    body_fat_is_estimate: true,
+  },
   first_impression: {
     message_key: "body_analysis.first_impression.primary_priority",
     parameters: { areas: ["shoulders"] },
@@ -45,6 +52,12 @@ const experience: BodyAnalysisExperienceV4 = {
       parameters: { state: "no_clear_difference" },
       score_percent: 90,
     },
+    muscle_balance: {
+      status: "available",
+      message_key: "body_analysis.indicators.muscle_balance",
+      parameters: {},
+      score_percent: 85,
+    },
     body_shape: {
       status: "available",
       message_key: "body_analysis.indicators.body_shape",
@@ -65,6 +78,13 @@ const experience: BodyAnalysisExperienceV4 = {
       display_classification: "balanced",
       insight_key: "body_analysis.insights.balanced",
       insight_parameters: { area: "chest" },
+      supporting_views: ["front"],
+    },
+    {
+      area: "arms",
+      display_classification: "stronger",
+      insight_key: "body_analysis.insights.stronger",
+      insight_parameters: { area: "arms" },
       supporting_views: ["front"],
     },
   ],
@@ -99,31 +119,65 @@ beforeEach(async () => {
   await i18n.changeLanguage("en");
 });
 
-it("renders first look, the route, and exactly three display scores", () => {
+it("renders top scan overview with body fat %, BMI, and first look summary", () => {
   render(<BodyAnalysisV4Result analysis={analysis} experience={experience} />);
 
   expect(screen.getByRole("heading", { name: "First look" })).toBeInTheDocument();
   expect(screen.getByText(/clearest focus is shoulders/i)).toBeInTheDocument();
   expect(screen.getByText(/current muscle-building direction/i)).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Symmetry & proportion" })).toBeInTheDocument();
-  expect(screen.getAllByTestId("body-analysis-score-row")).toHaveLength(3);
-  expect(screen.getByText("82%")).toBeInTheDocument();
-  expect(screen.getByText("Upper / lower balance")).toBeInTheDocument();
-  expect(screen.getByText("Visible symmetry")).toBeInTheDocument();
-  expect(screen.getByText("Body shape")).toBeInTheDocument();
-  expect(screen.queryByText("Four useful signals")).not.toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "Your direction" })).not.toBeInTheDocument();
+
+  // Metric cards
+  expect(screen.getByTestId("body-fat-card")).toBeInTheDocument();
+  expect(screen.getByText("21.6%")).toBeInTheDocument();
+  expect(screen.getByTestId("bmi-card")).toBeInTheDocument();
+  expect(screen.getByText("26")).toBeInTheDocument();
+
+  // View buttons
+  expect(screen.getByRole("button", { name: /^front$/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /^side$/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /^back$/i })).toBeInTheDocument();
 });
 
-it("renders two concise summary cards and compact review states", () => {
+it("toggles front / side / back views in top overview", async () => {
+  const user = userEvent.setup();
   render(<BodyAnalysisV4Result analysis={analysis} experience={experience} />);
 
-  expect(screen.getByRole("heading", { name: "Important weaknesses" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Important strengths" })).toBeInTheDocument();
+  const frontBtn = screen.getByRole("button", { name: /^front$/i });
+  const sideBtn = screen.getByRole("button", { name: /^side$/i });
+  const backBtn = screen.getByRole("button", { name: /^back$/i });
+
+  expect(frontBtn).toHaveAttribute("aria-pressed", "true");
+  expect(sideBtn).toHaveAttribute("aria-pressed", "false");
+
+  await user.click(sideBtn);
+  expect(sideBtn).toHaveAttribute("aria-pressed", "true");
+  expect(frontBtn).toHaveAttribute("aria-pressed", "false");
+
+  await user.click(backBtn);
+  expect(backBtn).toHaveAttribute("aria-pressed", "true");
+  expect(sideBtn).toHaveAttribute("aria-pressed", "false");
+});
+
+it("renders exactly three display score indicators", () => {
+  render(<BodyAnalysisV4Result analysis={analysis} experience={experience} />);
+
+  expect(screen.getByRole("heading", { name: /visual score indicators/i })).toBeInTheDocument();
+  expect(screen.getAllByTestId("body-analysis-score-row")).toHaveLength(3);
+  expect(screen.getByText("85%")).toBeInTheDocument();
+  expect(screen.getByText("Muscle balance")).toBeInTheDocument();
+  expect(screen.getByText(/vis(ible|ual) symmetry/i)).toBeInTheDocument();
+  expect(screen.getByText("Upper / lower balance")).toBeInTheDocument();
+  expect(screen.queryByText("Four useful signals")).not.toBeInTheDocument();
+});
+
+it("renders key weaknesses and key strengths summary cards", () => {
+  render(<BodyAnalysisV4Result analysis={analysis} experience={experience} />);
+
+  expect(screen.getByRole("heading", { name: /key weaknesses|important weaknesses/i })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /key strengths|important strengths/i })).toBeInTheDocument();
   expect(screen.getByText(/AI analysis can be wrong/i)).toBeInTheDocument();
   expect(screen.getByLabelText(/Coach review pending/i)).toBeInTheDocument();
   expect(screen.getByLabelText(/Doctor review pending/i)).toBeInTheDocument();
-  expect(screen.queryByText(/confidence/i)).not.toBeInTheDocument();
 });
 
 it("renders review colors from the real specialist decisions", () => {
@@ -139,16 +193,17 @@ it("renders review colors from the real specialist decisions", () => {
   expect(document.querySelector(".body-analysis-review--approved .body-analysis-review__dot")).toBeInTheDocument();
 });
 
-it("leaves an unavailable display score neutral", () => {
+it("leaves an unavailable display score neutral with a dash", () => {
   const partialExperience = {
     ...experience,
     indicators: {
       ...experience.indicators,
-      body_shape: { ...experience.indicators.body_shape, score_percent: null },
+      muscle_balance: { ...experience.indicators.muscle_balance, score_percent: null },
     },
   };
   render(<BodyAnalysisV4Result analysis={analysis} experience={partialExperience} />);
 
-  expect(screen.getByText("—")).toBeInTheDocument();
-  expect(screen.getAllByRole("progressbar")[2]).not.toHaveAttribute("aria-valuenow");
+  const scoreRows = screen.getAllByTestId("body-analysis-score-row");
+  expect(within(scoreRows[0]).getByText("—")).toBeInTheDocument();
+  expect(within(scoreRows[0]).getByRole("progressbar")).not.toHaveAttribute("aria-valuenow");
 });

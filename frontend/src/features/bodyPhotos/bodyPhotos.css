@@ -1107,3 +1107,660 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 @media (prefers-reduced-motion: reduce) {
   .body-analysis-requirements .profile-field input { transition: none; }
 }
+
+/* ==========================================================================
+   REDESIGNED BODY ANALYSIS SCAN EXPERIENCE (v4)
+   ========================================================================== */
+
+.body-analysis-result--v4 {
+  display: grid;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* 1. TOP SCAN OVERVIEW */
+.fitsho-scan-overview {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(80 223 206 / 22%);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 50%, rgb(80 223 206 / 7%), transparent 65%),
+    linear-gradient(175deg, #09171b 0%, #040c0f 100%);
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%), inset 0 1px 0 rgb(255 255 255 / 6%);
+  padding: clamp(1rem, 2.5vw, 1.75rem);
+}
+
+.fitsho-scan-overview__stage {
+  display: grid;
+  grid-template-columns: auto 1fr minmax(18rem, 21rem);
+  gap: clamp(1rem, 2vw, 1.75rem);
+  align-items: center;
+}
+
+/* Left: View selector nav */
+.fitsho-scan-overview__views {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  z-index: 2;
+}
+
+.fitsho-scan-overview__view-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.75rem 0.65rem;
+  min-width: 4.2rem;
+  border: 1px solid rgb(80 223 206 / 16%);
+  border-radius: 1rem;
+  background: rgb(13 32 38 / 65%);
+  color: var(--fitsho-muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 180ms ease;
+  backdrop-filter: blur(8px);
+}
+
+.fitsho-scan-overview__view-btn:hover {
+  border-color: rgb(80 223 206 / 40%);
+  color: var(--fitsho-text);
+  background: rgb(20 45 52 / 80%);
+}
+
+.fitsho-scan-overview__view-btn--active {
+  border-color: var(--fitsho-aqua);
+  background: linear-gradient(135deg, rgb(80 223 206 / 25%), rgb(80 223 206 / 10%));
+  color: #ffffff;
+  box-shadow: 0 0 1.25rem rgb(80 223 206 / 25%), inset 0 0 0 1px rgb(80 223 206 / 50%);
+}
+
+/* Center: Hero scan figure */
+.fitsho-scan-overview__hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 25rem;
+  max-height: 34rem;
+}
+
+.fitsho-scan-overview__hero-glow {
+  position: absolute;
+  inset: 15% 10% 10% 10%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(80 223 206 / 18%) 0%, transparent 70%);
+  filter: blur(2rem);
+  pointer-events: none;
+}
+
+.fitsho-scan-overview__hero-img {
+  display: block;
+  max-height: 32rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.5rem 1.5rem rgb(0 0 0 / 60%));
+  z-index: 1;
+}
+
+.fitsho-scan-overview__view-tag {
+  position: absolute;
+  bottom: 0.5rem;
+  z-index: 2;
+  padding: 0.25rem 0.85rem;
+  border-radius: 999px;
+  background: rgb(4 14 18 / 75%);
+  border: 1px solid rgb(80 223 206 / 25%);
+  color: var(--fitsho-aqua);
+  font-size: 0.75rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+}
+
+/* Right: Sidebar with cards */
+.fitsho-scan-overview__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  z-index: 2;
+}
+
+.fitsho-scan-card {
+  padding: 1rem 1.15rem;
+  border: 1px solid rgb(80 223 206 / 18%);
+  border-radius: 1.15rem;
+  background: rgb(8 22 27 / 75%);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 30%);
+}
+
+.fitsho-scan-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fitsho-scan-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.fitsho-scan-card__eyebrow {
+  color: var(--fitsho-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.fitsho-scan-card__info-trigger {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fitsho-muted);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.fitsho-scan-card__info-trigger:hover {
+  color: var(--fitsho-aqua);
+}
+
+.fitsho-scan-card__badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid rgb(80 223 206 / 30%);
+  border-radius: 999px;
+  background: rgb(80 223 206 / 10%);
+  color: var(--fitsho-aqua);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.fitsho-scan-card__badge--neutral {
+  border-color: rgb(255 255 255 / 15%);
+  background: rgb(255 255 255 / 6%);
+  color: var(--fitsho-text);
+}
+
+.fitsho-scan-card__value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-block: 0.35rem 0.2rem;
+}
+
+.fitsho-scan-card__value {
+  font-size: clamp(2rem, 3.5vw, 2.45rem);
+  font-weight: 900;
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.fitsho-scan-card__info-text {
+  margin: 0.35rem 0 0;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: rgb(4 12 15 / 80%);
+  color: var(--fitsho-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.fitsho-scan-card__track-container {
+  display: grid;
+  gap: 0.25rem;
+  margin-block-start: 0.4rem;
+}
+
+.fitsho-scan-card__track {
+  display: block;
+  height: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+  direction: ltr;
+}
+
+.fitsho-scan-card__bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38c8be, #50dfce);
+  box-shadow: 0 0 0.5rem rgb(80 223 206 / 50%);
+  transition: width 350ms ease-out;
+}
+
+.fitsho-scan-card__bar--bmi {
+  background: linear-gradient(90deg, #44b7d1, #62e5d6);
+}
+
+.fitsho-scan-card__track-hint {
+  color: var(--fitsho-muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+/* Summary Card */
+.fitsho-scan-card--summary {
+  display: grid;
+  gap: 0.45rem;
+  border-color: rgb(80 223 206 / 24%);
+  background: linear-gradient(145deg, rgb(80 223 206 / 10%), rgb(6 18 22 / 85%));
+}
+
+.fitsho-scan-card__summary-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.fitsho-scan-card__summary-icon {
+  color: var(--fitsho-aqua);
+  font-size: 0.85rem;
+}
+
+.fitsho-scan-card__summary-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 850;
+  color: var(--fitsho-text);
+}
+
+.fitsho-scan-card__summary-text {
+  margin: 0;
+  color: var(--fitsho-text);
+  font-size: 0.84rem;
+  font-weight: 750;
+  line-height: 1.6;
+}
+
+.fitsho-scan-card__summary-route {
+  margin: 0;
+  color: var(--fitsho-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* 2. THREE VISUAL SCORE INDICATORS */
+.fitsho-score-strip {
+  border: 1px solid rgb(80 223 206 / 18%);
+  border-radius: 1.35rem;
+  background: linear-gradient(160deg, #081a1f 0%, #040d10 100%);
+  padding: clamp(0.9rem, 2vw, 1.25rem);
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 35%);
+}
+
+.fitsho-score-strip__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.75rem, 2vw, 1.25rem);
+}
+
+.fitsho-score-ring-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.65rem;
+  padding: 1rem 0.75rem;
+  border: 1px solid rgb(80 223 206 / 14%);
+  border-radius: 1.15rem;
+  background: rgb(9 26 31 / 60%);
+  backdrop-filter: blur(8px);
+  transition: transform 180ms ease, border-color 180ms ease;
+}
+
+.fitsho-score-ring-card:hover {
+  border-color: rgb(80 223 206 / 35%);
+  transform: translateY(-2px);
+}
+
+.fitsho-score-ring-card__ring-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+}
+
+.fitsho-score-ring-card__svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+
+.fitsho-score-ring-card__track {
+  stroke: rgb(255 255 255 / 8%);
+}
+
+.fitsho-score-ring-card__fill {
+  stroke: var(--fitsho-aqua);
+  filter: drop-shadow(0 0 6px rgb(80 223 206 / 50%));
+  transition: stroke-dashoffset 600ms ease-out;
+}
+
+.fitsho-score-ring-card__center {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+
+.fitsho-score-ring-card__score {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.fitsho-score-ring-card__meta {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.fitsho-score-ring-card__title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 850;
+  color: var(--fitsho-text);
+}
+
+.fitsho-score-ring-card__subtitle {
+  margin: 0;
+  color: var(--fitsho-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+/* 3. INTERACTIVE BODY SECTION */
+.body-analysis-v4__interactive-section {
+  display: grid;
+  gap: 1.25rem;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border: 1px solid rgb(80 223 206 / 18%);
+  border-radius: 1.35rem;
+  background: linear-gradient(175deg, #07161b 0%, #030c0f 100%);
+  box-shadow: 0 0.75rem 2.5rem rgb(0 0 0 / 35%);
+}
+
+.body-analysis-v4__summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.body-analysis-v4__summary-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  color: var(--fitsho-text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.body-analysis-v4__summary-chip-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--fitsho-muted);
+}
+
+.body-analysis-v4__summary-card--strength .body-analysis-v4__summary-chip-dot {
+  background: var(--fitsho-aqua);
+  box-shadow: 0 0 0.4rem rgb(80 223 206 / 60%);
+}
+
+.body-analysis-v4__summary-card--priority .body-analysis-v4__summary-chip-dot {
+  background: #f5a623;
+  box-shadow: 0 0 0.4rem rgb(245 166 35 / 60%);
+}
+
+/* 4. PROGRESS STRIP */
+.fitsho-progress-strip {
+  display: grid;
+  gap: 1.15rem;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  border: 1px solid rgb(80 223 206 / 18%);
+  border-radius: 1.35rem;
+  background: linear-gradient(165deg, #081a20 0%, #030c0f 100%);
+  box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 35%);
+}
+
+.fitsho-progress-strip__header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.fitsho-progress-strip__header h2,
+.fitsho-progress-strip__header p {
+  margin: 0;
+}
+
+.fitsho-progress-strip__header h2 {
+  font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+  color: var(--fitsho-text);
+}
+
+.fitsho-progress-strip__summary {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.fitsho-progress-strip__summary-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgb(80 223 206 / 20%);
+  border-radius: 999px;
+  background: rgb(80 223 206 / 8%);
+  font-size: 0.78rem;
+}
+
+.fitsho-progress-strip__summary-label {
+  color: var(--fitsho-muted);
+}
+
+.fitsho-progress-strip__summary-val {
+  color: var(--fitsho-text);
+  font-weight: 850;
+}
+
+.fitsho-progress-strip__summary-val--pos {
+  color: var(--fitsho-aqua);
+}
+
+.fitsho-progress-strip__timeline {
+  position: relative;
+  overflow-x: auto;
+  padding-block: 0.75rem 0.5rem;
+}
+
+.fitsho-progress-strip__line {
+  position: absolute;
+  top: 1.25rem;
+  left: 2rem;
+  right: 2rem;
+  height: 2px;
+  background: linear-gradient(90deg, rgb(80 223 206 / 20%), rgb(80 223 206 / 50%), rgb(80 223 206 / 20%));
+}
+
+.fitsho-progress-strip__nodes {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 22rem;
+  position: relative;
+  z-index: 1;
+}
+
+.fitsho-progress-strip__node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.45rem;
+  flex: 1;
+}
+
+.fitsho-progress-strip__dot {
+  position: relative;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 2px solid #06151a;
+  background: var(--fitsho-muted);
+}
+
+.fitsho-progress-strip__node--current .fitsho-progress-strip__dot {
+  background: var(--fitsho-aqua);
+  box-shadow: 0 0 0.6rem var(--fitsho-aqua);
+}
+
+.fitsho-progress-strip__dot-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid var(--fitsho-aqua);
+  animation: fitsho-dot-pulse 1.8s infinite;
+}
+
+@keyframes fitsho-dot-pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.fitsho-progress-strip__date {
+  color: var(--fitsho-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.fitsho-progress-strip__metrics {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.fitsho-progress-strip__bf {
+  font-size: 0.86rem;
+  font-weight: 850;
+  color: var(--fitsho-text);
+}
+
+.fitsho-progress-strip__weight {
+  font-size: 0.76rem;
+  color: var(--fitsho-muted);
+}
+
+.fitsho-progress-strip__single-state {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem;
+  border: 1px dashed rgb(80 223 206 / 30%);
+  border-radius: 1rem;
+  background: rgb(80 223 206 / 5%);
+}
+
+.fitsho-progress-strip__single-icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  background: rgb(80 223 206 / 15%);
+  color: var(--fitsho-aqua);
+  flex-shrink: 0;
+}
+
+.fitsho-progress-strip__single-state h3 {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+  color: var(--fitsho-text);
+}
+
+.fitsho-progress-strip__single-state p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--fitsho-muted);
+  line-height: 1.55;
+}
+
+/* RESPONSIVE BREAKPOINTS */
+@media (max-width: 860px) {
+  .fitsho-scan-overview__stage {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .fitsho-scan-overview__views {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .fitsho-scan-overview__view-btn {
+    flex-direction: row;
+    min-width: auto;
+    padding: 0.5rem 1rem;
+  }
+
+  .fitsho-score-strip__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .fitsho-score-strip__grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .fitsho-score-ring-card {
+    flex-direction: row;
+    text-align: start;
+    padding: 0.75rem 1rem;
+  }
+
+  .fitsho-score-ring-card__ring-wrap {
+    width: 72px;
+    height: 72px;
+    flex-shrink: 0;
+  }
+
+  .fitsho-score-ring-card__svg {
+    width: 72px;
+    height: 72px;
+  }
+
+  .fitsho-score-ring-card__score {
+    font-size: 1.15rem;
+  }
+
+  .fitsho-progress-strip__header {
+    flex-direction: column;
+    align-items: start;
+  }
+}

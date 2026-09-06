@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   getBodyPhotoSession: vi.fn(),
   getBodyPhotoAnalysis: vi.fn(),
   getBodyPhotoComparison: vi.fn(),
+  getBodyProgressTimeline: vi.fn().mockResolvedValue({ schema_version: "1.0", items: [] }),
   startBodyPhotoAnalysis: vi.fn(),
   retryBodyPhotoAnalysis: vi.fn(),
 }));
@@ -375,6 +376,12 @@ it("uses the v4 experience branch without falling back to legacy confidence or c
         hip_circumference_cm: 98,
         selected_goal: "maintain_weight",
       },
+      body_composition: {
+        bmi: 22.8,
+        estimated_body_fat_percent: 24.5,
+        body_fat_estimation_method: "rfm",
+        body_fat_is_estimate: true,
+      },
       first_impression: {
         message_key: "body_analysis.first_impression.balanced",
         parameters: { areas: [] },
@@ -387,6 +394,7 @@ it("uses the v4 experience branch without falling back to legacy confidence or c
       indicators: {
         upper_lower_balance: { status: "balanced", message_key: "body_analysis.indicators.upper_lower_balance", parameters: { state: "balanced" }, score_percent: 90 },
         visible_symmetry: { status: "no_clear_difference", message_key: "body_analysis.indicators.visible_symmetry", parameters: { state: "no_clear_difference" }, score_percent: 90 },
+        muscle_balance: { status: "available", message_key: "body_analysis.indicators.muscle_balance", parameters: {}, score_percent: 88 },
         body_shape: { status: "available", message_key: "body_analysis.indicators.body_shape", parameters: {}, score_percent: 85 },
       },
       regions: Array.from(["shoulders", "chest", "back", "lats", "arms", "forearms", "waist_midsection", "glutes", "quads", "hamstrings", "calves"] as const, (area) => ({

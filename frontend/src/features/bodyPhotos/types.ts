@@ -115,7 +115,15 @@ export type BodyAnalysisExperienceIndicator = {
 export type BodyAnalysisExperienceIndicators = {
   upper_lower_balance: BodyAnalysisExperienceIndicator;
   visible_symmetry: BodyAnalysisExperienceIndicator;
+  muscle_balance: BodyAnalysisExperienceIndicator;
   body_shape: BodyAnalysisExperienceIndicator;
+};
+
+export type BodyCompositionMetrics = {
+  bmi: number | null;
+  estimated_body_fat_percent: number | null;
+  body_fat_estimation_method: "rfm" | null;
+  body_fat_is_estimate: boolean;
 };
 
 export type BodyAnalysisExperienceRegion = {
@@ -131,6 +139,7 @@ export type BodyAnalysisExperienceV4 = {
   presentation_version: "body-analysis-experience-v2";
   assessment_status: VisualAssessmentStatus;
   input_snapshot: BodyAnalysisInputSnapshot;
+  body_composition: BodyCompositionMetrics;
   first_impression: BodyAnalysisExperienceMessage;
   direction: BodyAnalysisExperienceDirection;
   indicators: BodyAnalysisExperienceIndicators;
