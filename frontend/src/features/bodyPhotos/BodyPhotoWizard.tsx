@@ -22,6 +22,8 @@ import {
   type ProcessedBodyPhoto,
 } from "./processor";
 import type { BodyPhotoPurpose, BodyPhotoSession, BodyPhotoSide, BodyPhotoView } from "./types";
+import { AppIcon } from "../../shared/AppIcon";
+import { ghostOverlayAssets, resolveGhostOverlayVariant } from "./ghostOverlayAssets";
 import "./bodyPhotos.css";
 
 const views: BodyPhotoView[] = ["front", "side", "back"];
@@ -72,6 +74,8 @@ export function BodyPhotoWizard({
 
   const view = views[currentIndex];
   const current = processed[view] ?? null;
+  const overlayVariant = resolveGhostOverlayVariant(profileSex);
+  const ghostSilhouetteUrl = ghostOverlayAssets[overlayVariant][view];
   const complete = views.every((item) => (
     processed[item] !== undefined || session?.photos.some((photo) => photo.view === item) === true
   ));
@@ -325,9 +329,15 @@ export function BodyPhotoWizard({
 
   if (state === "confirm") {
     return (
-      <section className="body-photo-wizard" aria-labelledby="body-photo-title">
-        <p className="eyebrow eyebrow--accent">{t("bodyPhotos.eyebrow")}</p>
-        <h1 id="body-photo-title" className="fitsho-display">{t("bodyPhotos.reviewTitle")}</h1>
+      <section className="body-photo-wizard body-photo-wizard--confirm" aria-labelledby="body-photo-title">
+        <div className="body-photo-wizard__heading">
+          <div className="body-photo-hud__beacon" aria-hidden="true">
+            <span className="body-photo-hud__beacon-dot" />
+            <span>BIOMETRIC SCAN REVIEW</span>
+          </div>
+          <p className="eyebrow eyebrow--accent">{t("bodyPhotos.eyebrow")}</p>
+          <h1 id="body-photo-title" className="fitsho-display">{t("bodyPhotos.reviewTitle")}</h1>
+        </div>
         <PhotoClothingGuide />
         <div className="body-photo-summary" aria-label={t("bodyPhotos.summaryLabel")}>
           {views.map((item, index) => (
@@ -335,7 +345,16 @@ export function BodyPhotoWizard({
               setCurrentIndex(index);
               setState("capture");
             }}>
-              <img src={photoPreviewUrl(item, processed, session)} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${item}`) })} />
+              <div className="body-photo-summary__media">
+                <div className="body-photo-hud-stage__corners" aria-hidden="true">
+                  <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tl" />
+                  <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tr" />
+                  <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--bl" />
+                  <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--br" />
+                </div>
+                <img src={photoPreviewUrl(item, processed, session)} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${item}`) })} />
+                <span className="body-photo-summary__badge" aria-hidden="true">✓</span>
+              </div>
               <span>{t("bodyPhotos.retake", { view: t(`bodyPhotos.views.${item}`) })}</span>
             </button>
           ))}
@@ -358,7 +377,7 @@ export function BodyPhotoWizard({
         </label>
         <p className="body-photo-muted">{t("bodyPhotos.modelTrainingHint")}</p>
         {error !== null && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-button" type="button" onClick={() => void submit()} disabled={busy || !operationalConsent}>
+        <button className="primary-button body-photo-submit-btn" type="button" onClick={() => void submit()} disabled={busy || !operationalConsent}>
           {busy ? t("bodyPhotos.submitting") : t("bodyPhotos.submit")}
         </button>
         {termsOpen && <ConsentModal onClose={() => setTermsOpen(false)} />}
@@ -369,6 +388,10 @@ export function BodyPhotoWizard({
   return (
     <section className="body-photo-wizard" aria-labelledby="body-photo-title">
       <div className="body-photo-wizard__heading">
+        <div className="body-photo-hud__beacon" aria-hidden="true">
+          <span className="body-photo-hud__beacon-dot" />
+          <span>HUD 3-AXIS SCANNER // 0{currentIndex + 1} OF 03</span>
+        </div>
         <p className="eyebrow eyebrow--accent">{t("bodyPhotos.eyebrow")}</p>
         <h1 id="body-photo-title" className="fitsho-display">{t("bodyPhotos.title")}</h1>
         <p>{t("bodyPhotos.optionalIntro")}</p>
@@ -378,26 +401,49 @@ export function BodyPhotoWizard({
       </div>
       <PhotoClothingGuide />
       <ol className="body-photo-steps" aria-label={t("bodyPhotos.stepsLabel")}>
-        {views.map((item, index) => <li key={item} aria-current={index === currentIndex ? "step" : undefined}>{t(`bodyPhotos.views.${item}`)}</li>)}
+        {views.map((item, index) => {
+          const isCurrent = index === currentIndex;
+          const isDone = processed[item] !== undefined || session?.photos.some((photo) => photo.view === item);
+          return (
+            <li
+              key={item}
+              aria-current={isCurrent ? "step" : undefined}
+              className={`body-photo-steps__item ${isCurrent ? "body-photo-steps__item--active" : ""} ${isDone ? "body-photo-steps__item--done" : ""}`}
+            >
+              <span className="body-photo-steps__index" aria-hidden="true">0{index + 1}</span>
+              <span className="body-photo-steps__label">{t(`bodyPhotos.views.${item}`)}</span>
+              {isDone && <span className="body-photo-steps__check" aria-hidden="true">✓</span>}
+            </li>
+          );
+        })}
       </ol>
       <section className="body-photo-capture" aria-labelledby={`body-photo-${view}`}>
-        <h2 id={`body-photo-${view}`}>{t("bodyPhotos.captureTitle", { view: t(`bodyPhotos.views.${view}`) })}</h2>
+        <div className="body-photo-capture__title-row">
+          <div>
+            <span className="body-photo-capture__badge" aria-hidden="true">
+              SCAN VIEW: {view.toUpperCase()}
+            </span>
+            <h2 id={`body-photo-${view}`}>{t("bodyPhotos.captureTitle", { view: t(`bodyPhotos.views.${view}`) })}</h2>
+          </div>
+          {view === "side" && (
+            <button
+              className="secondary-button body-photo-side-toggle"
+              type="button"
+              aria-label={t("bodyPhotos.sideProfile.toggleLabel", {
+                side: t(`bodyPhotos.sideProfile.${sideProfile}`),
+              })}
+              aria-pressed={sideProfile === "left"}
+              onClick={() => setSideProfile((current) => current === "right" ? "left" : "right")}
+              disabled={busy || sessionLoading}
+            >
+              <AppIcon name="refresh" className="body-photo-btn-icon" />
+              <span>{t(`bodyPhotos.sideProfile.${sideProfile}`)}</span>
+            </button>
+          )}
+        </div>
         <p>{instructions[view]}</p>
         <p className="body-photo-muted">{t("bodyPhotos.cameraGuidance")}</p>
-        {view === "side" && (
-          <button
-            className="secondary-button"
-            type="button"
-            aria-label={t("bodyPhotos.sideProfile.toggleLabel", {
-              side: t(`bodyPhotos.sideProfile.${sideProfile}`),
-            })}
-            aria-pressed={sideProfile === "left"}
-            onClick={() => setSideProfile((current) => current === "right" ? "left" : "right")}
-            disabled={busy || sessionLoading}
-          >
-            {t(`bodyPhotos.sideProfile.${sideProfile}`)}
-          </button>
-        )}
+
         {editorFile !== null ? (
           <GhostPhotoEditor
             file={editorFile}
@@ -410,7 +456,19 @@ export function BodyPhotoWizard({
         ) : (
           <>
             {captureMode === "upload" && <HeadlessPhotoGuide />}
-            <div className="body-photo-source-actions">
+            <div className="body-photo-hud-stage">
+              <div className="body-photo-hud-stage__corners" aria-hidden="true">
+                <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tl" />
+                <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tr" />
+                <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--bl" />
+                <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--br" />
+              </div>
+              <div className="body-photo-hud-stage__reticle" aria-hidden="true">
+                <div className="body-photo-hud-stage__crosshair body-photo-hud-stage__crosshair--v" />
+                <div className="body-photo-hud-stage__crosshair body-photo-hud-stage__crosshair--h" />
+                <div className="body-photo-hud-stage__scanline" />
+              </div>
+
               {captureMode === "camera" ? (
                 <GhostCameraCapture
                   sex={profileSex}
@@ -421,39 +479,95 @@ export function BodyPhotoWizard({
                   onClose={() => setCaptureMode("upload")}
                 />
               ) : (
-                <>
-                  <button className="secondary-button" type="button" onClick={openCamera} disabled={busy || sessionLoading}>
-                    {t("bodyPhotos.useCamera")}
-                  </button>
-                  <label className="body-photo-upload-control">
-                    <span>{t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}</span>
-                    <input
-                      aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
-                      accept="image/jpeg,image/png,image/webp"
-                      type="file"
-                      onChange={selectFile}
-                      disabled={busy || sessionLoading}
+                <div className="body-photo-capture-deck">
+                  <div className="body-photo-hud-stage__guide-frame" aria-hidden="true">
+                    <img
+                      src={ghostSilhouetteUrl}
+                      alt=""
+                      className="body-photo-hud-stage__silhouette"
                     />
-                  </label>
-                </>
+                    <span className="body-photo-hud-stage__guide-chip">
+                      <AppIcon name="target" className="body-photo-btn-icon" />
+                      ALIGNMENT TARGET // {view.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="body-photo-source-actions">
+                    <button
+                      className="secondary-button body-photo-camera-btn"
+                      type="button"
+                      onClick={openCamera}
+                      disabled={busy || sessionLoading}
+                    >
+                      <AppIcon name="camera" className="body-photo-btn-icon" />
+                      <span>{t("bodyPhotos.useCamera")}</span>
+                    </button>
+                    <label className="body-photo-upload-control">
+                      <span className="body-photo-upload-control__icon" aria-hidden="true">
+                        <AppIcon name="sparkles" />
+                      </span>
+                      <span className="body-photo-upload-control__title">
+                        {t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}
+                      </span>
+                      <span className="body-photo-upload-control__hint" aria-hidden="true">
+                        JPG, PNG, WebP
+                      </span>
+                      <input
+                        aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
+                        accept="image/jpeg,image/png,image/webp"
+                        type="file"
+                        onChange={selectFile}
+                        disabled={busy || sessionLoading}
+                      />
+                    </label>
+                  </div>
+                </div>
               )}
             </div>
+
             {selectedPreview?.view === view && (
               <div className="body-photo-source-preview">
-                <img
-                  src={selectedPreview.url}
-                  alt={t("bodyPhotos.selectedPreviewAlt", { view: t(`bodyPhotos.views.${view}`) })}
-                />
+                <div className="body-photo-preview__frame">
+                  <div className="body-photo-hud-stage__corners" aria-hidden="true">
+                    <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tl" />
+                    <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tr" />
+                    <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--bl" />
+                    <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--br" />
+                  </div>
+                  <img
+                    src={selectedPreview.url}
+                    alt={t("bodyPhotos.selectedPreviewAlt", { view: t(`bodyPhotos.views.${view}`) })}
+                  />
+                  {busy && (
+                    <div className="body-photo-preview__scan-overlay" aria-hidden="true">
+                      <span className="body-analysis-spinner" />
+                      <span>{t("bodyPhotos.preparing")}</span>
+                    </div>
+                  )}
+                </div>
                 <p>{t("bodyPhotos.selectedPreview")}</p>
               </div>
             )}
             {current !== null && (
               <div className="body-photo-preview">
-                <img src={current.previewUrl} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${view}`) })} />
+                <div className="body-photo-preview__frame">
+                  <div className="body-photo-hud-stage__corners" aria-hidden="true">
+                    <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tl" />
+                    <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--tr" />
+                    <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--bl" />
+                    <span className="body-photo-hud-stage__corner body-photo-hud-stage__corner--br" />
+                  </div>
+                  <img src={current.previewUrl} alt={t("bodyPhotos.previewAlt", { view: t(`bodyPhotos.views.${view}`) })} />
+                  <div className="body-photo-preview__shield-tag" aria-hidden="true">
+                    <AppIcon name="shield" className="body-photo-btn-icon" />
+                    <span>ANONYMIZED & BIOMETRIC READY</span>
+                  </div>
+                </div>
                 <p>{t("bodyPhotos.anonymizedPreview")}</p>
                 <PhotoQualityFeedback photo={current} />
-                <button type="button" className="secondary-button" onClick={retake} disabled={busy}>
-                  {t("bodyPhotos.retake", { view: t(`bodyPhotos.views.${view}`) })}
+                <button type="button" className="secondary-button body-photo-retake-btn" onClick={retake} disabled={busy}>
+                  <AppIcon name="refresh" className="body-photo-btn-icon" />
+                  <span>{t("bodyPhotos.retake", { view: t(`bodyPhotos.views.${view}`) })}</span>
                 </button>
               </div>
             )}
@@ -466,7 +580,7 @@ export function BodyPhotoWizard({
               <span>{t("bodyPhotos.processingConsentBefore")} <button type="button" className="body-photo-link-button" onClick={() => setTermsOpen(true)}>{t("bodyPhotos.processingTerms")}</button></span>
             </label>
             {error !== null && <p className="form-error" role="alert">{error}</p>}
-            <button className="primary-button" type="button" onClick={() => void confirmUpload()} disabled={current === null || !operationalConsent || busy || sessionLoading}>
+            <button className="primary-button body-photo-confirm-btn" type="button" onClick={() => void confirmUpload()} disabled={current === null || !operationalConsent || busy || sessionLoading}>
               {busy ? t("bodyPhotos.preparing") : t("bodyPhotos.confirmUpload", { view: t(`bodyPhotos.views.${view}`) })}
             </button>
           </>
@@ -479,7 +593,16 @@ export function BodyPhotoWizard({
 
 function PhotoClothingGuide() {
   const { t } = useTranslation();
-  return <aside className="body-photo-clothing-guide" aria-label={t("bodyPhotos.clothingTitle")}><strong>{t("bodyPhotos.clothingTitle")}</strong><p>{t("bodyPhotos.clothingBody")}</p><p>{t("bodyPhotos.coverage")}</p></aside>;
+  return (
+    <aside className="body-photo-clothing-guide" aria-label={t("bodyPhotos.clothingTitle")}>
+      <div className="body-photo-clothing-guide__header">
+        <span className="body-photo-clothing-guide__icon" aria-hidden="true">⚡</span>
+        <strong>{t("bodyPhotos.clothingTitle")}</strong>
+      </div>
+      <p>{t("bodyPhotos.clothingBody")}</p>
+      <p>{t("bodyPhotos.coverage")}</p>
+    </aside>
+  );
 }
 
 function HeadlessPhotoGuide() {
@@ -487,10 +610,22 @@ function HeadlessPhotoGuide() {
   const retained = ["shouldersArms", "waistHips", "legsKnees", "anklesFeet"] as const;
   return (
     <aside className="body-photo-headless-guide" aria-label={t("bodyPhotos.headlessGuideLabel")}>
-      <strong>{t("bodyPhotos.headlessInstruction")}</strong>
-      <p>{t("bodyPhotos.headlessGuideIntro")}</p>
+      <div className="body-photo-headless-guide__header">
+        <span className="body-photo-headless-guide__badge" aria-hidden="true">
+          <AppIcon name="shield" className="body-photo-btn-icon" />
+        </span>
+        <div>
+          <strong>{t("bodyPhotos.headlessInstruction")}</strong>
+          <p>{t("bodyPhotos.headlessGuideIntro")}</p>
+        </div>
+      </div>
       <ul>
-        {retained.map((item) => <li key={item}>{t(`bodyPhotos.retained.${item}`)}</li>)}
+        {retained.map((item) => (
+          <li key={item}>
+            <span className="body-photo-headless-guide__check" aria-hidden="true">✓</span>
+            <span>{t(`bodyPhotos.retained.${item}`)}</span>
+          </li>
+        ))}
       </ul>
     </aside>
   );
@@ -501,11 +636,39 @@ function PhotoQualityFeedback({ photo }: { photo: ProcessedBodyPhoto }) {
   const { quality, warnings } = photo.validation;
   return (
     <section className="body-photo-quality" aria-label={t("bodyPhotos.quality.title")}>
-      <strong>{t("bodyPhotos.quality.title")}</strong>
+      <div className="body-photo-quality__header">
+        <span className="body-photo-quality__beacon" aria-hidden="true" />
+        <strong>{t("bodyPhotos.quality.title")}</strong>
+        <span className="body-photo-quality__badge">AI VISION VERIFIED</span>
+      </div>
       <dl>
-        <div><dt>{t("bodyPhotos.quality.lighting")}</dt><dd>{formatScore(quality.brightnessScore)}</dd></div>
-        <div><dt>{t("bodyPhotos.quality.sharpness")}</dt><dd>{formatScore(quality.sharpnessScore)}</dd></div>
-        <div><dt>{t("bodyPhotos.quality.landmarks")}</dt><dd>{formatScore(quality.minimumLandmarkVisibility)}</dd></div>
+        <div>
+          <dt>{t("bodyPhotos.quality.lighting")}</dt>
+          <dd>
+            <span className="body-photo-quality__gauge" aria-hidden="true">
+              <span className="body-photo-quality__gauge-fill" style={{ width: `${Math.round(quality.brightnessScore * 100)}%` }} />
+            </span>
+            <span>{formatScore(quality.brightnessScore)}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>{t("bodyPhotos.quality.sharpness")}</dt>
+          <dd>
+            <span className="body-photo-quality__gauge" aria-hidden="true">
+              <span className="body-photo-quality__gauge-fill" style={{ width: `${Math.round(quality.sharpnessScore * 100)}%` }} />
+            </span>
+            <span>{formatScore(quality.sharpnessScore)}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>{t("bodyPhotos.quality.landmarks")}</dt>
+          <dd>
+            <span className="body-photo-quality__gauge" aria-hidden="true">
+              <span className="body-photo-quality__gauge-fill" style={{ width: `${Math.round(quality.minimumLandmarkVisibility * 100)}%` }} />
+            </span>
+            <span>{formatScore(quality.minimumLandmarkVisibility)}</span>
+          </dd>
+        </div>
       </dl>
       {warnings && warnings.length > 0 && (
         <aside className="body-photo-quality__warnings" aria-label={t("bodyPhotos.validationWarnings.title")}>
