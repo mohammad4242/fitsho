@@ -268,9 +268,17 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-estimate-summary { grid-template-columns: minmax(0, 1.4fr) minmax(15rem, .6fr); }
 .nutrition-today-panel, .nutrition-meal-summary { width: min(100% - 2rem, 72rem); margin-inline: auto; }
 .nutrition-today-panel { overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
-.nutrition-today-panel__top { min-height: 8rem; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .85rem; padding: .85rem; }
+.nutrition-today-panel__top { min-height: 8rem; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 1rem; padding: .85rem; }
+.nutrition-calorie-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1.25rem; align-items: center; }
+.nutrition-calorie-item { display: flex; align-items: center; justify-content: space-between; gap: .85rem; }
+.nutrition-calorie-item + .nutrition-calorie-item { border-inline-start: 1px solid var(--fitsho-line); padding-inline-start: 1.25rem; }
+.nutrition-breakdown-legend { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .75rem; margin-top: .35rem; }
+.nutrition-breakdown-pill { display: inline-flex; align-items: center; gap: .35rem; font-size: .72rem; color: var(--fitsho-muted); }
+.nutrition-breakdown-dot { width: .5rem; height: .5rem; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+.nutrition-breakdown-dot--bmr { background: var(--fitsho-blue, #3b82f6); box-shadow: 0 0 .5rem rgb(59 130 246 / 45%); }
+.nutrition-breakdown-dot--activity { background: var(--fitsho-aqua); box-shadow: 0 0 .5rem rgb(80 223 206 / 45%); }
 .nutrition-today-panel .nutrition-calorie-card { min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
-.nutrition-today-panel .nutrition-calorie-card strong { display: block; margin-block: .2rem; font: 850 clamp(2rem, 5.5vw, 3rem)/1 "Sora Variable", sans-serif; }
+.nutrition-today-panel .nutrition-calorie-card strong { display: block; margin-block: .2rem; font: 850 clamp(1.8rem, 5vw, 2.75rem)/1 "Sora Variable", sans-serif; }
 .nutrition-today-panel .fitsho-progress-ring { width: 4.75rem; }
 .nutrition-today-panel .nutrition-confidence-card { min-width: 8rem; align-self: stretch; display: grid; align-content: center; justify-items: start; padding: .75rem; border: 0; border-inline-start: 1px solid var(--fitsho-line); border-radius: 0; background: transparent; box-shadow: none; }
 .nutrition-today-panel .nutrition-target-grid--primary { width: auto; margin: 0; border: 0; border-top: 1px solid var(--fitsho-line); border-radius: 0; background: rgb(255 255 255 / 2%); box-shadow: none; }
@@ -431,8 +439,9 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   .nutrition-doctor-grid { grid-template-columns: 1fr; }
   .nutrition-doctor-supervision > header { align-items: flex-start; flex-wrap: wrap; }
   .nutrition-doctor-header-status { width: 100%; margin-inline-start: 3.3rem; }
-  .nutrition-photo-panel { width: min(100% - 1.5rem, 72rem); }
-  .nutrition-today-panel__top { min-height: 7.6rem; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; padding: .8rem; }
+  .nutrition-today-panel__top { min-height: 7.6rem; grid-template-columns: 1fr; gap: .85rem; padding: .8rem; }
+  .nutrition-calorie-group { grid-template-columns: 1fr; gap: .85rem; }
+  .nutrition-calorie-item + .nutrition-calorie-item { border-inline-start: 0; border-top: 1px solid var(--fitsho-line); padding-inline-start: 0; padding-top: .85rem; }
   .nutrition-today-panel .nutrition-confidence-card { grid-column: 1 / -1; min-width: 0; min-height: 2rem; display: flex; align-items: center; justify-content: space-between; padding: .45rem 0 0; border: 0; border-top: 1px solid var(--fitsho-line); }
   .nutrition-today-panel .fitsho-progress-ring { width: 4.4rem; }
   .nutrition-tracking-header { flex-direction: row; }

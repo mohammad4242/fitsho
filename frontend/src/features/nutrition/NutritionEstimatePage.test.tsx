@@ -25,6 +25,8 @@ const estimate: NutritionEstimate = {
   created_at: "2026-08-05T12:00:00Z",
   targets: {
     goal_calories: target("kcal/day", { preferred: 2100 }),
+    bmr: target("kcal/day", { preferred: 1600 }),
+    tdee: target("kcal/day", { preferred: 2400 }),
     protein: target("g/day", { minimum: 80, preferred: 120 }),
     carbohydrate: target("g/day", { minimum: 236, maximum: 394 }),
     total_fat: target("g/day", { minimum: 35, maximum: 70 }),
@@ -266,6 +268,25 @@ it("animates the real calorie target and full ring on the same timeline", async 
   expect(progress).toHaveAttribute("aria-valuenow", "2100");
   expect(progress).toHaveAttribute("aria-valuemax", "2100");
   expect(within(progress).getByText("100%")).toBeInTheDocument();
+});
+
+it("renders TDEE card and dual progress ring for BMR and activity expenditure", async () => {
+  await i18n.changeLanguage("fa");
+
+  render(<MemoryRouter><NutritionEstimatePage /></MemoryRouter>);
+
+  const tdeeCard = await screen.findByRole("region", { name: "کل مصرف روزانه انرژی (TDEE)" });
+  expect(within(tdeeCard).getByText("TDEE (کل مصرف روزانه)")).toBeInTheDocument();
+  expect(within(tdeeCard).getByText("۲٬۴۰۰")).toBeInTheDocument();
+  expect(within(tdeeCard).getByText(/پایه:\s*۱٬۶۰۰/)).toBeInTheDocument();
+  expect(within(tdeeCard).getByText(/فعالیت:\s*۸۰۰/)).toBeInTheDocument();
+
+  const dualRing = screen.getByRole("progressbar", { name: "تفکیک مصرف انرژی روزانه" });
+  expect(dualRing).toHaveAttribute("aria-valuenow", "2400");
+  expect(dualRing).toHaveAttribute("aria-valuemax", "2400");
+  expect(dualRing).toHaveTextContent("100%");
+  expect(dualRing.style.getPropertyValue("--ring-deg-1")).toBe("240.0deg");
+  expect(dualRing.style.getPropertyValue("--ring-deg-2")).toBe("360.0deg");
 });
 
 it("shows doctor supervision tools without inventing a pending plan", async () => {

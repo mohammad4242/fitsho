@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { AppIcon } from "../../shared/AppIcon";
+import { DualProgressRing } from "../../shared/DualProgressRing";
 import { ProgressRing } from "../../shared/ProgressRing";
 import * as nutritionApi from "./api";
 import type {
@@ -783,8 +784,14 @@ function EstimateContent({ estimate, language, onRefresh, plan, tracking }: { es
   const currentDate = new Date().toISOString().slice(0, 10);
   const todayPlan = plan?.days.find((day) => day.plan_date === currentDate) ?? plan?.days[0];
   const energyTarget = todayPlan?.nutrient_totals.energy_kcal ?? target("goal_calories")?.preferred ?? null;
+  const tdeeTarget = target("tdee")?.preferred ?? target("tdee")?.minimum ?? null;
+  const bmrTarget = target("bmr")?.preferred ?? target("bmr")?.minimum ?? null;
+  const activityTarget = tdeeTarget !== null && bmrTarget !== null ? Math.max(0, tdeeTarget - bmrTarget) : null;
   const animationProgress = useSynchronizedProgress();
   const animatedEnergyTarget = energyTarget === null ? null : energyTarget * animationProgress;
+  const animatedTdee = tdeeTarget === null ? null : tdeeTarget * animationProgress;
+  const animatedBmr = bmrTarget === null ? null : bmrTarget * animationProgress;
+  const animatedActivity = activityTarget === null ? null : activityTarget * animationProgress;
   const tracked = tracking?.actual_totals;
   const hasTrackedData = tracked !== undefined && (
     tracking?.data_status === "sufficient"
@@ -800,12 +807,41 @@ function EstimateContent({ estimate, language, onRefresh, plan, tracking }: { es
   return <>
     <section className="nutrition-today-panel" aria-label={l("خلاصه هدف‌ها", "Target summary")}>
       <div className="nutrition-today-panel__top">
-        <article className="nutrition-calorie-card" aria-label={l("کالری هدف روزانه", "Daily calorie goal")} role="region">
-          <span>{l("کالری هدف", "Calorie goal")}</span>
-          <strong>{animatedEnergyTarget === null ? l("تعیین نشده", "Not set") : number.format(animatedEnergyTarget)}</strong>
-          <small>{hasTrackedData ? l(`دریافت امروز ${number.format(tracked?.energy_kcal ?? 0)} کیلوکالری`, `Consumed today ${number.format(tracked?.energy_kcal ?? 0)} kcal`) : l("کیلوکالری روزانه", "daily kcal")}</small>
-        </article>
-        {energyTarget !== null && <ProgressRing value={animatedEnergyTarget ?? 0} max={energyTarget} label={l("پیشرفت کالری هدف", "Calorie goal progress")} />}
+        <div className="nutrition-calorie-group">
+          <div className="nutrition-calorie-item">
+            <article className="nutrition-calorie-card" aria-label={l("کالری هدف روزانه", "Daily calorie goal")} role="region">
+              <span>{l("کالری هدف", "Calorie goal")}</span>
+              <strong>{animatedEnergyTarget === null ? l("تعیین نشده", "Not set") : number.format(animatedEnergyTarget)}</strong>
+              <small>{hasTrackedData ? l(`دریافت امروز ${number.format(tracked?.energy_kcal ?? 0)} کیلوکالری`, `Consumed today ${number.format(tracked?.energy_kcal ?? 0)} kcal`) : l("کیلوکالری روزانه", "daily kcal")}</small>
+            </article>
+            {energyTarget !== null && <ProgressRing value={animatedEnergyTarget ?? 0} max={energyTarget} label={l("پیشرفت کالری هدف", "Calorie goal progress")} />}
+          </div>
+
+          {tdeeTarget !== null && (
+            <div className="nutrition-calorie-item nutrition-calorie-item--tdee">
+              <article className="nutrition-calorie-card nutrition-calorie-card--tdee" aria-label={l("کل مصرف روزانه انرژی (TDEE)", "Total daily energy expenditure (TDEE)")} role="region">
+                <span>{l("TDEE (کل مصرف روزانه)", "TDEE (Daily expenditure)")}</span>
+                <strong>{animatedTdee === null ? l("تعیین نشده", "Not set") : number.format(animatedTdee)}</strong>
+                <div className="nutrition-breakdown-legend" aria-label={l("تفکیک متابولیسم پایه و فعالیت", "BMR and activity breakdown")}>
+                  <span className="nutrition-breakdown-pill nutrition-breakdown-pill--bmr">
+                    <i className="nutrition-breakdown-dot nutrition-breakdown-dot--bmr" />
+                    {l("پایه", "BMR")}: {animatedBmr === null ? "—" : number.format(animatedBmr)}
+                  </span>
+                  <span className="nutrition-breakdown-pill nutrition-breakdown-pill--activity">
+                    <i className="nutrition-breakdown-dot nutrition-breakdown-dot--activity" />
+                    {l("فعالیت", "Activity")}: {animatedActivity === null ? "—" : number.format(animatedActivity)}
+                  </span>
+                </div>
+              </article>
+              <DualProgressRing
+                primaryValue={animatedBmr ?? 0}
+                secondaryValue={animatedActivity ?? 0}
+                total={tdeeTarget}
+                label={l("تفکیک مصرف انرژی روزانه", "Daily energy expenditure breakdown")}
+              />
+            </div>
+          )}
+        </div>
         <div className="nutrition-confidence-card">
           <span className={`nutrition-confidence nutrition-confidence--${estimate.confidence}`}>{confidence}</span>
           {estimate.is_stale && <button className="text-button" type="button" onClick={onRefresh}>{l("به‌روزرسانی", "Refresh")}</button>}
