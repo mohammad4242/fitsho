@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { AppIcon } from "../../shared/AppIcon";
+import bodyAnalysisHeroImg from "../../assets/bodyPhotos/bodyanalysis.jpg";
 import { deleteBodyPhotoSession, getBodyProgressTimeline } from "./api";
 import { BodyTimeline } from "./BodyTimeline";
 import type { BodyProgressTimelineItem, BodyProgressTimelineResponse } from "./types";
@@ -126,64 +127,91 @@ export function BodyProgressPage() {
 
       {timeline?.items.length === 0 && (
         <section className="body-analysis-empty" aria-labelledby="body-analysis-empty-title">
-          <div className="body-analysis-empty__hud" aria-hidden="true">
-            <div className="body-analysis-empty__reticle">
-              <span className="body-analysis-empty__reticle-ring body-analysis-empty__reticle-ring--outer" />
-              <span className="body-analysis-empty__reticle-ring body-analysis-empty__reticle-ring--inner" />
-              <span className="body-analysis-empty__reticle-pulse" />
-              <span className="body-analysis-empty__icon">
+          <div className="body-analysis-empty__visual">
+            <div className="body-analysis-empty__media-frame">
+              <img
+                src={bodyAnalysisHeroImg}
+                alt=""
+                aria-hidden="true"
+                className="body-analysis-empty__image"
+              />
+              <div className="body-analysis-empty__overlay">
+                <span className="body-analysis-empty__corner body-analysis-empty__corner--tl" aria-hidden="true" />
+                <span className="body-analysis-empty__corner body-analysis-empty__corner--tr" aria-hidden="true" />
+                <span className="body-analysis-empty__corner body-analysis-empty__corner--bl" aria-hidden="true" />
+                <span className="body-analysis-empty__corner body-analysis-empty__corner--br" aria-hidden="true" />
+                <div className="body-analysis-empty__scan-line" aria-hidden="true" />
+                <div className="body-analysis-empty__hud-badge">
+                  <span className="body-analysis-empty__hud-dot" aria-hidden="true" />
+                  <span>{isFa ? "اسکن هوشمند دوربین و بیومتریک بدن" : "Smart Camera & Body Biometric Scan"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="body-analysis-empty__content">
+            <h2 id="body-analysis-empty-title">{t("bodyPhotos.emptyTitle")}</h2>
+            <p>{t("bodyPhotos.emptyBody")}</p>
+
+            <div className="body-analysis-empty__steps" aria-label={isFa ? "مراحل ثبت" : "Steps"}>
+              <div className="body-analysis-empty__step">
+                <span className="body-analysis-empty__step-badge">۱</span>
+                <div className="body-analysis-empty__step-info">
+                  <strong>{isFa ? "عکاسی ۳ زاویه" : "3 Standard Angles"}</strong>
+                  <small>{isFa ? "روبه‌رو، نیمرخ، پشت" : "Front, Side, Back"}</small>
+                </div>
+              </div>
+              <div className="body-analysis-empty__step">
+                <span className="body-analysis-empty__step-badge">۲</span>
+                <div className="body-analysis-empty__step-info">
+                  <strong>{isFa ? "برش امن چهره" : "Face-Safe Crop"}</strong>
+                  <small>{isFa ? "کاملاً محرمانه در گوشی" : "100% On-device privacy"}</small>
+                </div>
+              </div>
+              <div className="body-analysis-empty__step">
+                <span className="body-analysis-empty__step-badge">۳</span>
+                <div className="body-analysis-empty__step-info">
+                  <strong>{isFa ? "تحلیل و دورسنجی" : "Biometric Report"}</strong>
+                  <small>{isFa ? "نمودار و روند پیشرفت" : "Progress comparison"}</small>
+                </div>
+              </div>
+            </div>
+
+            <Link className="primary-button body-analysis-empty__action" to="/body-progress/new">
+              <span className="body-analysis-empty__action-icon" aria-hidden="true">
                 <AppIcon name="camera" />
               </span>
-            </div>
+              <span>{t("bodyPhotos.emptyAction")}</span>
+            </Link>
           </div>
-          <h2 id="body-analysis-empty-title">{t("bodyPhotos.emptyTitle")}</h2>
-          <p>{t("bodyPhotos.emptyBody")}</p>
-
-          <div className="body-analysis-empty__steps" aria-label={isFa ? "مراحل ثبت" : "Steps"}>
-            <div className="body-analysis-empty__step">
-              <span className="body-analysis-empty__step-badge">۱</span>
-              <div className="body-analysis-empty__step-info">
-                <strong>{isFa ? "عکاسی ۳ زاویه" : "3 Standard Angles"}</strong>
-                <small>{isFa ? "روبه‌رو، نیمرخ، پشت" : "Front, Side, Back"}</small>
-              </div>
-            </div>
-            <div className="body-analysis-empty__step">
-              <span className="body-analysis-empty__step-badge">۲</span>
-              <div className="body-analysis-empty__step-info">
-                <strong>{isFa ? "برش امن چهره" : "Face-Safe Crop"}</strong>
-                <small>{isFa ? "کاملاً محرمانه در گوشی" : "100% On-device privacy"}</small>
-              </div>
-            </div>
-            <div className="body-analysis-empty__step">
-              <span className="body-analysis-empty__step-badge">۳</span>
-              <div className="body-analysis-empty__step-info">
-                <strong>{isFa ? "تحلیل و دورسنجی" : "Biometric Report"}</strong>
-                <small>{isFa ? "نمودار و روند پیشرفت" : "Progress comparison"}</small>
-              </div>
-            </div>
-          </div>
-
-          <Link className="primary-button body-analysis-empty__action" to="/body-progress/new">
-            {t("bodyPhotos.emptyAction")}
-          </Link>
         </section>
       )}
 
       {timeline !== null && timeline.items.length > 0 && (
         <div className="body-analysis-home__timeline-container">
           <div className="body-analysis-home__toolbar">
-            <div className="body-analysis-home__summary-chips">
-              <span className="body-analysis-stat-pill">
-                <span className="body-analysis-stat-pill__dot" aria-hidden="true" />
-                <span>
-                  {isFa
-                    ? `${timeline.items.length} جلسه تحلیل ثبت‌شده`
-                    : `${timeline.items.length} total sessions`}
+            <div className="body-analysis-home__toolbar-left">
+              <div className="body-analysis-home__toolbar-media" aria-hidden="true">
+                <img src={bodyAnalysisHeroImg} alt="" className="body-analysis-home__toolbar-thumb" />
+                <span className="body-analysis-home__toolbar-scan-indicator" />
+              </div>
+              <div className="body-analysis-home__toolbar-info">
+                <strong>{isFa ? "جلسه جدید آنالیز بدن" : "New Body Analysis Session"}</strong>
+                <span className="body-analysis-stat-pill">
+                  <span className="body-analysis-stat-pill__dot" aria-hidden="true" />
+                  <span>
+                    {isFa
+                      ? `${timeline.items.length} جلسه تحلیل ثبت‌شده`
+                      : `${timeline.items.length} total sessions`}
+                  </span>
                 </span>
-              </span>
+              </div>
             </div>
             <Link className="primary-button body-analysis-home__start" to="/body-progress/new">
-              {t("bodyPhotos.start")}
+              <span className="body-analysis-home__start-icon" aria-hidden="true">
+                <AppIcon name="camera" />
+              </span>
+              <span>{t("bodyPhotos.start")}</span>
             </Link>
           </div>
           <BodyTimeline items={timeline.items} onDelete={openDeleteDialog} />
