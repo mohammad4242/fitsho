@@ -879,6 +879,83 @@ class FoodReplacementOptionsResponse(BaseModel):
     options: list[FoodReplacementOptionResponse]
 
 
+JsonScalar = str | int | float | bool | None
+
+
+class ShoppingListItemResponse(BaseModel):
+    food_id: UUID
+    slug: str
+    name_fa: str
+    name_en: str
+    required_quantity: float
+    canonical_unit: str
+    cost_irr: int
+    nutrients: dict[str, float]
+    price_snapshot: dict[str, JsonScalar]
+
+
+class ShoppingListResponse(BaseModel):
+    plan_id: UUID
+    plan_revision: int
+    approval_status: str
+    warning_codes: list[str]
+    items: list[ShoppingListItemResponse]
+    total_cost_irr: int
+
+
+class MealControlResponse(BaseModel):
+    plan_id: UUID
+    plan_revision: int
+    meal_id: UUID
+    change_kind: Literal["plan_control_metadata"]
+
+
+class MealLockResponse(MealControlResponse):
+    is_locked: bool
+
+
+class MealFeedbackUpdateResponse(BaseModel):
+    meal_id: UUID
+    feedback_type: NutritionMealFeedbackType
+    change_kind: Literal["plan_control_metadata"]
+
+
+class MealRemovalPreviewResponse(BaseModel):
+    plan_id: UUID
+    expected_plan_revision_id: UUID
+    expected_revision: int
+    operation: Literal["remove_meal"]
+    meal_id: UUID
+    daily_delta: dict[str, float]
+    weekly_cost_delta_irr: int
+    new_warning_codes: list[str]
+    requires_physician_review: bool
+    change_kind: Literal["plan_defining"]
+
+
+class MealReplacementPreviewResponse(BaseModel):
+    plan_id: UUID
+    expected_plan_revision_id: UUID
+    meal_id: UUID
+    replacement_meal_id: UUID
+    daily_delta: dict[str, float]
+    weekly_cost_delta_irr: int
+    requires_physician_review: bool
+    change_kind: Literal["plan_defining"]
+
+
+class FoodReplacementPreviewResponse(BaseModel):
+    plan_id: UUID
+    expected_plan_revision_id: UUID
+    meal_id: UUID
+    food_id: UUID
+    replacement_food_id: UUID
+    meal_delta: dict[str, float]
+    cost_delta_irr: int
+    requires_physician_review: bool
+    change_kind: Literal["plan_defining"]
+
+
 class WeeklyPlanDayResponse(BaseModel):
     day_index: int
     plan_date: date

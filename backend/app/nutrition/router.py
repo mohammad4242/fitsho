@@ -203,10 +203,15 @@ from app.nutrition.schemas import (
     FoodPriceOverrideInput,
     FoodPriceOverrideResponse,
     FoodReplacementOptionsResponse,
+    FoodReplacementPreviewResponse,
     FreeMealTrackingInput,
     MealFeedbackInput,
+    MealFeedbackUpdateResponse,
     MealLockInput,
+    MealLockResponse,
+    MealRemovalPreviewResponse,
     MealReplacementOptionsResponse,
+    MealReplacementPreviewResponse,
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
@@ -236,6 +241,7 @@ from app.nutrition.schemas import (
     SafetyEvaluationResponse,
     SafetyProfileInput,
     SharedCatalogueMealPageResponse,
+    ShoppingListResponse,
     SingleFoodPriceResearchQuoteResponse,
     SingleFoodPriceResearchResponse,
     StructuredExerciseInput,
@@ -1549,18 +1555,24 @@ def read_food_replacement_options(
         raise _plan_edit_error(error) from None
 
 
-@router.get("/plans/{plan_id}/shopping-list")
-def read_shopping_list(plan_id: UUID, db: DatabaseSession, user: CurrentUser) -> dict[str, object]:
+@router.get("/plans/{plan_id}/shopping-list", response_model=ShoppingListResponse)
+def read_shopping_list(
+    plan_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> ShoppingListResponse:
     try:
         return shopping_list(db, user.id, plan_id)
     except PlanEditError as error:
         raise _plan_edit_error(error) from None
 
 
-@router.put("/plans/{plan_id}/meals/{meal_id}/lock", dependencies=[Depends(require_trusted_origin)])
+@router.put(
+    "/plans/{plan_id}/meals/{meal_id}/lock",
+    response_model=MealLockResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
 def update_meal_lock(
     plan_id: UUID, meal_id: UUID, payload: MealLockInput, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> MealLockResponse:
     try:
         return set_meal_lock(db, user.id, plan_id, meal_id, payload.is_locked)
     except PlanEditError as error:
@@ -1568,21 +1580,26 @@ def update_meal_lock(
 
 
 @router.put(
-    "/plans/{plan_id}/meals/{meal_id}/feedback", dependencies=[Depends(require_trusted_origin)]
+    "/plans/{plan_id}/meals/{meal_id}/feedback",
+    response_model=MealFeedbackUpdateResponse,
+    dependencies=[Depends(require_trusted_origin)],
 )
 def update_meal_feedback(
     plan_id: UUID, meal_id: UUID, payload: MealFeedbackInput, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> MealFeedbackUpdateResponse:
     try:
         return save_feedback(db, user.id, plan_id, meal_id, payload.feedback_type, payload.notes)
     except PlanEditError as error:
         raise _plan_edit_error(error) from None
 
 
-@router.post("/plans/{plan_id}/edits/remove-meal/preview")
+@router.post(
+    "/plans/{plan_id}/edits/remove-meal/preview",
+    response_model=MealRemovalPreviewResponse,
+)
 def preview_meal_removal(
     plan_id: UUID, meal_id: UUID, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> MealRemovalPreviewResponse:
     try:
         return preview_remove_meal(db, user.id, plan_id, meal_id)
     except PlanEditError as error:
@@ -1605,10 +1622,13 @@ def confirm_meal_removal(
         raise _plan_edit_error(error) from None
 
 
-@router.post("/plans/{plan_id}/edits/replace-meal/preview")
+@router.post(
+    "/plans/{plan_id}/edits/replace-meal/preview",
+    response_model=MealReplacementPreviewResponse,
+)
 def preview_meal_replacement(
     plan_id: UUID, payload: ReplaceMealInput, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> MealReplacementPreviewResponse:
     try:
         return preview_replace_meal(
             db, user.id, plan_id, payload.meal_id, payload.replacement_meal_id
@@ -1638,10 +1658,13 @@ def confirm_meal_replacement(
         raise _plan_edit_error(error) from None
 
 
-@router.post("/plans/{plan_id}/edits/replace-food/preview")
+@router.post(
+    "/plans/{plan_id}/edits/replace-food/preview",
+    response_model=FoodReplacementPreviewResponse,
+)
 def preview_food_replacement(
     plan_id: UUID, payload: ReplaceFoodInput, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> FoodReplacementPreviewResponse:
     try:
         return preview_replace_food(
             db, user.id, plan_id, payload.meal_id, payload.food_id, payload.replacement_food_id
