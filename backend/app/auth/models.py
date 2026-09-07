@@ -95,6 +95,100 @@ class AuthSession(Base):
     )
 
 
+class MobileTokenFamily(Base):
+    """Revocable native-device session that owns access and refresh tokens."""
+
+    __tablename__ = "mobile_token_families"
+    __table_args__ = (
+        CheckConstraint(
+            "char_length(btrim(device_id)) BETWEEN 1 AND 128",
+            name="ck_mobile_token_families_device_id_length",
+        ),
+        CheckConstraint(
+            "platform IN ('android', 'ios')",
+            name="ck_mobile_token_families_platform",
+        ),
+        CheckConstraint(
+            "char_length(btrim(app_version)) BETWEEN 1 AND 64",
+            name="ck_mobile_token_families_app_version_length",
+        ),
+        Index(
+            "ix_mobile_token_families_user_id_created_at",
+            "user_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    device_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    platform: Mapped[str] = mapped_column(String(16), nullable=False)
+    app_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    device_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoke_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class MobileAccessToken(Base):
+    """Hash-only opaque bearer token issued by a native token family."""
+
+    __tablename__ = "mobile_access_tokens"
+    __table_args__ = (
+        Index(
+            "ix_mobile_access_tokens_family_id_expires_at",
+            "family_id",
+            "expires_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    family_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mobile_token_families.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class MobileRefreshToken(Base):
+    """One opaque refresh-token generation in a rotatable token family."""
+
+    __tablename__ = "mobile_refresh_tokens"
+    __table_args__ = (
+        Index(
+            "ix_mobile_refresh_tokens_family_id_expires_at",
+            "family_id",
+            "expires_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    family_id: Mapped[UUID] = mapped_column(
+        ForeignKey("mobile_token_families.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    replaced_by_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("mobile_refresh_tokens.id", ondelete="SET NULL"), nullable=True
+    )
+
+
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
