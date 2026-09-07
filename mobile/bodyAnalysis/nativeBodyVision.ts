@@ -2,13 +2,23 @@ import type {
   FiticianBodyVision,
   NativeBodyVisionResult,
 } from "@fitician/body-vision";
+import {
+  validatePoseWithGhost,
+  type GhostPoseValidationResult,
+  type GhostPoseValidatorOptions,
+  type NormalizedBodyLandmark,
+} from "@fitician/core/body-ghost-pose";
+import {
+  normalizeBodySegmentationMask,
+  type BodySegmentationMask,
+} from "@fitician/core/body-photos";
 
 export const BODY_VISION_SPIKE_CONTRACT_VERSION = "1.0";
 
 export interface NormalizedBodyVisionResult {
   contractVersion: typeof BODY_VISION_SPIKE_CONTRACT_VERSION;
-  landmarks: Array<Array<{ x: number; y: number; z: number; visibility: number }> >;
-  mask: { width: number; height: number; values: number[] };
+  landmarks: NormalizedBodyLandmark[][];
+  mask: BodySegmentationMask;
   frame: { width: number; height: number; timestamp: number };
 }
 
@@ -17,6 +27,8 @@ interface RawBodyVisionResult {
   mask: unknown;
   frame: unknown;
 }
+
+type NativeBodyVisionValidationOptions = Omit<GhostPoseValidatorOptions, "poses">;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -76,12 +88,11 @@ export function normalizeBodyVisionResult(value: unknown): NormalizedBodyVisionR
   }
   const maskWidth = readPositiveInteger(raw.mask.width, "mask width");
   const maskHeight = readPositiveInteger(raw.mask.height, "mask height");
-  if (!Array.isArray(raw.mask.values) || raw.mask.values.length !== maskWidth * maskHeight) {
-    throw new Error("native mask values must match its dimensions");
-  }
-  const maskValues = raw.mask.values.map((maskValue, index) =>
-    readUnitNumber(maskValue, `mask value ${index}`),
-  );
+  const mask = normalizeBodySegmentationMask({
+    width: maskWidth,
+    height: maskHeight,
+    values: raw.mask.values,
+  });
 
   if (!isRecord(raw.frame)) {
     throw new Error("native frame metadata must be an object");
@@ -93,10 +104,11 @@ export function normalizeBodyVisionResult(value: unknown): NormalizedBodyVisionR
   return {
     contractVersion: BODY_VISION_SPIKE_CONTRACT_VERSION,
     landmarks,
-    mask: { width: maskWidth, height: maskHeight, values: maskValues },
+    mask,
     frame: { width: frameWidth, height: frameHeight, timestamp },
   };
 }
+
 
 export interface BodyVisionBenchmarkFrame {
   durationMs: number;
@@ -177,4 +189,17 @@ export function normalizeNativeBodyVisionResult(
   value: NativeBodyVisionResult,
 ): NormalizedBodyVisionResult {
   return normalizeBodyVisionResult(value);
+}
+
+export function validateNativeBodyVisionResult(
+  value: NativeBodyVisionResult,
+  options: NativeBodyVisionValidationOptions,
+): { normalized: NormalizedBodyVisionResult; validation: GhostPoseValidationResult } {
+  const normalized = normalizeNativeBodyVisionResult(value);
+  const validation = validatePoseWithGhost({
+    ...options,
+    poses: normalized.landmarks,
+    imageDimensions: options.imageDimensions ?? normalized.frame,
+  });
+  return { normalized, validation };
 }

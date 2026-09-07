@@ -42,7 +42,7 @@ class FiticianBodyVision : HybridFiticianBodyVisionSpec() {
       val mpImage = BitmapImageBuilder(bitmap).build()
       val poseResult = poseLandmarker.value.detect(mpImage)
       val segmentationResult = imageSegmenter.value.segment(mpImage)
-      val segmentationMask = segmentationResult.categoryMask().orElse(null)
+      val segmentationMask = segmentationResult.confidenceMasks().orElse(null)?.firstOrNull()
         ?: throw IllegalStateException("MediaPipe returned no segmentation mask")
       val maskBytes = ByteBufferExtractor.extract(segmentationMask)
       val elapsedNanos = System.nanoTime() - startedAt
@@ -116,8 +116,8 @@ class FiticianBodyVision : HybridFiticianBodyVisionSpec() {
     val options = ImageSegmenter.ImageSegmenterOptions.builder()
       .setBaseOptions(BaseOptions.builder().setModelAssetPath(SEGMENTATION_MODEL_ASSET).build())
       .setRunningMode(RunningMode.IMAGE)
-      .setOutputCategoryMask(true)
-      .setOutputConfidenceMasks(false)
+      .setOutputCategoryMask(false)
+      .setOutputConfidenceMasks(true)
       .build()
     ImageSegmenter.createFromOptions(applicationContext, options)
   }

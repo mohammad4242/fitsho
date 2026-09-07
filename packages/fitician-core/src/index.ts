@@ -28,6 +28,8 @@ export type {
   GhostViewGeometry,
   GhostZone,
 } from "./body-ghost";
+export { normalizeBodySegmentationMask } from "./body-photos";
+export type { BodySegmentationMask } from "./body-photos";
 export {
   GHOST_SCALE_MAX,
   GHOST_SCALE_MIN,

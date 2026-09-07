@@ -5,9 +5,14 @@ import {
 import { MediaPipeBodySegmenter } from "./mediaPipeBodySegmenter";
 import { MediaPipePoseLandmarkDetector } from "./mediaPipePoseDetector";
 import type { BodyPhotoSide, BodyPhotoView } from "./types";
+import {
+  normalizeBodySegmentationMask,
+  type BodySegmentationMask,
+} from "@fitician/core/body-photos";
 import type { NormalizedBodyLandmark } from "@fitician/core/body-ghost-pose";
 
 export type { NormalizedBodyLandmark } from "@fitician/core/body-ghost-pose";
+export type { BodySegmentationMask } from "@fitician/core/body-photos";
 
 export type BodyLandmarkDetection = {
   poses: NormalizedBodyLandmark[][];
@@ -16,12 +21,6 @@ export type BodyLandmarkDetection = {
 export interface BodyLandmarkDetector {
   detect(image: DecodedBodyPhoto, view?: BodyPhotoView): Promise<BodyLandmarkDetection>;
 }
-
-export type BodySegmentationMask = {
-  width: number;
-  height: number;
-  confidence: Float32Array;
-};
 
 export interface BodyPhotoSegmenter {
   segment(image: DecodedBodyPhoto): Promise<BodySegmentationMask>;
@@ -244,15 +243,7 @@ export class BrowserBodyPhotoProcessor implements BodyPhotoProcessor {
 
   private async segment(image: DecodedBodyPhoto): Promise<BodySegmentationMask> {
     try {
-      const mask = await this.segmenter.segment(image);
-      if (
-        mask.width <= 0
-        || mask.height <= 0
-        || mask.confidence.length !== mask.width * mask.height
-      ) {
-        throw new Error("invalid segmentation mask");
-      }
-      return mask;
+      return normalizeBodySegmentationMask(await this.segmenter.segment(image));
     } catch (error) {
       if (error instanceof BodyPhotoProcessingError) throw error;
       throw new BodyPhotoProcessingError("segmentation_unavailable");

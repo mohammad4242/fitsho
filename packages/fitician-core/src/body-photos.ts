@@ -1,6 +1,52 @@
 export type BodyPhotoView = "front" | "side" | "back";
 export type BodyPhotoSide = "right" | "left";
 
+export type BodySegmentationMask = {
+  width: number;
+  height: number;
+  confidence: Float32Array;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readPositiveInteger(value: unknown, label: string): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${label} must be a positive integer`);
+  }
+  return value;
+}
+
+function readMaskValues(value: unknown): Float32Array {
+  if (value instanceof ArrayBuffer) {
+    if (value.byteLength % Float32Array.BYTES_PER_ELEMENT !== 0) {
+      throw new Error("mask values must be Float32 data");
+    }
+    return new Float32Array(value.slice(0));
+  }
+  if (value instanceof Float32Array) return new Float32Array(value);
+  if (Array.isArray(value)) return Float32Array.from(value);
+  throw new Error("mask values must be Float32 data");
+}
+
+export function normalizeBodySegmentationMask(value: unknown): BodySegmentationMask {
+  if (!isRecord(value)) throw new Error("body segmentation mask must be an object");
+  const width = readPositiveInteger(value.width, "mask width");
+  const height = readPositiveInteger(value.height, "mask height");
+  const rawValues = value.confidence ?? value.values;
+  const confidence = readMaskValues(rawValues);
+  if (confidence.length !== width * height) {
+    throw new Error("mask values must match its dimensions");
+  }
+  confidence.forEach((maskValue, index) => {
+    if (!Number.isFinite(maskValue) || maskValue < 0 || maskValue > 1) {
+      throw new Error(`mask value ${index} must be between 0 and 1`);
+    }
+  });
+  return { width, height, confidence };
+}
+
 export type GhostTransform = {
   scale: number;
   translateX: number;

@@ -43,7 +43,9 @@ describe("Android body vision spike wiring", () => {
     expect(nativeSource).toContain("NativeFrame");
     expect(nativeSource).toContain("PoseLandmarker");
     expect(nativeSource).toContain("ImageSegmenter");
-    expect(nativeSource).toContain("categoryMask");
+    expect(nativeSource).toContain("confidenceMasks");
+    expect(nativeSource).toContain("setOutputConfidenceMasks(true)");
+    expect(nativeSource).toContain("setOutputCategoryMask(false)");
     expect(nativeSource).not.toMatch(/Log\.|println\(|console\./);
   });
 });
