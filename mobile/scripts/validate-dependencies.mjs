@@ -12,6 +12,7 @@ const lock = JSON.parse(await readFile(lockPath, "utf8"));
 assert.equal(lock.lockfileVersion, 3, "root npm lockfile must use lockfile version 3");
 const expected = {
   "@fitician/core": { declared: "0.1.0", version: /^0\.1\./ },
+  "@tanstack/react-query": { declared: "^5.102.8", version: /^5\./ },
   expo: { declared: "~57.0.0", version: /^57\./ },
   "expo-build-properties": { declared: "~57.0.2", version: /^57\./ },
   "expo-constants": { declared: "~57.0.2", version: /^57\./ },
