@@ -18,19 +18,25 @@ vi.mock("../auth/AuthContext", () => ({
 
 vi.mock("../auth/api", () => authApi);
 
-vi.mock("../auth/GoogleSignInButton", () => ({
-  GoogleSignInButton: ({
-    onCredential,
-    disabled,
-  }: {
-    onCredential: (credential: string) => void;
-    disabled: boolean;
-  }) => (
-    <button type="button" disabled={disabled} onClick={() => onCredential("signed-google-token")}>
-      Google
-    </button>
-  ),
-}));
+vi.mock("../auth/GoogleSignInButton", async () => {
+  const actual = await vi.importActual<typeof import("../auth/GoogleSignInButton")>(
+    "../auth/GoogleSignInButton",
+  );
+  return {
+    ...actual,
+    GoogleSignInButton: ({
+      onCredential,
+      disabled,
+    }: {
+      onCredential: (credential: string) => void;
+      disabled: boolean;
+    }) => (
+      <button type="button" disabled={disabled} onClick={() => onCredential("signed-google-token")}>
+        Google
+      </button>
+    ),
+  };
+});
 
 vi.mock("./onboardingDraft", async () => {
   const actual = await vi.importActual<typeof import("./onboardingDraft")>("./onboardingDraft");
@@ -261,6 +267,15 @@ it("offers email, phone, and Google while keeping Apple upcoming", () => {
   expect(screen.getByText("مسیر امن انتقال اطلاعات")).toBeInTheDocument();
   expect(document.querySelector(".public-account-step__card")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "بازگشت و ویرایش پاسخ‌ها" })).toBeInTheDocument();
+});
+
+it("keeps the Google provider and brand icon visible before client ID setup", () => {
+  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "");
+  seedReadyTrainingDraft();
+  render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
+
+  expect(screen.getByRole("img", { name: "Google" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Apple/ })).toBeDisabled();
 });
 
 it("finishes the onboarding handoff with phone OTP", async () => {

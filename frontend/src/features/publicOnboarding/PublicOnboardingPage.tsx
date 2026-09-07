@@ -6,7 +6,7 @@ import { AppIcon } from "../../shared/AppIcon";
 import * as authApi from "../auth/api";
 import { authErrorMessage } from "../auth/authError";
 import { useAuth } from "../auth/AuthContext";
-import { GoogleSignInButton } from "../auth/GoogleSignInButton";
+import { GoogleBrandIcon, GoogleSignInButton } from "../auth/GoogleSignInButton";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import { toProfileInput, validateStep, type ProfileValidationErrors } from "../profile/profileValidation";
 import type { ProductMode, ProfileFormValue, ProfileFormValues } from "../profile/types";
@@ -235,7 +235,6 @@ function FinalAccountStep({ draft, language, onEdit }: { draft: OnboardingDraft;
   const [countdown, setCountdown] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const googleConfigured = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim());
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -360,19 +359,17 @@ function FinalAccountStep({ draft, language, onEdit }: { draft: OnboardingDraft;
         </div>
 
         <div className="account-provider-grid" aria-label={text.providers}>
-          {googleConfigured && (
-            <div className="account-provider account-provider--google">
-              <span className="account-provider__identity">
-                <span className="account-provider__mark" aria-hidden="true">G</span>
-                <span>{text.google}</span>
-              </span>
-              <GoogleSignInButton
-                onCredential={handleGoogleCredential}
-                onError={handleGoogleError}
-                disabled={busy}
-              />
-            </div>
-          )}
+          <div className="account-provider account-provider--google">
+            <span className="account-provider__identity">
+              <GoogleBrandIcon className="account-provider__mark" />
+              <span>{text.google}</span>
+            </span>
+            <GoogleSignInButton
+              onCredential={handleGoogleCredential}
+              onError={handleGoogleError}
+              disabled={busy}
+            />
+          </div>
           <button
             className="account-provider account-provider--future"
             type="button"

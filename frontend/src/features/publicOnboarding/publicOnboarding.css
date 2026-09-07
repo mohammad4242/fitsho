@@ -427,7 +427,7 @@
 
 .account-provider--google { border-color: rgb(232 244 241 / 20%); }
 .account-provider__identity { min-width: 0; display: inline-flex; align-items: center; gap: 0.6rem; font-weight: 800; }
-.account-provider__mark { width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 0.6rem; color: #1b5eaa; background: #fff; font-family: Arial, sans-serif; font-weight: 900; }
+.account-provider__mark { width: 2rem; height: 2rem; display: grid; place-items: center; border-radius: 0.6rem; padding: 0.35rem; background: #fff; flex: 0 0 auto; }
 .account-provider--google .google-sign-in-slot { min-width: 15rem; min-height: 44px; flex: 1 1 15rem; display: flex; justify-content: flex-end; align-items: center; overflow: hidden; }
 .account-provider--google .google-sign-in-slot[data-disabled="true"] { pointer-events: none; }
 
