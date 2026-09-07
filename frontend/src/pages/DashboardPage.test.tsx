@@ -255,6 +255,45 @@ it("shows calorie progress against the real target before food is tracked", asyn
   );
 });
 
+it("shows estimated daily expenditure beside the calorie goal", async () => {
+  profile.productMode = "both";
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+  nutritionApi.getCurrentNutritionEstimate.mockResolvedValue({
+    confidence: "high",
+    targets: {
+      goal_calories: { preferred: 2567 },
+      tdee: { preferred: 2834 },
+      protein: { preferred: 130 },
+      carbohydrate: { preferred: 280 },
+      total_fat: { preferred: 68 },
+    },
+  });
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  expect(await screen.findByText("۲٬۸۳۴")).toBeInTheDocument();
+  expect(screen.getByText("مصرف تقریبی روزانه")).toBeInTheDocument();
+});
+
+it("hides estimated daily expenditure when TDEE is unavailable", async () => {
+  profile.productMode = "both";
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+  nutritionApi.getCurrentNutritionEstimate.mockResolvedValue({
+    confidence: "high",
+    targets: {
+      goal_calories: { preferred: 2567 },
+      protein: { preferred: 130 },
+      carbohydrate: { preferred: 280 },
+      total_fat: { preferred: 68 },
+    },
+  });
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  expect(await screen.findByText("۲٬۵۶۷")).toBeInTheDocument();
+  expect(screen.queryByText("مصرف تقریبی روزانه")).not.toBeInTheDocument();
+});
+
 it("routes the minimal body and food analysis shortcuts to their real flows", async () => {
   profile.productMode = "both";
   workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);

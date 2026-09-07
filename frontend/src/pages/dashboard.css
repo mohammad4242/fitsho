@@ -231,16 +231,29 @@ html[dir="rtl"] .command-card--primary::after {
   margin: .55rem 0 .75rem;
 }
 
-.command-card__calories > div {
-  display: grid;
+.command-card__calorie-values {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  min-width: 0;
 }
 
-.command-card__calories > div strong {
+.command-card__calorie-values > div {
+  display: grid;
+  min-width: 0;
+}
+
+.command-card__calorie-values > div + div {
+  border-inline-start: 1px solid var(--fitsho-line);
+  padding-inline-start: 1rem;
+}
+
+.command-card__calorie-values > div strong {
   font: 850 clamp(1.65rem, 4vw, 2.3rem)/1 "Sora Variable", sans-serif;
   font-variant-numeric: tabular-nums;
 }
 
-.command-card__calories > div span,
+.command-card__calorie-values > div span,
 .command-card__empty {
   margin-block-start: .3rem;
   color: var(--fitsho-muted);

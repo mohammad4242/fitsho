@@ -91,6 +91,7 @@ export function DashboardPage() {
   const todayPlan = nutritionPlan?.days?.find((day) => day.plan_date === currentDate) ?? nutritionPlan?.days?.[0];
   const planned = todayPlan?.nutrient_totals;
   const estimated = nutritionEstimate?.targets;
+  const tdeeTarget = estimated?.tdee?.preferred ?? estimated?.tdee?.minimum ?? null;
   const nutritionTarget = {
     energy_kcal: planned?.energy_kcal ?? estimated?.goal_calories?.preferred ?? null,
     protein_g: planned?.protein_g ?? estimated?.protein?.preferred ?? null,
@@ -161,7 +162,10 @@ export function DashboardPage() {
               <div className="command-card__head"><div><p>{t("dashboard.nutritionEyebrow")}</p><h2>{t("dashboard.nutritionTitle")}</h2></div><span className="command-card__arrow" aria-hidden="true">←</span></div>
               {hasNutritionTarget ? <>
                 <div className="command-card__calories">
-                  <div><strong>{format(actual?.energy_kcal ?? nutritionTarget.energy_kcal ?? 0)}</strong><span>{actual ? `${english ? "of" : "از"} ${format(nutritionTarget.energy_kcal ?? 0)} kcal` : english ? "daily target" : "هدف روزانه"}</span></div>
+                  <div className="command-card__calorie-values">
+                    <div><strong>{format(actual?.energy_kcal ?? nutritionTarget.energy_kcal ?? 0)}</strong><span>{actual ? `${english ? "of" : "از"} ${format(nutritionTarget.energy_kcal ?? 0)} kcal` : english ? "daily target" : "هدف روزانه"}</span></div>
+                    {tdeeTarget !== null && <div><strong>{format(tdeeTarget)}</strong><span>{english ? "Estimated daily expenditure" : "مصرف تقریبی روزانه"}</span></div>}
+                  </div>
                   <ProgressRing value={actual?.energy_kcal ?? 0} max={nutritionTarget.energy_kcal ?? 0} label={english ? "Today's calorie progress" : "پیشرفت کالری امروز"} />
                 </div>
                 <div className="fitsho-metric-strip">
