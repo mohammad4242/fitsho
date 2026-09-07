@@ -12,6 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.account_deletion.router import router as account_deletion_router
+from app.account_deletion.scheduler import account_deletion_scheduler_loop
 from app.admin.router import router as admin_router
 from app.auth.providers import (
     build_email_provider,
@@ -94,6 +96,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 background_tasks.append(
                     asyncio.create_task(retention_scheduler_loop(active_settings))
                 )
+                if active_settings.account_deletion_enabled:
+                    background_tasks.append(
+                        asyncio.create_task(account_deletion_scheduler_loop(active_settings))
+                    )
             try:
                 yield
             finally:
@@ -178,6 +184,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     app.include_router(auth_router)
+    app.include_router(account_deletion_router)
     app.include_router(body_photo_router)
     app.include_router(body_analysis_router)
     app.include_router(body_progress_comparison_router)

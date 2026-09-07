@@ -200,8 +200,8 @@ class BodyAnalysisReview(Base):
         nullable=False,
         index=True,
     )
-    reviewer_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    reviewer_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     reviewer_role: Mapped[BodyAnalysisReviewerRole] = mapped_column(
         Enum(

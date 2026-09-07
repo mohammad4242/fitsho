@@ -1255,8 +1255,8 @@ class NutritionFoodPriceOverride(Base):
     reference_price_toman: Mapped[Decimal] = mapped_column(Numeric(20, 8), nullable=False)
     canonical_unit: Mapped[str] = mapped_column(String(24), nullable=False)
     reason: Mapped[str] = mapped_column(String(500), nullable=False)
-    created_by_user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -1639,7 +1639,7 @@ class NutritionPlanPhysicianReview(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     physician_user_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT")
+        ForeignKey("users.id", ondelete="SET NULL")
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     user_visible_notes: Mapped[str | None] = mapped_column(String(2000))
@@ -1728,8 +1728,8 @@ class NutritionLabRequest(Base):
     plan_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_weekly_plans.id", ondelete="CASCADE"), nullable=False
     )
-    physician_user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    physician_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     status: Mapped[NutritionLabRequestStatus] = mapped_column(
         enum_column(NutritionLabRequestStatus, "ck_nutrition_lab_request_status_values"),
@@ -1758,8 +1758,8 @@ class NutritionSupplementOrder(Base):
     supplement_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("nutrition_supplement_catalogue.id", ondelete="RESTRICT")
     )
-    physician_user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    physician_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     dose: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -1825,8 +1825,8 @@ class NutritionSupplementOrderAudit(Base):
     order_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_supplement_orders.id", ondelete="CASCADE"), nullable=False
     )
-    actor_user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
@@ -2021,8 +2021,8 @@ class NutritionReviewAuditEvent(Base):
     review_id: Mapped[UUID] = mapped_column(
         ForeignKey("nutrition_plan_physician_reviews.id", ondelete="CASCADE"), nullable=False
     )
-    actor_user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    actor_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     metadata_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
@@ -2049,7 +2049,7 @@ class NutritionPhysicianReview(Base):
         enum_column(PhysicianReviewStatus, "ck_nutrition_physician_reviews_status_values"),
         nullable=False,
     )
-    reviewer_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    reviewer_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     notes: Mapped[str | None] = mapped_column(String(2000))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

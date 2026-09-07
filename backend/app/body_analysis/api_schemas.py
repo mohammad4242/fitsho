@@ -157,7 +157,7 @@ class SpecialistReviewResponse(BaseModel):
     id: UUID
     analysis_id: UUID
     result_version_id: UUID
-    reviewer_id: UUID
+    reviewer_id: UUID | None
     role: BodyAnalysisReviewerRole
     decision: BodyAnalysisReviewDecision
     notes: str | None

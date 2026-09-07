@@ -4,6 +4,7 @@ from sqlalchemy import Enum as SqlEnum
 from sqlalchemy import String, engine_from_config, pool
 
 from alembic import context
+from app.account_deletion import models as account_deletion_models  # noqa: F401
 from app.ai import models as ai_models  # noqa: F401
 from app.auth import models  # noqa: F401
 from app.body_analysis import comparison_models as body_analysis_comparison_models  # noqa: F401

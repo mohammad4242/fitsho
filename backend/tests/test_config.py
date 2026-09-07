@@ -108,6 +108,38 @@ def test_production_settings_accept_secure_cookie_contract() -> None:
     assert settings.app_env == "production"
 
 
+def test_account_deletion_is_disabled_by_default() -> None:
+    assert Settings(app_env="test").account_deletion_enabled is False
+
+
+def test_production_account_deletion_requires_legal_approval() -> None:
+    with pytest.raises(ValidationError, match="legal approval"):
+        Settings(
+            app_env="production",
+            frontend_origin="https://fitsho.example",
+            cookie_secure=True,
+            session_cookie_name="__Host-fitsho_session",
+            private_file_signing_key="production-private-file-signing-key-for-tests",
+            account_deletion_enabled=True,
+            **PRODUCTION_AUTH_DELIVERY,  # type: ignore[arg-type]
+        )
+
+
+def test_production_account_deletion_accepts_recorded_legal_approval() -> None:
+    settings = Settings(
+        app_env="production",
+        frontend_origin="https://fitsho.example",
+        cookie_secure=True,
+        session_cookie_name="__Host-fitsho_session",
+        private_file_signing_key="production-private-file-signing-key-for-tests",
+        account_deletion_enabled=True,
+        account_deletion_legal_approval="legal-approval-2026-09-08",
+        **PRODUCTION_AUTH_DELIVERY,  # type: ignore[arg-type]
+    )
+
+    assert settings.account_deletion_enabled is True
+
+
 def test_production_settings_normalize_a_trailing_origin_slash() -> None:
     settings = Settings(
         app_env="production",

@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     mobile_refresh_token_ttl_seconds: int = Field(
         default=30 * 24 * 60 * 60, ge=3600, le=365 * 24 * 60 * 60
     )
+    account_deletion_enabled: bool = False
+    account_deletion_legal_approval: str | None = Field(default=None, max_length=160)
+    account_deletion_grace_period_days: int = Field(default=7, ge=1, le=30)
+    account_deletion_reauth_window_seconds: int = Field(default=600, ge=60, le=3600)
+    account_deletion_worker_interval_seconds: int = Field(default=60, ge=10, le=3600)
     notification_worker_batch_size: int = Field(default=100, ge=1, le=500)
     notification_worker_poll_seconds: float = Field(default=5.0, gt=0, le=60)
     notification_worker_lease_seconds: int = Field(default=60, ge=10, le=3600)
@@ -249,6 +254,16 @@ class Settings(BaseSettings):
         ):
             raise ValueError("Production requires a strong private file signing key")
         self.frontend_origin = f"https://{origin.netloc}"
+        return self
+
+    @model_validator(mode="after")
+    def enforce_account_deletion_approval(self) -> Self:
+        if (
+            self.app_env == "production"
+            and self.account_deletion_enabled
+            and not self.account_deletion_legal_approval
+        ):
+            raise ValueError("Production account deletion requires recorded legal approval")
         return self
 
 

@@ -80,7 +80,7 @@ class WorkoutPlanReview(Base):
         nullable=False,
     )
     claimed_by_user_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT")
+        ForeignKey("users.id", ondelete="SET NULL")
     )
     lease_acquired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

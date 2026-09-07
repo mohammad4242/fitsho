@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, Security, status
@@ -16,6 +17,13 @@ BearerCredentials = Annotated[
     HTTPAuthorizationCredentials | None,
     Security(HTTPBearer(auto_error=False)),
 ]
+
+
+@dataclass(frozen=True)
+class AuthenticatedPrincipal:
+    user: User
+    mobile: MobileAccessContext | None
+    via_bearer: bool
 
 
 def _bearer_token(
@@ -37,12 +45,12 @@ def _bearer_token(
     return token.strip()
 
 
-def get_current_user(
+def get_current_authentication(
     request: Request,
     db: DatabaseSession,
     settings: AppSettings,
     credentials: BearerCredentials,
-) -> User:
+) -> AuthenticatedPrincipal:
     raw_bearer_token = _bearer_token(request, credentials)
     if raw_bearer_token is not None:
         context = mobile_access_context_for_token(db, raw_bearer_token)
@@ -52,7 +60,7 @@ def get_current_user(
                 detail="Authentication required",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return context.user
+        return AuthenticatedPrincipal(user=context.user, mobile=context, via_bearer=True)
 
     raw_token = request.cookies.get(settings.session_cookie_name)
     if raw_token is None:
@@ -67,7 +75,17 @@ def get_current_user(
             detail="Authentication required",
             headers={"Set-Cookie": session_cookie_deletion_header(settings)},
         )
-    return user
+    return AuthenticatedPrincipal(user=user, mobile=None, via_bearer=False)
+
+
+CurrentAuthentication = Annotated[
+    AuthenticatedPrincipal,
+    Depends(get_current_authentication),
+]
+
+
+def get_current_user(authentication: CurrentAuthentication) -> User:
+    return authentication.user
 
 
 def get_current_mobile_session(
