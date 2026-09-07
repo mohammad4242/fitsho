@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
 
-import { ApiError, type TransportRequest } from "@fitician/core";
+import { ApiError, type BinaryDownload, type TransportRequest } from "@fitician/core";
 
 import { MobileAuthClient } from "./authClient";
 
@@ -252,4 +252,75 @@ it("does not repeat a rejected refresh during one request", async () => {
   });
   expect(refreshCalls).toBe(1);
   expect(clearCalls).toBe(1);
+});
+
+it("authenticates binary downloads and refreshes once after a 401", async () => {
+  let refreshCalls = 0;
+  let downloadCalls = 0;
+  const client = new MobileAuthClient({
+    refreshTokenStorage: {
+      clear: async () => undefined,
+      read: async () => "initial-refresh",
+      write: async () => undefined,
+    },
+    transport: {
+      download: async (request): Promise<BinaryDownload> => {
+        downloadCalls += 1;
+        if (request.headers?.Authorization !== "Bearer fresh-access") {
+          throw new ApiError(401, "Authentication required");
+        }
+        return { bytes: Uint8Array.from([1, 2]), contentType: "image/jpeg", filename: "photo.jpg" };
+      },
+      request: async <TResponse>(request: TransportRequest): Promise<TResponse> => {
+        if (request.path.endsWith("/refresh")) {
+          refreshCalls += 1;
+          return {
+            access_token: "fresh-access",
+            expires_in: 900,
+            refresh_expires_in: 2_592_000,
+            refresh_token: "fresh-refresh",
+            token_type: "Bearer" as const,
+            user: {
+              created_at: "2026-01-01T00:00:00Z",
+              email: "member@example.com",
+              id: "member-1",
+              is_admin: false,
+              phone_number: null,
+            },
+          } as TResponse;
+        }
+        return {} as TResponse;
+      },
+      upload: async <TResponse>(): Promise<TResponse> => ({ ok: true }) as TResponse,
+    },
+  });
+
+  await client.setSession({
+    access_token: "stale-access",
+    expires_in: 900,
+    refresh_expires_in: 2_592_000,
+    refresh_token: "initial-refresh",
+    token_type: "Bearer",
+    user: {
+      created_at: "2026-01-01T00:00:00Z",
+      email: "member@example.com",
+      id: "member-1",
+      is_admin: false,
+      phone_number: null,
+    },
+  });
+
+  await expect(
+    client.download({
+      method: "GET",
+      path: "/api/v1/profile/photo/member-1",
+      responseType: "binary",
+    }),
+  ).resolves.toEqual({
+    bytes: Uint8Array.from([1, 2]),
+    contentType: "image/jpeg",
+    filename: "photo.jpg",
+  });
+  expect(downloadCalls).toBe(2);
+  expect(refreshCalls).toBe(1);
 });

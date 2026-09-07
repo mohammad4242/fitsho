@@ -1,5 +1,7 @@
 import {
   ApiError,
+  type BinaryDownload,
+  type BinaryDownloadRequest,
   type FiticianTransport,
   type MobileAuthTokens,
   type RefreshTokenStorage,
@@ -69,6 +71,21 @@ export class MobileAuthClient {
   }
 
   async request<TResponse>(request: TransportRequest): Promise<TResponse> {
+    return this.executeWithAuthentication(request, (authenticatedRequest) =>
+      this.transport.request<TResponse>(authenticatedRequest),
+    );
+  }
+
+  async download(request: BinaryDownloadRequest): Promise<BinaryDownload> {
+    return this.executeWithAuthentication(request, (authenticatedRequest) =>
+      this.transport.download(authenticatedRequest),
+    );
+  }
+
+  private async executeWithAuthentication<TRequest extends TransportRequest, TResponse>(
+    request: TRequest,
+    send: (authenticatedRequest: TRequest) => Promise<TResponse>,
+  ): Promise<TResponse> {
     let accessToken = this.accessTokenStore.getValid(this.clockSkewMilliseconds);
     let initialRefreshOutcome: RefreshOutcome | null = null;
     if (accessToken === null) {
@@ -80,7 +97,7 @@ export class MobileAuthClient {
     }
 
     try {
-      return await this.send<TResponse>(request, accessToken);
+      return await send(this.withAccessToken(request, accessToken));
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 401) {
         throw error;
@@ -106,7 +123,7 @@ export class MobileAuthClient {
       }
 
       try {
-        return await this.send<TResponse>(request, retryToken);
+        return await send(this.withAccessToken(request, retryToken));
       } catch (retryError) {
         if (retryError instanceof ApiError && retryError.status === 401) {
           await this.expireSession();
@@ -116,21 +133,21 @@ export class MobileAuthClient {
     }
   }
 
-  private async send<TResponse>(
-    request: TransportRequest,
+  private withAccessToken<TRequest extends TransportRequest>(
+    request: TRequest,
     accessToken: string | null,
-  ): Promise<TResponse> {
+  ): TRequest {
     if (accessToken === null) {
-      return this.transport.request<TResponse>(request);
+      return request;
     }
 
-    return this.transport.request<TResponse>({
+    return {
       ...request,
       headers: {
         ...request.headers,
         Authorization: `Bearer ${accessToken}`,
       },
-    });
+    } as TRequest;
   }
 
   private refreshOnce(): Promise<RefreshOutcome> {
