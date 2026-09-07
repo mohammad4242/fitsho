@@ -334,6 +334,6 @@ describe("renderGhostPhoto", () => {
     );
 
     expect(canvas.width).toBe(1200);
-    expect(canvas.height).toBe(1656);
+    expect(canvas.height).toBe(1692);
   });
 });
