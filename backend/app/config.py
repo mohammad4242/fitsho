@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     auth_email_verification_ip_limit: int = Field(default=10, ge=1, le=1000)
     auth_email_verification_user_limit: int = Field(default=5, ge=1, le=1000)
     auth_google_ip_limit: int = Field(default=30, ge=1, le=1000)
+    auth_mobile_password_ip_limit: int = Field(default=20, ge=1, le=1000)
+    auth_mobile_password_identifier_limit: int = Field(default=5, ge=1, le=1000)
+    auth_mobile_google_ip_limit: int = Field(default=30, ge=1, le=1000)
+    auth_mobile_refresh_ip_limit: int = Field(default=60, ge=1, le=1000)
     media_root: Path = Path("var/media")
     media_public_path: str = "/media"
     media_max_bytes: int = 20 * 1024 * 1024

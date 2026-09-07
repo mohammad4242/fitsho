@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -186,6 +187,37 @@ class MobileRefreshToken(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     replaced_by_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("mobile_refresh_tokens.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class MobileAuthEvent(Base):
+    """Non-secret audit record for native authentication lifecycle events."""
+
+    __tablename__ = "mobile_auth_events"
+    __table_args__ = (
+        Index(
+            "ix_mobile_auth_events_user_id_created_at",
+            "user_id",
+            "created_at",
+        ),
+        Index(
+            "ix_mobile_auth_events_family_id_created_at",
+            "family_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    family_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("mobile_token_families.id", ondelete="CASCADE"), nullable=True
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    event_data: Mapped[dict[str, str] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 

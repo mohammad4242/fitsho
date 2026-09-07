@@ -23,6 +23,7 @@ from app.auth.models import (
     AuthSession,
     EmailVerificationToken,
     MobileAccessToken,
+    MobileAuthEvent,
     MobileRefreshToken,
     MobileTokenFamily,
     PasswordResetToken,
@@ -108,6 +109,24 @@ def authenticate_password_user(db: Session, payload: LoginRequest) -> User:
     return user
 
 
+def _record_mobile_auth_event(
+    db: Session,
+    *,
+    user_id: UUID | None,
+    family_id: UUID | None,
+    event_type: str,
+    event_data: dict[str, str] | None = None,
+) -> None:
+    db.add(
+        MobileAuthEvent(
+            user_id=user_id,
+            family_id=family_id,
+            event_type=event_type,
+            event_data=event_data,
+        )
+    )
+
+
 def issue_mobile_tokens(
     db: Session,
     user: User,
@@ -149,6 +168,13 @@ def issue_mobile_tokens(
             expires_at=issued_at + timedelta(seconds=refresh_ttl_seconds),
             created_at=issued_at,
         )
+    )
+    _record_mobile_auth_event(
+        db,
+        user_id=user.id,
+        family_id=family.id,
+        event_type="token_issued",
+        event_data={"platform": platform},
     )
     try:
         db.commit()
@@ -419,12 +445,24 @@ def refresh_mobile_tokens(
         .where(MobileRefreshToken.token_hash == hash_mobile_token(raw_refresh_token))
         .with_for_update()
     )
-    if current is None or current.used_at is not None or current.revoked_at is not None:
-        return None
-    if current.expires_at <= refreshed_at:
+    if current is None:
         return None
     family = db.get(MobileTokenFamily, current.family_id)
-    if family is None or family.revoked_at is not None:
+    if family is None:
+        return None
+    if current.used_at is not None:
+        if family.revoked_at is None:
+            revoke_mobile_token_family(
+                db,
+                family,
+                reason="refresh_reuse",
+                event_type="refresh_replay_detected",
+                now=refreshed_at,
+            )
+        return None
+    if current.revoked_at is not None or family.revoked_at is not None:
+        return None
+    if current.expires_at <= refreshed_at:
         return None
     user = db.get(User, family.user_id)
     if user is None:
@@ -449,6 +487,12 @@ def refresh_mobile_tokens(
     current.used_at = refreshed_at
     current.replaced_by_id = new_refresh_token.id
     family.last_seen_at = refreshed_at
+    _record_mobile_auth_event(
+        db,
+        user_id=user.id,
+        family_id=family.id,
+        event_type="refresh_rotated",
+    )
     try:
         db.commit()
         db.refresh(user)
@@ -469,6 +513,7 @@ def revoke_mobile_token_family(
     family: MobileTokenFamily,
     *,
     reason: str,
+    event_type: str = "logout",
     now: datetime | None = None,
 ) -> None:
     revoked_at = now or datetime.now(UTC)
@@ -483,6 +528,13 @@ def revoke_mobile_token_family(
         update(MobileRefreshToken)
         .where(MobileRefreshToken.family_id == family.id, MobileRefreshToken.revoked_at.is_(None))
         .values(revoked_at=revoked_at)
+    )
+    _record_mobile_auth_event(
+        db,
+        user_id=family.user_id,
+        family_id=family.id,
+        event_type=event_type,
+        event_data={"reason": reason},
     )
     try:
         db.commit()
@@ -523,6 +575,13 @@ def revoke_all_mobile_token_families(
                 MobileRefreshToken.revoked_at.is_(None),
             )
             .values(revoked_at=revoked_at)
+        )
+        _record_mobile_auth_event(
+            db,
+            user_id=user_id,
+            family_id=family.id,
+            event_type="logout_all",
+            event_data={"reason": reason},
         )
     try:
         db.commit()

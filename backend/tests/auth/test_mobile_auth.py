@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import (
     AuthSession,
     MobileAccessToken,
+    MobileAuthEvent,
     MobileRefreshToken,
     MobileTokenFamily,
     User,
@@ -128,6 +129,67 @@ def test_mobile_refresh_rotates_the_refresh_token(client: TestClient, db: Sessio
     assert old.replaced_by_id is not None
 
 
+def test_mobile_refresh_replay_revokes_the_family_and_records_an_audit_event(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _register(client)
+    first = _password_login(client)
+    rotated = client.post(
+        "/api/v1/auth/mobile/refresh",
+        json={"refresh_token": first["refresh_token"]},
+    )
+    assert rotated.status_code == 200
+
+    replay = client.post(
+        "/api/v1/auth/mobile/refresh",
+        json={"refresh_token": first["refresh_token"]},
+    )
+
+    assert replay.status_code == 401
+    assert (
+        client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {rotated.json()['access_token']}"},
+        ).status_code
+        == 401
+    )
+    old = db.scalar(
+        select(MobileRefreshToken).where(
+            MobileRefreshToken.token_hash == hash_mobile_token(first["refresh_token"])
+        )
+    )
+    assert old is not None
+    family = db.get(MobileTokenFamily, old.family_id)
+    assert family is not None
+    assert family.revoked_at is not None
+    assert db.scalar(
+        select(MobileAuthEvent).where(
+            MobileAuthEvent.family_id == family.id,
+            MobileAuthEvent.event_type == "refresh_replay_detected",
+        )
+    ) is not None
+
+
+def test_mobile_refresh_updates_device_last_seen(client: TestClient, db: Session) -> None:
+    _register(client)
+    first = _password_login(client)
+    family = db.scalar(
+        select(MobileTokenFamily).where(MobileTokenFamily.device_id == DEVICE["device_id"])
+    )
+    assert family is not None
+    previous_seen = family.last_seen_at
+
+    rotated = client.post(
+        "/api/v1/auth/mobile/refresh",
+        json={"refresh_token": first["refresh_token"]},
+    )
+
+    assert rotated.status_code == 200
+    db.refresh(family)
+    assert family.last_seen_at >= previous_seen
+
+
 def test_mobile_logout_revokes_the_current_token_family(client: TestClient, db: Session) -> None:
     _register(client)
     body = _password_login(client)
@@ -164,6 +226,24 @@ def test_mobile_logout_revokes_the_current_token_family(client: TestClient, db: 
         ).status_code
         == 401
     )
+
+
+def test_mobile_password_login_is_rate_limited_by_ip(
+    client: TestClient,
+    test_settings,
+) -> None:
+    test_settings.auth_mobile_password_ip_limit = 1
+    payload = {
+        "email": "member@example.com",
+        "password": "long password",
+        **DEVICE,
+    }
+
+    first = client.post("/api/v1/auth/mobile/password", json=payload)
+    second = client.post("/api/v1/auth/mobile/password", json=payload)
+
+    assert first.status_code == 401
+    assert second.status_code == 429
 
 
 def test_mobile_logout_all_revokes_other_devices(client: TestClient) -> None:

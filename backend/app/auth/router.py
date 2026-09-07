@@ -198,9 +198,24 @@ def login(
 )
 def mobile_password_login(
     payload: MobilePasswordLoginRequest,
+    request: Request,
     db: DatabaseSession,
     settings: AppSettings,
 ) -> MobileAuthResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="mobile-password-ip",
+        limit=settings.auth_mobile_password_ip_limit,
+    )
+    _consume_limit(
+        db,
+        settings,
+        actor=f"email:{normalize_email(str(payload.email))}",
+        operation="mobile-password-email",
+        limit=settings.auth_mobile_password_identifier_limit,
+    )
     try:
         user = authenticate_password_user(
             db,
@@ -270,10 +285,18 @@ def google_auth(
 )
 def mobile_google_auth(
     payload: MobileGoogleLoginRequest,
+    request: Request,
     db: DatabaseSession,
     settings: AppSettings,
     provider: GoogleIdentityDelivery,
 ) -> MobileAuthResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="mobile-google-ip",
+        limit=settings.auth_mobile_google_ip_limit,
+    )
     try:
         identity = provider.verify(payload.credential)
     except (GoogleAuthError, ValueError):
@@ -378,9 +401,17 @@ def mobile_phone_verify_otp(
 )
 def mobile_refresh(
     payload: MobileRefreshRequest,
+    request: Request,
     db: DatabaseSession,
     settings: AppSettings,
 ) -> MobileAuthResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="mobile-refresh-ip",
+        limit=settings.auth_mobile_refresh_ip_limit,
+    )
     result = refresh_mobile_tokens(
         db,
         payload.refresh_token,
