@@ -4,6 +4,7 @@ import os
 import re
 import tempfile
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -40,7 +41,7 @@ PROFILE_PHOTO_FORMATS = {
     "PNG": ("image/png", ".png"),
     "WEBP": ("image/webp", ".webp"),
 }
-PROFILE_PHOTO_SIGNATURES = {
+PROFILE_PHOTO_SIGNATURES: dict[str, Callable[[bytes], bool]] = {
     "JPEG": lambda data: data.startswith(b"\xff\xd8\xff"),
     "PNG": lambda data: data.startswith(b"\x89PNG\r\n\x1a\n"),
     "WEBP": lambda data: len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP",
