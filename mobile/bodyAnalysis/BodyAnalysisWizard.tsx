@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, StyleSheet, Switch, Text, View } from "react-native";
+import { File } from "expo-file-system";
 
 import { ApiError } from "@fitician/core";
 import type {
@@ -83,10 +84,19 @@ export function BodyAnalysisWizard({
   const [operationalConsent, setOperationalConsent] = useState(false);
   const [modelTrainingConsent, setModelTrainingConsent] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(null);
+  const capturedAssetsRef = useRef(capturedAssets);
   const complete = session !== null && ["front", "side", "back"].every((view) => (
     capturedAssets[view as BodyPhotoView] !== undefined
     || session.photos.some((photo) => photo.view === view)
   ));
+
+  useEffect(() => {
+    capturedAssetsRef.current = capturedAssets;
+  }, [capturedAssets]);
+
+  useEffect(() => {
+    return () => deleteCapturedAssets(capturedAssetsRef.current);
+  }, []);
 
   useEffect(() => {
     if (userId === null) return undefined;
@@ -196,11 +206,18 @@ export function BodyAnalysisWizard({
       nextView,
       asset.source,
     );
+    const previous = capturedAssets[activeView];
+    if (previous !== undefined && previous.uri !== asset.uri) deleteLocalFile(previous.uri);
     await draftStore.save(userId, nextDraft);
     setCapturedAssets((current) => ({ ...current, [activeView]: asset }));
     setDraft(nextDraft);
     setActiveView(nextView);
     setPhase(nextView === null ? "review" : "capture");
+  }
+
+  function exitWizard() {
+    deleteCapturedAssets(capturedAssetsRef.current);
+    onExit();
   }
 
   async function submitAnalysis() {
@@ -279,7 +296,7 @@ export function BodyAnalysisWizard({
               setError(null);
               setPhase("requirements");
             }} />
-            <Button label="بازگشت" onPress={onExit} variant="secondary" />
+            <Button label="بازگشت" onPress={exitWizard} variant="secondary" />
           </View>
         </View>
       </Screen>
@@ -289,7 +306,7 @@ export function BodyAnalysisWizard({
   if (phase === "requirements") {
     return (
       <BodyAnalysisRequirements
-        onCancel={onExit}
+        onCancel={exitWizard}
         onConfirmed={() => void confirmMeasurements()}
       />
     );
@@ -310,7 +327,7 @@ export function BodyAnalysisWizard({
     return (
       <SubmissionProgress
         error={error}
-        onExit={onExit}
+        onExit={exitWizard}
         progress={uploadProgress}
       />
     );
@@ -321,7 +338,7 @@ export function BodyAnalysisWizard({
       <AnalysisSubmitted
         analysis={analysis}
         error={error}
-        onExit={onExit}
+        onExit={exitWizard}
         onRetry={() => void retryAnalysis()}
       />
     );
@@ -336,7 +353,7 @@ export function BodyAnalysisWizard({
           setActiveView(view);
           setPhase("capture");
         }}
-        onExit={onExit}
+        onExit={exitWizard}
         onModelTrainingConsentChange={setModelTrainingConsent}
         onOperationalConsentChange={setOperationalConsent}
         onSubmit={() => void submitAnalysis()}
@@ -358,7 +375,7 @@ export function BodyAnalysisWizard({
         initialCaptureMode={draft.capture_mode}
         initialGhostScale={draft.ghost_scale}
         initialSideProfile={draft.side_profile}
-        onCancel={onExit}
+        onCancel={exitWizard}
         onCaptured={captureConfirmed}
         onGhostScaleChange={(scale) => updateDraft({ ghost_scale: scale })}
         onSideProfileChange={(nextSideProfile) => updateDraft({ side_profile: nextSideProfile })}
@@ -623,6 +640,26 @@ function viewLabel(view: BodyPhotoView): string {
   if (view === "front") return "روبه‌رو";
   if (view === "side") return "نیمرخ";
   return "پشت";
+}
+
+function deleteCapturedAssets(
+  assets: Partial<Record<BodyPhotoView, BodyPhotoCapturedAsset>>,
+): void {
+  const uris = new Set(
+    Object.values(assets)
+      .filter((asset): asset is BodyPhotoCapturedAsset => asset !== undefined)
+      .map((asset) => asset.uri),
+  );
+  uris.forEach(deleteLocalFile);
+}
+
+function deleteLocalFile(uri: string): void {
+  try {
+    const file = new File(uri);
+    if (file.exists) file.delete();
+  } catch {
+    // Temporary crop cleanup is best effort only.
+  }
 }
 
 const styles = StyleSheet.create({
