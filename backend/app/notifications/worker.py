@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.database.session import get_engine
 
+from .content import PREFERENCE_FIELDS
 from .fcm import (
     FcmConfigurationError,
     FcmProvider,
@@ -26,7 +27,9 @@ from .models import (
     NotificationDeviceToken,
     NotificationEventDelivery,
     NotificationOutboxEvent,
+    NotificationPreference,
 )
+from .reminders import enqueue_due_cycle_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +91,20 @@ def process_outbox_event(
     if event is None:
         db.rollback()
         return False
+
+    preference = db.get(NotificationPreference, event.user_id)
+    preference_field = PREFERENCE_FIELDS.get(event.category)
+    if preference_field is None:
+        logger.error("Unsupported notification preference category: %s", event.category)
+    elif preference is not None and (
+        not preference.enabled or not bool(getattr(preference, preference_field))
+    ):
+        event.status = "processed"
+        event.processed_at = now
+        event.locked_at = None
+        event.locked_by = None
+        db.commit()
+        return True
 
     token_ids = db.scalars(
         select(NotificationDeviceToken.id)
@@ -324,6 +341,7 @@ def run_notification_once(
     retry_max_seconds: int = 1800,
 ) -> int:
     current = now or datetime.now(UTC)
+    reminders = enqueue_due_cycle_reminders(db, now=current)
     processed = run_outbox_once(
         db,
         worker_id=worker_id,
@@ -343,7 +361,7 @@ def run_notification_once(
             retry_base_seconds=retry_base_seconds,
             retry_max_seconds=retry_max_seconds,
         )
-    return processed
+    return processed + reminders
 
 
 def _worker_id() -> str:

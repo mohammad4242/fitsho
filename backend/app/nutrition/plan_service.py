@@ -11,6 +11,10 @@ from sqlalchemy import Select, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
+from app.body_analysis.enums import SpecialistRole
+from app.notifications.content import build_notification_payload
+from app.notifications.outbox import enqueue_notification_event
+from app.notifications.recipients import specialist_user_ids
 from app.nutrition.candidate_selection import (
     CandidateEvaluation,
     CandidateQuality,
@@ -1817,6 +1821,25 @@ def _persist_successful_plan(
     )
     db.add(plan)
     db.flush()
+    review = plan.review
+    if review is None:
+        raise RuntimeError("nutrition review must be created with a pending plan")
+    payload = build_notification_payload(
+        "nutrition_review_required",
+        data={"review_id": review.id, "plan_id": plan.id},
+    )
+    for physician_id in specialist_user_ids(
+        db,
+        (SpecialistRole.PHYSICIAN, SpecialistRole.DOCTOR),
+    ):
+        enqueue_notification_event(
+            db,
+            user_id=physician_id,
+            event_type="nutrition_review_required",
+            category="required_reviews",
+            deduplication_key=f"nutrition-review:{review.id}:required",
+            payload=payload,
+        )
     return plan
 
 

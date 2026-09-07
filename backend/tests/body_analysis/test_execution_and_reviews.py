@@ -43,6 +43,7 @@ from app.body_analysis.service import (
 )
 from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
+from app.notifications.models import NotificationOutboxEvent
 from app.profile.enums import FitnessGoal, Sex
 from app.profile.models import BodyMeasurement, UserProfile
 
@@ -418,6 +419,13 @@ def test_v4_snapshot_survives_provider_failure(db: Session) -> None:
     assert failed.status is BodyAnalysisStatus.FAILED
     assert isinstance(failed.raw_result, dict)
     assert "input_snapshot" in failed.raw_result
+    failure_event = db.scalar(
+        select(NotificationOutboxEvent).where(
+            NotificationOutboxEvent.user_id == user.id,
+            NotificationOutboxEvent.event_type == "body_analysis_failed",
+        )
+    )
+    assert failure_event is not None
 
 
 def _grant(db: Session, user: User, role: SpecialistRole) -> None:
@@ -440,6 +448,12 @@ def test_queue_is_idempotent_for_same_session(db: Session) -> None:
 
 def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> None:
     user, session = _submitted_session(db)
+    coach = User(id=uuid4(), email=f"coach-{uuid4()}@example.com", password_hash="not-used")
+    doctor = User(id=uuid4(), email=f"doctor-{uuid4()}@example.com", password_hash="not-used")
+    db.add_all([coach, doctor])
+    db.flush()
+    _grant(db, coach, SpecialistRole.COACH)
+    _grant(db, doctor, SpecialistRole.DOCTOR)
     provider = _Provider()
     service = BodyAnalysisService(db)
     analysis = service.queue(session.id, user.id, _config())
@@ -460,6 +474,19 @@ def test_execution_persists_validated_result_and_is_idempotent(db: Session) -> N
     assert len(versions) == 1
     assert versions[0].version == 1
     assert versions[0].normalized_result["summary"]["priority_areas"] == ["shoulders"]
+    completion_event = db.scalar(
+        select(NotificationOutboxEvent).where(
+            NotificationOutboxEvent.user_id == user.id,
+            NotificationOutboxEvent.event_type == "body_analysis_completed",
+        )
+    )
+    assert completion_event is not None
+    specialist_events = db.scalars(
+        select(NotificationOutboxEvent).where(
+            NotificationOutboxEvent.event_type == "body_analysis_review_required"
+        )
+    ).all()
+    assert {event.user_id for event in specialist_events} == {coach.id, doctor.id}
 
 
 def test_v4_execution_persists_evidence_projection_without_legacy_visual_result(

@@ -9,6 +9,10 @@ from uuid import UUID
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.body_analysis.enums import SpecialistRole
+from app.notifications.content import build_notification_payload
+from app.notifications.outbox import enqueue_notification_event
+from app.notifications.recipients import specialist_user_ids
 from app.nutrition.clinical_service import ClinicalError, require_physician
 from app.nutrition.enums import (
     NutritionMealFeedbackType,
@@ -438,6 +442,27 @@ def _create_revision(
         plan.review.invalidation_reason = "PLAN_DEFINING_REVISION"
         plan.lifecycle_status = NutritionPlanLifecycleStatus.ARCHIVED
     db.add(new_plan)
+    db.flush()
+    if physician_id is None:
+        review = new_plan.review
+        if review is None:
+            raise PlanEditError("NUTRITION_REVIEW_NOT_CREATED")
+        payload = build_notification_payload(
+            "nutrition_review_required",
+            data={"review_id": review.id, "plan_id": new_plan.id},
+        )
+        for reviewer_id in specialist_user_ids(
+            db,
+            (SpecialistRole.PHYSICIAN, SpecialistRole.DOCTOR),
+        ):
+            enqueue_notification_event(
+                db,
+                user_id=reviewer_id,
+                event_type="nutrition_review_required",
+                category="required_reviews",
+                deduplication_key=f"nutrition-review:{review.id}:required",
+                payload=payload,
+            )
     db.commit()
     db.refresh(new_plan)
     return weekly_plan_response(owned_plan(db, user_id, new_plan.id))
@@ -1048,6 +1073,24 @@ def physician_action(
         plan.lifecycle_status = NutritionPlanLifecycleStatus.REJECTED
     else:
         raise PlanEditError("INVALID_REVIEW_ACTION")
+    decision_event_types = {
+        "approve": "physician_plan_approved",
+        "request_changes": "physician_changes_requested",
+        "reject": "physician_plan_rejected",
+    }
+    decision_event_type = decision_event_types.get(action)
+    if decision_event_type is not None:
+        enqueue_notification_event(
+            db,
+            user_id=plan.user_id,
+            event_type=decision_event_type,
+            category="physician_decisions",
+            deduplication_key=f"nutrition-plan:{plan.id}:physician:{action}:{plan.revision}",
+            payload=build_notification_payload(
+                decision_event_type,
+                data={"plan_id": plan.id, "action": action},
+            ),
+        )
     db.add(
         NutritionReviewAuditEvent(
             review_id=plan.review.id,

@@ -7,6 +7,8 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.notifications.content import build_notification_payload
+from app.notifications.outbox import enqueue_notification_event
 from app.workout_cycles.service import start_cycle
 from app.workout_reviews.diff import build_coach_difference_summary
 from app.workout_reviews.enums import (
@@ -176,6 +178,17 @@ class WorkoutReviewService:
         review.status = WorkoutReviewStatus.APPROVED
         review.approved_plan_id = approved.id
         review.approved_at = now
+        enqueue_notification_event(
+            self._db,
+            user_id=approved.user_id,
+            event_type="workout_plan_approved",
+            category="approved_plans",
+            deduplication_key=f"workout-plan:{approved.id}:approved",
+            payload=build_notification_payload(
+                "workout_plan_approved",
+                data={"plan_id": approved.id},
+            ),
+        )
         self._db.commit()
         return approved
 

@@ -18,6 +18,8 @@ from sqlalchemy.sql.elements import ColumnElement
 from app.body_analysis.enums import SpecialistRole
 from app.body_analysis.models import UserSpecialistRole
 from app.config import Settings
+from app.notifications.content import build_notification_payload
+from app.notifications.outbox import enqueue_notification_event
 from app.nutrition.enums import (
     NutritionLabRequestStatus,
     NutritionPlanLifecycleStatus,
@@ -583,6 +585,17 @@ def request_labs(
             action="laboratory_information_requested",
             metadata_snapshot={"request_id": str(row.id), "requested_tests": requested_tests},
         )
+    )
+    enqueue_notification_event(
+        db,
+        user_id=plan.user_id,
+        event_type="physician_labs_requested",
+        category="physician_decisions",
+        deduplication_key=f"nutrition-plan:{plan.id}:physician:labs:{row.id}",
+        payload=build_notification_payload(
+            "physician_labs_requested",
+            data={"plan_id": plan.id},
+        ),
     )
     db.commit()
     return {"id": row.id, "status": row.status.value, "requested_tests": requested_tests}

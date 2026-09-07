@@ -6,8 +6,12 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.body_analysis.enums import SpecialistRole
 from app.exercises.enums import ExerciseContentType
 from app.exercises.models import Exercise
+from app.notifications.content import build_notification_payload
+from app.notifications.outbox import enqueue_notification_event
+from app.notifications.recipients import specialist_user_ids
 from app.workout_reviews.enums import WorkoutReviewQueueView, WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
@@ -22,6 +26,19 @@ def ensure_pending_review(db: Session, plan: WorkoutPlan) -> WorkoutPlanReview:
     review = WorkoutPlanReview(source_plan=plan, user_id=plan.user_id)
     db.add(review)
     db.flush()
+    payload = build_notification_payload(
+        "workout_review_required",
+        data={"review_id": review.id, "plan_id": plan.id},
+    )
+    for coach_id in specialist_user_ids(db, (SpecialistRole.COACH,)):
+        enqueue_notification_event(
+            db,
+            user_id=coach_id,
+            event_type="workout_review_required",
+            category="required_reviews",
+            deduplication_key=f"workout-review:{review.id}:required",
+            payload=payload,
+        )
     return review
 
 

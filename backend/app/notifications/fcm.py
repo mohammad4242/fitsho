@@ -138,7 +138,7 @@ def build_fcm_provider(settings: Settings) -> FcmProvider | None:
 def _message(event_type: str, token_value: str, payload: dict[str, object]) -> dict[str, object]:
     data: dict[str, str] = {"event_type": event_type}
     for key, value in payload.items():
-        if key in {"title", "body"}:
+        if key in {"title", "body", "channel_id"}:
             continue
         if isinstance(value, (str, int, float, bool)):
             data[key] = str(value)
@@ -148,7 +148,7 @@ def _message(event_type: str, token_value: str, payload: dict[str, object]) -> d
                     data[str(nested_key)] = str(nested_value)
     title = payload.get("title")
     body = payload.get("body")
-    return {
+    message: dict[str, object] = {
         "token": token_value,
         "notification": {
             "title": title if isinstance(title, str) and title else "Fitician",
@@ -156,6 +156,10 @@ def _message(event_type: str, token_value: str, payload: dict[str, object]) -> d
         },
         "data": data,
     }
+    channel_id = payload.get("channel_id")
+    if isinstance(channel_id, str) and channel_id:
+        message["android"] = {"notification": {"channel_id": channel_id}}
+    return message
 
 
 def _classify_response(response: httpx.Response) -> FcmSendOutcome:

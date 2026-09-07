@@ -17,6 +17,7 @@ from app.body_analysis.enums import (
     BodyAnalysisReviewDecision,
     BodyAnalysisReviewerRole,
     BodyAnalysisStatus,
+    SpecialistRole,
 )
 from app.body_analysis.models import (
     BodyAnalysis,
@@ -52,6 +53,9 @@ from app.body_analysis.schemas import (
 )
 from app.body_photos.enums import BodyPhotoSessionState, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
+from app.notifications.content import build_notification_payload
+from app.notifications.outbox import enqueue_notification_event
+from app.notifications.recipients import enqueue_specialist_notification
 from app.profile.enums import FitnessGoal, Sex
 from app.profile.models import BodyMeasurement, UserProfile
 
@@ -330,6 +334,17 @@ class BodyAnalysisService:
             latest.error_code = ProviderErrorCode.TIMEOUT.value
             latest.error_message = "Body analysis could not be completed. Please retry later."
             latest.completed_at = datetime.now(UTC)
+            enqueue_notification_event(
+                self._db,
+                user_id=photo_session.user_id,
+                event_type="body_analysis_failed",
+                category="body_analysis",
+                deduplication_key=f"body-analysis:{latest.id}:failed",
+                payload=build_notification_payload(
+                    "body_analysis_failed",
+                    data={"analysis_id": latest.id},
+                ),
+            )
             self._db.commit()
         elif latest.status is not BodyAnalysisStatus.FAILED:
             raise BodyAnalysisStateError("only failed or stale analyses can be retried")
@@ -673,6 +688,24 @@ class BodyAnalysisService:
                     overall_confidence=normalized.overall_confidence,
                 )
             )
+            enqueue_notification_event(
+                self._db,
+                user_id=analysis.session.user_id,
+                event_type="body_analysis_completed",
+                category="body_analysis",
+                deduplication_key=f"body-analysis:{analysis.id}:completed",
+                payload=build_notification_payload(
+                    "body_analysis_completed",
+                    data={"analysis_id": analysis.id},
+                ),
+            )
+            enqueue_specialist_notification(
+                self._db,
+                roles=(SpecialistRole.COACH, SpecialistRole.DOCTOR),
+                event_type="body_analysis_review_required",
+                deduplication_key=f"body-analysis:{analysis.id}:review-required",
+                data={"analysis_id": analysis.id},
+            )
             self._db.commit()
             result_version = self._current_version(analysis.id)
             if result_version is not None:
@@ -705,6 +738,17 @@ class BodyAnalysisService:
                 analysis.provider_request_id = provider_error.provider_request_id
             analysis.completed_at = datetime.now(UTC)
             analysis.session.state = self._session_state_after_failure(analysis)
+            enqueue_notification_event(
+                self._db,
+                user_id=analysis.session.user_id,
+                event_type="body_analysis_failed",
+                category="body_analysis",
+                deduplication_key=f"body-analysis:{analysis.id}:failed",
+                payload=build_notification_payload(
+                    "body_analysis_failed",
+                    data={"analysis_id": analysis.id},
+                ),
+            )
             self._db.commit()
         return self._analysis(analysis_id)
 

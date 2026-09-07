@@ -32,6 +32,7 @@ from app.exercises.enums import (
     MuscleGroup,
 )
 from app.exercises.models import Exercise
+from app.notifications.models import NotificationOutboxEvent
 from app.workout_cycles.enums import WorkoutExerciseReplacementReason
 from app.workout_cycles.models import WorkoutCycle
 from app.workout_cycles.service import start_cycle
@@ -695,6 +696,14 @@ def test_approval_activates_pending_plan_without_creating_review_loop(db: Sessio
     assert cycle.duration_weeks == approved.profile_snapshot["plan_duration_weeks"] == 4
     assert review.status is WorkoutReviewStatus.APPROVED
     assert review.approved_plan_id == approved.id
+    approval_event = db.scalar(
+        select(NotificationOutboxEvent).where(
+            NotificationOutboxEvent.user_id == member.id,
+            NotificationOutboxEvent.event_type == "workout_plan_approved",
+        )
+    )
+    assert approval_event is not None
+    assert approval_event.payload["data"]["plan_id"] == str(approved.id)
     assert (
         db.query(WorkoutPlanReview).filter(WorkoutPlanReview.source_plan_id == approved.id).count()
         == 0

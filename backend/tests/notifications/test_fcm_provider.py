@@ -36,6 +36,7 @@ def test_fcm_provider_sends_a_v1_message_with_string_data() -> None:
         payload={
             "title": "Plan ready",
             "body": "Your plan is ready.",
+            "channel_id": "fitician-activity",
             "deep_link": "/workouts",
             "revision": 3,
         },
@@ -56,6 +57,9 @@ def test_fcm_provider_sends_a_v1_message_with_string_data() -> None:
         "event_type": "plan_approved",
         "deep_link": "/workouts",
         "revision": "3",
+    }
+    assert body["message"]["android"] == {
+        "notification": {"channel_id": "fitician-activity"},
     }
     client.close()
 

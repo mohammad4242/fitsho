@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth.models import User
 from app.body_analysis.enums import SpecialistRole
 from app.body_analysis.models import UserSpecialistRole
+from app.notifications.models import NotificationOutboxEvent
 from app.nutrition.models import (
     NutritionLabDocument,
     NutritionLabRequest,
@@ -49,6 +50,39 @@ def _login_physician(
     db.add(UserSpecialistRole(user_id=physician.id, role=SpecialistRole.PHYSICIAN))
     db.flush()
     return physician
+
+
+def test_plan_generation_notifies_existing_physicians_of_required_review(
+    client: TestClient,
+    db: Session,
+) -> None:
+    assert (
+        client.post(
+            "/api/v1/auth/register",
+            headers=ORIGIN,
+            json={
+                "email": "existing-physician@example.com",
+                "password": "long password",
+            },
+        ).status_code
+        == 201
+    )
+    physician = db.scalar(select(User).where(User.email == "existing-physician@example.com"))
+    assert physician is not None
+    db.add(UserSpecialistRole(user_id=physician.id, role=SpecialistRole.PHYSICIAN))
+    db.flush()
+    assert client.post("/api/v1/auth/logout", headers=ORIGIN).status_code == 204
+
+    plan = _member_plan(client, db)
+
+    event = db.scalar(
+        select(NotificationOutboxEvent).where(
+            NotificationOutboxEvent.user_id == physician.id,
+            NotificationOutboxEvent.event_type == "nutrition_review_required",
+        )
+    )
+    assert event is not None
+    assert event.payload["data"]["plan_id"] == plan["id"]
 
 
 def test_lab_upload_is_private_and_physician_request_has_explicit_state(
@@ -393,6 +427,20 @@ def test_approval_requires_claim_and_activates_exact_due_revision(
     persisted = db.get(NutritionWeeklyPlan, plan["id"])
     assert persisted is not None and persisted.review is not None
     assert persisted.review.internal_notes == "یادداشت محرمانه پزشک"
+    member = db.scalar(select(User).where(User.email == "clinical-member@example.com"))
+    assert member is not None
+    approval_event = db.scalar(
+        select(NotificationOutboxEvent).where(
+            NotificationOutboxEvent.user_id == member.id,
+            NotificationOutboxEvent.event_type == "physician_plan_approved",
+        )
+    )
+    assert approval_event is not None
+    assert approval_event.payload["data"] == {
+        "event_type": "physician_plan_approved",
+        "plan_id": plan["id"],
+        "action": "approve",
+    }
 
 
 def test_physician_queue_views_move_a_case_from_pending_to_claimed_to_approved(
