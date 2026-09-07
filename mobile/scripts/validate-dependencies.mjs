@@ -13,6 +13,7 @@ assert.equal(lock.lockfileVersion, 3, "root npm lockfile must use lockfile versi
 const expected = {
   "@fitician/core": { declared: "0.1.0", version: /^0\.1\./ },
   "@tanstack/react-query": { declared: "^5.102.8", version: /^5\./ },
+  "expo-crypto": { declared: "~57.0.2", version: /^57\./ },
   expo: { declared: "~57.0.0", version: /^57\./ },
   "expo-build-properties": { declared: "~57.0.2", version: /^57\./ },
   "expo-constants": { declared: "~57.0.2", version: /^57\./ },
@@ -20,6 +21,7 @@ const expected = {
   "expo-linking": { declared: "~57.0.1", version: /^57\./ },
   "expo-router": { declared: "~57.0.2", version: /^57\./ },
   "expo-secure-store": { declared: "~57.0.3", version: /^57\./ },
+  "expo-sqlite": { declared: "~57.0.2", version: /^57\./ },
   "expo-splash-screen": { declared: "~57.0.1", version: /^57\./ },
   "expo-status-bar": { declared: "~57.0.0", version: /^57\./ },
   "expo-system-ui": { declared: "~57.0.0", version: /^57\./ },

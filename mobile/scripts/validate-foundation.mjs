@@ -33,6 +33,7 @@ for (const required of [
   /targetSdkVersion:\s*36/,
   /autoVerify:\s*true/,
   /scheme:\s*["']https["']/,
+  /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
 ]) {
   assert.match(appConfig, required);
 }

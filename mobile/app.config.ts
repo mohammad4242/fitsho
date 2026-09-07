@@ -35,6 +35,7 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-dev-client",
     "expo-secure-store",
+    ["expo-sqlite", { useSQLCipher: true }],
     [
       "expo-build-properties",
       {
