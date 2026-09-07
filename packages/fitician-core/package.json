@@ -46,6 +46,14 @@
       "types": "./dist/i18n/fa.d.ts",
       "import": "./dist/i18n/fa.js"
     },
+    "./body-ghost": {
+      "types": "./dist/body-ghost.d.ts",
+      "import": "./dist/body-ghost.js"
+    },
+    "./body-ghost-scale": {
+      "types": "./dist/body-ghost-scale.d.ts",
+      "import": "./dist/body-ghost-scale.js"
+    },
     "./workout-reviews": {
       "types": "./dist/workout-reviews.d.ts",
       "import": "./dist/workout-reviews.js"

@@ -9,6 +9,34 @@ export {
   roundToTenThousandToman,
   tomanToIrr,
 } from "./formatters";
+export {
+  GHOST_BACK_PRIVACY_CUT_RATIO,
+  GHOST_PRIVACY_CUT_RATIO,
+  GHOST_SIDE_PRIVACY_CUT_RATIO,
+  clampGhostScale,
+  getGhostGeometry,
+  ghostPrivacyCutRatioForView,
+  ghostPrivacyLineGeometry,
+  isPointInZone,
+  pointZoneDistance,
+  transformGhostPoint,
+  transformGhostZone,
+} from "./body-ghost";
+export type {
+  GhostPoint,
+  GhostPrivacyLine,
+  GhostViewGeometry,
+  GhostZone,
+} from "./body-ghost";
+export {
+  GHOST_SCALE_MAX,
+  GHOST_SCALE_MIN,
+  GHOST_SCALE_STEP,
+  PHOTO_SCALE_MAX,
+  PHOTO_SCALE_MIN,
+  PHOTO_SCALE_STEP,
+  stepGhostScale,
+} from "./body-ghost-scale";
 export type * from "./profile-validation";
 export { ApiError } from "./transport";
 export type {
