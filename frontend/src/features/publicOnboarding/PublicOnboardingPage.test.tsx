@@ -1,22 +1,71 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const auth = vi.hoisted(() => ({ register: vi.fn(), login: vi.fn() }));
+const auth = vi.hoisted(() => ({
+  register: vi.fn(),
+  login: vi.fn(),
+  loginWithPhone: vi.fn(),
+  loginWithGoogle: vi.fn(),
+}));
+
+const authApi = vi.hoisted(() => ({ sendPhoneOtp: vi.fn() }));
 
 vi.mock("../auth/AuthContext", () => ({
   useAuth: () => ({ ...auth, user: null, loading: false, startupError: false }),
 }));
 
+vi.mock("../auth/api", () => authApi);
+
+vi.mock("../auth/GoogleSignInButton", () => ({
+  GoogleSignInButton: ({
+    onCredential,
+    disabled,
+  }: {
+    onCredential: (credential: string) => void;
+    disabled: boolean;
+  }) => (
+    <button type="button" disabled={disabled} onClick={() => onCredential("signed-google-token")}>
+      Google
+    </button>
+  ),
+}));
+
+vi.mock("./onboardingDraft", async () => {
+  const actual = await vi.importActual<typeof import("./onboardingDraft")>("./onboardingDraft");
+  return { ...actual, hydrateOnboardingDraft: vi.fn().mockResolvedValue(undefined) };
+});
+
 import { PublicOnboardingPage } from "./PublicOnboardingPage";
 import i18n from "../../i18n";
+import * as onboardingDraft from "./onboardingDraft";
 
 beforeEach(async () => {
   sessionStorage.clear();
   vi.clearAllMocks();
+  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "fitsho-client-id.apps.googleusercontent.com");
+  auth.register.mockResolvedValue(undefined);
+  auth.login.mockResolvedValue(undefined);
+  auth.loginWithPhone.mockResolvedValue(undefined);
+  auth.loginWithGoogle.mockResolvedValue(undefined);
+  authApi.sendPhoneOtp.mockResolvedValue({ message: "accepted", retry_after_seconds: 60 });
   await i18n.changeLanguage("fa");
 });
+
+function seedReadyTrainingDraft() {
+  sessionStorage.setItem("fitsho:onboarding-draft:v1", JSON.stringify({
+    mode: "training",
+    training: {
+      display_name: "محمد", birth_date: "2000-05-14", sex: "male", height_cm: 178,
+      current_weight_kg: 76, shoulder_circumference_cm: null, waist_circumference_cm: null,
+      hip_circumference_cm: null, fitness_goal: "build_muscle", experience_level: "beginner",
+      training_days_per_week: 3, training_location: "gym", home_training_setup: null,
+      session_duration_minutes: 60, training_cautions: [], plan_duration_weeks: 4,
+    },
+    readyForAuth: true,
+  }));
+}
 
 it("uses English on the first public onboarding screen when English is selected", async () => {
   await i18n.changeLanguage("en");
@@ -198,24 +247,63 @@ it("lets the user go back from the first question to mode selection", async () =
   expect(screen.getByRole("heading", { name: "تو چه زمینه‌ای به کمک نیاز داری؟" })).toBeInTheDocument();
 });
 
-it("offers email at the final account step and labels other providers upcoming", () => {
-  sessionStorage.setItem("fitsho:onboarding-draft:v1", JSON.stringify({
-    mode: "training",
-    training: {
-      display_name: "محمد", birth_date: "2000-05-14", sex: "male", height_cm: 178,
-      current_weight_kg: 76, shoulder_circumference_cm: null, waist_circumference_cm: null,
-      hip_circumference_cm: null, fitness_goal: "build_muscle", experience_level: "beginner",
-      training_days_per_week: 3, training_location: "gym", home_training_setup: null,
-      session_duration_minutes: 60, training_cautions: [], plan_duration_weeks: 4,
-    },
-    readyForAuth: true,
-  }));
+it("offers email, phone, and Google while keeping Apple upcoming", () => {
+  seedReadyTrainingDraft();
   render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
 
   expect(screen.getByRole("heading", { name: "حالا حسابت را بساز" })).toBeInTheDocument();
-  expect(screen.getByLabelText("ایمیل")).toBeEnabled();
-  expect(screen.getByRole("button", { name: /Google/ })).toBeDisabled();
+  expect(screen.getByRole("textbox", { name: "ایمیل" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Google" })).toBeEnabled();
   expect(screen.getByRole("button", { name: /Apple/ })).toBeDisabled();
-  expect(screen.getByRole("button", { name: /شماره تلفن/ })).toBeDisabled();
+  expect(screen.getByRole("tab", { name: "شماره تلفن" })).toBeEnabled();
+  expect(screen.getByText("مسیر امن انتقال اطلاعات")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "بازگشت و ویرایش پاسخ‌ها" })).toBeInTheDocument();
+});
+
+it("finishes the onboarding handoff with phone OTP", async () => {
+  const user = userEvent.setup();
+  seedReadyTrainingDraft();
+  render(
+    <MemoryRouter initialEntries={["/onboarding"]}>
+      <Routes>
+        <Route path="/onboarding" element={<PublicOnboardingPage />} />
+        <Route path="/dashboard" element={<div>dashboard reached</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("tab", { name: "شماره تلفن" }));
+  await user.type(screen.getByLabelText("شماره موبایل"), "09123456789");
+  await user.click(screen.getByRole("button", { name: "ارسال کد ورود" }));
+  expect(await screen.findByLabelText("کد ورود")).toBeInTheDocument();
+
+  await user.type(screen.getByLabelText("کد ورود"), "123456");
+  await user.click(screen.getByRole("button", { name: "تأیید و ذخیره پاسخ‌ها" }));
+
+  expect(auth.loginWithPhone).toHaveBeenCalledWith("09123456789", "123456");
+  expect(onboardingDraft.hydrateOnboardingDraft).toHaveBeenCalledWith(
+    expect.objectContaining({ mode: "training", readyForAuth: true }),
+  );
+  expect(await screen.findByText("dashboard reached")).toBeInTheDocument();
+});
+
+it("finishes the onboarding handoff with Google", async () => {
+  const user = userEvent.setup();
+  seedReadyTrainingDraft();
+  render(
+    <MemoryRouter initialEntries={["/onboarding"]}>
+      <Routes>
+        <Route path="/onboarding" element={<PublicOnboardingPage />} />
+        <Route path="/dashboard" element={<div>dashboard reached</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Google" }));
+
+  expect(auth.loginWithGoogle).toHaveBeenCalledWith("signed-google-token");
+  expect(onboardingDraft.hydrateOnboardingDraft).toHaveBeenCalledWith(
+    expect.objectContaining({ mode: "training", readyForAuth: true }),
+  );
+  expect(await screen.findByText("dashboard reached")).toBeInTheDocument();
 });
