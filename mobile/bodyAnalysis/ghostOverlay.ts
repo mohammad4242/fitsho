@@ -1,10 +1,9 @@
-import {
-  clampGhostScale,
-  ghostPrivacyLineGeometry,
-} from "@fitician/core/body-ghost";
+import { clampGhostScale } from "@fitician/core/body-ghost";
 import type { GhostPrivacyLine } from "@fitician/core/body-ghost";
 import type { BodyPhotoSide, BodyPhotoView } from "@fitician/core/body-photos";
 import type { Sex } from "@fitician/core/profile";
+
+import { bodyPhotoPrivacyLine } from "./privacyCrop";
 
 export type GhostOverlayVariant = "male" | "female" | "neutral";
 
@@ -29,7 +28,7 @@ export function getGhostOverlayLayout(
   const mirrored = view === "side" && sideProfile === "left";
   return {
     mirrored,
-    privacyLine: ghostPrivacyLineGeometry(view, scale, mirrored),
+    privacyLine: bodyPhotoPrivacyLine(view, scale, mirrored),
     scale,
     view,
   };
