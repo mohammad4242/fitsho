@@ -14,6 +14,13 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.database.session import get_engine
 
+from .fcm import (
+    FcmConfigurationError,
+    FcmProvider,
+    FcmSendOutcome,
+    NotificationProvider,
+    build_fcm_provider,
+)
 from .models import (
     NotificationDevice,
     NotificationDeviceToken,
@@ -146,6 +153,199 @@ def run_outbox_once(
     return processed
 
 
+def claim_notification_deliveries(
+    db: Session,
+    *,
+    worker_id: str,
+    now: datetime,
+    lease_seconds: int,
+    batch_size: int,
+) -> list[UUID]:
+    stale_before = now - timedelta(seconds=lease_seconds)
+    deliveries = db.scalars(
+        select(NotificationEventDelivery)
+        .join(
+            NotificationDeviceToken,
+            NotificationDeviceToken.id == NotificationEventDelivery.token_id,
+        )
+        .where(
+            NotificationDeviceToken.invalid_at.is_(None),
+            or_(
+                (
+                    (NotificationEventDelivery.status == "pending")
+                    & (NotificationEventDelivery.next_attempt_at <= now)
+                ),
+                (
+                    (NotificationEventDelivery.status == "processing")
+                    & (NotificationEventDelivery.locked_at <= stale_before)
+                ),
+            ),
+        )
+        .order_by(NotificationEventDelivery.created_at)
+        .limit(batch_size)
+        .with_for_update(skip_locked=True)
+    ).all()
+    for delivery in deliveries:
+        delivery.status = "processing"
+        delivery.locked_at = now
+        delivery.locked_by = worker_id
+    if not deliveries:
+        db.rollback()
+        return []
+    db.commit()
+    return [delivery.id for delivery in deliveries]
+
+
+def process_notification_delivery(
+    db: Session,
+    delivery_id: UUID,
+    *,
+    provider: NotificationProvider,
+    worker_id: str,
+    now: datetime,
+    max_attempts: int,
+    retry_base_seconds: int,
+    retry_max_seconds: int,
+) -> bool:
+    delivery = db.scalar(
+        select(NotificationEventDelivery)
+        .where(
+            NotificationEventDelivery.id == delivery_id,
+            NotificationEventDelivery.status == "processing",
+            NotificationEventDelivery.locked_by == worker_id,
+        )
+        .with_for_update()
+    )
+    if delivery is None:
+        db.rollback()
+        return False
+    event = db.get(NotificationOutboxEvent, delivery.event_id)
+    token = db.get(NotificationDeviceToken, delivery.token_id)
+    if event is None or token is None or token.invalid_at is not None:
+        delivery.status = "dead_letter"
+        delivery.dead_letter_at = now
+        delivery.last_error = "TOKEN_UNAVAILABLE"
+        delivery.locked_at = None
+        delivery.locked_by = None
+        db.commit()
+        return True
+
+    delivery.attempt_count += 1
+    try:
+        outcome = provider.send(
+            token_value=token.token_value,
+            event_type=event.event_type,
+            payload=event.payload,
+        )
+    except Exception:
+        logger.exception("Notification provider delivery failed")
+        outcome = FcmSendOutcome.retryable("PROVIDER_EXCEPTION")
+
+    delivery.locked_at = None
+    delivery.locked_by = None
+    if outcome.kind == "sent":
+        delivery.status = "sent"
+        delivery.sent_at = now
+        delivery.provider_message_id = outcome.provider_message_id
+        delivery.last_error = None
+    elif outcome.kind == "invalid_token":
+        token.invalid_at = now
+        token.invalid_reason = outcome.error_code or "INVALID_TOKEN"
+        delivery.status = "dead_letter"
+        delivery.dead_letter_at = now
+        delivery.last_error = outcome.error_code or "INVALID_TOKEN"
+    elif outcome.kind == "permanent" or delivery.attempt_count >= max(1, max_attempts):
+        delivery.status = "dead_letter"
+        delivery.dead_letter_at = now
+        delivery.last_error = outcome.error_code or "PROVIDER_ERROR"
+    else:
+        delay = min(
+            retry_max_seconds,
+            retry_base_seconds * 2 ** max(delivery.attempt_count - 1, 0),
+        )
+        delivery.status = "pending"
+        delivery.next_attempt_at = now + timedelta(seconds=delay)
+        delivery.last_error = outcome.error_code or "PROVIDER_ERROR"
+    db.commit()
+    return True
+
+
+def run_delivery_once(
+    db: Session,
+    *,
+    provider: NotificationProvider,
+    worker_id: str,
+    now: datetime | None = None,
+    lease_seconds: int = 60,
+    batch_size: int = 100,
+    max_attempts: int = 5,
+    retry_base_seconds: int = 30,
+    retry_max_seconds: int = 1800,
+) -> int:
+    current = now or datetime.now(UTC)
+    delivery_ids = claim_notification_deliveries(
+        db,
+        worker_id=worker_id,
+        now=current,
+        lease_seconds=lease_seconds,
+        batch_size=batch_size,
+    )
+    processed = 0
+    for delivery_id in delivery_ids:
+        try:
+            processed += int(
+                process_notification_delivery(
+                    db,
+                    delivery_id,
+                    provider=provider,
+                    worker_id=worker_id,
+                    now=current,
+                    max_attempts=max_attempts,
+                    retry_base_seconds=retry_base_seconds,
+                    retry_max_seconds=retry_max_seconds,
+                )
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Notification delivery processing failed")
+    return processed
+
+
+def run_notification_once(
+    db: Session,
+    *,
+    worker_id: str,
+    provider: NotificationProvider | None,
+    now: datetime | None = None,
+    lease_seconds: int = 60,
+    batch_size: int = 100,
+    max_attempts: int = 5,
+    retry_base_seconds: int = 30,
+    retry_max_seconds: int = 1800,
+) -> int:
+    current = now or datetime.now(UTC)
+    processed = run_outbox_once(
+        db,
+        worker_id=worker_id,
+        now=current,
+        lease_seconds=lease_seconds,
+        batch_size=batch_size,
+    )
+    if provider is not None:
+        processed += run_delivery_once(
+            db,
+            provider=provider,
+            worker_id=worker_id,
+            now=current,
+            lease_seconds=lease_seconds,
+            batch_size=batch_size,
+            max_attempts=max_attempts,
+            retry_base_seconds=retry_base_seconds,
+            retry_max_seconds=retry_max_seconds,
+        )
+    return processed
+
+
 def _worker_id() -> str:
     return f"{socket.gethostname()}:{uuid4()}"
 
@@ -153,18 +353,32 @@ def _worker_id() -> str:
 def run_worker(settings: Settings) -> None:
     worker_id = _worker_id()
     engine = get_engine(settings.database_url)
-    while True:
+    provider: FcmProvider | None = None
+    try:
         try:
-            with Session(engine) as db:
-                run_outbox_once(
-                    db,
-                    worker_id=worker_id,
-                    lease_seconds=settings.notification_worker_lease_seconds,
-                    batch_size=settings.notification_worker_batch_size,
-                )
-        except Exception:
-            logger.exception("Notification worker iteration failed")
-        time.sleep(settings.notification_worker_poll_seconds)
+            provider = build_fcm_provider(settings)
+        except FcmConfigurationError:
+            logger.exception("FCM provider configuration is invalid")
+            provider = None
+        while True:
+            try:
+                with Session(engine) as db:
+                    run_notification_once(
+                        db,
+                        worker_id=worker_id,
+                        provider=provider,
+                        lease_seconds=settings.notification_worker_lease_seconds,
+                        batch_size=settings.notification_worker_batch_size,
+                        max_attempts=settings.notification_max_delivery_attempts,
+                        retry_base_seconds=settings.notification_retry_base_seconds,
+                        retry_max_seconds=settings.notification_retry_max_seconds,
+                    )
+            except Exception:
+                logger.exception("Notification worker iteration failed")
+            time.sleep(settings.notification_worker_poll_seconds)
+    finally:
+        if provider is not None:
+            provider.close()
 
 
 if __name__ == "__main__":

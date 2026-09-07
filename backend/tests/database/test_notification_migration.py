@@ -51,4 +51,16 @@ def test_notification_tables_are_migrated(db: Session) -> None:
     delivery_columns = {
         column["name"] for column in inspector.get_columns("notification_event_deliveries")
     }
-    assert {"event_id", "token_id", "status", "created_at"}.issubset(delivery_columns)
+    assert {
+        "event_id",
+        "token_id",
+        "status",
+        "created_at",
+        "attempt_count",
+        "next_attempt_at",
+        "locked_at",
+        "sent_at",
+        "dead_letter_at",
+        "last_error",
+        "provider_message_id",
+    }.issubset(delivery_columns)

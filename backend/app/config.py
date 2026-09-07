@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     notification_worker_batch_size: int = Field(default=100, ge=1, le=500)
     notification_worker_poll_seconds: float = Field(default=5.0, gt=0, le=60)
     notification_worker_lease_seconds: int = Field(default=60, ge=10, le=3600)
+    notification_fcm_enabled: bool = False
+    notification_fcm_project_id: str | None = None
+    notification_fcm_service_account_json: SecretStr | None = Field(default=None, repr=False)
+    notification_fcm_base_url: str = "https://fcm.googleapis.com"
+    notification_fcm_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
+    notification_max_delivery_attempts: int = Field(default=5, ge=1, le=10)
+    notification_retry_base_seconds: int = Field(default=30, ge=1, le=3600)
+    notification_retry_max_seconds: int = Field(default=1800, ge=1, le=86400)
     email_provider: Literal["fake", "smtp"] = "fake"
     smtp_host: str | None = None
     smtp_port: int = Field(default=587, ge=1, le=65535)
