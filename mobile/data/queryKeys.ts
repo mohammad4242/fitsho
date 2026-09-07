@@ -44,6 +44,8 @@ export const workoutKeys = {
   plans: () => ["workouts", "plans"] as const,
   plan: (planId: string) => ["workouts", "plan", planId] as const,
   currentCycle: () => ["workouts", "current-cycle"] as const,
+  weeklyCheckIn: (cycleId: string) => ["workouts", "weekly-check-in", cycleId] as const,
+  completionFeedback: (cycleId: string) => ["workouts", "completion-feedback", cycleId] as const,
   cycle: (cycleId: string) => ["workouts", "cycle", cycleId] as const,
 };
 

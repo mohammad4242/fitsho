@@ -9,6 +9,7 @@ import {
   isWorkoutPlanExecutable,
   workoutPlanAverageDuration,
   workoutPlanPdfFilename,
+  workoutCycleWeekDisplay,
 } from "./workoutModel";
 
 type WorkoutPlan = components["schemas"]["WorkoutPlanResponse"];
@@ -60,6 +61,17 @@ it("keeps generation failure states explicit", () => {
   expect(classifyWorkoutGenerationError(new ApiError(422, "invalid"))).toBe("unsupported");
   expect(classifyWorkoutGenerationError(new ApiError(503, "provider"))).toBe("failed");
   expect(classifyWorkoutGenerationError(new Error("offline"))).toBe("failed");
+});
+
+it("displays the backend's bounded cycle week without recalculating it", () => {
+  expect(workoutCycleWeekDisplay({
+    current_week: 4,
+    cycle_id: "cycle-1",
+    duration_weeks: 4,
+    started_at: "2026-01-01T00:00:00Z",
+    status: "active",
+    workout_plan_id: "plan-1",
+  })).toEqual({ currentWeek: 4, durationWeeks: 4, isAtEnd: true });
 });
 
 it("never exposes pending or historical plans as executable", () => {

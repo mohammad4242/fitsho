@@ -22,6 +22,17 @@ it("creates hierarchical feature keys for list and detail invalidation", () => {
     "list",
     { status: "active" },
   ]);
+  expect(workoutKeys.currentCycle()).toEqual(["workouts", "current-cycle"]);
+  expect(workoutKeys.weeklyCheckIn("cycle-1")).toEqual([
+    "workouts",
+    "weekly-check-in",
+    "cycle-1",
+  ]);
+  expect(workoutKeys.completionFeedback("cycle-1")).toEqual([
+    "workouts",
+    "completion-feedback",
+    "cycle-1",
+  ]);
   expect(nutritionKeys.detail("plan-1")).toEqual(["nutrition", "detail", "plan-1"]);
   expect(bodyAnalysisKeys.session("session-1")).toEqual([
     "body-analysis",

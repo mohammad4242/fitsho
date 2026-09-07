@@ -5,9 +5,24 @@ import type {
   WorkoutPlanExercise,
   WorkoutPlanVersionSummary,
 } from "./workoutApi";
+import type { WorkoutCycleCurrent } from "./workoutCycleApi";
 
 export type WorkoutGenerationErrorKind = "cooldown" | "failed" | "in_progress" | "unsupported";
 export type WorkoutPlanSummaryStatus = "active" | "pending" | "inactive";
+
+export type WorkoutCycleWeekDisplay = {
+  readonly currentWeek: number;
+  readonly durationWeeks: number;
+  readonly isAtEnd: boolean;
+};
+
+export function workoutCycleWeekDisplay(cycle: WorkoutCycleCurrent): WorkoutCycleWeekDisplay {
+  return {
+    currentWeek: cycle.current_week,
+    durationWeeks: cycle.duration_weeks,
+    isAtEnd: cycle.current_week >= cycle.duration_weeks,
+  };
+}
 
 export function classifyWorkoutGenerationError(error: unknown): WorkoutGenerationErrorKind {
   if (!(error instanceof ApiError)) return "failed";
