@@ -39,6 +39,10 @@ uv run python -m app.nutrition.retention_cleanup
 uv run pytest tests/nutrition
 ```
 
+Authentication provider setup:
+
+- [Authentication setup](docs/authentication-setup.md)
+
 Automatic food-price refresh checks ten isolated public sources every Saturday at 12:00
 `Asia/Tehran`, with restart catch-up and a PostgreSQL advisory lock. It requires three distinct
 sources, removes outliers, and stores the mean plus immutable history. No API key is enabled or
