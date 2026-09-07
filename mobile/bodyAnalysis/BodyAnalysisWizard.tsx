@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Switch, Text, View } from "react-native";
 
 import { ApiError } from "@fitician/core";
 import type {
+  BodyAnalysis,
   BodyPhotoPurpose,
   BodyPhotoSession,
   BodyPhotoView,
@@ -36,7 +37,27 @@ export interface BodyAnalysisWizardProps {
   readonly sessionId?: string;
 }
 
-type WizardPhase = "capture" | "error" | "loading" | "requirements" | "review" | "starting";
+type WizardPhase =
+  | "capture"
+  | "error"
+  | "loading"
+  | "requirements"
+  | "review"
+  | "starting"
+  | "submitting"
+  | "submitted";
+
+type UploadProgressState = {
+  readonly activeView: BodyPhotoView | null;
+  readonly completed: number;
+  readonly total: number;
+};
+
+const activeAnalysisStates = new Set<BodyAnalysis["status"]>([
+  "queued",
+  "validating",
+  "analyzing",
+]);
 
 export function BodyAnalysisWizard({
   onExit,
@@ -45,7 +66,10 @@ export function BodyAnalysisWizard({
 }: BodyAnalysisWizardProps) {
   const auth = useMobileAuth();
   const userId = auth.user?.id ?? null;
-  const api = useMemo(() => createBodyPhotoApi(auth.request), [auth.request]);
+  const api = useMemo(
+    () => createBodyPhotoApi(auth.request, auth.upload, auth.download),
+    [auth.download, auth.request, auth.upload],
+  );
   const profileApi = useMemo(() => createProfileApi(auth.request), [auth.request]);
   const draftStore = useMemo(() => new SecureBodyPhotoDraftStore(), []);
   const [phase, setPhase] = useState<WizardPhase>("loading");
@@ -53,8 +77,16 @@ export function BodyAnalysisWizard({
   const [draft, setDraft] = useState<BodyPhotoFlowDraft | null>(null);
   const [activeView, setActiveView] = useState<BodyPhotoView | null>(null);
   const [capturedAssets, setCapturedAssets] = useState<Partial<Record<BodyPhotoView, BodyPhotoCapturedAsset>>>({});
+  const [analysis, setAnalysis] = useState<BodyAnalysis | null>(null);
   const [sex, setSex] = useState<Sex | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [operationalConsent, setOperationalConsent] = useState(false);
+  const [modelTrainingConsent, setModelTrainingConsent] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(null);
+  const complete = session !== null && ["front", "side", "back"].every((view) => (
+    capturedAssets[view as BodyPhotoView] !== undefined
+    || session.photos.some((photo) => photo.view === view)
+  ));
 
   useEffect(() => {
     if (userId === null) return undefined;
@@ -75,6 +107,8 @@ export function BodyAnalysisWizard({
         return;
       }
       setSession(loaded.session);
+      setOperationalConsent(loaded.session.operational_processing_consent?.granted ?? false);
+      setModelTrainingConsent(loaded.session.model_training_consent?.granted ?? false);
       setDraft(loaded.draft);
       setActiveView(loaded.draft.current_view);
       setPhase(loaded.draft.current_view === null ? "review" : "capture");
@@ -103,6 +137,24 @@ export function BodyAnalysisWizard({
     };
   }, [profileApi, userId]);
 
+  useEffect(() => {
+    if (phase !== "submitted" || session === null || analysis === null || !activeAnalysisStates.has(analysis.status)) {
+      return undefined;
+    }
+    let active = true;
+    const timer = setTimeout(() => {
+      void api.getAnalysis(session.id)
+        .then((next) => {
+          if (active && next !== null) setAnalysis(next);
+        })
+        .catch(() => undefined);
+    }, 3000);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [analysis, api, phase, session]);
+
   const updateDraft = useCallback((changes: Partial<BodyPhotoFlowDraft>) => {
     if (userId === null) return;
     setDraft((current) => {
@@ -124,6 +176,9 @@ export function BodyAnalysisWizard({
       setSession(created);
       setDraft(nextDraft);
       setActiveView(nextDraft.current_view);
+      setOperationalConsent(false);
+      setModelTrainingConsent(false);
+      setAnalysis(null);
       setPhase("capture");
     } catch (cause) {
       setError(bodyPhotoWizardErrorMessage(cause));
@@ -146,6 +201,59 @@ export function BodyAnalysisWizard({
     setDraft(nextDraft);
     setActiveView(nextView);
     setPhase(nextView === null ? "review" : "capture");
+  }
+
+  async function submitAnalysis() {
+    if (session === null || !complete || !operationalConsent || phase === "submitting") return;
+    const pendingViews = (Object.keys(capturedAssets) as BodyPhotoView[]).filter((view) => (
+      capturedAssets[view] !== undefined
+      && !session.photos.some((photo) => photo.view === view)
+    ));
+    setPhase("submitting");
+    setError(null);
+    setUploadProgress({ activeView: null, completed: 0, total: pendingViews.length });
+    let currentSession = session;
+    try {
+      for (const [index, view] of pendingViews.entries()) {
+        const asset = capturedAssets[view];
+        if (asset === undefined) continue;
+        setUploadProgress({ activeView: view, completed: index, total: pendingViews.length });
+        currentSession = await api.uploadPhoto(currentSession.id, view, asset);
+        setSession(currentSession);
+        setUploadProgress({ activeView: null, completed: index + 1, total: pendingViews.length });
+      }
+      if (!["front", "side", "back"].every((view) => currentSession.photos.some((photo) => photo.view === view))) {
+        throw new Error("Three cropped body photos are required");
+      }
+      const submitted = await api.submitSession(
+        currentSession.id,
+        operationalConsent,
+        modelTrainingConsent,
+      );
+      setSession(submitted);
+      const started = await api.startAnalysis(submitted.id, true);
+      setAnalysis(started);
+      setUploadProgress(null);
+      setPhase("submitted");
+    } catch (cause) {
+      setError(bodyPhotoSubmitErrorMessage(cause));
+      setUploadProgress((current) => current === null ? null : { ...current, activeView: null });
+      setPhase("review");
+    }
+  }
+
+  async function retryAnalysis() {
+    if (session === null || phase !== "submitted") return;
+    setPhase("submitting");
+    setError(null);
+    try {
+      const next = await api.retryAnalysis(session.id, true);
+      setAnalysis(next);
+      setPhase("submitted");
+    } catch (cause) {
+      setError(bodyPhotoSubmitErrorMessage(cause));
+      setPhase("submitted");
+    }
   }
 
   if (phase === "loading") {
@@ -198,15 +306,43 @@ export function BodyAnalysisWizard({
     );
   }
 
+  if (phase === "submitting") {
+    return (
+      <SubmissionProgress
+        error={error}
+        onExit={onExit}
+        progress={uploadProgress}
+      />
+    );
+  }
+
+  if (phase === "submitted") {
+    return (
+      <AnalysisSubmitted
+        analysis={analysis}
+        error={error}
+        onExit={onExit}
+        onRetry={() => void retryAnalysis()}
+      />
+    );
+  }
+
   if (phase === "review") {
     return (
       <CaptureReview
         assets={capturedAssets}
+        error={error}
         onEdit={(view) => {
           setActiveView(view);
           setPhase("capture");
         }}
         onExit={onExit}
+        onModelTrainingConsentChange={setModelTrainingConsent}
+        onOperationalConsentChange={setOperationalConsent}
+        onSubmit={() => void submitAnalysis()}
+        operationalConsent={operationalConsent}
+        modelTrainingConsent={modelTrainingConsent}
+        session={session}
       />
     );
   }
@@ -288,18 +424,45 @@ function bodyPhotoWizardErrorMessage(error: unknown): string {
   return "آماده‌سازی تحلیل بدن انجام نشد. دوباره تلاش کن.";
 }
 
+function bodyPhotoSubmitErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.status === 403) {
+    return "ارسال از مسیر امن فیتیچیان انجام نشد. دوباره تلاش کن.";
+  }
+  if (error instanceof ApiError && error.status === 409) {
+    return "وضعیت این نشست تغییر کرده است. نشست را دوباره باز کن.";
+  }
+  if (error instanceof ApiError && error.status >= 500) {
+    return "سرویس تحلیل بدن موقتاً در دسترس نیست. اطلاعات ثبت‌شده حفظ شد.";
+  }
+  return "ارسال امن تصاویر انجام نشد. عکس‌های ثبت‌شده حفظ شدند؛ دوباره تلاش کن.";
+}
+
 function isBodyPhotoView(value: string): value is BodyPhotoView {
   return value === "front" || value === "side" || value === "back";
 }
 
 function CaptureReview({
   assets,
+  error,
   onEdit,
   onExit,
+  onModelTrainingConsentChange,
+  onOperationalConsentChange,
+  onSubmit,
+  operationalConsent,
+  modelTrainingConsent,
+  session,
 }: {
   readonly assets: Partial<Record<BodyPhotoView, BodyPhotoCapturedAsset>>;
+  readonly error: string | null;
   readonly onEdit: (view: BodyPhotoView) => void;
   readonly onExit: () => void;
+  readonly onModelTrainingConsentChange: (value: boolean) => void;
+  readonly onOperationalConsentChange: (value: boolean) => void;
+  readonly onSubmit: () => void;
+  readonly operationalConsent: boolean;
+  readonly modelTrainingConsent: boolean;
+  readonly session: BodyPhotoSession | null;
 }) {
   return (
     <Screen>
@@ -312,10 +475,13 @@ function CaptureReview({
         <View style={styles.reviewGrid}>
           {(["front", "side", "back"] as const).map((view) => {
             const asset = assets[view];
+            const uploaded = session?.photos.some((photo) => photo.view === view) === true;
             return (
               <Card key={view} style={styles.reviewCard}>
                 {asset === undefined ? (
-                  <Text style={styles.body}>{viewLabel(view)} در این دستگاه ثبت نشد.</Text>
+                  <Text style={styles.body}>{uploaded
+                    ? `${viewLabel(view)} قبلاً در نشست امن ثبت شده است.`
+                    : `${viewLabel(view)} در این دستگاه ثبت نشد.`}</Text>
                 ) : (
                   <Image
                     accessibilityLabel={`پیش‌نمایش ${viewLabel(view)}`}
@@ -332,10 +498,125 @@ function CaptureReview({
           message="ارسال، رضایت‌نامه و شروع تحلیل در مرحله امن پردازش تصویر انجام می‌شود."
           variant="info"
         />
+        <ConsentToggle
+          label="با پردازش عملیاتی تصاویر برای تحلیل بدن موافقم."
+          onValueChange={onOperationalConsentChange}
+          value={operationalConsent}
+        />
+        <ConsentToggle
+          label="با استفاده از تصاویر برای بهبود مدل‌ها موافقم (اختیاری)."
+          onValueChange={onModelTrainingConsentChange}
+          value={modelTrainingConsent}
+        />
+        <Button
+          disabled={!operationalConsent}
+          label="ارسال و شروع تحلیل"
+          onPress={onSubmit}
+        />
+        {error !== null ? <Notice message={error} variant="danger" /> : null}
         <Button label="بستن" onPress={onExit} variant="ghost" />
       </View>
     </Screen>
   );
+}
+
+function ConsentToggle({
+  label,
+  onValueChange,
+  value,
+}: {
+  readonly label: string;
+  readonly onValueChange: (value: boolean) => void;
+  readonly value: boolean;
+}) {
+  return (
+    <View style={styles.consentRow}>
+      <Text style={styles.body}>{label}</Text>
+      <Switch
+        accessibilityLabel={label}
+        onValueChange={onValueChange}
+        thumbColor={value ? fiticianTokens.colors.aqua : fiticianTokens.colors.muted}
+        trackColor={{ false: fiticianTokens.colors.lineStrong, true: fiticianTokens.colors.surfaceInteractive }}
+        value={value}
+      />
+    </View>
+  );
+}
+
+function SubmissionProgress({
+  error,
+  onExit,
+  progress,
+}: {
+  readonly error: string | null;
+  readonly onExit: () => void;
+  readonly progress: UploadProgressState | null;
+}) {
+  const completed = progress?.completed ?? 0;
+  const total = progress?.total ?? 0;
+  const retrying = progress === null;
+  return (
+    <Screen scroll={false}>
+      <View style={styles.statusState}>
+        <Text style={styles.eyebrow}>ارسال امن تحلیل بدن</Text>
+        <Text style={styles.title}>{retrying ? "درخواست تحلیل دوباره در حال ارسال است" : "تصاویرت در حال ارسال است"}</Text>
+        <Text style={styles.body}>
+          {retrying
+            ? "وضعیت آخرین نشست دوباره بررسی می‌شود."
+            : "فقط نسخه‌های برش‌خورده و رمزگذاری‌شده برای نشست تحلیل ارسال می‌شوند."}
+        </Text>
+        <Skeleton accessibilityLabel="در حال ارسال تصاویر تحلیل بدن" height={12} />
+        {total > 0 ? <Text style={styles.body}>نمایش {completed} از {total} آماده شد.</Text> : null}
+        {progress?.activeView !== null && progress?.activeView !== undefined ? (
+          <Text style={styles.body}>در حال ارسال نمای {viewLabel(progress.activeView)}…</Text>
+        ) : null}
+        {error !== null ? <Notice message={error} variant="danger" /> : null}
+        <Button label="بازگشت" onPress={onExit} variant="ghost" />
+      </View>
+    </Screen>
+  );
+}
+
+function AnalysisSubmitted({
+  analysis,
+  error,
+  onExit,
+  onRetry,
+}: {
+  readonly analysis: BodyAnalysis | null;
+  readonly error: string | null;
+  readonly onExit: () => void;
+  readonly onRetry: () => void;
+}) {
+  const status = analysis?.status ?? "queued";
+  const failed = analysis?.status === "failed";
+  return (
+    <Screen scroll={false}>
+      <View style={styles.statusState}>
+        <Text style={styles.eyebrow}>تحلیل بدن</Text>
+        <Text style={styles.title}>{failed ? "تحلیل کامل نشد" : "تحلیل در حال آماده‌سازی است"}</Text>
+        <Text style={styles.body}>{analysisStatusLabel(status)}</Text>
+        {analysis?.safe_error_message !== null && analysis?.safe_error_message !== undefined ? (
+          <Notice message={analysis.safe_error_message} variant="danger" />
+        ) : null}
+        {error !== null ? <Notice message={error} variant="danger" /> : null}
+        {activeAnalysisStates.has(status) ? (
+          <Skeleton accessibilityLabel="تحلیل بدن در حال انجام است" height={12} />
+        ) : null}
+        {failed ? <Button label="تلاش دوباره" onPress={onRetry} /> : null}
+        <Button label="بازگشت به خانه" onPress={onExit} variant="secondary" />
+      </View>
+    </Screen>
+  );
+}
+
+function analysisStatusLabel(status: BodyAnalysis["status"]): string {
+  if (status === "queued") return "در صف پردازش قرار گرفت.";
+  if (status === "validating") return "کیفیت و استاندارد تصاویر در حال بررسی است.";
+  if (status === "analyzing") return "تحلیل محلی و سرویس امن در حال انجام است.";
+  if (status === "review_pending") return "نتیجه برای بررسی مربی و پزشک ارسال شده است.";
+  if (status === "completed") return "نتیجه آماده است و پس از بررسی تخصصی نمایش داده می‌شود.";
+  return "تحلیل به پایان نرسید.";
 }
 
 function viewLabel(view: BodyPhotoView): string {
@@ -357,6 +638,12 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  consentRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[3],
+    justifyContent: "space-between",
   },
   errorState: {
     gap: fiticianTokens.spacing[4],
@@ -391,6 +678,11 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.medium,
     height: 260,
     width: "100%",
+  },
+  statusState: {
+    gap: fiticianTokens.spacing[4],
+    justifyContent: "center",
+    minHeight: 420,
   },
   title: {
     color: fiticianTokens.colors.ink,
