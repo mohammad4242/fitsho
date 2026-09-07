@@ -26,6 +26,9 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(appConfig, /minSdkVersion:\s*24/);
   assert.match(appConfig, /compileSdkVersion:\s*36/);
   assert.match(appConfig, /targetSdkVersion:\s*36/);
+  assert.match(appConfig, /autoVerify:\s*true/);
+  assert.match(appConfig, /pathPrefix:\s*["']\/link["']/);
+  assert.match(appConfig, /scheme:\s*["']https["']/);
   assert.equal(mobileTsconfig.compilerOptions.strict, true);
   assert.doesNotMatch(appConfig, /Fitsho|Fitition/);
 });

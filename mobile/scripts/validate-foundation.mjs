@@ -12,6 +12,7 @@ const rootPackage = await readJson(resolve(projectRoot, "package.json"));
 const mobilePackage = await readJson(resolve(mobileRoot, "package.json"));
 const corePackage = await readJson(resolve(projectRoot, "packages/fitician-core/package.json"));
 const appConfig = await readFile(resolve(mobileRoot, "app.config.ts"), "utf8");
+const androidManifestPath = resolve(mobileRoot, "android/app/src/main/AndroidManifest.xml");
 const tsconfig = await readJson(resolve(mobileRoot, "tsconfig.json"));
 const fontFiles = [
   "Vazirmatn-Regular.ttf",
@@ -45,11 +46,28 @@ for (const required of [
   /targetSdkVersion:\s*36/,
   /autoVerify:\s*true/,
   /scheme:\s*["']https["']/,
+  /pathPrefix:\s*["']\/link["']/,
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
   /["']expo-background-task["']/,
   /["']expo-font["']/,
 ]) {
   assert.match(appConfig, required);
+}
+try {
+  const androidManifest = await readFile(androidManifestPath, "utf8");
+  assert.match(androidManifest, /android:scheme="fitician"/);
+  assert.match(androidManifest, /android:autoVerify="true"/);
+  for (const identifier of ["Fitsho", "Fitition"]) {
+    assert.equal(
+      androidManifest.includes(identifier),
+      false,
+      `generated Android manifest contains ${identifier}`,
+    );
+  }
+} catch (error) {
+  if (error?.code !== "ENOENT") {
+    throw error;
+  }
 }
 for (const fontFile of fontFiles) {
   const info = await stat(resolve(mobileRoot, "assets/fonts", fontFile));
