@@ -145,6 +145,7 @@ class WorkoutReviewQueueItemResponse(BaseModel):
     source_plan_id: UUID
     user_id: UUID
     member_display_name: str | None
+    member_profile_photo_url: str | None = None
     fitness_goal: str | None
     experience_level: str | None
     status: WorkoutReviewStatus

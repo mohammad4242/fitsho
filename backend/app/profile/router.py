@@ -1,12 +1,16 @@
-from typing import Annotated, NoReturn
+from collections.abc import Iterator
+from typing import Annotated, BinaryIO, NoReturn
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.cookies import require_trusted_origin
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
+from app.config import Settings, get_settings
 from app.database.session import get_db
 from app.exercises.enums import MuscleGroup
 from app.nutrition.models import NutritionProfile, NutritionSafetyDecision
@@ -21,10 +25,19 @@ from app.profile.exceptions import (
     ProfileInvariantError,
     ProfileNotFoundError,
 )
-from app.profile.models import UserProfile
+from app.profile.models import UserProfile, UserProfilePhoto
+from app.profile.photo import (
+    ProfilePhotoAccessDeniedError,
+    ProfilePhotoNotFoundError,
+    ProfilePhotoService,
+    ProfilePhotoStorageError,
+    ProfilePhotoValidationError,
+    profile_photo_url,
+)
 from app.profile.schemas import (
     ProductModeSelection,
     ProfileCreate,
+    ProfilePhotoResponse,
     ProfileResponse,
     ProfileStatusResponse,
     ProfileUpdate,
@@ -51,6 +64,7 @@ router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 
 DatabaseSession = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
+AppSettings = Annotated[Settings, Depends(get_settings)]
 
 
 def raise_age_error(error: Exception) -> NoReturn:
@@ -110,7 +124,10 @@ def read_status(db: DatabaseSession, user: CurrentUser) -> ProfileStatusResponse
     )
 
 
-def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
+def to_response(
+    snapshot: ProfileSnapshot,
+    photo_url: str | None = None,
+) -> ProfileResponse:
     profile = snapshot.profile
     measurement = snapshot.measurement
     assert profile.experience_level is not None
@@ -189,10 +206,14 @@ def to_response(snapshot: ProfileSnapshot) -> ProfileResponse:
         workout_generation_method=profile.workout_generation_method,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
+        profile_photo_url=photo_url,
     )
 
 
-def to_shared_response(snapshot: ProfileSnapshot) -> SharedProfileResponse:
+def to_shared_response(
+    snapshot: ProfileSnapshot,
+    photo_url: str | None = None,
+) -> SharedProfileResponse:
     return SharedProfileResponse(
         user_id=snapshot.profile.user_id,
         product_mode=snapshot.profile.product_mode,
@@ -203,7 +224,134 @@ def to_shared_response(snapshot: ProfileSnapshot) -> SharedProfileResponse:
         current_weight_kg=float(snapshot.measurement.weight_kg),
         weight_measured_at=snapshot.measurement.measured_at,
         fitness_goal=snapshot.profile.fitness_goal,
+        profile_photo_url=photo_url,
     )
+
+
+def _owner_photo_url(db: Session, user_id: UUID) -> str | None:
+    photo = db.scalar(select(UserProfilePhoto).where(UserProfilePhoto.user_id == user_id))
+    if photo is None:
+        return None
+    return profile_photo_url(user_id, photo.updated_at)
+
+
+def _photo_response(photo: UserProfilePhoto) -> ProfilePhotoResponse:
+    return ProfilePhotoResponse(
+        id=photo.id,
+        profile_photo_url=profile_photo_url(photo.user_id, photo.updated_at),
+        mime_type=photo.mime_type,  # type: ignore[arg-type]
+        byte_size=photo.byte_size,
+        width=photo.width,
+        height=photo.height,
+        updated_at=photo.updated_at,
+    )
+
+
+def _stream_photo(
+    row: UserProfilePhoto,
+    handle: BinaryIO,
+    settings: Settings,
+) -> StreamingResponse:
+    def stream() -> Iterator[bytes]:
+        with handle:
+            while chunk := handle.read(settings.profile_photo_read_chunk_bytes):
+                yield chunk
+
+    return StreamingResponse(
+        stream(),
+        media_type=row.mime_type,
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
+@router.put(
+    "/photo",
+    response_model=ProfilePhotoResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def upload_profile_photo(
+    db: DatabaseSession,
+    user: CurrentUser,
+    settings: AppSettings,
+    file: Annotated[UploadFile, File()],
+) -> ProfilePhotoResponse:
+    try:
+        photo = ProfilePhotoService(db, settings).save(user.id, file)
+    except ProfilePhotoValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": error.code},
+        ) from None
+    except ProfilePhotoStorageError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable",
+        ) from None
+    return _photo_response(photo)
+
+
+@router.get("/photo")
+def read_profile_photo(
+    db: DatabaseSession,
+    user: CurrentUser,
+    settings: AppSettings,
+) -> StreamingResponse:
+    return _read_profile_photo(db, settings, user.id, user.id)
+
+
+@router.get("/photo/{owner_id}")
+def read_related_profile_photo(
+    owner_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+    settings: AppSettings,
+) -> StreamingResponse:
+    return _read_profile_photo(db, settings, user.id, owner_id)
+
+
+def _read_profile_photo(
+    db: Session,
+    settings: Settings,
+    viewer_id: UUID,
+    owner_id: UUID,
+) -> StreamingResponse:
+    try:
+        row, handle = ProfilePhotoService(db, settings).open_for(viewer_id, owner_id)
+    except ProfilePhotoAccessDeniedError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Profile photo access is not allowed",
+        ) from None
+    except ProfilePhotoNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile photo not found",
+        ) from None
+    return _stream_photo(row, handle, settings)
+
+
+@router.delete(
+    "/photo",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def delete_profile_photo(
+    db: DatabaseSession,
+    user: CurrentUser,
+    settings: AppSettings,
+) -> None:
+    try:
+        ProfilePhotoService(db, settings).delete(user.id)
+    except ProfilePhotoNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile photo not found",
+        ) from None
+    except ProfilePhotoStorageError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service temporarily unavailable",
+        ) from None
 
 
 @router.put(
@@ -217,7 +365,10 @@ def save_shared_profile(
     user: CurrentUser,
 ) -> SharedProfileResponse:
     try:
-        return to_shared_response(upsert_shared_profile(db, user.id, payload))
+        return to_shared_response(
+            upsert_shared_profile(db, user.id, payload),
+            _owner_photo_url(db, user.id),
+        )
     except (AgeNotSupportedError, AgeOutOfRangeError) as error:
         raise_age_error(error)
     except ProfileNotFoundError:
@@ -230,7 +381,7 @@ def save_shared_profile(
 @router.get("/shared", response_model=SharedProfileResponse)
 def read_shared_profile(db: DatabaseSession, user: CurrentUser) -> SharedProfileResponse:
     try:
-        return to_shared_response(get_shared_profile(db, user.id))
+        return to_shared_response(get_shared_profile(db, user.id), _owner_photo_url(db, user.id))
     except ProfileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -255,7 +406,7 @@ def create(
     user: CurrentUser,
 ) -> ProfileResponse:
     try:
-        return to_response(create_profile(db, user.id, payload))
+        return to_response(create_profile(db, user.id, payload), _owner_photo_url(db, user.id))
     except (AgeNotSupportedError, AgeOutOfRangeError) as error:
         raise_age_error(error)
     except ProfileAlreadyExistsError:
@@ -289,7 +440,7 @@ def update(
     user: CurrentUser,
 ) -> ProfileResponse:
     try:
-        return to_response(update_profile(db, user.id, payload))
+        return to_response(update_profile(db, user.id, payload), _owner_photo_url(db, user.id))
     except (AgeNotSupportedError, AgeOutOfRangeError) as error:
         raise_age_error(error)
     except ProfileNotFoundError:
@@ -330,7 +481,7 @@ def update(
 @router.get("", response_model=ProfileResponse)
 def read(db: DatabaseSession, user: CurrentUser) -> ProfileResponse:
     try:
-        return to_response(get_profile(db, user.id))
+        return to_response(get_profile(db, user.id), _owner_photo_url(db, user.id))
     except ProfileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

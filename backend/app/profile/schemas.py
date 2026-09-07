@@ -324,6 +324,7 @@ class ProfileResponse(BaseModel):
     workout_generation_method: WorkoutGenerationMethod
     session_duration_minutes: SessionDurationMinutes
     training_intensity: TrainingIntensity | None
+    profile_photo_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -361,6 +362,17 @@ class SharedProfileResponse(BaseModel):
     current_weight_kg: float
     weight_measured_at: datetime
     fitness_goal: FitnessGoal
+    profile_photo_url: str | None = None
+
+
+class ProfilePhotoResponse(BaseModel):
+    id: UUID
+    profile_photo_url: str
+    mime_type: Literal["image/jpeg", "image/png", "image/webp"]
+    byte_size: int
+    width: int
+    height: int
+    updated_at: datetime
 
 
 class ProfileStatusResponse(BaseModel):

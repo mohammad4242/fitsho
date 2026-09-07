@@ -33,6 +33,7 @@ from app.nutrition.models import (
 from app.nutrition.schemas import PhysicianQueueView
 from app.nutrition.security import audit_security_event
 from app.profile.models import UserProfile
+from app.profile.photo import authorized_profile_photo_url
 
 
 class ClinicalError(Exception):
@@ -434,6 +435,9 @@ def review_queue(
             "plan_id": review.plan_id,
             "user_id": user_id,
             "member_display_name": display_name,
+            "member_profile_photo_url": authorized_profile_photo_url(
+                db, physician_id, user_id
+            ),
             "status": review.status.value,
             "priority": review.priority,
             "physician_user_id": review.physician_user_id,

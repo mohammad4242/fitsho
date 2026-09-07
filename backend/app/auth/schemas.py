@@ -75,5 +75,6 @@ class UserResponse(BaseModel):
     phone_number: str | None
     created_at: datetime
     is_admin: bool
+    profile_photo_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -35,7 +35,15 @@ def test_login_and_me_return_public_user(client: TestClient) -> None:
     assert current.json()["email"] == "user@example.com"
     assert current.json()["is_admin"] is False
     assert current.json()["phone_number"] is None
-    assert set(current.json()) == {"id", "email", "phone_number", "created_at", "is_admin"}
+    assert set(current.json()) == {
+        "id",
+        "email",
+        "phone_number",
+        "created_at",
+        "is_admin",
+        "profile_photo_url",
+    }
+    assert current.json()["profile_photo_url"] is None
 
 
 def test_login_uses_generic_error_for_unknown_email_and_wrong_password(

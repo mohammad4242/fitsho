@@ -5,15 +5,35 @@ import re
 import tempfile
 import warnings
 from dataclasses import dataclass
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
+from app.body_analysis.enums import SpecialistRole
+from app.body_analysis.models import UserSpecialistRole
 from app.config import Settings
+from app.nutrition.enums import (
+    NutritionLabRequestStatus,
+    NutritionPlanReviewStatus,
+    NutritionSupplementOrderStatus,
+)
+from app.nutrition.models import (
+    NutritionLabRequest,
+    NutritionPlanPhysicianReview,
+    NutritionSupplementOrder,
+    NutritionWeeklyPlan,
+)
+from app.profile.models import UserProfilePhoto
+from app.workout_reviews.enums import WorkoutReviewStatus
+from app.workout_reviews.models import WorkoutPlanReview
 
 PROFILE_PHOTO_FORMATS = {
     "JPEG": ("image/jpeg", ".jpg"),
@@ -37,6 +57,14 @@ class ProfilePhotoValidationError(ValueError):
 
 
 class ProfilePhotoStorageError(RuntimeError):
+    pass
+
+
+class ProfilePhotoNotFoundError(LookupError):
+    pass
+
+
+class ProfilePhotoAccessDeniedError(PermissionError):
     pass
 
 
@@ -199,3 +227,184 @@ class ProfilePhotoStorage:
             self.path_for(key).unlink(missing_ok=True)
         except (OSError, ProfilePhotoStorageError) as error:
             raise ProfilePhotoStorageError("Private storage is temporarily unavailable") from error
+
+
+def profile_photo_url(user_id: UUID, updated_at: datetime | None = None) -> str:
+    suffix = f"?v={int(updated_at.timestamp())}" if updated_at is not None else ""
+    return f"/api/v1/profile/photo/{user_id}{suffix}"
+
+
+def can_view_profile_photo(db: Session, viewer_id: UUID, owner_id: UUID) -> bool:
+    if viewer_id == owner_id:
+        return True
+
+    roles = set(
+        db.scalars(
+            select(UserSpecialistRole.role).where(UserSpecialistRole.user_id == viewer_id)
+        ).all()
+    )
+    if SpecialistRole.COACH in roles:
+        claimed_review = db.scalar(
+            select(WorkoutPlanReview.id).where(
+                WorkoutPlanReview.user_id == owner_id,
+                WorkoutPlanReview.claimed_by_user_id == viewer_id,
+                WorkoutPlanReview.status.in_(
+                    [WorkoutReviewStatus.CLAIMED, WorkoutReviewStatus.APPROVED]
+                ),
+            )
+        )
+        if claimed_review is not None:
+            return True
+
+    if roles.intersection({SpecialistRole.DOCTOR, SpecialistRole.PHYSICIAN}):
+        physician_review = db.scalar(
+            select(NutritionPlanPhysicianReview.id)
+            .join(
+                NutritionWeeklyPlan,
+                NutritionWeeklyPlan.id == NutritionPlanPhysicianReview.plan_id,
+            )
+            .where(
+                NutritionWeeklyPlan.user_id == owner_id,
+                NutritionPlanPhysicianReview.physician_user_id == viewer_id,
+                NutritionPlanPhysicianReview.status.in_(
+                    [
+                        NutritionPlanReviewStatus.IN_REVIEW,
+                        NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,
+                        NutritionPlanReviewStatus.APPROVED,
+                    ]
+                ),
+            )
+        )
+        if physician_review is not None:
+            return True
+        lab_request = db.scalar(
+            select(NutritionLabRequest.id).where(
+                NutritionLabRequest.user_id == owner_id,
+                NutritionLabRequest.physician_user_id == viewer_id,
+                NutritionLabRequest.status.in_(
+                    [
+                        NutritionLabRequestStatus.REQUESTED,
+                        NutritionLabRequestStatus.UPLOADED,
+                        NutritionLabRequestStatus.REVIEWED,
+                    ]
+                ),
+            )
+        )
+        if lab_request is not None:
+            return True
+        supplement_order = db.scalar(
+            select(NutritionSupplementOrder.id).where(
+                NutritionSupplementOrder.user_id == owner_id,
+                NutritionSupplementOrder.physician_user_id == viewer_id,
+                NutritionSupplementOrder.status.in_(
+                    [
+                        NutritionSupplementOrderStatus.PRESCRIBED,
+                        NutritionSupplementOrderStatus.ACTIVE,
+                        NutritionSupplementOrderStatus.COMPLETED,
+                        NutritionSupplementOrderStatus.DISCONTINUED,
+                    ]
+                ),
+            )
+        )
+        if supplement_order is not None:
+            return True
+    return False
+
+
+def authorized_profile_photo_url(
+    db: Session,
+    viewer_id: UUID,
+    owner_id: UUID,
+) -> str | None:
+    if not can_view_profile_photo(db, viewer_id, owner_id):
+        return None
+    row = db.scalar(select(UserProfilePhoto).where(UserProfilePhoto.user_id == owner_id))
+    return profile_photo_url(owner_id, row.updated_at) if row is not None else None
+
+
+class ProfilePhotoService:
+    def __init__(self, db: Session, settings: Settings) -> None:
+        self._db = db
+        self._storage = ProfilePhotoStorage(settings)
+        self._settings = settings
+
+    @property
+    def storage(self) -> ProfilePhotoStorage:
+        return self._storage
+
+    def get(self, owner_id: UUID) -> UserProfilePhoto:
+        row = self._db.scalar(
+            select(UserProfilePhoto).where(UserProfilePhoto.user_id == owner_id)
+        )
+        if row is None:
+            raise ProfilePhotoNotFoundError
+        return row
+
+    def save(self, owner_id: UUID, upload: UploadFile) -> UserProfilePhoto:
+        normalized = validate_and_normalize_profile_photo(upload, self._settings)
+        stored = self._storage.store(normalized.content, normalized.extension)
+        old_key: str | None = None
+        try:
+            row = self._db.scalar(
+                select(UserProfilePhoto)
+                .where(UserProfilePhoto.user_id == owner_id)
+                .with_for_update()
+            )
+            if row is None:
+                row = UserProfilePhoto(
+                    user_id=owner_id,
+                    storage_key=stored.key,
+                    mime_type=normalized.mime_type,
+                    byte_size=len(normalized.content),
+                    width=normalized.width,
+                    height=normalized.height,
+                )
+                self._db.add(row)
+            else:
+                old_key = row.storage_key
+                row.storage_key = stored.key
+                row.mime_type = normalized.mime_type
+                row.byte_size = len(normalized.content)
+                row.width = normalized.width
+                row.height = normalized.height
+            self._db.commit()
+            self._db.refresh(row)
+        except SQLAlchemyError:
+            self._db.rollback()
+            try:
+                self._storage.delete(stored.key)
+            except ProfilePhotoStorageError:
+                pass
+            raise
+        if old_key is not None and old_key != stored.key:
+            try:
+                self._storage.delete(old_key)
+            except ProfilePhotoStorageError:
+                pass
+        return row
+
+    def delete(self, owner_id: UUID) -> None:
+        row = self._db.scalar(
+            select(UserProfilePhoto)
+            .where(UserProfilePhoto.user_id == owner_id)
+            .with_for_update()
+        )
+        if row is None:
+            raise ProfilePhotoNotFoundError
+        key = row.storage_key
+        self._db.delete(row)
+        self._db.commit()
+        try:
+            self._storage.delete(key)
+        except ProfilePhotoStorageError:
+            pass
+
+    def open_for(self, viewer_id: UUID, owner_id: UUID) -> tuple[UserProfilePhoto, BinaryIO]:
+        if not can_view_profile_photo(self._db, viewer_id, owner_id):
+            raise ProfilePhotoAccessDeniedError
+        row = self.get(owner_id)
+        try:
+            handle = self._storage.open(row.storage_key)
+        except ProfilePhotoStorageError as error:
+            raise ProfilePhotoNotFoundError from error
+        return row, handle

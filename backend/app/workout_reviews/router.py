@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.cookies import require_trusted_origin
 from app.exercises.enums import ExerciseContentType
 from app.profile.models import UserProfile
+from app.profile.photo import authorized_profile_photo_url
 from app.workout_reviews.coach_quality import build_coach_quality_projection
 from app.workout_reviews.dependencies import (
     CoachUser,
@@ -51,17 +52,17 @@ def read_queue(
     db: DatabaseSession,
     view: WorkoutReviewQueueView = WorkoutReviewQueueView.PENDING,
 ) -> list[WorkoutReviewQueueItemResponse]:
-    return [_queue_response(db, review) for review in service.queue(view, coach.id)]
+    return [_queue_response(db, review, coach.id) for review in service.queue(view, coach.id)]
 
 
 @router.get("/{review_id}", response_model=WorkoutReviewDetailResponse)
 def read_review(
     review_id: UUID,
     service: WorkoutReviewServiceDependency,
-    _coach: CoachUser,
+    coach: CoachUser,
     db: DatabaseSession,
 ) -> WorkoutReviewDetailResponse:
-    return _detail_response(db, _service_call(lambda: service.detail(review_id)))
+    return _detail_response(db, _service_call(lambda: service.detail(review_id)), coach.id)
 
 
 @router.post(
@@ -76,7 +77,7 @@ def claim_review(
     db: DatabaseSession,
 ) -> WorkoutReviewDetailResponse:
     review = _service_call(lambda: service.claim(review_id, coach.id))
-    return _detail_response(db, review)
+    return _detail_response(db, review, coach.id)
 
 
 @router.post(
@@ -91,7 +92,7 @@ def renew_review(
     db: DatabaseSession,
 ) -> WorkoutReviewDetailResponse:
     review = _service_call(lambda: service.renew(review_id, coach.id))
-    return _detail_response(db, review)
+    return _detail_response(db, review, coach.id)
 
 
 @router.put(
@@ -115,7 +116,7 @@ def save_review_draft(
         ) from error
     except ReviewConflict as error:
         raise _http_conflict(error) from error
-    return _detail_response(db, review)
+    return _detail_response(db, review, coach.id)
 
 
 @router.post(
@@ -144,7 +145,7 @@ def approve_review(
         ) from error
     except ReviewConflict as error:
         raise _http_conflict(error) from error
-    return _detail_response(db, review)
+    return _detail_response(db, review, coach.id)
 
 
 def _service_call(operation: Callable[[], WorkoutPlanReview]) -> WorkoutPlanReview:
@@ -166,7 +167,11 @@ def _http_conflict(error: ReviewConflict) -> HTTPException:
     )
 
 
-def _queue_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewQueueItemResponse:
+def _queue_response(
+    db: Session,
+    review: WorkoutPlanReview,
+    viewer_id: UUID | None = None,
+) -> WorkoutReviewQueueItemResponse:
     profile = db.scalar(select(UserProfile).where(UserProfile.user_id == review.user_id))
     snapshot = review.source_plan.profile_snapshot
     return WorkoutReviewQueueItemResponse(
@@ -174,6 +179,11 @@ def _queue_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewQueu
         source_plan_id=review.source_plan_id,
         user_id=review.user_id,
         member_display_name=profile.display_name if profile else None,
+        member_profile_photo_url=(
+            authorized_profile_photo_url(db, viewer_id, review.user_id)
+            if viewer_id is not None
+            else None
+        ),
         fitness_goal=_optional_text(snapshot.get("goal") or snapshot.get("fitness_goal")),
         experience_level=_optional_text(snapshot.get("experience_level")),
         status=review.status,
@@ -185,8 +195,12 @@ def _queue_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewQueu
     )
 
 
-def _detail_response(db: Session, review: WorkoutPlanReview) -> WorkoutReviewDetailResponse:
-    summary = _queue_response(db, review)
+def _detail_response(
+    db: Session,
+    review: WorkoutPlanReview,
+    viewer_id: UUID | None = None,
+) -> WorkoutReviewDetailResponse:
+    summary = _queue_response(db, review, viewer_id)
     catalog = review.source_plan.exercise_catalog_snapshot.get("exercises")
     candidate_ids = (
         {UUID(value) for value in catalog if _uuid_text(value) is not None}

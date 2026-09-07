@@ -1061,6 +1061,7 @@ class PhysicianReviewQueueItemResponse(BaseModel):
     plan_id: UUID
     user_id: UUID
     member_display_name: str | None
+    member_profile_photo_url: str | None = None
     status: str
     priority: int
     physician_user_id: UUID | None
