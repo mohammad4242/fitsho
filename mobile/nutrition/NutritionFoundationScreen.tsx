@@ -36,6 +36,8 @@ import {
 } from "./nutritionApi";
 import { NutritionPlanSection } from "./NutritionPlanSection";
 import { NutritionCatalogueSection } from "./NutritionCatalogueSection";
+import { NutritionTrackingSection } from "./NutritionTrackingSection";
+import { NutritionAdherenceSection } from "./NutritionAdherenceSection";
 
 type ChoiceOption = { readonly label: string; readonly value: string };
 
@@ -135,6 +137,8 @@ export function NutritionFoundationScreen() {
       />
       <NutritionPlanSection safety={safety ?? null} />
       <NutritionCatalogueSection />
+      <NutritionTrackingSection />
+      <NutritionAdherenceSection />
     </Screen>
   );
 }

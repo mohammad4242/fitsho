@@ -68,6 +68,23 @@ export const nutritionKeys = {
   ] as const,
   mealCatalogue: (category: string | null) => ["nutrition", "meal-catalogue", category] as const,
   tracking: (date: string) => ["nutrition", "tracking", date] as const,
+  trackingHistory: (start: string, end: string) => [
+    "nutrition",
+    "tracking-history",
+    { end, start },
+  ] as const,
+  adherence: (start: string, end: string) => [
+    "nutrition",
+    "adherence",
+    { end, start },
+  ] as const,
+  recentFoods: () => ["nutrition", "recent-foods"] as const,
+  labs: () => ["nutrition", "labs"] as const,
+  labRequests: () => ["nutrition", "lab-requests"] as const,
+  supplementCatalogue: () => ["nutrition", "supplement-catalogue"] as const,
+  supplementOrders: () => ["nutrition", "supplement-orders"] as const,
+  adaptivePreferences: () => ["nutrition", "adaptive-preferences"] as const,
+  photoEstimate: (estimateId: string) => ["nutrition", "photo-estimate", estimateId] as const,
 };
 
 export const bodyAnalysisKeys = {

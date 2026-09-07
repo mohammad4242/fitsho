@@ -50,7 +50,7 @@ for (const required of [
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
   /["']expo-background-task["']/,
   /["']expo-font["']/,
-  /cameraPermission:\s*false/,
+  /cameraPermission:\s*["'][^"']+["']/,
   /microphonePermission:\s*false/,
   /photosPermission:\s*false/,
 ]) {

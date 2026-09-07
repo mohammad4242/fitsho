@@ -85,7 +85,7 @@ const config: ExpoConfig = {
     [
       "expo-image-picker",
       {
-        cameraPermission: false,
+        cameraPermission: "اجازه بده فیتیچیان برای ثبت عکس غذا از دوربین استفاده کند.",
         microphonePermission: false,
         photosPermission: false,
       },

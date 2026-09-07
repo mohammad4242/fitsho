@@ -18,7 +18,7 @@ it("localizes tracking statuses and sources for members", () => {
 });
 
 it("rounds adherence only for display", () => {
-  expect(adherencePercentLabel(0.876)).toBe("۸۸٪");
+  expect(adherencePercentLabel(87.6)).toBe("۸۸٪");
   expect(adherencePercentLabel(null)).toBe("—");
 });
 
@@ -59,4 +59,20 @@ it("does not offer confirmation for deleted or already confirmed estimates", () 
     canConfirm: false,
     title: "برآورد حذف شده است",
   });
+});
+
+it("keeps every estimated photo confirmable after review, even at high confidence", () => {
+  const estimate: components["schemas"]["NutritionFoodPhotoEstimateResponse"] = {
+    expires_at: "2026-09-08T00:00:00Z",
+    id: "estimate-1",
+    items: [],
+    macro_totals: { calories: 450 },
+    macro_totals_complete: true,
+    model_id: "model-1",
+    needs_user_confirmation: false,
+    overall_confidence: 0.99,
+    status: "estimated",
+  };
+
+  expect(photoEstimatePresentation(estimate).canConfirm).toBe(true);
 });

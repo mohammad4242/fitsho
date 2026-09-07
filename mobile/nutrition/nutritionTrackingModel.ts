@@ -41,7 +41,7 @@ export function trackingSourceLabel(
 
 export function adherencePercentLabel(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "—";
-  return `${formatNutritionNumber(Math.round(value * 100))}٪`;
+  return `${formatNutritionNumber(Math.round(value))}٪`;
 }
 
 export function photoEstimatePresentation(estimate: NutritionFoodPhotoEstimate): {
@@ -64,7 +64,7 @@ export function photoEstimatePresentation(estimate: NutritionFoodPhotoEstimate):
     };
   }
   return {
-    canConfirm: estimate.needs_user_confirmation,
+    canConfirm: true,
     message: estimate.needs_user_confirmation
       ? "این نتیجه تخمینی است و قبل از ثبت باید آن را بررسی کنی."
       : "این نتیجه هنوز تخمینی است و تا تأیید تو نهایی نمی‌شود.",
