@@ -231,6 +231,8 @@ from app.nutrition.schemas import (
     NutritionProgramWrite,
     NutritionRecentFoodResponse,
     NutritionReviewClaimResponse,
+    NutritionSupplementCatalogueResponse,
+    NutritionSupplementOrderResponse,
     NutritionTargetUpdateResponse,
     NutritionTrackingEntryResponse,
     PartialRegenerationInput,
@@ -2506,24 +2508,31 @@ def _supplement_error(error: SupplementError) -> HTTPException:
     return HTTPException(status_code=error_status, detail={"code": error.code, **error.details})
 
 
-@router.get("/supplements/catalogue")
-def read_supplement_catalogue(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+@router.get(
+    "/supplements/catalogue",
+    response_model=list[NutritionSupplementCatalogueResponse],
+)
+def read_supplement_catalogue(
+    db: DatabaseSession, user: CurrentUser
+) -> list[NutritionSupplementCatalogueResponse]:
     return list_catalogue(db)
 
 
 @router.put(
     "/admin/supplements/catalogue",
+    response_model=NutritionSupplementCatalogueResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def update_supplement_catalogue(
     payload: SupplementCatalogueInput, db: DatabaseSession, admin: AdminUser
-) -> dict[str, object]:
+) -> NutritionSupplementCatalogueResponse:
     del admin
     return save_catalogue(db, payload.model_dump(mode="json"))
 
 
 @router.post(
     "/physician/plans/{plan_id}/supplement-orders",
+    response_model=NutritionSupplementOrderResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_trusted_origin)],
 )
@@ -2532,7 +2541,7 @@ def create_physician_supplement_order(
     payload: PhysicianSupplementOrderInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionSupplementOrderResponse:
     try:
         data = payload.model_dump(mode="python", exclude={"supplement_id"})
         return create_order(db, user.id, plan_id, payload.supplement_id, data)
@@ -2540,10 +2549,13 @@ def create_physician_supplement_order(
         raise _supplement_error(error) from None
 
 
-@router.get("/physician/plans/{plan_id}/supplement-orders")
+@router.get(
+    "/physician/plans/{plan_id}/supplement-orders",
+    response_model=list[NutritionSupplementOrderResponse],
+)
 def read_physician_supplement_orders(
     plan_id: UUID, db: DatabaseSession, user: CurrentUser
-) -> list[dict[str, object]]:
+) -> list[NutritionSupplementOrderResponse]:
     try:
         return list_physician_orders(db, user.id, plan_id)
     except SupplementError as error:
@@ -2552,6 +2564,7 @@ def read_physician_supplement_orders(
 
 @router.put(
     "/physician/supplement-orders/{order_id}",
+    response_model=NutritionSupplementOrderResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def modify_physician_supplement_order(
@@ -2559,7 +2572,7 @@ def modify_physician_supplement_order(
     payload: PhysicianSupplementOrderInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionSupplementOrderResponse:
     try:
         data = payload.model_dump(mode="python", exclude={"supplement_id"})
         return update_order(db, user.id, order_id, payload.supplement_id, data)
@@ -2569,6 +2582,7 @@ def modify_physician_supplement_order(
 
 @router.post(
     "/physician/supplement-orders/{order_id}/transition",
+    response_model=NutritionSupplementOrderResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def update_supplement_order_status(
@@ -2576,7 +2590,7 @@ def update_supplement_order_status(
     payload: SupplementTransitionInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionSupplementOrderResponse:
     try:
         return transition_order(
             db, user.id, order_id, NutritionSupplementOrderStatus(payload.status)
@@ -2585,13 +2599,16 @@ def update_supplement_order_status(
         raise _supplement_error(error) from None
 
 
-@router.get("/supplement-orders")
-def read_user_supplement_orders(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+@router.get("/supplement-orders", response_model=list[NutritionSupplementOrderResponse])
+def read_user_supplement_orders(
+    db: DatabaseSession, user: CurrentUser
+) -> list[NutritionSupplementOrderResponse]:
     return list_user_orders(db, user.id)
 
 
 @router.post(
     "/supplement-orders/{order_id}/acknowledge",
+    response_model=NutritionSupplementOrderResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def acknowledge_supplement_order(
@@ -2599,7 +2616,7 @@ def acknowledge_supplement_order(
     payload: SupplementAcknowledgementInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionSupplementOrderResponse:
     try:
         return acknowledge_order(db, user.id, order_id, payload.adherence_note)
     except SupplementError as error:

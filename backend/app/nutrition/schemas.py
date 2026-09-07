@@ -31,6 +31,7 @@ from app.nutrition.enums import (
     NutritionOnboardingStatus,
     NutritionPlanStyle,
     NutritionProgramSlotKind,
+    NutritionSupplementOrderStatus,
     PhysicianReviewMode,
     PhysicianReviewStatus,
     PreferredVariety,
@@ -881,6 +882,7 @@ class FoodReplacementOptionsResponse(BaseModel):
 
 
 JsonScalar = str | int | float | bool | None
+type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
 
 
 class ShoppingListItemResponse(BaseModel):
@@ -1130,6 +1132,52 @@ class NutritionLabRequestCreatedResponse(BaseModel):
 class NutritionReviewClaimResponse(BaseModel):
     review_id: UUID
     status: str
+
+
+class NutritionSupplementCatalogueResponse(BaseModel):
+    id: UUID
+    slug: str
+    name_fa: str
+    name_en: str
+    verification_status: Literal["draft", "verified", "retired"]
+    source_name: str
+    source_reference: str
+    active_ingredients: list[dict[str, JsonValue]]
+    nutrient_contribution_per_unit: dict[str, JsonValue]
+    contraindication_codes: list[str]
+    allergen_codes: list[str]
+    interaction_codes: list[str]
+    upper_bound_rules: list[dict[str, JsonValue]]
+
+
+class NutritionSupplementExposureResponse(BaseModel):
+    food_contribution: dict[str, str]
+    supplement_contribution: dict[str, str]
+    combined_exposure: dict[str, str]
+    hard_blocks: list[JsonValue]
+
+
+class NutritionSupplementOrderResponse(BaseModel):
+    id: UUID
+    plan_id: UUID
+    supplement_id: UUID | None
+    name: str
+    dose_amount: float | None
+    dose_unit: str | None
+    daily_units: float | None
+    frequency: str | None
+    duration_days: int | None
+    starts_on: date | None
+    ends_on: date | None
+    instructions: str | None
+    rationale: str | None
+    status: NutritionSupplementOrderStatus
+    linked_gap_codes: list[str]
+    linked_lab_document_ids: list[UUID]
+    food_nutrient_contribution: dict[str, JsonValue]
+    supplement_nutrient_contribution: dict[str, str]
+    combined_exposure_safety: NutritionSupplementExposureResponse
+    acknowledged_at: datetime | None
 
 
 class WeeklyPlanDayResponse(BaseModel):
