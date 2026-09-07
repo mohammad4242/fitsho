@@ -178,6 +178,15 @@ const en = {
       invalidToken: "The recovery link is invalid or has expired.",
       backToLogin: "Back to sign in",
     },
+    emailVerification: {
+      eyebrow: "Account security",
+      title: "Verify your email",
+      subtitle: "We are checking the email-verification link for your Fitsho account.",
+      checking: "Verifying your email…",
+      success: "Your email has been verified.",
+      invalidToken: "The verification link is invalid or has expired.",
+      backToLogin: "Back to sign in",
+    },
     onboarding: {
       eyebrow: "Start personalizing",
       title: "Build your fitness profile",

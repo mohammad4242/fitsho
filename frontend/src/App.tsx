@@ -52,11 +52,13 @@ const PublicLandingRoute = lazy(() => import("./features/landing/PublicLandingRo
 const PublicOnboardingPage = lazy(() => import("./features/publicOnboarding/PublicOnboardingPage").then(({ PublicOnboardingPage }) => ({ default: PublicOnboardingPage })));
 const RegisterPage = lazy(() => import("./features/auth/RegisterPage").then(({ RegisterPage }) => ({ default: RegisterPage })));
 const ResetPasswordPage = lazy(() => import("./features/auth/ResetPasswordPage").then(({ ResetPasswordPage }) => ({ default: ResetPasswordPage })));
+const VerifyEmailPage = lazy(() => import("./features/auth/VerifyEmailPage").then(({ VerifyEmailPage }) => ({ default: VerifyEmailPage })));
 const WorkoutPlanPage = lazy(() => import("./features/workouts/WorkoutPlanPage").then(({ WorkoutPlanPage }) => ({ default: WorkoutPlanPage })));
 
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/verify-email" element={deferred(<VerifyEmailPage />)} />
       <Route element={<GuestRoute />}>
         <Route path="/login" element={deferred(<LoginPage />)} />
         <Route path="/register" element={deferred(<RegisterPage />)} />

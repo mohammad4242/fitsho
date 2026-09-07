@@ -7,6 +7,7 @@ import { ApiError } from "../../shared/apiClient";
 import * as api from "./api";
 import { ForgotPasswordPage } from "./ForgotPasswordPage";
 import { ResetPasswordPage } from "./ResetPasswordPage";
+import { VerifyEmailPage } from "./VerifyEmailPage";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -84,4 +85,45 @@ it("shows the same message for invalid, expired, and reused reset tokens", async
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "لینک بازیابی معتبر نیست یا منقضی شده است.",
   );
+});
+
+it("verifies the email token from the URL and shows success", async () => {
+  const verifyEmail = vi.spyOn(api, "verifyEmail").mockResolvedValue();
+  render(
+    <MemoryRouter initialEntries={["/verify-email?token=verification-token"]}>
+      <VerifyEmailPage />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByText("ایمیل با موفقیت تأیید شد.")).toBeInTheDocument();
+  expect(verifyEmail).toHaveBeenCalledWith("verification-token");
+});
+
+it("shows a safe error for an invalid email verification token", async () => {
+  vi.spyOn(api, "verifyEmail").mockRejectedValue(
+    new ApiError(400, "Invalid or expired verification token"),
+  );
+  render(
+    <MemoryRouter initialEntries={["/verify-email?token=expired-token"]}>
+      <VerifyEmailPage />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "لینک تأیید معتبر نیست یا منقضی شده است.",
+  );
+});
+
+it("does not call the verification API when the link has no token", async () => {
+  const verifyEmail = vi.spyOn(api, "verifyEmail").mockResolvedValue();
+  render(
+    <MemoryRouter initialEntries={["/verify-email"]}>
+      <VerifyEmailPage />
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "لینک تأیید معتبر نیست یا منقضی شده است.",
+  );
+  expect(verifyEmail).not.toHaveBeenCalled();
 });

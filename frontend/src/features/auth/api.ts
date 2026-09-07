@@ -36,6 +36,13 @@ export function resetPassword(token: string, password: string): Promise<void> {
   });
 }
 
+export function verifyEmail(token: string): Promise<void> {
+  return request<void>("/api/v1/auth/email/verify", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+
 export function sendPhoneOtp(phoneNumber: string): Promise<PhoneOtpSent> {
   return request<PhoneOtpSent>("/api/v1/auth/phone/send-otp", {
     method: "POST",
