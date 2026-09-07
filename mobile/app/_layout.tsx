@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { createMobileQueryClient } from "../data/queryClient";
+import { MobileQueryCacheBoundary } from "../data/MobileQueryCacheBoundary";
 import { MobileAuthProvider } from "../auth/MobileAuthProvider";
 import { connectivityMonitor } from "../platform/connectivity";
 import { MobileRouteStateProviderFromAuth } from "../ui/navigation/RouteGuards";
@@ -26,7 +27,9 @@ export default function RootLayout() {
         <MobileRouteStateProviderFromAuth>
           <AndroidBackBehaviorProvider>
             <QueryClientProvider client={queryClient}>
-              <Stack screenOptions={{ headerShown: false }} />
+              <MobileQueryCacheBoundary>
+                <Stack screenOptions={{ headerShown: false }} />
+              </MobileQueryCacheBoundary>
             </QueryClientProvider>
           </AndroidBackBehaviorProvider>
         </MobileRouteStateProviderFromAuth>
