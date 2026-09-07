@@ -76,7 +76,13 @@ const replacementScopes: readonly Choice<"this_time" | "persistent">[] = [
   { label: "از این به بعد", value: "persistent" },
 ];
 
-export function WorkoutCyclePanel({ plan }: { readonly plan: WorkoutPlan }) {
+export function WorkoutCyclePanel({
+  expectedCycleId,
+  plan,
+}: {
+  readonly expectedCycleId?: string;
+  readonly plan: WorkoutPlan;
+}) {
   const auth = useMobileAuth();
   const connectivityStatus = useConnectivityStatus();
   const api = useMemo(
@@ -109,6 +115,9 @@ export function WorkoutCyclePanel({ plan }: { readonly plan: WorkoutPlan }) {
   }
   if (cycle.workout_plan_id !== plan.id) {
     return <Notice message="چرخهٔ فعلی با این نسخهٔ برنامه هماهنگ نیست." variant="warning" />;
+  }
+  if (expectedCycleId !== undefined && cycle.cycle_id !== expectedCycleId) {
+    return <Notice message="این چرخه دیگر چرخهٔ فعلی نیست یا در دسترس نیست." variant="warning" />;
   }
 
   return (

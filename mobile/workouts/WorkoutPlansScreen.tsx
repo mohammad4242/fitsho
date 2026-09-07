@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, StyleSheet, Text, View } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 
@@ -44,6 +44,7 @@ const generationErrorMessages: Record<WorkoutGenerationErrorKind, string> = {
 export function WorkoutPlansScreen() {
   const auth = useMobileAuth();
   const router = useRouter();
+  const params = useLocalSearchParams<{ cycleId?: string | string[]; planId?: string | string[] }>();
   const queryClient = useQueryClient();
   const connectivityStatus = useConnectivityStatus();
   const api = useMemo(
@@ -51,8 +52,14 @@ export function WorkoutPlansScreen() {
     [auth.download, auth.request],
   );
   const pdfStore = useMemo(() => new ExpoWorkoutPlanPdfStore(), []);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const planTargetId = firstParam(params.planId);
+  const cycleTargetId = firstParam(params.cycleId);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(planTargetId ?? null);
   const [generationError, setGenerationError] = useState<WorkoutGenerationErrorKind | null>(null);
+
+  useEffect(() => {
+    setSelectedPlanId(planTargetId ?? null);
+  }, [planTargetId]);
 
   const activeQuery = useQuery({
     queryFn: api.getActive,
@@ -88,7 +95,7 @@ export function WorkoutPlansScreen() {
   const pendingPlan = pendingPlanId === null ? undefined : viewData(pendingState);
   const selectedPlan = selectedPlanId === null ? undefined : viewData(selectedState);
   const displayedPlan = selectedPlanId === null ? activePlan : selectedPlan;
-  const isViewingHistorical = selectedPlanId !== null;
+  const isViewingHistorical = selectedPlanId !== null && selectedPlanId !== activePlan?.id;
   const generation = useMutation({
     mutationFn: () => api.generate(),
     onError: (error: unknown) => setGenerationError(classifyWorkoutGenerationError(error)),
@@ -171,9 +178,9 @@ export function WorkoutPlansScreen() {
         />
       ) : null}
 
-      {!loading && !activeLoadError && !activeOffline && activePlan !== null && activePlan !== undefined
-        && selectedPlanId === null && isWorkoutPlanExecutable(activePlan) ? (
-        <WorkoutCyclePanel plan={activePlan} />
+      {!loading && !activeLoadError && !activeOffline && displayedPlan !== null && displayedPlan !== undefined
+        && isWorkoutPlanExecutable(displayedPlan, isViewingHistorical) ? (
+        <WorkoutCyclePanel expectedCycleId={cycleTargetId} plan={displayedPlan} />
       ) : null}
 
       {!loading && !activeLoadError && !activeOffline && pendingPlan !== undefined && pendingPlan.id !== displayedPlan?.id ? (
@@ -563,6 +570,12 @@ function useConnectivityStatus(): ConnectivityStatus {
   const [status, setStatus] = useState<ConnectivityStatus>(connectivityMonitor.getSnapshot().status);
   useEffect(() => connectivityMonitor.subscribe((snapshot) => setStatus(snapshot.status)), []);
   return status;
+}
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  const normalized = candidate?.trim();
+  return normalized === "" ? undefined : normalized;
 }
 
 const styles = StyleSheet.create({
