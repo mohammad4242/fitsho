@@ -26,8 +26,7 @@ that geometry for:
 
 - the visible `GhostOverlayGuide` privacy line;
 - the photo editor's source-pixel crop and render-plan height;
-- camera capture's crop boundary; and
-- live pose framing guidance.
+- camera capture's crop boundary.
 
 No CSS-only offset or sex-specific duplicate crop rule will be added, so the
 visible line and encoded image boundary cannot drift apart.
