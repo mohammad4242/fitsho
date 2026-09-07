@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -15,9 +18,12 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+
+if TYPE_CHECKING:
+    from app.profile.models import UserProfilePhoto
 
 
 class User(Base):
@@ -53,6 +59,21 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    profile_photo: Mapped[UserProfilePhoto | None] = relationship(
+        "UserProfilePhoto",
+        back_populates="user",
+        uselist=False,
+        passive_deletes=True,
+    )
+
+    @property
+    def profile_photo_url(self) -> str | None:
+        photo = self.profile_photo
+        if photo is None:
+            return None
+        version = photo.updated_at or photo.created_at
+        suffix = f"?v={int(version.timestamp())}" if version is not None else ""
+        return f"/api/v1/profile/photo/{self.id}{suffix}"
 
 
 class AuthSession(Base):

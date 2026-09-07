@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import get_args
+from typing import TYPE_CHECKING, get_args
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     SmallInteger,
     String,
@@ -32,6 +33,9 @@ from app.profile.enums import (
     WorkoutGenerationMethod,
 )
 from app.profile.schemas import SessionDurationMinutes
+
+if TYPE_CHECKING:
+    from app.auth.models import User
 
 
 class UserProfile(Base):
@@ -186,6 +190,27 @@ class UserProfile(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class UserProfilePhoto(Base):
+    __tablename__ = "user_profile_photos"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    storage_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    mime_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+    width: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    height: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    user: Mapped["User"] = relationship("User", back_populates="profile_photo")
 
 
 class UserProfileTrainingCaution(Base):

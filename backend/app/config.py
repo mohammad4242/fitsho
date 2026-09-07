@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     body_photo_min_width: int = Field(default=256, ge=64, le=4096)
     body_photo_min_height: int = Field(default=512, ge=64, le=8192)
     body_photo_read_chunk_bytes: int = Field(default=1024 * 1024, ge=1024, le=4 * 1024 * 1024)
+    profile_photo_storage_root: Path = Path("var/private/profile-photos")
+    profile_photo_max_bytes: int = Field(default=5 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
+    profile_photo_max_pixels: int = Field(default=16_000_000, ge=1, le=40_000_000)
+    profile_photo_min_dimension: int = Field(default=128, ge=1, le=4096)
+    profile_photo_read_chunk_bytes: int = Field(default=1024 * 1024, ge=1024, le=4 * 1024 * 1024)
     food_photo_storage_root: Path = Path("var/private/food-photos")
     food_photo_max_bytes: int = Field(default=8 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
     food_photo_max_pixels: int = Field(default=20_000_000, ge=1, le=40_000_000)
@@ -173,6 +178,9 @@ class Settings(BaseSettings):
         private_root = self.body_photo_storage_root.resolve()
         if private_root == public_root or private_root.is_relative_to(public_root):
             raise ValueError("Body photo storage must be outside public media storage")
+        profile_private_root = self.profile_photo_storage_root.resolve()
+        if profile_private_root == public_root or profile_private_root.is_relative_to(public_root):
+            raise ValueError("Profile photo storage must be outside public media storage")
         food_private_root = self.food_photo_storage_root.resolve()
         if food_private_root == public_root or food_private_root.is_relative_to(public_root):
             raise ValueError("Food photo storage must be outside public media storage")
