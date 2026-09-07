@@ -376,7 +376,7 @@ def authenticate_mobile_google(
         raise
 
 
-def user_for_session(db: Session, raw_token: str) -> User | None:
+def session_for_token(db: Session, raw_token: str) -> AuthSession | None:
     auth_session = db.scalar(
         select(AuthSession).where(AuthSession.token_hash == hash_session_token(raw_token))
     )
@@ -389,6 +389,13 @@ def user_for_session(db: Session, raw_token: str) -> User | None:
         except SQLAlchemyError:
             db.rollback()
             raise
+        return None
+    return auth_session
+
+
+def user_for_session(db: Session, raw_token: str) -> User | None:
+    auth_session = session_for_token(db, raw_token)
+    if auth_session is None:
         return None
     return db.get(User, auth_session.user_id)
 

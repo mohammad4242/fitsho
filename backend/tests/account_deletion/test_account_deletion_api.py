@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.account_deletion.models import AccountDeletionRequest
 from app.account_deletion.service import execute_due_account_deletions
 from app.auth.models import AuthSession, MobileTokenFamily, User
+from app.auth.security import hash_session_token, make_session_token
 from app.auth.service import issue_mobile_tokens
 from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoView
 from app.body_photos.models import BodyPhoto, BodyPhotoSession
@@ -397,3 +398,67 @@ def test_passwordless_accounts_cannot_delete_from_an_old_mobile_session(
     )
 
     assert response.status_code == 403
+
+
+def test_fresh_passwordless_web_session_allows_external_deletion(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _enable_deletion(test_settings)
+    now = datetime.now(UTC)
+    user = User(google_sub="fresh-web-delete-sub")
+    db.add(user)
+    db.flush()
+    raw_token, token_hash = make_session_token()
+    db.add(
+        AuthSession(
+            user_id=user.id,
+            token_hash=token_hash,
+            created_at=now - timedelta(seconds=30),
+            expires_at=now + timedelta(hours=1),
+        )
+    )
+    db.commit()
+    client.cookies.set(test_settings.session_cookie_name, raw_token)
+
+    response = client.post(
+        "/api/v1/account-deletion",
+        headers=ORIGIN,
+        json={"confirmation": "DELETE"},
+    )
+
+    assert response.status_code == 202
+
+
+def test_old_passwordless_web_session_requires_reauthentication(
+    client: TestClient,
+    db: Session,
+    test_settings: Settings,
+) -> None:
+    _enable_deletion(test_settings)
+    now = datetime.now(UTC)
+    user = User(google_sub="old-web-delete-sub")
+    db.add(user)
+    db.flush()
+    raw_token, token_hash = make_session_token()
+    db.add(
+        AuthSession(
+            user_id=user.id,
+            token_hash=hash_session_token(raw_token),
+            created_at=now
+            - timedelta(seconds=test_settings.account_deletion_reauth_window_seconds + 1),
+            expires_at=now + timedelta(hours=1),
+        )
+    )
+    db.commit()
+    client.cookies.set(test_settings.session_cookie_name, raw_token)
+
+    response = client.post(
+        "/api/v1/account-deletion",
+        headers=ORIGIN,
+        json={"confirmation": "DELETE"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": "RECENT_AUTHENTICATION_REQUIRED"}

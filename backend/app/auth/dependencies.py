@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, Security, status
@@ -7,7 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.auth.cookies import session_cookie_deletion_header
 from app.auth.models import User
-from app.auth.service import MobileAccessContext, mobile_access_context_for_token, user_for_session
+from app.auth.service import (
+    MobileAccessContext,
+    mobile_access_context_for_token,
+    session_for_token,
+)
 from app.config import Settings, get_settings
 from app.database.session import get_db
 
@@ -24,6 +29,7 @@ class AuthenticatedPrincipal:
     user: User
     mobile: MobileAccessContext | None
     via_bearer: bool
+    authenticated_at: datetime | None = None
 
 
 def _bearer_token(
@@ -60,7 +66,12 @@ def get_current_authentication(
                 detail="Authentication required",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        return AuthenticatedPrincipal(user=context.user, mobile=context, via_bearer=True)
+        return AuthenticatedPrincipal(
+            user=context.user,
+            mobile=context,
+            via_bearer=True,
+            authenticated_at=context.family.created_at,
+        )
 
     raw_token = request.cookies.get(settings.session_cookie_name)
     if raw_token is None:
@@ -68,14 +79,26 @@ def get_current_authentication(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
-    user = user_for_session(db, raw_token)
+    auth_session = session_for_token(db, raw_token)
+    if auth_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"Set-Cookie": session_cookie_deletion_header(settings)},
+        )
+    user = db.get(User, auth_session.user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
             headers={"Set-Cookie": session_cookie_deletion_header(settings)},
         )
-    return AuthenticatedPrincipal(user=user, mobile=None, via_bearer=False)
+    return AuthenticatedPrincipal(
+        user=user,
+        mobile=None,
+        via_bearer=False,
+        authenticated_at=auth_session.created_at,
+    )
 
 
 CurrentAuthentication = Annotated[

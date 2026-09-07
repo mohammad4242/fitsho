@@ -63,8 +63,7 @@ def _ensure_reauthenticated(
         if password is None or not verify_password(password, principal.user.password_hash):
             raise AccountDeletionError("INVALID_REAUTHENTICATION")
         return
-    mobile = principal.mobile
-    if mobile is None or mobile.family.created_at < (
+    if principal.authenticated_at is None or principal.authenticated_at < (
         now - timedelta(seconds=settings.account_deletion_reauth_window_seconds)
     ):
         raise AccountDeletionError("RECENT_AUTHENTICATION_REQUIRED")
