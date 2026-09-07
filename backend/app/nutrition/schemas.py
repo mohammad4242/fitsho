@@ -1035,6 +1035,54 @@ class NutritionFoodPhotoMacroPreviewResponse(BaseModel):
     fat_g: float
 
 
+class NutritionAdherenceDayResponse(BaseModel):
+    date: date
+    status: Literal["sufficient", "insufficient_data"]
+    check_in_status: NutritionDailyCheckInStatus
+    plan_revision_id: UUID | None
+    planned: dict[str, float]
+    actual: dict[str, float]
+    calorie_adherence: float | None
+    protein_adherence: float | None
+    meal_adherence: float | None
+    budget_adherence: float | None
+    tracking_completeness: float
+    exact_entry_ratio: float | None
+    composite_score: float | None
+    formula_version: str
+    structured_exercise_calories: float | None
+    major_deviations: int
+
+
+class NutritionWeightTrendResponse(BaseModel):
+    measured_at: datetime
+    weight_kg: float
+
+
+class NutritionAdherenceResponse(BaseModel):
+    start: date
+    end: date
+    days: list[NutritionAdherenceDayResponse]
+    weight_trend: list[NutritionWeightTrendResponse]
+    weight_causality_claimed: bool
+    explanation_codes: list[str]
+
+
+class NutritionAdaptivePreferencesResponse(BaseModel):
+    feedback_counts: dict[str, int]
+    avoid_meal_ids: list[UUID]
+    disliked_meal_ids: list[UUID]
+    prefer_meal_ids: list[UUID]
+    scientific_targets_changed: bool
+
+
+class NutritionTargetUpdateResponse(BaseModel):
+    previous_goal: FitnessGoal
+    requested_goal: FitnessGoal
+    estimate_id: UUID
+    user_confirmed: bool
+
+
 class WeeklyPlanDayResponse(BaseModel):
     day_index: int
     plan_date: date

@@ -212,6 +212,8 @@ from app.nutrition.schemas import (
     MealRemovalPreviewResponse,
     MealReplacementOptionsResponse,
     MealReplacementPreviewResponse,
+    NutritionAdaptivePreferencesResponse,
+    NutritionAdherenceResponse,
     NutritionDailyTrackingResponse,
     NutritionEstimateResponse,
     NutritionFoodPhotoConfirmationResponse,
@@ -223,6 +225,7 @@ from app.nutrition.schemas import (
     NutritionProgramResponse,
     NutritionProgramWrite,
     NutritionRecentFoodResponse,
+    NutritionTargetUpdateResponse,
     NutritionTrackingEntryResponse,
     PartialRegenerationInput,
     PhysicianFoodQuantityInput,
@@ -2193,27 +2196,30 @@ def download_food_photo(
     return StreamingResponse(handle, media_type=content_type)
 
 
-@router.get("/adherence")
+@router.get("/adherence", response_model=NutritionAdherenceResponse)
 def read_adherence(
     start: date, end: date, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> NutritionAdherenceResponse:
     if end < start or (end - start).days > 366:
         raise HTTPException(status_code=422, detail={"code": "INVALID_DATE_RANGE"})
     return adherence_history(db, user.id, start, end)
 
 
-@router.get("/adaptive-preferences")
-def read_adaptive_preferences(db: DatabaseSession, user: CurrentUser) -> dict[str, object]:
+@router.get("/adaptive-preferences", response_model=NutritionAdaptivePreferencesResponse)
+def read_adaptive_preferences(
+    db: DatabaseSession, user: CurrentUser
+) -> NutritionAdaptivePreferencesResponse:
     return adaptive_preferences(db, user.id)
 
 
 @router.post(
     "/targets/confirm-update",
+    response_model=NutritionTargetUpdateResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def update_confirmed_target(
     payload: TargetUpdateConfirmationInput, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> NutritionTargetUpdateResponse:
     try:
         return confirm_target_update(db, user.id, payload.requested_goal, payload.confirmed)
     except AdherenceError as error:
