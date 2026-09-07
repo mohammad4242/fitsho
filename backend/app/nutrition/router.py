@@ -212,12 +212,15 @@ from app.nutrition.schemas import (
     MealRemovalPreviewResponse,
     MealReplacementOptionsResponse,
     MealReplacementPreviewResponse,
+    NutritionDailyTrackingResponse,
     NutritionEstimateResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
     NutritionProgramPageResponse,
     NutritionProgramResponse,
     NutritionProgramWrite,
+    NutritionRecentFoodResponse,
+    NutritionTrackingEntryResponse,
     PartialRegenerationInput,
     PhysicianFoodQuantityInput,
     PhysicianLabRequestInput,
@@ -1819,10 +1822,14 @@ def _tracking_error(error: TrackingError) -> HTTPException:
     return HTTPException(status_code=error_status, detail={"code": error.code})
 
 
-@router.put("/tracking/check-in", dependencies=[Depends(require_trusted_origin)])
+@router.put(
+    "/tracking/check-in",
+    response_model=NutritionDailyTrackingResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
 def update_daily_check_in(
     payload: DailyCheckInInput, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> NutritionDailyTrackingResponse:
     try:
         return submit_check_in(db, user.id, payload.entry_date, payload.status, payload.note)
     except TrackingError as error:
@@ -1831,12 +1838,13 @@ def update_daily_check_in(
 
 @router.post(
     "/tracking/entries/catalogue",
+    response_model=NutritionTrackingEntryResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_trusted_origin)],
 )
 def create_catalogue_consumption(
     payload: CatalogueConsumptionInput, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> NutritionTrackingEntryResponse:
     try:
         return add_catalogue_food(
             db,
@@ -1852,12 +1860,13 @@ def create_catalogue_consumption(
 
 @router.post(
     "/tracking/entries/quick",
+    response_model=NutritionTrackingEntryResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_trusted_origin)],
 )
 def create_quick_consumption(
     payload: QuickApproximationInput, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> NutritionTrackingEntryResponse:
     return save_quick_approximation(
         db,
         user.id,
@@ -1870,6 +1879,7 @@ def create_quick_consumption(
 
 @router.put(
     "/tracking/free-meals/{meal_id}",
+    response_model=NutritionDailyTrackingResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def update_free_meal_consumption(
@@ -1877,7 +1887,7 @@ def update_free_meal_consumption(
     payload: FreeMealTrackingInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionDailyTrackingResponse:
     try:
         return save_free_meal(
             db,
@@ -1893,33 +1903,34 @@ def update_free_meal_consumption(
         raise _tracking_error(error) from None
 
 
-@router.get("/tracking/days/{entry_date}")
+@router.get("/tracking/days/{entry_date}", response_model=NutritionDailyTrackingResponse)
 def read_daily_tracking(
     entry_date: date, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> NutritionDailyTrackingResponse:
     return daily_summary(db, user.id, entry_date)
 
 
-@router.get("/tracking/history")
+@router.get("/tracking/history", response_model=list[NutritionDailyTrackingResponse])
 def read_tracking_history(
     start: date, end: date, db: DatabaseSession, user: CurrentUser
-) -> list[dict[str, object]]:
+) -> list[NutritionDailyTrackingResponse]:
     if end < start or (end - start).days > 366:
         raise HTTPException(status_code=422, detail={"code": "INVALID_DATE_RANGE"})
     return history(db, user.id, start, end)
 
 
-@router.get("/tracking/recent-foods")
+@router.get("/tracking/recent-foods", response_model=list[NutritionRecentFoodResponse])
 def read_recent_foods(
     db: DatabaseSession,
     user: CurrentUser,
     limit: int = Query(default=20, ge=1, le=50),
-) -> list[dict[str, object]]:
+) -> list[NutritionRecentFoodResponse]:
     return recent_foods(db, user.id, limit)
 
 
 @router.put(
     "/tracking/entries/{entry_id}",
+    response_model=NutritionTrackingEntryResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def update_consumption_entry(
@@ -1927,7 +1938,7 @@ def update_consumption_entry(
     payload: ConsumptionEntryEditInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionTrackingEntryResponse:
     try:
         return edit_entry(
             db,
@@ -1946,6 +1957,7 @@ def update_consumption_entry(
 
 @router.put(
     "/tracking/planned-meals/{meal_id}",
+    response_model=NutritionDailyTrackingResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def update_planned_meal_tracking(
@@ -1953,7 +1965,7 @@ def update_planned_meal_tracking(
     payload: PlannedMealTrackingInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionDailyTrackingResponse:
     try:
         return adjust_planned_meal(
             db,

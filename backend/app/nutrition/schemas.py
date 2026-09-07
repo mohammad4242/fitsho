@@ -22,6 +22,7 @@ from app.nutrition.enums import (
     MedicalConditionCode,
     MetabolicBasis,
     NutritionBudgetTier,
+    NutritionConsumptionSource,
     NutritionDailyCheckInStatus,
     NutritionDietStyle,
     NutritionEstimateStatus,
@@ -954,6 +955,38 @@ class FoodReplacementPreviewResponse(BaseModel):
     cost_delta_irr: int
     requires_physician_review: bool
     change_kind: Literal["plan_defining"]
+
+
+class NutritionTrackingEntryResponse(BaseModel):
+    id: UUID
+    entry_date: date
+    plan_revision_id: UUID | None
+    planned_meal_id: UUID | None
+    food_id: UUID | None
+    display_name: str
+    quantity_grams: float | None
+    source: NutritionConsumptionSource
+    confidence: EstimateConfidence
+    user_confirmed: bool
+    nutrients: dict[str, float]
+    warning_codes: list[str]
+    note: str | None
+
+
+class NutritionDailyTrackingResponse(BaseModel):
+    entry_date: date
+    check_in_status: NutritionDailyCheckInStatus
+    plan_revision_id: UUID | None
+    data_status: Literal["sufficient", "insufficient_data"]
+    actual_totals: dict[str, float]
+    entries: list[NutritionTrackingEntryResponse]
+
+
+class NutritionRecentFoodResponse(BaseModel):
+    food_id: UUID
+    display_name: str
+    last_quantity_grams: float | None
+    last_entry_date: date
 
 
 class WeeklyPlanDayResponse(BaseModel):
