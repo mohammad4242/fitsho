@@ -29,6 +29,7 @@ import {
   ExpoWorkoutPlanPdfStore,
   type StoredWorkoutPlanPdf,
 } from "./workoutPdfStore";
+import { WorkoutCyclePanel } from "./WorkoutCyclePanel";
 import type { WorkoutGenerationErrorKind } from "./workoutModel";
 
 type PdfStatus = "checking" | "downloading" | "error" | "idle" | "ready";
@@ -168,6 +169,11 @@ export function WorkoutPlansScreen() {
           plan={displayedPlan}
           pending={displayedPlan.status === "pending_review"}
         />
+      ) : null}
+
+      {!loading && !activeLoadError && !activeOffline && activePlan !== null && activePlan !== undefined
+        && selectedPlanId === null && isWorkoutPlanExecutable(activePlan) ? (
+        <WorkoutCyclePanel plan={activePlan} />
       ) : null}
 
       {!loading && !activeLoadError && !activeOffline && pendingPlan !== undefined && pendingPlan.id !== displayedPlan?.id ? (
