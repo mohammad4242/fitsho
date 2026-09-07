@@ -53,6 +53,7 @@ export const nutritionKeys = {
   ...createResourceQueryKeys("nutrition"),
   plans: () => ["nutrition", "plans"] as const,
   plan: (planId: string) => ["nutrition", "plan", planId] as const,
+  shoppingList: (planId: string) => ["nutrition", "shopping-list", planId] as const,
   latestBundle: () => ["nutrition", "plan-bundle", "latest"] as const,
   mealFeedback: (planId: string) => ["nutrition", "meal-feedback", planId] as const,
   profile: () => ["nutrition", "profile"] as const,
@@ -60,6 +61,12 @@ export const nutritionKeys = {
   safety: () => ["nutrition", "safety"] as const,
   structuredExercise: () => ["nutrition", "structured-exercise"] as const,
   estimate: () => ["nutrition", "estimate"] as const,
+  foodCatalogue: (filters: { category: string; page: number; pageSize: number; query: string }) => [
+    "nutrition",
+    "food-catalogue",
+    filters,
+  ] as const,
+  mealCatalogue: (category: string | null) => ["nutrition", "meal-catalogue", category] as const,
   tracking: (date: string) => ["nutrition", "tracking", date] as const,
 };
 

@@ -2,6 +2,11 @@ import { ApiError, type BinaryDownload, type BinaryDownloadRequest, type Transpo
 import type { components } from "@fitician/core";
 
 import type { AuthenticatedNutritionRequest } from "./nutritionApi";
+import {
+  toPublicShoppingList,
+  type ShoppingList,
+  type ShoppingListResponse,
+} from "./nutritionShoppingList";
 
 export type WeeklyPlan = components["schemas"]["WeeklyPlanResponse"];
 export type WeeklyPlanDay = components["schemas"]["WeeklyPlanDayResponse"];
@@ -12,6 +17,7 @@ export type WeeklyPlanGeneration = components["schemas"]["WeeklyPlanGenerationRe
 export type WeeklyPlanHistoryItem = components["schemas"]["WeeklyPlanHistoryItemResponse"];
 export type PlanBundleSelectionInput = components["schemas"]["PlanBundleSelectInput"];
 export type PlanBundleSelectResponse = components["schemas"]["PlanBundleSelectResponse"];
+export type { ShoppingList } from "./nutritionShoppingList";
 
 export type AuthenticatedNutritionDownload = (
   request: BinaryDownloadRequest,
@@ -25,6 +31,7 @@ export interface NutritionPlanApi {
   getHistory(): Promise<WeeklyPlanHistoryItem[]>;
   getLatest(): Promise<WeeklyPlan | null>;
   getLatestBundle(): Promise<WeeklyPlanGeneration | null>;
+  getShoppingList(planId: string): Promise<ShoppingList>;
   selectBundle(bundleId: string, input: PlanBundleSelectionInput): Promise<PlanBundleSelectResponse>;
 }
 
@@ -88,6 +95,14 @@ export function createNutritionPlanApi(
 
     getLatestBundle() {
       return optional<WeeklyPlanGeneration>(request, `${nutritionBundlesPath}/latest`);
+    },
+
+    async getShoppingList(planId) {
+      const response = await request<ShoppingListResponse>({
+        method: "GET",
+        path: `${nutritionPlansPath}/${encodeURIComponent(planId)}/shopping-list`,
+      });
+      return toPublicShoppingList(response);
     },
 
     selectBundle(bundleId, input) {
