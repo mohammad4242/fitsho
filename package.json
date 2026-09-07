@@ -20,6 +20,7 @@
     "test:mobile:foundation": "node --test mobile/scripts/*.test.mjs"
   },
   "devDependencies": {
+    "jsdom": "29.1.1",
     "openapi-typescript": "7.13.0"
   }
 }
