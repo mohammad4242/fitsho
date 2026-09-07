@@ -101,3 +101,12 @@ it("places route guards at group boundaries and hides capability tabs", async ()
     "AndroidBackBehaviorProvider",
   );
 });
+
+it("uses the native onboarding flow instead of a route placeholder", async () => {
+  await expect(
+    readFile(resolve(appRoot, "(onboarding)/onboarding/index.tsx"), "utf8"),
+  ).resolves.toMatch(/OnboardingScreen/);
+  await expect(
+    readFile(resolve(appRoot, "(onboarding)/onboarding/index.tsx"), "utf8"),
+  ).resolves.toMatch(/onboarding\/OnboardingScreen/);
+});

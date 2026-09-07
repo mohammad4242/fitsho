@@ -1,5 +1,5 @@
-import { RouteEntryScreen } from "../../../ui/navigation/RouteEntryScreen";
+import { OnboardingScreen } from "../../../onboarding/OnboardingScreen";
 
 export default function OnboardingEntryScreen() {
-  return <RouteEntryScreen description="پروفایل خود را برای شروع آماده کنید" title="شروع پروفایل" />;
+  return <OnboardingScreen />;
 }
