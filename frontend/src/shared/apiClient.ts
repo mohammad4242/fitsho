@@ -1,65 +1,82 @@
-export type ApiValidationDetail = {
-  type?: string;
-  loc?: Array<string | number>;
-  msg?: string;
-};
+import {
+  type HttpMethod,
+  type JsonValue,
+  type RequestHeaders,
+} from "@fitician/core";
 
-export class ApiError extends Error {
-  readonly status: number;
-  readonly details: ApiValidationDetail[] | null;
-  readonly code: string | null;
+import { createWebTransport } from "./webTransport";
 
-  constructor(
-    status: number,
-    message: string,
-    details: ApiValidationDetail[] | null = null,
-    code: string | null = null,
-  ) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-    this.details = details;
-    this.code = code;
+export { ApiError } from "@fitician/core";
+export type { ApiValidationDetail } from "@fitician/core";
+
+const browserTransport = createWebTransport();
+
+function isFormDataBody(body: BodyInit | null | undefined): body is FormData {
+  return typeof FormData !== "undefined" && body instanceof FormData;
+}
+
+function requestMethod(method: string | undefined): HttpMethod {
+  const normalized = (method ?? "GET").toUpperCase();
+  if (normalized === "DELETE" || normalized === "GET" || normalized === "PATCH"
+    || normalized === "POST" || normalized === "PUT") {
+    return normalized;
+  }
+  throw new TypeError(`Unsupported HTTP method: ${method}`);
+}
+
+function requestHeaders(init: RequestInit | undefined, isMultipart: boolean): RequestHeaders {
+  const headers = new Headers(init?.headers);
+  if (!isMultipart && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  return Object.fromEntries(headers.entries());
+}
+
+function requestBody(body: BodyInit | null | undefined): JsonValue | undefined {
+  if (body === undefined || body === null) {
+    return undefined;
+  }
+  if (typeof body !== "string") {
+    throw new TypeError("Only JSON strings and FormData are supported by the web API client");
+  }
+  try {
+    return JSON.parse(body) as JsonValue;
+  } catch {
+    throw new TypeError("The web API client requires a valid JSON request body");
   }
 }
 
-async function requestResponse(path: string, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers);
-  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
-  if (!isFormData && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-  const response = await fetch(path, {
-    ...init,
-    credentials: "include",
-    headers,
-  });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      detail?: unknown;
-    } | null;
-    const message = typeof body?.detail === "string" ? body.detail : "Request failed";
-    const details = Array.isArray(body?.detail)
-      ? (body.detail as ApiValidationDetail[])
-      : null;
-    const code = typeof body?.detail === "object" && body.detail !== null
-      && "code" in body.detail && typeof body.detail.code === "string"
-      ? body.detail.code
-      : null;
-    throw new ApiError(response.status, message, details, code);
-  }
-  return response;
+function requestOptions(init: RequestInit | undefined, isMultipart: boolean) {
+  return {
+    headers: requestHeaders(init, isMultipart),
+    method: requestMethod(init?.method),
+    signal: init?.signal ?? undefined,
+  };
 }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await requestResponse(path, init);
-  if (response.status === 204) {
-    return undefined as T;
+  if (isFormDataBody(init?.body)) {
+    return browserTransport.uploadFormData<T>({
+      ...requestOptions(init, true),
+      formData: init.body,
+      path,
+    });
   }
-  return (await response.json()) as T;
+  return browserTransport.request<T>({
+    ...requestOptions(init, false),
+    body: requestBody(init?.body),
+    path,
+  });
 }
 
 export async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
-  const response = await requestResponse(path, init);
-  return response.blob();
+  const download = await browserTransport.download({
+    ...requestOptions(init, false),
+    body: requestBody(init?.body),
+    path,
+    responseType: "binary",
+  });
+  return new Blob([download.bytes.buffer as ArrayBuffer], {
+    type: download.contentType ?? "",
+  });
 }
