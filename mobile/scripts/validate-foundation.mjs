@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +13,18 @@ const mobilePackage = await readJson(resolve(mobileRoot, "package.json"));
 const corePackage = await readJson(resolve(projectRoot, "packages/fitician-core/package.json"));
 const appConfig = await readFile(resolve(mobileRoot, "app.config.ts"), "utf8");
 const tsconfig = await readJson(resolve(mobileRoot, "tsconfig.json"));
+const fontFiles = [
+  "Vazirmatn-Regular.ttf",
+  "Vazirmatn-Medium.ttf",
+  "Vazirmatn-SemiBold.ttf",
+  "Vazirmatn-Bold.ttf",
+  "Vazirmatn-ExtraBold.ttf",
+  "Lalezar-Regular.otf",
+  "Sora-Regular.otf",
+  "Sora-SemiBold.otf",
+  "Sora-Bold.otf",
+  "Sora-ExtraBold.otf",
+];
 
 assert.deepEqual(rootPackage.workspaces, ["frontend", "mobile", "packages/fitician-core"]);
 assert.equal(mobilePackage.name, "@fitician/mobile");
@@ -35,8 +47,13 @@ for (const required of [
   /scheme:\s*["']https["']/,
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
   /["']expo-background-task["']/,
+  /["']expo-font["']/,
 ]) {
   assert.match(appConfig, required);
+}
+for (const fontFile of fontFiles) {
+  const info = await stat(resolve(mobileRoot, "assets/fonts", fontFile));
+  assert.ok(info.isFile() && info.size > 0, `${fontFile} must be a non-empty font file`);
 }
 
 console.log("Fitician mobile foundation is valid");
