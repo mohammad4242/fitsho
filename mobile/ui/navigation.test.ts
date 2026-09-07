@@ -48,6 +48,8 @@ it("defines the public, auth, onboarding, member, coach, and physician route gro
     "(member)/member/(tabs)/workouts.tsx",
     "(member)/member/(tabs)/nutrition.tsx",
     "(member)/member/(tabs)/profile.tsx",
+    "(member)/member/exercises/index.tsx",
+    "(member)/member/exercises/[slug].tsx",
     "(coach)/_layout.tsx",
     "(coach)/coach/index.tsx",
     "(physician)/_layout.tsx",
@@ -118,4 +120,13 @@ it("uses the native profile editor inside the member profile tab", async () => {
   await expect(
     readFile(resolve(appRoot, "(member)/member/(tabs)/profile.tsx"), "utf8"),
   ).resolves.not.toMatch(/RouteEntryScreen/);
+});
+
+it("keeps the exercise library inside the completed member training boundary", async () => {
+  await expect(
+    readFile(resolve(appRoot, "(member)/member/exercises/index.tsx"), "utf8"),
+  ).resolves.toMatch(/requiredCapability="training"/);
+  await expect(
+    readFile(resolve(appRoot, "(member)/member/exercises/[slug].tsx"), "utf8"),
+  ).resolves.toMatch(/requiredCapability="training"/);
 });

@@ -1,20 +1,23 @@
 import { StyleSheet, Text, View } from "react-native";
+import { type ReactNode } from "react";
 
 import { Screen } from "../layout";
 import { fiticianTokens } from "../tokens";
 
 export interface RouteEntryScreenProps {
+  readonly children?: ReactNode;
   readonly description: string;
   readonly title: string;
 }
 
-export function RouteEntryScreen({ description, title }: RouteEntryScreenProps) {
+export function RouteEntryScreen({ children, description, title }: RouteEntryScreenProps) {
   return (
     <Screen contentContainerStyle={styles.screen} contentWidth="reading" scroll={false}>
       <View style={styles.content}>
         <Text style={styles.brand}>FITICIAN</Text>
         <Text accessibilityRole="header" style={styles.title}>{title}</Text>
         <Text style={styles.description}>{description}</Text>
+        {children}
       </View>
     </Screen>
   );

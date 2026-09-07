@@ -34,7 +34,10 @@ export const profileKeys = {
   measurements: () => ["profile", "measurements"] as const,
 };
 
-export const exerciseKeys = createResourceQueryKeys("exercises");
+export const exerciseKeys = {
+  ...createResourceQueryKeys("exercises"),
+  categories: () => ["exercises", "categories"] as const,
+};
 
 export const workoutKeys = {
   ...createResourceQueryKeys("workouts"),
