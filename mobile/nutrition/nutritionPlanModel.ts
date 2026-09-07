@@ -73,6 +73,14 @@ export function isNutritionPlanExecutable(plan: WeeklyPlan, historical = false):
     && plan.review_status === "approved";
 }
 
+export function canEditNutritionPlan(
+  plan: WeeklyPlan,
+  historical: boolean,
+  offline: boolean,
+): boolean {
+  return !offline && isNutritionPlanExecutable(plan, historical);
+}
+
 export function selectNutritionPlan(
   active: WeeklyPlan | null,
   latest: WeeklyPlan | null,

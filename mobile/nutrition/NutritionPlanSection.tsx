@@ -7,10 +7,21 @@ import { ApiError } from "@fitician/core";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
-import { Button, Card, EmptyState, Notice, Skeleton } from "../ui/components";
+import { Button, Card, Dialog, EmptyState, Notice, Sheet, Skeleton } from "../ui/components";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { canGenerateNutritionEstimate, formatNutritionNumber } from "./nutritionModel";
+import {
+  type FoodReplacementOptions,
+  type FoodReplacementPreview,
+  type MealFeedbackUpdateResponse,
+  type MealRemovalPreview,
+  type MealReplacementOptions,
+  type MealReplacementPreview,
+  type NutritionPlanActionsApi,
+  type WeeklyPlanFeedback,
+  createNutritionPlanActionsApi,
+} from "./nutritionPlanActionsApi";
 import {
   createNutritionPlanApi,
   type NutritionPlanApi,
@@ -22,6 +33,7 @@ import {
   type WeeklyPlanMeal,
 } from "./nutritionPlanApi";
 import {
+  canEditNutritionPlan,
   classifyNutritionGenerationOutcome,
   formatNutritionPlanMoney,
   getNutritionPlanStatus,
@@ -55,6 +67,10 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
   const api = useMemo(
     () => createNutritionPlanApi(auth.request, auth.download),
     [auth.download, auth.request],
+  );
+  const actionsApi = useMemo(
+    () => createNutritionPlanActionsApi(auth.request),
+    [auth.request],
   );
   const pdfStore = useMemo(() => new ExpoNutritionPlanPdfStore(), []);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -149,6 +165,12 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
     setSelectedPlanId(version.id);
   }
 
+  function handlePlanUpdated(next: WeeklyPlan) {
+    queryClient.setQueryData(nutritionKeys.plan(next.id), next);
+    queryClient.setQueryData(nutritionKeys.plan("latest"), next);
+    void Promise.all([activeQuery.refetch(), latestQuery.refetch(), historyQuery.refetch()]);
+  }
+
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeading}>
@@ -172,10 +194,13 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
       {displayedPlan !== undefined && displayedPlan !== null ? (
         <NutritionPlanCard
           api={api}
+          actionsApi={actionsApi}
           connectivityStatus={connectivityStatus}
           historical={historical}
+          onPlanUpdated={handlePlanUpdated}
           pdfStore={pdfStore}
           plan={displayedPlan}
+          safety={safety}
           stale={offline || (selectedPlanId === null && (activeState.status === "stale" || latestState.status === "stale"))}
         />
       ) : null}
@@ -208,7 +233,7 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
 
       <BundleChoice
         bundle={bundle}
-        disabled={offline || selectBundle.isPending}
+        disabled={!canGenerate || selectBundle.isPending}
         onSelect={(role) => {
           if (bundle?.bundle_id === null || bundle?.bundle_id === undefined) return;
           setGenerationError(null);
@@ -229,30 +254,46 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
 }
 
 function NutritionPlanCard({
+  actionsApi,
   api,
   connectivityStatus,
   historical,
+  onPlanUpdated,
   pdfStore,
   plan,
+  safety,
   stale,
 }: {
+  readonly actionsApi: NutritionPlanActionsApi;
   readonly api: NutritionPlanApi;
   readonly connectivityStatus: ConnectivityStatus;
   readonly historical: boolean;
+  readonly onPlanUpdated: (plan: WeeklyPlan) => void;
   readonly pdfStore: ExpoNutritionPlanPdfStore;
   readonly plan: WeeklyPlan;
+  readonly safety: SafetyDecision | null;
   readonly stale: boolean;
 }) {
-  const status = getNutritionPlanStatus(plan, historical);
-  const executable = isNutritionPlanExecutable(plan, historical);
+  const queryClient = useQueryClient();
+  const [currentPlan, setCurrentPlan] = useState(plan);
+  const feedbackQuery = useQuery({
+    enabled: !historical,
+    queryFn: () => actionsApi.getFeedback(plan.id),
+    queryKey: nutritionKeys.mealFeedback(plan.id),
+  });
+  const status = getNutritionPlanStatus(currentPlan, historical);
+  const executable = isNutritionPlanExecutable(currentPlan, historical);
+  const editable = canEditNutritionPlan(currentPlan, historical, connectivityStatus === "offline")
+    && safety?.can_continue_onboarding === true;
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const selectedDay = plan.days[selectedDayIndex] ?? plan.days[0] ?? null;
+  const selectedDay = currentPlan.days[selectedDayIndex] ?? currentPlan.days[0] ?? null;
 
   useEffect(() => {
+    setCurrentPlan(plan);
     setSelectedDayIndex(0);
   }, [plan.id, plan.revision]);
 
-  if (!plan.is_user_visible) {
+  if (!currentPlan.is_user_visible) {
     return <Notice message="این نسخه برای نمایش عضو آماده نیست." variant="info" />;
   }
 
@@ -270,26 +311,47 @@ function NutritionPlanCard({
         {historical ? <Notice message="این نسخه فقط برای مشاهده تاریخچه است و برنامه فعال تو نیست." variant="info" /> : null}
         {!executable && !historical ? <PlanReviewNotice status={status} /> : null}
         <View style={styles.statsGrid}>
-          <PlanStat label="هزینه هفتگی" value={formatNutritionPlanMoney(plan.weekly_cost_irr)} />
-          <PlanStat label="بودجه هفتگی" value={formatNutritionPlanMoney(plan.weekly_budget_irr)} />
-          <PlanStat label="تعداد روز" value={formatNutritionNumber(plan.days.length)} />
-          <PlanStat label="نسخه" value={formatNutritionNumber(plan.revision)} />
+          <PlanStat label="هزینه هفتگی" value={formatNutritionPlanMoney(currentPlan.weekly_cost_irr)} />
+          <PlanStat label="بودجه هفتگی" value={formatNutritionPlanMoney(currentPlan.weekly_budget_irr)} />
+          <PlanStat label="تعداد روز" value={formatNutritionNumber(currentPlan.days.length)} />
+          <PlanStat label="نسخه" value={formatNutritionNumber(currentPlan.revision)} />
         </View>
-        {plan.physician_user_visible_notes ? (
-          <Notice message={plan.physician_user_visible_notes} title="یادداشت پزشک" variant="info" />
+        {currentPlan.physician_user_visible_notes ? (
+          <Notice message={currentPlan.physician_user_visible_notes} title="یادداشت پزشک" variant="info" />
         ) : null}
-        {plan.warning_codes.length > 0 ? (
-          <Notice message={plan.warning_codes.join("\n")} title="هشدارهای برنامه" variant="warning" />
+        {currentPlan.warning_codes.length > 0 ? (
+          <Notice message={currentPlan.warning_codes.join("\n")} title="هشدارهای برنامه" variant="warning" />
         ) : null}
-        <SummaryRow label="وضعیت بودجه" value={budgetStatusLabel(plan.budget_status)} />
-        <SummaryRow label="شروع برنامه" value={formatPlanDate(plan.start_date)} />
+        <SummaryRow label="وضعیت بودجه" value={budgetStatusLabel(currentPlan.budget_status)} />
+        <SummaryRow label="شروع برنامه" value={formatPlanDate(currentPlan.start_date)} />
       </Card>
 
       {selectedDay !== null ? (
         <View style={styles.daysSection}>
           <Text style={styles.sectionTitle}>روزهای برنامه</Text>
-          <DaySelector days={plan.days} selectedDayIndex={selectedDayIndex} onSelect={setSelectedDayIndex} />
-          <NutritionDayCard day={selectedDay} />
+          <DaySelector days={currentPlan.days} selectedDayIndex={selectedDayIndex} onSelect={setSelectedDayIndex} />
+          <NutritionDayCard
+            actionsApi={actionsApi}
+            canEdit={editable}
+            day={selectedDay}
+            feedback={feedbackQuery.data?.feedback ?? {}}
+            onFeedbackSaved={(result) => {
+              queryClient.setQueryData<WeeklyPlanFeedback>(nutritionKeys.mealFeedback(currentPlan.id), {
+                feedback: {
+                  ...feedbackQuery.data?.feedback,
+                  [result.meal_id]: result.feedback_type,
+                },
+              });
+            }}
+            onLockChanged={(mealId, isLocked) => {
+              setCurrentPlan((previous) => updateMealLock(previous, mealId, isLocked));
+            }}
+            onPlanUpdated={(next) => {
+              setCurrentPlan(next);
+              onPlanUpdated(next);
+            }}
+            planId={currentPlan.id}
+          />
         </View>
       ) : (
         <Notice message="برای این نسخه هنوز روزی ثبت نشده است." variant="info" />
@@ -299,7 +361,25 @@ function NutritionPlanCard({
   );
 }
 
-function NutritionDayCard({ day }: { readonly day: WeeklyPlanDay }) {
+function NutritionDayCard({
+  actionsApi,
+  canEdit,
+  day,
+  feedback,
+  onFeedbackSaved,
+  onLockChanged,
+  onPlanUpdated,
+  planId,
+}: {
+  readonly actionsApi: NutritionPlanActionsApi;
+  readonly canEdit: boolean;
+  readonly day: WeeklyPlanDay;
+  readonly feedback: WeeklyPlanFeedback["feedback"];
+  readonly onFeedbackSaved: (result: MealFeedbackUpdateResponse) => void;
+  readonly onLockChanged: (mealId: string, isLocked: boolean) => void;
+  readonly onPlanUpdated: (plan: WeeklyPlan) => void;
+  readonly planId: string;
+}) {
   return (
     <Card style={styles.dayCard}>
       <View style={styles.dayHeading}>
@@ -318,14 +398,208 @@ function NutritionDayCard({ day }: { readonly day: WeeklyPlanDay }) {
         ))}
       </View>
       <View style={styles.mealStack}>
-        {day.meals.map((meal) => <NutritionMealCard key={meal.id} meal={meal} />)}
+        {day.meals.map((meal) => (
+          <NutritionMealCard
+            actionsApi={actionsApi}
+            canEdit={canEdit}
+            feedbackType={feedback[meal.id]}
+            key={meal.id}
+            meal={meal}
+            onFeedbackSaved={onFeedbackSaved}
+            onLockChanged={onLockChanged}
+            onPlanUpdated={onPlanUpdated}
+            planId={planId}
+          />
+        ))}
       </View>
     </Card>
   );
 }
 
-function NutritionMealCard({ meal }: { readonly meal: WeeklyPlanMeal }) {
+type ReplacementSelector =
+  | { readonly kind: "food"; readonly options: FoodReplacementOptions | null; readonly selectedId: string | null; readonly targetFoodId: string | null }
+  | { readonly kind: "meal"; readonly options: MealReplacementOptions | null; readonly selectedId: string | null };
+
+type PlanEditPreview =
+  | { readonly data: MealRemovalPreview; readonly kind: "remove" }
+  | { readonly data: MealReplacementPreview; readonly kind: "meal"; readonly replacementId: string }
+  | { readonly data: FoodReplacementPreview; readonly foodId: string; readonly kind: "food"; readonly replacementId: string };
+
+type MealAction = "confirm" | "feedback" | "lock" | "options";
+
+function NutritionMealCard({
+  actionsApi,
+  canEdit,
+  feedbackType,
+  meal,
+  onFeedbackSaved,
+  onLockChanged,
+  onPlanUpdated,
+  planId,
+}: {
+  readonly actionsApi: NutritionPlanActionsApi;
+  readonly canEdit: boolean;
+  readonly feedbackType: WeeklyPlanFeedback["feedback"][string] | undefined;
+  readonly meal: WeeklyPlanMeal;
+  readonly onFeedbackSaved: (result: MealFeedbackUpdateResponse) => void;
+  readonly onLockChanged: (mealId: string, isLocked: boolean) => void;
+  readonly onPlanUpdated: (plan: WeeklyPlan) => void;
+  readonly planId: string;
+}) {
   const mealName = meal.name_fa ?? meal.name_en ?? meal.meal_code ?? "وعده غذایی";
+  const [busy, setBusy] = useState<MealAction | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selector, setSelector] = useState<ReplacementSelector | null>(null);
+  const [preview, setPreview] = useState<PlanEditPreview | null>(null);
+  const editable = canEdit && busy === null;
+
+  async function toggleLock() {
+    if (!canEdit || busy !== null) return;
+    setBusy("lock");
+    setError(null);
+    try {
+      const result = await actionsApi.setMealLock(planId, meal.id, !meal.is_locked);
+      onLockChanged(result.meal_id, result.is_locked);
+    } catch (actionError) {
+      setError(nutritionPlanErrorMessage(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveFeedback(feedback: "liked" | "disliked") {
+    if (!canEdit || busy !== null) return;
+    setBusy("feedback");
+    setError(null);
+    try {
+      const result = await actionsApi.setMealFeedback(planId, meal.id, {
+        feedback_type: feedback,
+        notes: null,
+      });
+      onFeedbackSaved(result);
+    } catch (actionError) {
+      setError(nutritionPlanErrorMessage(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function openMealReplacement() {
+    if (!canEdit || meal.is_locked || busy !== null) return;
+    setBusy("options");
+    setError(null);
+    setSelector({ kind: "meal", options: null, selectedId: null });
+    try {
+      const options = await actionsApi.getMealReplacementOptions(planId, meal.id);
+      setSelector({ kind: "meal", options, selectedId: null });
+    } catch (actionError) {
+      setSelector(null);
+      setError(nutritionPlanErrorMessage(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function openFoodReplacement() {
+    if (!canEdit || meal.is_locked || busy !== null) return;
+    setError(null);
+    setSelector({ kind: "food", options: null, selectedId: null, targetFoodId: null });
+  }
+
+  async function loadFoodReplacementOptions(foodId: string) {
+    if (selector?.kind !== "food" || busy !== null) return;
+    setBusy("options");
+    setError(null);
+    try {
+      const options = await actionsApi.getFoodReplacementOptions(planId, meal.id, foodId);
+      setSelector({ ...selector, options, targetFoodId: foodId, selectedId: null });
+    } catch (actionError) {
+      setError(nutritionPlanErrorMessage(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function previewSelectedReplacement() {
+    if (selector === null || selector.selectedId === null || busy !== null) return;
+    setBusy("options");
+    setError(null);
+    try {
+      if (selector.kind === "meal" && selector.options !== null) {
+        const replacement = selector.options.options.find((option) => option.id === selector.selectedId);
+        if (replacement === undefined) return;
+        const data = await actionsApi.previewReplaceMeal(planId, {
+          expected_plan_revision_id: planId,
+          meal_id: meal.id,
+          replacement_meal_id: replacement.id,
+        });
+        setPreview({ data, kind: "meal", replacementId: replacement.id });
+        setSelector(null);
+      } else if (selector.kind === "food" && selector.options !== null && selector.targetFoodId !== null) {
+        const replacement = selector.options.options.find((option) => option.food_id === selector.selectedId);
+        if (replacement === undefined) return;
+        const data = await actionsApi.previewReplaceFood(planId, {
+          expected_plan_revision_id: planId,
+          food_id: selector.targetFoodId,
+          meal_id: meal.id,
+          replacement_food_id: replacement.food_id,
+        });
+        setPreview({ data, foodId: selector.targetFoodId, kind: "food", replacementId: replacement.food_id });
+        setSelector(null);
+      }
+    } catch (actionError) {
+      setError(nutritionPlanErrorMessage(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function previewRemoval() {
+    if (!canEdit || meal.is_locked || busy !== null) return;
+    setBusy("options");
+    setError(null);
+    try {
+      const data = await actionsApi.previewRemoveMeal(planId, meal.id);
+      setPreview({ data, kind: "remove" });
+    } catch (actionError) {
+      setError(nutritionPlanErrorMessage(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirmPreview() {
+    if (preview === null || busy !== null) return;
+    setBusy("confirm");
+    setError(null);
+    try {
+      const next = preview.kind === "remove"
+        ? await actionsApi.confirmRemoveMeal(planId, {
+          expected_plan_revision_id: preview.data.expected_plan_revision_id,
+          meal_id: preview.data.meal_id,
+        })
+        : preview.kind === "meal"
+          ? await actionsApi.confirmReplaceMeal(planId, {
+            expected_plan_revision_id: preview.data.expected_plan_revision_id,
+            meal_id: preview.data.meal_id,
+            replacement_meal_id: preview.replacementId,
+          })
+          : await actionsApi.confirmReplaceFood(planId, {
+            expected_plan_revision_id: preview.data.expected_plan_revision_id,
+            food_id: preview.data.food_id,
+            meal_id: preview.data.meal_id,
+            replacement_food_id: preview.replacementId,
+          });
+      setPreview(null);
+      setSelector(null);
+      onPlanUpdated(next);
+    } catch (actionError) {
+      setError(nutritionPlanErrorMessage(actionError));
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <View style={styles.mealCard}>
       <View style={styles.mealHeading}>
@@ -349,8 +623,167 @@ function NutritionMealCard({ meal }: { readonly meal: WeeklyPlanMeal }) {
           ))}
         </View>
       ) : <Text style={styles.bodyText}>جزئیات این وعده هنوز در دسترس نیست.</Text>}
+      {error !== null ? <Notice message={error} variant="danger" /> : null}
+      <View style={styles.mealActions}>
+        <Button
+          disabled={!editable}
+          label={meal.is_locked ? "باز کردن قفل" : "قفل وعده"}
+          loading={busy === "lock"}
+          onPress={() => void toggleLock()}
+          variant="ghost"
+        />
+        <Button
+          disabled={!editable}
+          label={feedbackType === "liked" ? "پسندیده شد" : "پسندیدم"}
+          loading={busy === "feedback"}
+          onPress={() => void saveFeedback("liked")}
+          variant="ghost"
+        />
+        <Button
+          disabled={!editable}
+          label={feedbackType === "disliked" ? "کمتر پیشنهاد بده ✓" : "کمتر پیشنهاد بده"}
+          loading={busy === "feedback"}
+          onPress={() => void saveFeedback("disliked")}
+          variant="ghost"
+        />
+        <Button
+          disabled={!editable || meal.is_locked}
+          label="تعویض وعده"
+          loading={busy === "options" && selector?.kind === "meal"}
+          onPress={() => void openMealReplacement()}
+          variant="secondary"
+        />
+        {meal.foods.some((food) => food.food_id !== null) ? (
+          <Button
+            disabled={!editable || meal.is_locked}
+            label="تعویض ماده غذایی"
+            onPress={() => void openFoodReplacement()}
+            variant="secondary"
+          />
+        ) : null}
+        <Button
+          disabled={!editable || meal.is_locked}
+          label="حذف وعده"
+          loading={busy === "options" && selector === null}
+          onPress={() => void previewRemoval()}
+          variant="danger"
+        />
+      </View>
+      <ReplacementSheet
+        busy={busy === "options"}
+        onClose={() => setSelector(null)}
+        onFoodTarget={loadFoodReplacementOptions}
+        onSelect={(selectedId) => {
+          if (selector === null) return;
+          setSelector({ ...selector, selectedId });
+        }}
+        onSubmit={() => void previewSelectedReplacement()}
+        selector={selector}
+        meal={meal}
+      />
+      <Dialog
+        confirmLabel="تأیید تغییر"
+        destructive={preview?.kind === "remove"}
+        message={previewMessage(preview)}
+        onClose={() => setPreview(null)}
+        onConfirm={() => void confirmPreview()}
+        title="تأیید تغییر برنامه"
+        visible={preview !== null}
+      >
+        {previewRequiresReview(preview) ? <Notice message="این تغییر نیازمند بررسی دوباره پزشک است." variant="warning" /> : null}
+      </Dialog>
     </View>
   );
+}
+
+function ReplacementSheet({
+  busy,
+  meal,
+  onClose,
+  onFoodTarget,
+  onSelect,
+  onSubmit,
+  selector,
+}: {
+  readonly busy: boolean;
+  readonly meal: WeeklyPlanMeal;
+  readonly onClose: () => void;
+  readonly onFoodTarget: (foodId: string) => void;
+  readonly onSelect: (id: string) => void;
+  readonly onSubmit: () => void;
+  readonly selector: ReplacementSelector | null;
+}) {
+  const visible = selector !== null;
+  const options = selector?.options;
+  const targetFood = selector?.kind === "food" ? meal.foods.find((food) => food.food_id === selector.targetFoodId) : undefined;
+  return (
+    <Sheet onClose={onClose} title={selector?.kind === "food" ? "تعویض ماده غذایی" : "تعویض وعده"} visible={visible}>
+      {selector?.kind === "food" && selector.targetFoodId === null ? (
+        <View style={styles.optionStack}>
+          <Text style={styles.bodyText}>ابتدا ماده غذایی موردنظر را انتخاب کن.</Text>
+          {meal.foods.filter((food) => food.food_id !== null).map((food) => (
+            <Button
+              key={food.food_id}
+              label={food.name_fa || food.name_en}
+              onPress={() => onFoodTarget(food.food_id as string)}
+              variant="secondary"
+            />
+          ))}
+        </View>
+      ) : options === null ? (
+        <Skeleton height={160} />
+      ) : selector !== null && options !== undefined ? (
+        <View style={styles.optionStack}>
+          <Text style={styles.bodyText}>
+            {targetFood ? `جایگزین‌های ${targetFood.name_fa || targetFood.name_en}` : "یک جایگزین سازگار را انتخاب کن."}
+          </Text>
+          {options.options.length === 0 ? <Notice message="جایگزین سازگاری در دسترس نیست." variant="info" /> : null}
+          {options.options.map((option) => {
+            const id = "food_id" in option ? option.food_id : option.id;
+            const name = option.name_fa || option.name_en;
+            const selected = selector.selectedId === id;
+            return (
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                key={id}
+                onPress={() => onSelect(id)}
+                style={[styles.option, selected && styles.optionSelected]}
+              >
+                <Text style={[styles.optionName, selected && styles.optionNameSelected]}>{name}</Text>
+                <Text style={styles.optionMeta}>{formatNutritionPlanMoney(option.cost_irr)}</Text>
+              </Pressable>
+            );
+          })}
+          <Button disabled={busy || selector.selectedId === null} label="بررسی تغییر" loading={busy} onPress={onSubmit} />
+        </View>
+      ) : null}
+    </Sheet>
+  );
+}
+
+function previewMessage(preview: PlanEditPreview | null): string {
+  if (preview === null) return "";
+  if (preview.kind === "remove") {
+    return `حذف این وعده حدود ${formatNutritionPlanMoney(Math.abs(preview.data.weekly_cost_delta_irr))} تغییر هزینه دارد. این عملیات قابل بازگشت خودکار نیست.`;
+  }
+  const delta = preview.kind === "meal" ? preview.data.weekly_cost_delta_irr : preview.data.cost_delta_irr;
+  return `این تغییر ${delta >= 0 ? "حدود " : "حدود "}${formatNutritionPlanMoney(Math.abs(delta))} در هزینه اثر می‌گذارد. قبل از ثبت، خلاصه تغییر را بررسی کن.`;
+}
+
+function previewRequiresReview(preview: PlanEditPreview | null): boolean {
+  if (preview === null) return false;
+  return preview.data.requires_physician_review;
+}
+
+function updateMealLock(plan: WeeklyPlan, mealId: string, isLocked: boolean): WeeklyPlan {
+  return {
+    ...plan,
+    days: plan.days.map((day) => ({
+      ...day,
+      meals: day.meals.map((meal) => meal.id === mealId ? { ...meal, is_locked: isLocked } : meal),
+    })),
+  };
 }
 
 function PreparedRecipeSummary({ summary }: { readonly summary: PreparedRecipePresentation | null }) {
@@ -926,6 +1359,11 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "ltr",
   },
+  mealActions: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+  },
   mealHeading: {
     alignItems: "flex-start",
     flexDirection: "row-reverse",
@@ -979,6 +1417,42 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  option: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    padding: fiticianTokens.spacing[3],
+  },
+  optionMeta: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "left",
+    writingDirection: "rtl",
+  },
+  optionName: {
+    color: fiticianTokens.colors.ink,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  optionNameSelected: {
+    color: fiticianTokens.colors.aqua,
+  },
+  optionSelected: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  optionStack: {
+    gap: fiticianTokens.spacing[3],
   },
   pdfActions: {
     gap: fiticianTokens.spacing[2],

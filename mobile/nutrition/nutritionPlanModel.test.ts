@@ -4,6 +4,7 @@ import type { components } from "@fitician/core";
 
 import {
   classifyNutritionGenerationOutcome,
+  canEditNutritionPlan,
   formatNutritionPlanMoney,
   getNutritionPlanStatus,
   isNutritionPlanExecutable,
@@ -70,6 +71,9 @@ it("never marks historical or unapproved plans executable", () => {
   expect(isNutritionPlanExecutable(plan({ physician_approved: false }))).toBe(false);
   expect(isNutritionPlanExecutable(plan({ is_user_visible: false }))).toBe(false);
   expect(isNutritionPlanExecutable(plan({ lifecycle_status: "pending_physician_review" }))).toBe(false);
+  expect(canEditNutritionPlan(plan(), false, false)).toBe(true);
+  expect(canEditNutritionPlan(plan(), true, false)).toBe(false);
+  expect(canEditNutritionPlan(plan(), false, true)).toBe(false);
 });
 
 it("prefers the latest revision while preserving the active plan fallback", () => {
