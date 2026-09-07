@@ -11,6 +11,26 @@ import type {
 
 const profilePath = "/api/v1/profile";
 
+export type ProfilePhoto = {
+  id: string;
+  profile_photo_url: string;
+  mime_type: "image/jpeg" | "image/png" | "image/webp";
+  byte_size: number;
+  width: number;
+  height: number;
+  updated_at: string;
+};
+
+export function uploadProfilePhoto(file: File): Promise<ProfilePhoto> {
+  const body = new FormData();
+  body.append("file", file);
+  return request<ProfilePhoto>(`${profilePath}/photo`, { method: "PUT", body });
+}
+
+export function deleteProfilePhoto(): Promise<void> {
+  return request<void>(`${profilePath}/photo`, { method: "DELETE" });
+}
+
 export function getProfileStatus(): Promise<ProfileStatusResponse> {
   return request<ProfileStatusResponse>(`${profilePath}/status`);
 }

@@ -1,0 +1,131 @@
+.profile-photo-avatar {
+  --profile-photo-size: 3rem;
+  position: relative;
+  width: var(--profile-photo-size);
+  height: var(--profile-photo-size);
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--fitsho-line-strong);
+  border-radius: 50%;
+  color: var(--fitsho-canvas);
+  background:
+    radial-gradient(circle at 28% 18%, rgb(232 244 241 / 72%), transparent 20%),
+    linear-gradient(140deg, var(--fitsho-aqua), #198b82);
+  font-family: "Sora Variable", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 850;
+  object-fit: cover;
+  box-shadow: 0 0 0 3px rgb(80 223 206 / 8%), var(--fitsho-shadow-glow);
+}
+
+.profile-photo-avatar::after {
+  position: absolute;
+  inset: 0.17rem;
+  border: 1px solid rgb(232 244 241 / 38%);
+  border-radius: 50%;
+  content: "";
+  pointer-events: none;
+}
+
+.profile-photo-avatar--sm { --profile-photo-size: 2.25rem; font-size: 0.75rem; }
+.profile-photo-avatar--lg { --profile-photo-size: 5.25rem; font-size: 1.6rem; }
+
+.profile-photo-control {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--fitsho-line-strong);
+  border-radius: var(--fitsho-radius-lg);
+  background: linear-gradient(135deg, rgb(80 223 206 / 10%), var(--fitsho-surface));
+  box-shadow: var(--fitsho-shadow-card);
+}
+
+.profile-photo-control__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.profile-photo-control__identity > div { min-width: 0; display: grid; gap: 0.2rem; }
+.profile-photo-control__identity strong { color: var(--fitsho-ink); font-size: 0.92rem; }
+.profile-photo-control__identity p { margin: 0; color: var(--fitsho-muted); font-size: 0.72rem; line-height: 1.6; }
+
+.profile-photo-control__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; }
+.profile-photo-control__upload,
+.profile-photo-control__remove,
+.profile-photo-dialog__cancel,
+.profile-photo-dialog__save {
+  min-height: 2.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--fitsho-radius-pill);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform var(--fitsho-duration-fast) var(--fitsho-ease), background var(--fitsho-duration-fast) var(--fitsho-ease), border-color var(--fitsho-duration-fast) var(--fitsho-ease);
+}
+
+.profile-photo-control__upload {
+  border: 1px solid var(--fitsho-line-strong);
+  color: var(--fitsho-canvas);
+  background: var(--fitsho-aqua);
+}
+
+.profile-photo-control__upload:hover { transform: translateY(-1px); background: #78eadb; }
+.profile-photo-control__remove { border: 1px solid rgb(246 120 89 / 30%); color: #ffad98; background: rgb(246 120 89 / 8%); }
+.profile-photo-control__remove:hover { border-color: rgb(246 120 89 / 55%); background: rgb(246 120 89 / 14%); }
+.profile-photo-control__input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.profile-photo-control__input:focus-visible + .profile-photo-control__upload { outline: 3px solid var(--fitsho-amber); outline-offset: 3px; }
+.profile-photo-control__error { margin: 0; color: #ffb5a3; font-size: 0.76rem; font-weight: 750; }
+
+.profile-photo-dialog-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 6 7 / 74%);
+  backdrop-filter: blur(12px);
+}
+
+.profile-photo-dialog {
+  width: min(100%, 26rem);
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--fitsho-line-strong);
+  border-radius: var(--fitsho-radius-xl);
+  color: var(--fitsho-ink);
+  background: linear-gradient(145deg, #102622, #061413);
+  box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 48%);
+}
+
+.profile-photo-dialog header,
+.profile-photo-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; }
+.profile-photo-dialog header p { margin: 0; color: var(--fitsho-aqua); font-size: 0.68rem; font-weight: 800; }
+.profile-photo-dialog h2 { margin: 0.2rem 0 0; font-size: 1.1rem; }
+.profile-photo-dialog__close { width: 2rem; height: 2rem; border: 1px solid var(--fitsho-line); border-radius: 50%; color: var(--fitsho-muted); background: transparent; font-size: 1.2rem; cursor: pointer; }
+.profile-photo-dialog__preview { aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-lg); background: #020807; }
+.profile-photo-dialog__preview img { width: 100%; height: 100%; object-fit: cover; }
+.profile-photo-dialog__preview span { padding: 1rem; color: var(--fitsho-muted); font-size: 0.8rem; overflow-wrap: anywhere; text-align: center; }
+.profile-photo-dialog__hint { margin: 0; color: var(--fitsho-muted); font-size: 0.72rem; line-height: 1.6; }
+.profile-photo-dialog__cancel { border: 1px solid var(--fitsho-line); color: var(--fitsho-ink); background: transparent; }
+.profile-photo-dialog__save { border: 1px solid var(--fitsho-line-strong); color: var(--fitsho-canvas); background: var(--fitsho-aqua); }
+.profile-photo-dialog__save:hover, .profile-photo-dialog__cancel:hover, .profile-photo-dialog__close:hover { transform: translateY(-1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-photo-control__upload,
+  .profile-photo-control__remove,
+  .profile-photo-dialog__cancel,
+  .profile-photo-dialog__save { transition: none; }
+}
+
+@media (max-width: 420px) {
+  .profile-photo-control__actions > * { flex: 1 1 8rem; }
+}

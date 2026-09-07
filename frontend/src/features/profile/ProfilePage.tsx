@@ -13,6 +13,7 @@ import {
   ExperienceFields,
   PersonalFields,
 } from "./ProfileFormFields";
+import { ProfilePhotoAvatar, ProfilePhotoControl } from "./ProfilePhoto";
 import { useProfile } from "./ProfileContext";
 import {
   profileToFormValues,
@@ -150,7 +151,7 @@ function ReadyProfilePage({
   onNutritionComplete: () => void;
 }) {
   const { i18n, t } = useTranslation();
-  const { user } = useAuth();
+  const { user, refreshCurrentUser } = useAuth();
   const navigate = useNavigate();
   const language = i18n.resolvedLanguage === "en" ? "en" : "fa";
   const l = (fa: string, en: string) => language === "en" ? en : fa;
@@ -164,6 +165,9 @@ function ReadyProfilePage({
   const [saveError, setSaveError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [section, setSection] = useState<ProfileSection>("personal");
+  const [photoUrl, setPhotoUrl] = useState(
+    initialShared.profile_photo_url ?? initialProfile?.profile_photo_url ?? user?.profile_photo_url ?? null,
+  );
 
   useEffect(() => {
     const firstInvalidField = Object.keys(errors)[0];
@@ -271,6 +275,13 @@ function ReadyProfilePage({
     else setSection(section === "nutrition" ? "training" : "personal");
   }
 
+  function handlePhotoChanged(nextUrl: string | null) {
+    setPhotoUrl(nextUrl);
+    if (typeof refreshCurrentUser === "function") {
+      void refreshCurrentUser().catch(() => undefined);
+    }
+  }
+
   const locale = language === "en" ? "en" : "fa-IR";
   const measuredWeight = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 })
     .format(baselineShared.current_weight_kg);
@@ -291,7 +302,7 @@ function ReadyProfilePage({
 
         <section className="profile-account-summary" aria-label={l("خلاصه پروفایل", "Profile summary")}>
           <header>
-            <span aria-hidden="true">{baselineShared.display_name.slice(0, 1).toLocaleUpperCase()}</span>
+            <ProfilePhotoAvatar url={photoUrl} label={baselineShared.display_name} size="lg" />
             <div><h2>{baselineShared.display_name}</h2>{user?.email && <p>{user.email}</p>}</div>
             <a href="#profile-editor">{l("ویرایش پروفایل", "Edit profile")}</a>
           </header>
@@ -345,6 +356,13 @@ function ReadyProfilePage({
             </div>
           </dl>
         </section>
+
+        <ProfilePhotoControl
+          className="profile-page-photo-control"
+          initialUrl={photoUrl}
+          label={baselineShared.display_name}
+          onChanged={handlePhotoChanged}
+        />
 
         {section === "personal" && <>
           <aside className="measurement-card" aria-label={t("profile.measurementTitle")}>
@@ -497,6 +515,7 @@ function sharedFromProfile(profile: Profile, productMode: ProductMode): SharedPr
     current_weight_kg: profile.current_weight_kg,
     fitness_goal: profile.fitness_goal,
     weight_measured_at: profile.weight_measured_at,
+    profile_photo_url: profile.profile_photo_url,
   };
 }
 

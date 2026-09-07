@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../features/auth/AuthContext";
 import { verifyPhysicianAccess } from "../features/nutrition/api";
 import { useProfile } from "../features/profile/ProfileContext";
+import { ProfilePhotoAvatar } from "../features/profile/ProfilePhoto";
 import { verifyCoachAccess } from "../features/workoutReviews/api";
 import { LanguageSwitcher } from "../shared/LanguageSwitcher";
 import { AppIcon, type IconName } from "../shared/AppIcon";
@@ -57,9 +58,11 @@ export function MorePage() {
         </header>
 
         <section className="more-profile-card" aria-label={l("خلاصه پروفایل", "Profile summary")}>
-          <span className="more-profile-card__avatar" aria-hidden="true">
-            {accountLabel.slice(0, 1).toLocaleUpperCase()}
-          </span>
+          <ProfilePhotoAvatar
+            className="more-profile-card__avatar"
+            url={user.profile_photo_url}
+            label={accountLabel}
+          />
           <div>
             <strong>{accountLabel}</strong>
             <span>{accountContact}</span>

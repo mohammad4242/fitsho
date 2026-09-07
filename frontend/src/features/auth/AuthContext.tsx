@@ -21,6 +21,7 @@ type AuthContextValue = {
   login: (credentials: Credentials) => Promise<void>;
   loginWithPhone: (phoneNumber: string, code: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
+  refreshCurrentUser?: () => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -87,6 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginWithGoogle: async (credential) => {
         cancelStartupRequest();
         setUser(await api.loginWithGoogle(credential));
+      },
+      refreshCurrentUser: async () => {
+        setUser(await api.getCurrentUser());
       },
       logout: async () => {
         cancelStartupRequest();

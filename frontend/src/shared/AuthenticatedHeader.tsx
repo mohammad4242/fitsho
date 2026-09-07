@@ -6,6 +6,7 @@ import { useAuth } from "../features/auth/AuthContext";
 import { useOptionalProfile } from "../features/profile/ProfileContext";
 import { verifyPhysicianAccess } from "../features/nutrition/api";
 import { verifyCoachAccess } from "../features/workoutReviews/api";
+import { ProfilePhotoAvatar } from "../features/profile/ProfilePhoto";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { AppIcon } from "./AppIcon";
 import "./authenticatedHeader.css";
@@ -115,7 +116,6 @@ export function AuthenticatedHeader() {
     : primaryNavigationCandidates.slice(0, 4);
   const isFa = i18n.language.startsWith("fa");
   const mobileContext = getMobileContext(location.pathname, t, isFa);
-  const initial = (user.email?.trim().charAt(0) || t("common.brand").charAt(0)).toUpperCase();
 
   return (
     <>
@@ -129,7 +129,9 @@ export function AuthenticatedHeader() {
             ) : <span className="authenticated-header__pulse" aria-hidden="true" />}
             <span className="authenticated-header__title">{mobileContext.title}</span>
           </div>
-          <Link className="authenticated-header__account" to="/more" aria-label={t("header.accountMenu")}>{initial}</Link>
+          <Link className="authenticated-header__account" to="/more" aria-label={t("header.accountMenu")}>
+            <ProfilePhotoAvatar url={user.profile_photo_url} label={t("header.accountMenu")} size="sm" />
+          </Link>
         </div>
         <div className="authenticated-header__desktop">
           <Link className="brand-mark brand-mark--dark" to="/dashboard">
@@ -145,6 +147,7 @@ export function AuthenticatedHeader() {
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((open) => !open)}
             >
+              <ProfilePhotoAvatar url={user.profile_photo_url} label={t("header.accountMenu")} size="sm" />
               <span aria-hidden="true">☰</span>
             </button>
             {menuOpen && (

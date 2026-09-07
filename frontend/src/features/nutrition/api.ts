@@ -601,6 +601,7 @@ export type PhysicianReviewQueueItem = {
   plan_id: string;
   user_id: string;
   member_display_name: string | null;
+  member_profile_photo_url?: string | null;
   status: string;
   priority: number;
   physician_user_id: string | null;

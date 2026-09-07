@@ -131,6 +131,10 @@
 .coach-review-cases article.is-selected { border-color: #58c9b9; }
 .coach-review-cases small, .coach-review-cases span { color: #87aaa5; }
 .coach-review-cases strong { font-size: 1.05rem; }
+.coach-review-member { display: flex; align-items: center; gap: 0.55rem; min-width: 0; }
+.coach-review-member small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coach-review-case-member { display: flex; align-items: center; gap: 0.75rem; }
+.coach-review-case-member h2 { min-width: 0; }
 
 .coach-review-cases button,
 .coach-review-actions button {

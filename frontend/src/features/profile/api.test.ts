@@ -8,6 +8,8 @@ import {
   getProfileStatus,
   selectProductMode,
   saveSharedProfile,
+  deleteProfilePhoto,
+  uploadProfilePhoto,
   updateProfile,
 } from "./api";
 import type { Profile, ProfileInput } from "./types";
@@ -155,6 +157,40 @@ describe("profile api", () => {
 
     await expect(getProfile()).rejects.toEqual(
       new ApiError(503, "Service temporarily unavailable"),
+    );
+  });
+
+  it("uploads and deletes the authenticated profile photo", async () => {
+    const photo = {
+      id: "photo-1",
+      profile_photo_url: "/api/v1/profile/photo/user-1?v=1",
+      mime_type: "image/jpeg" as const,
+      byte_size: 128,
+      width: 256,
+      height: 256,
+      updated_at: "2026-09-07T12:00:00Z",
+    };
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json(photo))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const file = new File(["photo"], "avatar.jpg", { type: "image/jpeg" });
+
+    await expect(uploadProfilePhoto(file)).resolves.toEqual(photo);
+    await expect(deleteProfilePhoto()).resolves.toBeUndefined();
+
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/profile/photo",
+      expect.objectContaining({ method: "PUT", body: expect.any(FormData) }),
+    );
+    const request = vi.mocked(fetch).mock.calls[0]?.[1];
+    const body = request?.body;
+    expect(body).toBeInstanceOf(FormData);
+    if (body instanceof FormData) expect(body.get("file")).toEqual(file);
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/profile/photo",
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 });

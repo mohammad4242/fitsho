@@ -710,6 +710,8 @@ html[dir="rtl"] .profile-page-heading h1 {
 .profile-account-summary { grid-column: 1 / -1; overflow: hidden; border: 1px solid var(--fitsho-line-strong); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); }
 .profile-account-summary > header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .8rem; border-bottom: 1px solid var(--fitsho-line); }
 .profile-account-summary > header > span { width: 3rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; color: var(--fitsho-canvas); background: var(--fitsho-aqua); font: 850 1.1rem "Sora Variable", sans-serif; }
+.profile-account-summary > header > .profile-photo-avatar { --profile-photo-size: 3rem; box-shadow: none; }
+.profile-page-photo-control { grid-column: 1 / -1; }
 .profile-account-summary header div { min-width: 0; }
 .profile-account-summary h2, .profile-account-summary p { margin: 0; }
 .profile-account-summary h2 { font-size: 1rem; }

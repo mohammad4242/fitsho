@@ -35,6 +35,7 @@ export type WorkoutReviewQueueItem = {
   source_plan_id: string;
   user_id: string;
   member_display_name: string | null;
+  member_profile_photo_url?: string | null;
   fitness_goal: string | null;
   experience_level: string | null;
   status: WorkoutReviewStatus;

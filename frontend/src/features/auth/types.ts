@@ -4,6 +4,7 @@ export type User = {
   phone_number: string | null;
   created_at: string;
   is_admin: boolean;
+  profile_photo_url?: string | null;
 };
 
 export type GenericMessage = {

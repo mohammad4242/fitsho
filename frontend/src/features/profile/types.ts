@@ -101,6 +101,7 @@ export type SharedProfile = SharedProfileInput & {
   user_id: string;
   product_mode: ProductMode;
   weight_measured_at: string;
+  profile_photo_url?: string | null;
 };
 
 export type ProfileInput = {
@@ -137,6 +138,7 @@ export type Profile = ProfileInput & {
   created_at: string;
   updated_at: string;
   physical_limitations: string | null;
+  profile_photo_url?: string | null;
 };
 
 export type ProfileFormValues = {

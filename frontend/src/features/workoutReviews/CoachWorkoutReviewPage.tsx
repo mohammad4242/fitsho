@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 
 import { AuthenticatedHeader } from "../../shared/AuthenticatedHeader";
+import { ProfilePhotoAvatar } from "../profile/ProfilePhoto";
 import {
   approveWorkoutReview,
   claimWorkoutReview,
@@ -217,7 +218,14 @@ export function CoachWorkoutReviewPage() {
             <div className="coach-review-cases">
               {queue.map((item) => (
                 <article key={item.id} className={selected?.id === item.id ? "is-selected" : undefined}>
-                  <small>{item.member_display_name ?? l("کاربر فیتشو", "Fitsho member")}</small>
+                  <div className="coach-review-member">
+                    <ProfilePhotoAvatar
+                      url={item.member_profile_photo_url}
+                      label={item.member_display_name ?? l("کاربر فیتشو", "Fitsho member")}
+                      size="sm"
+                    />
+                    <small>{item.member_display_name ?? l("کاربر فیتشو", "Fitsho member")}</small>
+                  </div>
                   <strong>{humanize(item.fitness_goal, fa)}</strong>
                   <span>{humanize(item.experience_level, fa)}</span>
                   <button type="button" disabled={busy} onClick={() => void openReview(item)}>
@@ -241,7 +249,14 @@ export function CoachWorkoutReviewPage() {
                 <header className="coach-review-case-header">
                   <div>
                     <small>{l("پرونده", "Case")}</small>
-                    <h2>{selected.member_display_name ?? l("کاربر فیتشو", "Fitsho member")}</h2>
+                    <div className="coach-review-case-member">
+                      <ProfilePhotoAvatar
+                        url={selected.member_profile_photo_url}
+                        label={selected.member_display_name ?? l("کاربر فیتشو", "Fitsho member")}
+                        size="md"
+                      />
+                      <h2>{selected.member_display_name ?? l("کاربر فیتشو", "Fitsho member")}</h2>
+                    </div>
                   </div>
                   <span data-status={selected.status}>{statusTitle(selected.status, fa)}</span>
                 </header>
