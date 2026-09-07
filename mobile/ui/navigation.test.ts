@@ -73,3 +73,23 @@ it("uses native stack and tab navigators without an admin route", async () => {
   const files = await routeFiles(appRoot);
   expect(files.some((file) => file.includes("/admin/"))).toBe(false);
 });
+
+it("places route guards at group boundaries and hides capability tabs", async () => {
+  const guardedLayouts: Record<string, string> = {
+    "(auth)/_layout.tsx": 'kind="auth"',
+    "(coach)/_layout.tsx": 'kind="coach"',
+    "(member)/_layout.tsx": 'kind="member"',
+    "(onboarding)/_layout.tsx": 'kind="onboarding"',
+    "(physician)/_layout.tsx": 'kind="physician"',
+    "(public)/_layout.tsx": 'kind="public"',
+  };
+  for (const [layout, marker] of Object.entries(guardedLayouts)) {
+    await expect(readFile(resolve(appRoot, layout), "utf8")).resolves.toContain(marker);
+  }
+  await expect(
+    readFile(resolve(appRoot, "(member)/member/(tabs)/_layout.tsx"), "utf8"),
+  ).resolves.toMatch(/href: .*null/);
+  await expect(readFile(resolve(appRoot, "_layout.tsx"), "utf8")).resolves.toContain(
+    "MobileRouteStateProvider",
+  );
+});

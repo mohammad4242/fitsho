@@ -1,5 +1,11 @@
 import { Stack } from "expo-router";
 
+import { RouteGuard } from "../../ui/navigation/RouteGuards";
+
 export default function AuthLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <RouteGuard kind="auth">
+      <Stack screenOptions={{ headerShown: false }} />
+    </RouteGuard>
+  );
 }

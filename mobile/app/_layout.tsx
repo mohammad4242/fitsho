@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 
 import { createMobileQueryClient } from "../data/queryClient";
 import { connectivityMonitor } from "../platform/connectivity";
+import { MobileRouteStateProvider } from "../ui/navigation/RouteGuards";
 import "../platform/backgroundSync";
 
 const queryClient = createMobileQueryClient();
@@ -15,8 +16,10 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Stack screenOptions={{ headerShown: false }} />
-    </QueryClientProvider>
+    <MobileRouteStateProvider>
+      <QueryClientProvider client={queryClient}>
+        <Stack screenOptions={{ headerShown: false }} />
+      </QueryClientProvider>
+    </MobileRouteStateProvider>
   );
 }

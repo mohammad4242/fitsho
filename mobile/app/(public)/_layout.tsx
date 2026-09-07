@@ -1,5 +1,11 @@
 import { Stack } from "expo-router";
 
+import { RouteGuard } from "../../ui/navigation/RouteGuards";
+
 export default function PublicLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <RouteGuard kind="public">
+      <Stack screenOptions={{ headerShown: false }} />
+    </RouteGuard>
+  );
 }
