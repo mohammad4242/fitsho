@@ -6,6 +6,7 @@ import {
   BODY_PHOTO_FLOW_SCHEMA_VERSION,
   createBodyPhotoFlowDraft,
   firstMissingBodyPhotoView,
+  firstMissingBodyPhotoViewFromViews,
   parseBodyPhotoFlowDraft,
   reconcileBodyPhotoFlowDraft,
   serializeBodyPhotoFlowDraft,
@@ -38,6 +39,12 @@ it("keeps the shared three-view order and finds the first missing view", () => {
     { view: "side" },
     { view: "back" },
   ] as BodyPhotoSession["photos"]))).toBeNull();
+});
+
+it("advances local capture order without treating local files as uploaded", () => {
+  expect(firstMissingBodyPhotoViewFromViews(["front"])).toBe("side");
+  expect(firstMissingBodyPhotoViewFromViews(["back", "side"])).toBe("front");
+  expect(firstMissingBodyPhotoViewFromViews(["front", "side", "back"])).toBeNull();
 });
 
 it("creates a resumable draft without persisting photo bytes or paths", () => {

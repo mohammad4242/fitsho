@@ -30,7 +30,14 @@ export type BodyPhotoFlowDraft = {
 
 export function firstMissingBodyPhotoView(session: BodyPhotoSession): BodyPhotoView | null {
   const uploadedViews = new Set(session.photos.map((photo) => photo.view));
-  return BODY_PHOTO_VIEWS.find((view) => !uploadedViews.has(view)) ?? null;
+  return firstMissingBodyPhotoViewFromViews(uploadedViews);
+}
+
+export function firstMissingBodyPhotoViewFromViews(
+  capturedViews: Iterable<BodyPhotoView>,
+): BodyPhotoView | null {
+  const seenViews = new Set(capturedViews);
+  return BODY_PHOTO_VIEWS.find((view) => !seenViews.has(view)) ?? null;
 }
 
 export function createBodyPhotoFlowDraft(
