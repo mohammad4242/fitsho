@@ -156,6 +156,20 @@ export function nutritionMimeTypeForAsset(
   return null;
 }
 
+export function labMimeTypeForAsset(
+  mimeType: string | null | undefined,
+  uri: string,
+): NutritionLabMimeType | null {
+  if (mimeType && isSupportedMimeType(mimeType, LAB_DOCUMENT_MIME_TYPES)) {
+    return mimeType as NutritionLabMimeType;
+  }
+  const extension = uri.split(/[?#]/u)[0]?.split(".").pop()?.toLowerCase();
+  if (extension === "pdf") return "application/pdf";
+  if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
+  if (extension === "png") return "image/png";
+  return null;
+}
+
 export function createFoodPhotoUploadJob(input: FoodPhotoUploadInput): UploadJob {
   const { asset, consent, idempotencyKey, language = "fa" } = input;
   if (!consent) throw new Error("Food-photo consent is required");

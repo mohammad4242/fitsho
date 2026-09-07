@@ -8,6 +8,7 @@ import {
   LAB_DOCUMENT_MAX_PIXELS,
   createFoodPhotoUploadJob,
   createLabDocumentUploadJob,
+  labMimeTypeForAsset,
   nutritionMimeTypeForAsset,
 } from "./nutritionUpload";
 
@@ -160,6 +161,9 @@ it("infers only supported nutrition upload MIME types from picker assets", () =>
   expect(nutritionMimeTypeForAsset(undefined, "picked.JPG")).toBe("image/jpeg");
   expect(nutritionMimeTypeForAsset("image/webp", "picked.bin")).toBe("image/webp");
   expect(nutritionMimeTypeForAsset("image/gif", "picked.gif")).toBeNull();
+  expect(labMimeTypeForAsset(undefined, "report.PDF")).toBe("application/pdf");
+  expect(labMimeTypeForAsset(undefined, "report.jpg")).toBe("image/jpeg");
+  expect(labMimeTypeForAsset("image/webp", "report.webp")).toBeNull();
 });
 
 it("keeps backend pixel limits explicit for both protected upload types", () => {

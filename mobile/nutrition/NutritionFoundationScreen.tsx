@@ -38,6 +38,7 @@ import { NutritionPlanSection } from "./NutritionPlanSection";
 import { NutritionCatalogueSection } from "./NutritionCatalogueSection";
 import { NutritionTrackingSection } from "./NutritionTrackingSection";
 import { NutritionAdherenceSection } from "./NutritionAdherenceSection";
+import { NutritionClinicalSection } from "./NutritionClinicalSection";
 
 type ChoiceOption = { readonly label: string; readonly value: string };
 
@@ -139,6 +140,7 @@ export function NutritionFoundationScreen() {
       <NutritionCatalogueSection />
       <NutritionTrackingSection />
       <NutritionAdherenceSection />
+      <NutritionClinicalSection />
     </Screen>
   );
 }

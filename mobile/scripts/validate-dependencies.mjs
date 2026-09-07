@@ -23,6 +23,7 @@ const expected = {
   "expo-dev-client": { declared: "~57.0.2", version: /^57\./ },
   "expo-font": { declared: "~57.0.3", version: /^57\./ },
   "expo-file-system": { declared: "~57.0.6", version: /^57\./ },
+  "expo-document-picker": { declared: "~57.0.1", version: /^57\./ },
   "expo-linking": { declared: "~57.0.1", version: /^57\./ },
   "expo-image-picker": { declared: "~57.0.16", version: /^57\./ },
   "expo-router": { declared: "~57.0.2", version: /^57\./ },

@@ -7,6 +7,13 @@ const labStatusLabels: Readonly<Record<string, string>> = {
   uploaded: "بارگذاری‌شده",
 };
 
+const labRequestStatusLabels: Readonly<Record<string, string>> = {
+  cancelled: "لغوشده",
+  requested: "درخواست‌شده",
+  reviewed: "بررسی‌شده",
+  uploaded: "بارگذاری‌شده",
+};
+
 const supplementStatusLabels: Readonly<Record<components["schemas"]["NutritionSupplementOrderStatus"], string>> = {
   active: "فعال",
   cancelled: "لغوشده",
@@ -18,6 +25,10 @@ const supplementStatusLabels: Readonly<Record<components["schemas"]["NutritionSu
 
 export function labReviewStatusLabel(status: string): string {
   return labStatusLabels[status] ?? status;
+}
+
+export function labRequestStatusLabel(status: string): string {
+  return labRequestStatusLabels[status] ?? status;
 }
 
 export function supplementStatusLabel(
