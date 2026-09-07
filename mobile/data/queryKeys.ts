@@ -38,12 +38,16 @@ export const exerciseKeys = createResourceQueryKeys("exercises");
 
 export const workoutKeys = {
   ...createResourceQueryKeys("workouts"),
+  plans: () => ["workouts", "plans"] as const,
+  plan: (planId: string) => ["workouts", "plan", planId] as const,
   currentCycle: () => ["workouts", "current-cycle"] as const,
   cycle: (cycleId: string) => ["workouts", "cycle", cycleId] as const,
 };
 
 export const nutritionKeys = {
   ...createResourceQueryKeys("nutrition"),
+  plans: () => ["nutrition", "plans"] as const,
+  plan: (planId: string) => ["nutrition", "plan", planId] as const,
   profile: () => ["nutrition", "profile"] as const,
   estimate: () => ["nutrition", "estimate"] as const,
   tracking: (date: string) => ["nutrition", "tracking", date] as const,

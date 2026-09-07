@@ -11,6 +11,12 @@ const CACHE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS "__fitician_cache_schema" (
     schema_version INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS "__fitician_query_cache" (
+    query_hash TEXT PRIMARY KEY NOT NULL,
+    payload TEXT NOT NULL,
+    saved_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
 `;
 
 export type OpenedUserEncryptedDatabase = {
