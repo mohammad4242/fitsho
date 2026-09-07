@@ -10,6 +10,9 @@ __pycache__/
 htmlcov/
 node_modules/
 dist/
+mobile/.expo/
+mobile/android/
+mobile/ios/
 *.egg-info/
 .codex-log/
 exercise-import/raw/

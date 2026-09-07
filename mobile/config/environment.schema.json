@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fitician mobile environment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["APP_VARIANT", "EXPO_PUBLIC_API_BASE_URL", "FITICIAN_APP_LINK_HOST"],
+  "properties": {
+    "APP_VARIANT": {
+      "type": "string",
+      "enum": ["development", "preview", "production"]
+    },
+    "EXPO_PUBLIC_API_BASE_URL": {
+      "type": "string",
+      "format": "uri-reference"
+    },
+    "FITICIAN_APP_LINK_HOST": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]+)?$"
+    }
+  }
+}

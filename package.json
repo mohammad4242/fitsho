@@ -1,0 +1,19 @@
+{
+  "name": "fitician-workspace",
+  "private": true,
+  "packageManager": "npm@11.18.0",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "workspaces": [
+    "frontend",
+    "mobile",
+    "packages/fitician-core"
+  ],
+  "scripts": {
+    "build:core": "npm run build --workspace @fitician/core",
+    "typecheck:mobile": "npm run typecheck --workspace @fitician/mobile",
+    "validate:mobile": "npm run validate --workspace @fitician/mobile",
+    "test:mobile:foundation": "node --test mobile/scripts/foundation.test.mjs"
+  }
+}
