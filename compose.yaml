@@ -103,6 +103,26 @@ services:
       - -c
       - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  notification-worker:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://fitsho:fitsho@db:5432/fitsho
+      APP_ENV: local
+      NOTIFICATION_WORKER_BATCH_SIZE: ${NOTIFICATION_WORKER_BATCH_SIZE:-100}
+      NOTIFICATION_WORKER_POLL_SECONDS: ${NOTIFICATION_WORKER_POLL_SECONDS:-5}
+      NOTIFICATION_WORKER_LEASE_SECONDS: ${NOTIFICATION_WORKER_LEASE_SECONDS:-60}
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && python -m app.notifications.worker
+    restart: unless-stopped
+
 volumes:
   fitsho_postgres_data:
   fitsho_exercise_media:

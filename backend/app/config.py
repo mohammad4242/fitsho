@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     mobile_refresh_token_ttl_seconds: int = Field(
         default=30 * 24 * 60 * 60, ge=3600, le=365 * 24 * 60 * 60
     )
+    notification_worker_batch_size: int = Field(default=100, ge=1, le=500)
+    notification_worker_poll_seconds: float = Field(default=5.0, gt=0, le=60)
+    notification_worker_lease_seconds: int = Field(default=60, ge=10, le=3600)
     email_provider: Literal["fake", "smtp"] = "fake"
     smtp_host: str | None = None
     smtp_port: int = Field(default=587, ge=1, le=65535)

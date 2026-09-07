@@ -34,3 +34,21 @@ def test_notification_tables_are_migrated(db: Session) -> None:
         "cycle_reminders",
         "physician_decisions",
     }.issubset(preference_columns)
+
+    outbox_columns = {
+        column["name"] for column in inspector.get_columns("notification_outbox_events")
+    }
+    assert {
+        "user_id",
+        "event_type",
+        "category",
+        "deduplication_key",
+        "payload",
+        "status",
+        "locked_at",
+        "processed_at",
+    }.issubset(outbox_columns)
+    delivery_columns = {
+        column["name"] for column in inspector.get_columns("notification_event_deliveries")
+    }
+    assert {"event_id", "token_id", "status", "created_at"}.issubset(delivery_columns)
