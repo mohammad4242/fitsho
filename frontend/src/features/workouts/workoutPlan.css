@@ -13,6 +13,11 @@
 .workout-plan-context > span + span { border-inline-start: 1px solid var(--fitsho-line); }
 .workout-plan-context small { color: var(--fitsho-muted); font-size: .62rem; }
 .workout-plan-context strong { overflow-wrap: anywhere; font-size: .76rem; line-height: 1.35; }
+.workout-plan-context__status { display: inline-flex; align-items: center; justify-content: center; gap: .2rem; }
+.workout-plan-context__status-icon { width: .8rem; height: .8rem; flex: 0 0 auto; }
+.workout-plan-context__status--active { color: var(--fitsho-aqua); }
+.workout-plan-context__status--pending { color: var(--fitsho-amber); }
+.workout-plan-context__status--inactive { color: var(--fitsho-muted); }
 .workout-status, .workout-empty { margin: .8rem 0; padding: 1.25rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); text-align: center; }
 .workout-empty h2 { margin: 0; font-size: 1.45rem; }
 .workout-status p, .workout-empty p { color: var(--fitsho-muted); line-height: 1.6; }

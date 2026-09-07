@@ -450,7 +450,7 @@ it("shows plan context without cinematic background media", async () => {
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByRole("region", { name: "خلاصه برنامه فعال" })).toBeInTheDocument();
+  expect(await screen.findByRole("region", { name: "خلاصه برنامه" })).toBeInTheDocument();
   expect(screen.getByText("۱ روز تمرین")).toBeInTheDocument();
   expect(screen.getByText("۴۵ دقیقه برای هر جلسه")).toBeInTheDocument();
   expect(screen.getByRole("list", { name: "روزهای تمرین تو" })).toBeInTheDocument();
@@ -458,6 +458,98 @@ it("shows plan context without cinematic background media", async () => {
   const schedule = screen.getByRole("list", { name: "روزهای تمرین تو" });
   const guidance = screen.getByText("قبل از شروع");
   expect(schedule.compareDocumentPosition(guidance) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("shows the rounded average duration for every session instead of a range", async () => {
+  const averagePlan: WorkoutPlan = {
+    ...plan,
+    days: [
+      { ...plan.days[0]!, day_number: 1, estimated_duration_minutes: 44 },
+      { ...plan.days[0]!, day_number: 2, estimated_duration_minutes: 45 },
+    ],
+  };
+  api.getActiveWorkoutPlan.mockResolvedValue(averagePlan);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("۴۵ دقیقه برای هر جلسه")).toBeInTheDocument();
+  expect(screen.queryByText("۴۴ تا ۴۵ دقیقه")).not.toBeInTheDocument();
+});
+
+it("shows the active compact plan status", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const status = await screen.findByText("فعال");
+  expect(status.closest("strong")).toHaveClass("workout-plan-context__status--active");
+});
+
+it("shows pending when coach approval is still pending", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({
+    ...plan,
+    coach_review: {
+      state: "pending_coach_review",
+      coach_display_name: null,
+      coach_note: null,
+      approved_at: null,
+    },
+  });
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const status = await screen.findByText("در انتظار مربی");
+  expect(status.closest("strong")).toHaveClass("workout-plan-context__status--pending");
+});
+
+it("shows inactive when an archived version is selected", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.getWorkoutPlanHistory.mockResolvedValue([
+    {
+      id: plan.id,
+      status: "active",
+      created_at: plan.created_at,
+      activated_at: plan.activated_at,
+      is_active: true,
+      coach_review: {
+        state: "coach_approved",
+        coach_display_name: "مربی سارا",
+        coach_note: null,
+        approved_at: plan.activated_at,
+      },
+    },
+    {
+      ...pendingVersion,
+      id: "018f0000-0000-7000-8000-000000000098",
+      status: "superseded",
+      is_active: false,
+      coach_review: {
+        state: "initial_generated",
+        coach_display_name: null,
+        coach_note: null,
+        approved_at: null,
+      },
+    },
+  ]);
+  api.getWorkoutPlan.mockResolvedValue({ ...plan, id: "018f0000-0000-7000-8000-000000000098", status: "superseded" });
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: /نسخه اولیه/ }));
+  const status = await screen.findByText("غیرفعال");
+  expect(status.closest("strong")).toHaveClass("workout-plan-context__status--inactive");
+});
+
+it("shows pending status and summary data for a pending-only plan", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(null);
+  api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion]);
+  api.getWorkoutPlan.mockResolvedValue(pendingPlan);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("در انتظار مربی")).toBeInTheDocument();
+  expect(screen.getByText("۴۵ دقیقه برای هر جلسه")).toBeInTheDocument();
 });
 
 it("explains the generation cooldown instead of showing a generic failure", async () => {

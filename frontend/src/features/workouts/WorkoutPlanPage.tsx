@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../../shared/apiClient";
-import { AppIcon } from "../../shared/AppIcon";
+import { AppIcon, type IconName } from "../../shared/AppIcon";
 import { getProfile, updateProfile } from "../profile/api";
 import type { WorkoutGenerationMethod } from "../profile/types";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
@@ -28,6 +28,7 @@ import type {
 import "./workoutPlan.css";
 
 type PlanState = "loading" | "empty" | "ready" | "error";
+type WorkoutPlanSummaryStatus = "active" | "pending" | "inactive";
 type GenerationError =
   | "cooldown"
   | "failed"
@@ -42,6 +43,24 @@ const bodyweightGenerationErrors: Record<string, GenerationError> = {
   BODYWEIGHT_PULL_UP_BAR_REQUIRED: "bodyweight_pull_up_bar",
   BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE: "bodyweight_exercise",
 };
+
+const workoutPlanStatusIcons: Record<WorkoutPlanSummaryStatus, IconName> = {
+  active: "zap",
+  pending: "clock",
+  inactive: "lock",
+};
+
+const workoutPlanStatusLabels: Record<WorkoutPlanSummaryStatus, string> = {
+  active: "workoutPlan.active",
+  pending: "workoutPlan.pendingCoach",
+  inactive: "workoutPlan.inactive",
+};
+
+function getWorkoutPlanSummaryStatus(plan: WorkoutPlan, historical: boolean): WorkoutPlanSummaryStatus {
+  if (historical) return "inactive";
+  if (plan.status === "pending_review" || plan.coach_review?.state === "pending_coach_review") return "pending";
+  return plan.status === "active" ? "active" : "inactive";
+}
 
 function generationErrorMessageKey(error: GenerationError): string {
   if (error === "cooldown") return "workoutPlan.generateCooldown";
@@ -84,12 +103,15 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const l = (fa: string, en: string) => isEnglish ? en : fa;
   const displayedPlanDuration = plan?.plan_duration_weeks ?? planDurationWeeks;
   const isViewingHistorical = plan !== null && activePlanId !== null && plan.id !== activePlanId;
+  const summaryPlan = plan ?? pendingPlan;
+  const summaryStatus = summaryPlan === null ? null : getWorkoutPlanSummaryStatus(summaryPlan, isViewingHistorical);
   const hasPendingReview = history.some((version) => version.status === "pending_review");
   const memberHistory = history.filter((version) => version.status !== "pending_review");
   const number = new Intl.NumberFormat(isEnglish ? "en-US" : "fa-IR");
-  const sessionDurations = plan?.days.map((day) => day.estimated_duration_minutes) ?? [];
-  const shortestSession = sessionDurations.length > 0 ? Math.min(...sessionDurations) : null;
-  const longestSession = sessionDurations.length > 0 ? Math.max(...sessionDurations) : null;
+  const sessionDurations = summaryPlan?.days.map((day) => day.estimated_duration_minutes) ?? [];
+  const averageSession = sessionDurations.length > 0
+    ? Math.round(sessionDurations.reduce((total, duration) => total + duration, 0) / sessionDurations.length)
+    : null;
 
   useEffect(() => {
     let active = true;
@@ -199,16 +221,20 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
           </div>
         </header>
 
-        {plan !== null && shortestSession !== null && longestSession !== null && (
+        {summaryPlan !== null && summaryStatus !== null && averageSession !== null && (
           <section className="workout-plan-context" aria-label={t("workoutPlan.contextLabel")}>
-            <span><small>{t("workoutPlan.currentPlan")}</small><strong>{t("workoutPlan.active")}</strong></span>
-            <span><small>{t("workoutPlan.cycle")}</small><strong>{t("workoutPlan.duration", { count: number.format(displayedPlanDuration) })}</strong></span>
-            <span><small>{t("workoutPlan.trainingDays")}</small><strong>{t("workoutPlan.daysCount", { count: number.format(plan.days.length) })}</strong></span>
+            <span>
+              <small>{t("workoutPlan.currentPlan")}</small>
+              <strong className={`workout-plan-context__status workout-plan-context__status--${summaryStatus}`}>
+                <AppIcon name={workoutPlanStatusIcons[summaryStatus]} className="workout-plan-context__status-icon" />
+                {t(workoutPlanStatusLabels[summaryStatus])}
+              </strong>
+            </span>
+            <span><small>{t("workoutPlan.cycle")}</small><strong>{t("workoutPlan.duration", { count: number.format(summaryPlan.plan_duration_weeks) })}</strong></span>
+            <span><small>{t("workoutPlan.trainingDays")}</small><strong>{t("workoutPlan.daysCount", { count: number.format(summaryPlan.days.length) })}</strong></span>
             <span>
               <small>{t("workoutPlan.sessionDuration")}</small>
-              <strong>{shortestSession === longestSession
-                ? t("workoutPlan.perSession", { count: number.format(shortestSession) })
-                : t("workoutPlan.sessionRange", { min: number.format(shortestSession), max: number.format(longestSession) })}</strong>
+              <strong>{t("workoutPlan.perSession", { count: number.format(averageSession) })}</strong>
             </span>
           </section>
         )}
