@@ -20,6 +20,7 @@ from app.notifications.models import (
     NotificationPreference,
 )
 from app.notifications.outbox import enqueue_notification_event
+from app.notifications.recipients import enqueue_specialist_notification
 from app.notifications.reminders import (
     CycleReminderCandidate,
     due_cycle_reminders,
@@ -46,6 +47,49 @@ def test_notification_copy_is_static_and_rejects_sensitive_payload_keys() -> Non
             "body_analysis_completed",
             data={"notes": "private medical note"},
         )
+
+    with pytest.raises(NotificationContentError):
+        build_notification_payload(
+            "body_analysis_review_required",
+            data={"analysis_id": uuid4(), "recipient_role": "admin"},
+        )
+
+
+def test_body_analysis_review_notifications_preserve_the_authorized_specialist_role(
+    db: Session,
+) -> None:
+    coach = User(email=f"role-coach-{uuid4()}@example.com", password_hash="test-hash")
+    doctor = User(email=f"role-doctor-{uuid4()}@example.com", password_hash="test-hash")
+    db.add_all([coach, doctor])
+    db.flush()
+    db.add_all(
+        [
+            UserSpecialistRole(user_id=coach.id, role=SpecialistRole.COACH),
+            UserSpecialistRole(user_id=doctor.id, role=SpecialistRole.DOCTOR),
+        ]
+    )
+
+    enqueue_specialist_notification(
+        db,
+        roles=(SpecialistRole.COACH, SpecialistRole.DOCTOR),
+        event_type="body_analysis_review_required",
+        deduplication_key="body-analysis:role-routing",
+        data={"analysis_id": uuid4()},
+    )
+    db.commit()
+
+    events = db.scalars(
+        select(NotificationOutboxEvent).where(
+            NotificationOutboxEvent.event_type == "body_analysis_review_required"
+        )
+    ).all()
+    assert {
+        event.user_id: event.payload["data"]["recipient_role"]
+        for event in events
+    } == {
+        coach.id: "coach",
+        doctor.id: "doctor",
+    }
 
 
 def test_cycle_reminders_are_due_only_once_per_missing_action() -> None:

@@ -1,5 +1,8 @@
-import { normalizeMemberDeepLinkPath } from "../ui/navigation/deepLinks";
+import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
+import { normalizeNativeDeepLinkPath } from "../ui/navigation/deepLinks";
 
 export async function redirectSystemPath(intent: { path: string; initial: boolean }): Promise<string> {
-  return normalizeMemberDeepLinkPath(intent.path);
+  return normalizeNativeDeepLinkPath(intent.path, {
+    appLinkHost: getMobileRuntimeConfig().appLinkHost,
+  });
 }

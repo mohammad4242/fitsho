@@ -46,7 +46,7 @@ _COPY: dict[str, NotificationCopy] = {
         title="بررسی جدید",
         body="یک مورد برای بررسی تخصصی آماده است.",
         channel_id="fitician-health",
-        allowed_data_keys=frozenset({"analysis_id"}),
+        allowed_data_keys=frozenset({"analysis_id", "recipient_role"}),
     ),
     "body_analysis_completed": NotificationCopy(
         title="به‌روزرسانی فیتیچیان",
@@ -121,6 +121,8 @@ def build_notification_payload(
     for key, value in (data or {}).items():
         if key not in copy.allowed_data_keys:
             raise NotificationContentError(f"Unsupported notification data key: {key}")
+        if key == "recipient_role" and value not in {"coach", "doctor", "physician"}:
+            raise NotificationContentError(f"Unsupported notification recipient role: {value}")
         if isinstance(value, UUID):
             safe_data[key] = str(value)
         elif isinstance(value, (str, int, bool)):

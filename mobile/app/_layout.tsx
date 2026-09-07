@@ -14,6 +14,7 @@ import {
 import { createNotificationApi } from "../notifications/notificationApi";
 import { registerAndroidNotifications } from "../notifications/notificationRegistration";
 import { configureNotificationRuntime } from "../notifications/notificationRuntime";
+import { NotificationRoutingBootstrap } from "../notifications/NotificationRoutingBootstrap";
 import { MobileRouteStateProviderFromAuth } from "../ui/navigation/RouteGuards";
 import { AndroidBackBehaviorProvider } from "../ui/navigation/BackBehaviorProvider";
 import { configureFiticianRtl } from "../ui/rtl";
@@ -53,6 +54,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <MobileAuthProvider>
         <NotificationPermissionBootstrap />
+        <NotificationRoutingBootstrap />
         <MobileRouteStateProviderFromAuth>
           <AndroidBackBehaviorProvider>
             <QueryClientProvider client={queryClient}>

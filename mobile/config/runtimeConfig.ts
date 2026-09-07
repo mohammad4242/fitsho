@@ -1,16 +1,21 @@
+export const DEFAULT_APP_LINK_HOST = "app.fitician.example";
+
 export interface MobileRuntimeConfig {
+  readonly appLinkHost: string;
   readonly apiBaseUrl: string;
   readonly frontendOrigin: string;
   readonly googleAndroidClientId: string | null;
 }
 
 export interface MobileRuntimeExtra {
+  readonly appLinkHost?: unknown;
   readonly apiBaseUrl?: unknown;
   readonly frontendOrigin?: unknown;
   readonly googleAndroidClientId?: unknown;
 }
 
 const DEFAULT_RUNTIME_CONFIG: MobileRuntimeConfig = {
+  appLinkHost: DEFAULT_APP_LINK_HOST,
   apiBaseUrl: "http://10.0.2.2:8001",
   frontendOrigin: "http://localhost:5173",
   googleAndroidClientId: null,
@@ -31,10 +36,12 @@ function withoutTrailingSlash(value: string): string {
 export function mobileRuntimeConfigFromExtra(
   extra: MobileRuntimeExtra | null | undefined,
 ): MobileRuntimeConfig {
+  const appLinkHost = trimmedString(extra?.appLinkHost);
   const apiBaseUrl = trimmedString(extra?.apiBaseUrl);
   const frontendOrigin = trimmedString(extra?.frontendOrigin);
   const googleAndroidClientId = trimmedString(extra?.googleAndroidClientId);
   return {
+    appLinkHost: appLinkHost ?? DEFAULT_RUNTIME_CONFIG.appLinkHost,
     apiBaseUrl: withoutTrailingSlash(apiBaseUrl ?? DEFAULT_RUNTIME_CONFIG.apiBaseUrl),
     frontendOrigin: withoutTrailingSlash(frontendOrigin ?? DEFAULT_RUNTIME_CONFIG.frontendOrigin),
     googleAndroidClientId,

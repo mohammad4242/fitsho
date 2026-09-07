@@ -1,35 +1,81 @@
+import { DEFAULT_APP_LINK_HOST } from "../../config/runtimeConfig";
+
 const deepLinkBase = "fitician://app";
+const nativeLinkHosts = new Set(["app", "auth", "link", "member"]);
 
 type MemberDeepLinkResource = "cycles" | "exercises" | "plans";
 
 export function normalizeMemberDeepLinkPath(path: string): string {
-  let parsed: URL;
-  try {
-    parsed = new URL(path, deepLinkBase);
-  } catch {
-    return path;
+  const parsed = parseDeepLink(path);
+  if (parsed === null) return path;
+  return normalizeMemberSegments(routeSegments(parsed)) ?? path;
+}
+
+export interface NativeDeepLinkOptions {
+  readonly appLinkHost?: string;
+}
+
+export function normalizeNativeDeepLinkPath(
+  path: string,
+  options: NativeDeepLinkOptions = {},
+): string {
+  const parsed = parseDeepLink(path);
+  if (parsed === null || !isAllowedNativeLink(parsed, options.appLinkHost ?? DEFAULT_APP_LINK_HOST)) {
+    return "/";
   }
 
+  const segments = routeSegments(parsed);
+  const memberPath = normalizeMemberSegments(segments);
+  if (memberPath !== null) return memberPath;
+
+  const authSegments = segments[0] === "auth" ? segments : ["auth", ...segments];
+  if (authSegments.length !== 2) return "/";
+  const authRoute = authSegments[1];
+  if (authRoute !== "reset-password" && authRoute !== "verify-email") return "/";
+  const tokens = parsed.searchParams.getAll("token");
+  const token = tokens.length === 1 ? tokens[0]?.trim() : undefined;
+  if (token === undefined || token.length === 0 || token.length > 512) return "/";
+  return `/auth/${authRoute}?token=${encodeURIComponent(token)}`;
+}
+
+function parseDeepLink(path: string): URL | null {
+  try {
+    return new URL(path, deepLinkBase);
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedNativeLink(parsed: URL, appLinkHost: string): boolean {
+  if (parsed.protocol === "https:") {
+    const host = appLinkHost.trim().toLowerCase();
+    return parsed.hostname === host
+      && (parsed.pathname === "/link" || parsed.pathname.startsWith("/link/"));
+  }
+  return parsed.protocol === "fitician:" && nativeLinkHosts.has(parsed.hostname);
+}
+
+function routeSegments(parsed: URL): string[] {
   const segments = parsed.pathname
     .split("/")
     .filter((segment) => segment.length > 0)
     .map((segment) => decodeSegment(segment));
-  const routeSegments = parsed.hostname === "member"
-    ? ["member", ...segments]
+  const routeSegments = parsed.hostname === "member" || parsed.hostname === "auth"
+    ? [parsed.hostname, ...segments]
     : segments;
-  const normalizedSegments = routeSegments[0] === "link"
-    ? routeSegments.slice(1)
-    : routeSegments;
+  return routeSegments[0] === "link" ? routeSegments.slice(1) : routeSegments;
+}
 
-  if (normalizedSegments[0] !== "member") return path;
-  const resource = normalizedSegments[1] as MemberDeepLinkResource | undefined;
-  const identifier = normalizedSegments[2];
+function normalizeMemberSegments(segments: readonly string[]): string | null {
+  if (segments[0] !== "member") return null;
+  const resource = segments[1] as MemberDeepLinkResource | undefined;
+  const identifier = segments[2];
   if (
     identifier === undefined
-    || normalizedSegments.length !== 3
+    || segments.length !== 3
     || (resource !== "cycles" && resource !== "exercises" && resource !== "plans")
   ) {
-    return path;
+    return null;
   }
 
   const encodedIdentifier = encodeURIComponent(identifier);
