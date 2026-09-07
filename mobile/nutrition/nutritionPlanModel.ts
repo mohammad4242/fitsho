@@ -1,6 +1,6 @@
 import { irrToRoundedToman } from "@fitician/core";
 
-import type { WeeklyPlan } from "./nutritionPlanApi";
+import type { WeeklyPlan, WeeklyPlanFood } from "./nutritionPlanApi";
 
 export type NutritionPlanSelection = {
   readonly isLatest: boolean;
@@ -24,6 +24,20 @@ export type NutritionGenerationStatus =
   | "price_unavailable"
   | "safety_blocked"
   | "success";
+
+export type PreparedRecipePresentation = {
+  readonly costIrrPer100g: number | null;
+  readonly nutrients: readonly { readonly code: string; readonly value: number }[];
+  readonly status: "estimated" | "verified";
+};
+
+const publicPreparedRecipeNutrients = [
+  "energy_kcal",
+  "protein_g",
+  "carbohydrate_g",
+  "total_fat_g",
+  "fibre_g",
+] as const;
 
 export function getNutritionPlanStatus(
   plan: WeeklyPlan,
@@ -65,6 +79,21 @@ export function selectNutritionPlan(
 ): NutritionPlanSelection {
   if (latest !== null) return { isLatest: true, plan: latest };
   return { isLatest: false, plan: active };
+}
+
+export function preparedRecipePresentation(food: WeeklyPlanFood): PreparedRecipePresentation | null {
+  if (food.item_kind !== "prepared_recipe") return null;
+  const summary = food.prepared_recipe;
+  return {
+    costIrrPer100g: summary?.cost_irr_per_100g ?? null,
+    nutrients: summary === undefined || summary === null
+      ? []
+      : publicPreparedRecipeNutrients.flatMap((code) => {
+        const value = summary.nutrients_per_100g[code];
+        return value === undefined ? [] : [{ code, value }];
+      }),
+    status: summary?.status ?? "estimated",
+  };
 }
 
 export function classifyNutritionGenerationOutcome(outcome: string): NutritionGenerationStatus {

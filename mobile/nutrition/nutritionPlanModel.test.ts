@@ -7,6 +7,7 @@ import {
   formatNutritionPlanMoney,
   getNutritionPlanStatus,
   isNutritionPlanExecutable,
+  preparedRecipePresentation,
   selectNutritionPlan,
   nutritionPlanPdfFilename,
 } from "./nutritionPlanModel";
@@ -92,4 +93,50 @@ it("classifies backend generation outcomes and keeps money display rounding loca
   expect(classifyNutritionGenerationOutcome("unknown_backend_value")).toBe("failed");
   expect(formatNutritionPlanMoney(1_234_567)).toBe("۱۲۰٬۰۰۰ تومان");
   expect(nutritionPlanPdfFilename("plan/id")).toBe("fitician-nutrition-plan-plan-id.pdf");
+});
+
+it("shows only public prepared-recipe nutrients and marks missing summaries estimated", () => {
+  expect(preparedRecipePresentation({
+    cost_irr: 120_000,
+    food_id: null,
+    grams: 250,
+    item_kind: "prepared_recipe",
+    name_en: "Prepared meal",
+    name_fa: "غذای آماده",
+    nutrients: { private_snapshot_value: 99 },
+    slug: "prepared-meal",
+  })).toEqual({
+    costIrrPer100g: null,
+    nutrients: [],
+    status: "estimated",
+  });
+
+  expect(preparedRecipePresentation({
+    cost_irr: 120_000,
+    food_id: null,
+    grams: 250,
+    item_kind: "prepared_recipe",
+    name_en: "Prepared meal",
+    name_fa: "غذای آماده",
+    nutrients: {},
+    prepared_recipe: {
+      cost_irr_per_100g: 345_678,
+      nutrients_per_100g: {
+        carbohydrate_g: 20.5,
+        energy_kcal: 180,
+        private_snapshot_value: 99,
+        protein_g: 12,
+      },
+      status: "verified",
+    },
+    slug: "prepared-meal",
+  })).toEqual({
+    costIrrPer100g: 345_678,
+    nutrients: [
+      { code: "energy_kcal", value: 180 },
+      { code: "protein_g", value: 12 },
+      { code: "carbohydrate_g", value: 20.5 },
+    ],
+    status: "verified",
+  });
 });

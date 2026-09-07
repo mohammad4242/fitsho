@@ -26,7 +26,9 @@ import {
   formatNutritionPlanMoney,
   getNutritionPlanStatus,
   isNutritionPlanExecutable,
+  preparedRecipePresentation,
   selectNutritionPlan,
+  type PreparedRecipePresentation,
 } from "./nutritionPlanModel";
 import {
   ExpoNutritionPlanPdfStore,
@@ -337,13 +339,44 @@ function NutritionMealCard({ meal }: { readonly meal: WeeklyPlanMeal }) {
       {meal.foods.length > 0 ? (
         <View style={styles.foodStack}>
           {meal.foods.map((food) => (
-            <View key={`${food.slug}-${food.food_id ?? food.item_kind}`} style={styles.foodRow}>
-              <Text style={styles.foodAmount}>{formatNutritionNumber(food.grams)} گرم</Text>
-              <Text style={styles.foodName}>{food.name_fa || food.name_en}</Text>
+            <View key={`${food.slug}-${food.food_id ?? food.item_kind}`}>
+              <View style={styles.foodRow}>
+                <Text style={styles.foodAmount}>{formatNutritionNumber(food.grams)} گرم</Text>
+                <Text style={styles.foodName}>{food.name_fa || food.name_en}</Text>
+              </View>
+              <PreparedRecipeSummary summary={preparedRecipePresentation(food)} />
             </View>
           ))}
         </View>
       ) : <Text style={styles.bodyText}>جزئیات این وعده هنوز در دسترس نیست.</Text>}
+    </View>
+  );
+}
+
+function PreparedRecipeSummary({ summary }: { readonly summary: PreparedRecipePresentation | null }) {
+  if (summary === null) return null;
+  return (
+    <View style={styles.preparedRecipeCard}>
+      <View style={styles.preparedRecipeHeading}>
+        <Text style={styles.preparedRecipeTitle}>خلاصه دستور آماده</Text>
+        <Text style={[styles.preparedRecipeStatus, summary.status === "estimated" && styles.preparedRecipeEstimated]}>
+          {summary.status === "estimated" ? "تخمینی" : "تأیید شده"}
+        </Text>
+      </View>
+      {summary.nutrients.length > 0 ? (
+        <View style={styles.preparedRecipeNutrients}>
+          {summary.nutrients.map((nutrient) => (
+            <Text key={nutrient.code} style={styles.preparedRecipeNutrient}>
+              {nutritionLabel(nutrient.code)}: {formatNutritionNumber(nutrient.value)}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+      {summary.costIrrPer100g !== null ? (
+        <Text style={styles.preparedRecipeCost}>
+          {formatNutritionPlanMoney(summary.costIrrPer100g)} در ۱۰۰ گرم
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -1036,6 +1069,59 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  preparedRecipeCard: {
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[2],
+    marginTop: fiticianTokens.spacing[2],
+    padding: fiticianTokens.spacing[3],
+  },
+  preparedRecipeCost: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  preparedRecipeEstimated: {
+    color: fiticianTokens.colors.amber,
+  },
+  preparedRecipeHeading: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+  },
+  preparedRecipeNutrient: {
+    color: fiticianTokens.colors.muted,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  preparedRecipeNutrients: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+  },
+  preparedRecipeStatus: {
+    color: fiticianTokens.colors.success,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  preparedRecipeTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
