@@ -882,7 +882,7 @@ class FoodReplacementOptionsResponse(BaseModel):
 
 
 JsonScalar = str | int | float | bool | None
-type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
+type JsonObject = dict[str, JsonScalar]
 
 
 class ShoppingListItemResponse(BaseModel):
@@ -1142,19 +1142,19 @@ class NutritionSupplementCatalogueResponse(BaseModel):
     verification_status: Literal["draft", "verified", "retired"]
     source_name: str
     source_reference: str
-    active_ingredients: list[dict[str, JsonValue]]
-    nutrient_contribution_per_unit: dict[str, JsonValue]
+    active_ingredients: list[JsonObject]
+    nutrient_contribution_per_unit: dict[str, JsonObject]
     contraindication_codes: list[str]
     allergen_codes: list[str]
     interaction_codes: list[str]
-    upper_bound_rules: list[dict[str, JsonValue]]
+    upper_bound_rules: list[JsonObject]
 
 
 class NutritionSupplementExposureResponse(BaseModel):
     food_contribution: dict[str, str]
     supplement_contribution: dict[str, str]
     combined_exposure: dict[str, str]
-    hard_blocks: list[JsonValue]
+    hard_blocks: list[JsonObject]
 
 
 class NutritionSupplementOrderResponse(BaseModel):
@@ -1174,7 +1174,7 @@ class NutritionSupplementOrderResponse(BaseModel):
     status: NutritionSupplementOrderStatus
     linked_gap_codes: list[str]
     linked_lab_document_ids: list[UUID]
-    food_nutrient_contribution: dict[str, JsonValue]
+    food_nutrient_contribution: dict[str, JsonScalar]
     supplement_nutrient_contribution: dict[str, str]
     combined_exposure_safety: NutritionSupplementExposureResponse
     acknowledged_at: datetime | None

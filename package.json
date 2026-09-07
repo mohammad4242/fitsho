@@ -12,8 +12,14 @@
   ],
   "scripts": {
     "build:core": "npm run build --workspace @fitician/core",
+    "check:openapi": "node scripts/generate-openapi.mjs --check",
+    "generate:openapi": "node scripts/generate-openapi.mjs",
+    "test:contracts": "node --test scripts/openapi_generation.test.mjs",
     "typecheck:mobile": "npm run typecheck --workspace @fitician/mobile",
     "validate:mobile": "npm run validate --workspace @fitician/mobile",
     "test:mobile:foundation": "node --test mobile/scripts/*.test.mjs"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
   }
 }
