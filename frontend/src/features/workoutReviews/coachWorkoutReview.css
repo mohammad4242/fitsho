@@ -395,6 +395,12 @@
   background: #7de0d2;
 }
 
+.coach-review-actions button.is-reject {
+  border-color: rgb(239 141 119 / 42%);
+  color: #ffd9d0;
+  background: rgb(119 43 32 / 34%);
+}
+
 .coach-review-actions button:disabled,
 .coach-review-cases button:disabled { cursor: wait; opacity: 0.55; }
 

@@ -314,6 +314,12 @@ def _coach_review_response(
             coach_display_name=_coach_display_name(db, source.claimed_by_user_id),
             approved_at=source.approved_at,
         )
+    if source.status is WorkoutReviewStatus.REJECTED:
+        return WorkoutPlanCoachReviewResponse(
+            state="coach_rejected",
+            coach_display_name=_coach_display_name(db, source.claimed_by_user_id),
+            coach_note=source.coach_note,
+        )
     return WorkoutPlanCoachReviewResponse(state="none")
 
 

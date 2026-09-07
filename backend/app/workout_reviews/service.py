@@ -179,6 +179,25 @@ class WorkoutReviewService:
         self._db.commit()
         return approved
 
+    def reject(
+        self,
+        review_id: UUID,
+        coach_id: UUID,
+        *,
+        expected_revision: int,
+        explanation: str,
+    ) -> WorkoutPlanReview:
+        review = self._required_review(review_id)
+        self._require_lease(review, coach_id)
+        self._require_revision(review, expected_revision)
+        normalized_explanation = explanation.strip()
+        if not normalized_explanation:
+            raise ReviewConflict(WorkoutReviewErrorCode.REVIEW_EXPLANATION_REQUIRED)
+        review.coach_note = normalized_explanation
+        review.status = WorkoutReviewStatus.REJECTED
+        self._db.commit()
+        return review
+
     def _required_review(self, review_id: UUID) -> WorkoutPlanReview:
         review = get_review_for_update(self._db, review_id)
         if review is None:
@@ -189,6 +208,8 @@ class WorkoutReviewService:
     def _require_open(review: WorkoutPlanReview) -> None:
         if review.status is WorkoutReviewStatus.APPROVED:
             raise ReviewConflict(WorkoutReviewErrorCode.REVIEW_ALREADY_APPROVED)
+        if review.status is WorkoutReviewStatus.REJECTED:
+            raise ReviewConflict(WorkoutReviewErrorCode.REVIEW_ALREADY_REJECTED)
         if review.status is WorkoutReviewStatus.SUPERSEDED:
             raise ReviewConflict(WorkoutReviewErrorCode.REVIEW_SUPERSEDED)
 

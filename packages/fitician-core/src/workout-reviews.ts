@@ -1,7 +1,7 @@
 import type { PrescriptionMode } from "./exercises.js";
 import type { WorkoutPlan } from "./workouts.js";
 
-export type WorkoutReviewStatus = "pending" | "claimed" | "approved" | "superseded";
+export type WorkoutReviewStatus = "pending" | "claimed" | "approved" | "rejected" | "superseded";
 export type WorkoutReviewQueueView = "pending" | "mine" | "approved";
 
 export type WorkoutReviewExerciseDraft = {

@@ -9,6 +9,7 @@ import {
   claimWorkoutReview,
   getWorkoutReview,
   listWorkoutReviews,
+  rejectWorkoutReview,
   renewWorkoutReview,
   saveWorkoutReviewDraft,
 } from "./api";
@@ -37,7 +38,7 @@ export function CoachWorkoutReviewPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const readOnly = selected?.status === "approved";
+  const readOnly = selected?.status === "approved" || selected?.status === "rejected";
 
   const loadQueue = useCallback(async (nextView: WorkoutReviewQueueView) => {
     setLoading(true);
@@ -161,6 +162,28 @@ export function CoachWorkoutReviewPage() {
       await loadQueue("approved");
     } catch {
       setError(l("تأیید انجام نشد؛ خطاهای برنامه یا زمان بازبینی را بررسی کن.", "Approval failed. Check the plan errors or review lease."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reject() {
+    if (!selected) return;
+    const explanation = coachNote.trim();
+    if (!explanation) {
+      setError(l("برای برگشت برنامه، دلیل اصلاح را بنویس.", "Add an explanation before returning the plan."));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await rejectWorkoutReview(selected.id, selected.draft_revision, explanation);
+      setSelected(null);
+      setDraft([]);
+      setView("mine");
+      await loadQueue("mine");
+    } catch {
+      setError(l("برگشت انجام نشد؛ نسخه یا زمان بازبینی تغییر کرده است.", "Return failed. The revision or review lease changed."));
     } finally {
       setBusy(false);
     }
@@ -341,6 +364,7 @@ export function CoachWorkoutReviewPage() {
                 {!readOnly && (
                   <footer className="coach-review-actions">
                     <button type="button" disabled={busy} onClick={() => void saveDraft()}>{l("ذخیره پیش‌نویس", "Save draft")}</button>
+                    <button className="is-reject" type="button" disabled={busy || !coachNote.trim()} onClick={() => void reject()}>{l("برگشت برای اصلاح", "Return for correction")}</button>
                     <button className="is-primary" type="button" disabled={busy} onClick={() => void approve()}>{l("تأیید و ارسال برای کاربر", "Approve and send to member")}</button>
                   </footer>
                 )}
@@ -416,6 +440,7 @@ function statusTitle(status: WorkoutReviewQueueItem["status"], fa: boolean) {
     pending: fa ? "در انتظار" : "Waiting",
     claimed: fa ? "در حال بررسی" : "In review",
     approved: fa ? "تأییدشده" : "Approved",
+    rejected: fa ? "برگشت‌داده‌شده" : "Returned",
     superseded: fa ? "بایگانی‌شده" : "Archived",
   };
   return labels[status];

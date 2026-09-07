@@ -150,7 +150,7 @@ export type WorkoutPlan = {
   ai_coach_template_slug?: string | null;
   ai_coach_program_explanation_fa?: string | null;
   coach_review?: {
-    state: "pending_coach_review" | "initial_generated" | "coach_approved" | "none";
+    state: "pending_coach_review" | "initial_generated" | "coach_approved" | "coach_rejected" | "none";
     coach_display_name: string | null;
     coach_note: string | null;
     approved_at: string | null;

@@ -50,3 +50,14 @@ export function approveWorkoutReview(
     body: JSON.stringify({ expected_revision: expectedRevision }),
   });
 }
+
+export function rejectWorkoutReview(
+  reviewId: string,
+  expectedRevision: number,
+  explanation: string,
+): Promise<WorkoutReviewDetail> {
+  return request(`${basePath}/${reviewId}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ expected_revision: expectedRevision, explanation }),
+  });
+}

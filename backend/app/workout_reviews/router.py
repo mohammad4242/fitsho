@@ -27,6 +27,7 @@ from app.workout_reviews.schemas import (
     WorkoutReviewDraftUpdate,
     WorkoutReviewExerciseOption,
     WorkoutReviewQueueItemResponse,
+    WorkoutReviewRejectRequest,
 )
 from app.workout_reviews.service import ReviewConflict
 from app.workout_reviews.summary import (
@@ -143,6 +144,30 @@ def approve_review(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail={"code": error.code.value, "problems": error.problems},
         ) from error
+    except ReviewConflict as error:
+        raise _http_conflict(error) from error
+    return _detail_response(db, review, coach.id)
+
+
+@router.post(
+    "/{review_id}/reject",
+    response_model=WorkoutReviewDetailResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def reject_review(
+    review_id: UUID,
+    payload: WorkoutReviewRejectRequest,
+    service: WorkoutReviewServiceDependency,
+    coach: CoachUser,
+    db: DatabaseSession,
+) -> WorkoutReviewDetailResponse:
+    try:
+        review = service.reject(
+            review_id,
+            coach.id,
+            expected_revision=payload.expected_revision,
+            explanation=payload.explanation,
+        )
     except ReviewConflict as error:
         raise _http_conflict(error) from error
     return _detail_response(db, review, coach.id)

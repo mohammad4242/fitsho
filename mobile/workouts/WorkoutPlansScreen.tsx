@@ -348,6 +348,13 @@ function PlanView({
           variant="success"
         />
       ) : null}
+      {plan.coach_review?.state === "coach_rejected" ? (
+        <Notice
+          message={plan.coach_review.coach_note ?? "مربی برای این برنامه توضیح اصلاحات ثبت کرده است."}
+          title="نیاز به اصلاح طبق نظر مربی"
+          variant="danger"
+        />
+      ) : null}
       {!executable && plan.status === "active" && !historical && !pending ? (
         <Notice message="این برنامه هنوز برای اجرا آزاد نشده است." variant="warning" />
       ) : null}
@@ -557,6 +564,7 @@ function viewData<TData>(state: MobileViewState<TData>): TData | undefined {
 
 function historyLabel(version: WorkoutPlanVersionSummary): string {
   if (version.coach_review.state === "coach_approved") return "نسخهٔ تأییدشده توسط مربی";
+  if (version.coach_review.state === "coach_rejected") return "نسخهٔ برگشت‌داده‌شده برای اصلاح";
   if (version.status === "failed") return "نسخهٔ ناموفق";
   if (version.status === "active") return "نسخهٔ فعال";
   return "نسخهٔ اولیه";

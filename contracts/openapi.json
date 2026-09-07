@@ -20915,6 +20915,7 @@
               "pending_coach_review",
               "initial_generated",
               "coach_approved",
+              "coach_rejected",
               "none"
             ],
             "title": "State",
@@ -21986,11 +21987,34 @@
         "title": "WorkoutReviewQueueView",
         "type": "string"
       },
+      "WorkoutReviewRejectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "explanation": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Explanation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "explanation"
+        ],
+        "title": "WorkoutReviewRejectRequest",
+        "type": "object"
+      },
       "WorkoutReviewStatus": {
         "enum": [
           "pending",
           "claimed",
           "approved",
+          "rejected",
           "superseded"
         ],
         "title": "WorkoutReviewStatus",
@@ -25620,6 +25644,64 @@
           }
         ],
         "summary": "Save Review Draft",
+        "tags": [
+          "coach-workout-reviews"
+        ]
+      }
+    },
+    "/api/v1/coach/workout-reviews/{review_id}/reject": {
+      "post": {
+        "operationId": "reject_review_api_v1_coach_workout_reviews__review_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "review_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Review Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkoutReviewRejectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkoutReviewDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reject Review",
         "tags": [
           "coach-workout-reviews"
         ]

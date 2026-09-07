@@ -1,5 +1,5 @@
-import { RouteEntryScreen } from "../../../ui/navigation/RouteEntryScreen";
+import { CoachWorkoutReviewScreen } from "../../../coach/CoachWorkoutReviewScreen";
 
 export default function CoachEntryScreen() {
-  return <RouteEntryScreen description="صف بررسی و همراهی مربی" title="فضای مربی" />;
+  return <CoachWorkoutReviewScreen />;
 }

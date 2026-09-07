@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   renewWorkoutReview: vi.fn(),
   saveWorkoutReviewDraft: vi.fn(),
   approveWorkoutReview: vi.fn(),
+  rejectWorkoutReview: vi.fn(),
 }));
 
 vi.mock("./api", () => api);
@@ -142,6 +143,7 @@ beforeEach(() => {
   api.renewWorkoutReview.mockResolvedValue(detail);
   api.saveWorkoutReviewDraft.mockResolvedValue({ ...detail, draft_revision: 2 });
   api.approveWorkoutReview.mockResolvedValue({ ...detail, status: "approved" });
+  api.rejectWorkoutReview.mockResolvedValue({ ...detail, status: "rejected", coach_note: "فرم را کنترل کن" });
 });
 
 function renderPage() {
@@ -239,4 +241,20 @@ it("approves the saved coach version and refreshes the approved queue", async ()
 
   expect(api.approveWorkoutReview).toHaveBeenCalledWith("review-1", 1);
   expect(api.listWorkoutReviews).toHaveBeenLastCalledWith("approved");
+});
+
+it("requires an explanation before returning a plan for correction", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByRole("button", { name: "شروع بازبینی" }));
+
+  const reject = screen.getByRole("button", { name: "برگشت برای اصلاح" });
+  expect(reject).toBeDisabled();
+
+  await user.type(screen.getByLabelText("یادداشت مربی برای کاربر"), "فرم را کنترل کن");
+  expect(reject).toBeEnabled();
+  await user.click(reject);
+
+  expect(api.rejectWorkoutReview).toHaveBeenCalledWith("review-1", 1, "فرم را کنترل کن");
+  expect(api.listWorkoutReviews).toHaveBeenLastCalledWith("mine");
 });

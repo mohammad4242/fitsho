@@ -195,6 +195,55 @@ def test_coach_lists_and_claims_pending_review(client: TestClient, db: Session) 
     assert claimed.json()["draft_revision"] == 1
 
 
+def test_coach_rejection_requires_explanation_and_current_revision(
+    client: TestClient, db: Session
+) -> None:
+    member_id = _register(client, f"reject-member-{uuid4()}@example.com")
+    review = ensure_pending_review(db, _plan(db, member_id))
+    db.commit()
+    coach_id = _switch_user(client, f"reject-coach-{uuid4()}@example.com")
+    db.add(UserSpecialistRole(user_id=coach_id, role=SpecialistRole.COACH))
+    db.commit()
+
+    claimed = client.post(
+        f"/api/v1/coach/workout-reviews/{review.id}/claim",
+        headers=ORIGIN,
+    )
+    assert claimed.status_code == 200
+
+    stale = client.post(
+        f"/api/v1/coach/workout-reviews/{review.id}/reject",
+        headers=ORIGIN,
+        json={"expected_revision": 2, "explanation": "نسخه قدیمی است"},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "STALE_DRAFT_REVISION"
+
+    missing_explanation = client.post(
+        f"/api/v1/coach/workout-reviews/{review.id}/reject",
+        headers=ORIGIN,
+        json={"expected_revision": 1, "explanation": "  "},
+    )
+    assert missing_explanation.status_code == 422
+
+    rejected = client.post(
+        f"/api/v1/coach/workout-reviews/{review.id}/reject",
+        headers=ORIGIN,
+        json={"expected_revision": 1, "explanation": "نیاز به اصلاح ایمنی دارد"},
+    )
+    assert rejected.status_code == 200, rejected.text
+    assert rejected.json()["status"] == "rejected"
+    assert rejected.json()["coach_note"] == "نیاز به اصلاح ایمنی دارد"
+
+    replay = client.post(
+        f"/api/v1/coach/workout-reviews/{review.id}/reject",
+        headers=ORIGIN,
+        json={"expected_revision": 1, "explanation": "توضیح دوم"},
+    )
+    assert replay.status_code == 409
+    assert replay.json()["detail"]["code"] == "REVIEW_ALREADY_REJECTED"
+
+
 def test_coach_detail_projects_selected_template_without_full_trace(
     client: TestClient,
     db: Session,

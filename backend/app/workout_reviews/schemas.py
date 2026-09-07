@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.athlete_state.schemas import AthleteState
 from app.exercises.enums import PrescriptionMode
@@ -74,6 +74,21 @@ class WorkoutReviewApproveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_revision: int = Field(ge=1)
+
+
+class WorkoutReviewRejectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=1)
+    explanation: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("explanation")
+    @classmethod
+    def normalize_explanation(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("A rejection explanation is required")
+        return normalized
 
 
 class WorkoutReviewExerciseOption(BaseModel):

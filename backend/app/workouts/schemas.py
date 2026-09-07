@@ -208,6 +208,7 @@ class WorkoutPlanCoachReviewResponse(BaseModel):
         "pending_coach_review",
         "initial_generated",
         "coach_approved",
+        "coach_rejected",
         "none",
     ]
     coach_display_name: str | None = None

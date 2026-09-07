@@ -387,7 +387,11 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 <div><p className="eyebrow eyebrow--accent">{l("نسخه‌های برنامه", "Plan versions")}</p><h2 id="workout-version-history-title">{l("تاریخچه برنامه", "Plan history")}</h2></div>
                 <div className="workout-version-history__list">
                   {memberHistory.map((version) => {
-                    const label = version.coach_review.state === "coach_approved" ? l("نسخه تأیید مربی", "Coach-approved version") : l("نسخه اولیه", "Initial version");
+                    const label = version.coach_review.state === "coach_approved"
+                      ? l("نسخه تأیید مربی", "Coach-approved version")
+                      : version.coach_review.state === "coach_rejected"
+                        ? l("نسخه برگشت‌داده‌شده برای اصلاح", "Returned for correction")
+                        : l("نسخه اولیه", "Initial version");
                     return <button type="button" key={version.id} className={version.id === plan.id ? "workout-version-history__active" : undefined} disabled={selectingVersionId !== null} aria-label={`${label} — ${new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "medium" }).format(new Date(version.created_at))}`} onClick={() => selectVersion(version)}><strong>{label}</strong><span>{version.is_active ? l("فعال", "Active") : l("آرشیو", "Archived")}</span></button>;
                   })}
                 </div>
@@ -423,6 +427,17 @@ function CoachReviewBanner({ plan, isEnglish, historical }: { plan: WorkoutPlan;
         <div>
           <strong>{l(`تأییدشده توسط ${coach}`, `Approved by ${coach}`)}</strong>
           {review.approved_at && <time dateTime={review.approved_at}>{new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "long" }).format(new Date(review.approved_at))}</time>}
+          {review.coach_note && <p>{review.coach_note}</p>}
+        </div>
+      </aside>
+    );
+  }
+  if (review?.state === "coach_rejected") {
+    return (
+      <aside className="workout-review-banner workout-review-banner--pending" role="status">
+        <span className="workout-review-indicator" aria-hidden="true">!</span>
+        <div>
+          <strong>{l("نیاز به اصلاح طبق نظر مربی", "Returned for coach corrections")}</strong>
           {review.coach_note && <p>{review.coach_note}</p>}
         </div>
       </aside>

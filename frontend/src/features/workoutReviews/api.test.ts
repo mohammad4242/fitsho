@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   claimWorkoutReview,
   listWorkoutReviews,
+  rejectWorkoutReview,
   saveWorkoutReviewDraft,
   verifyCoachAccess,
 } from "./api";
@@ -78,6 +79,23 @@ it("claims and saves a typed review draft", async () => {
     expect.objectContaining({
       method: "PUT",
       body: JSON.stringify(payload),
+    }),
+  );
+});
+
+it("rejects a review with the expected revision and explanation", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(jsonResponse(detail));
+
+  await rejectWorkoutReview("review-1", 2, "Reduce the first-day volume.");
+
+  expect(fetch).toHaveBeenCalledWith(
+    "/api/v1/coach/workout-reviews/review-1/reject",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({
+        expected_revision: 2,
+        explanation: "Reduce the first-day volume.",
+      }),
     }),
   );
 });
