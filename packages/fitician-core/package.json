@@ -58,6 +58,10 @@
       "types": "./dist/body-ghost-editor.d.ts",
       "import": "./dist/body-ghost-editor.js"
     },
+    "./body-ghost-pose": {
+      "types": "./dist/body-ghost-pose.d.ts",
+      "import": "./dist/body-ghost-pose.js"
+    },
     "./workout-reviews": {
       "types": "./dist/workout-reviews.d.ts",
       "import": "./dist/workout-reviews.js"

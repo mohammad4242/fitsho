@@ -53,6 +53,15 @@ export type {
   GhostPhotoRenderPlan,
   GhostPhotoTransform,
 } from "./body-ghost-editor";
+export { validatePoseWithGhost } from "./body-ghost-pose";
+export type {
+  GhostPoseValidationResult,
+  GhostPoseValidatorOptions,
+  GhostValidationComponentScores,
+  GhostValidationHardRejectCode,
+  GhostValidationWarning,
+  NormalizedBodyLandmark,
+} from "./body-ghost-pose";
 export type * from "./profile-validation";
 export { ApiError } from "./transport";
 export type {

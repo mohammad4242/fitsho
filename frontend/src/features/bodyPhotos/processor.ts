@@ -5,13 +5,9 @@ import {
 import { MediaPipeBodySegmenter } from "./mediaPipeBodySegmenter";
 import { MediaPipePoseLandmarkDetector } from "./mediaPipePoseDetector";
 import type { BodyPhotoSide, BodyPhotoView } from "./types";
+import type { NormalizedBodyLandmark } from "@fitician/core/body-ghost-pose";
 
-export type NormalizedBodyLandmark = {
-  x: number;
-  y: number;
-  z: number;
-  visibility: number;
-};
+export type { NormalizedBodyLandmark } from "@fitician/core/body-ghost-pose";
 
 export type BodyLandmarkDetection = {
   poses: NormalizedBodyLandmark[][];
