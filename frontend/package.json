@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fitician/core": "0.1.0",
     "@fontsource-variable/sora": "^5.3.0",
     "@fontsource-variable/vazirmatn": "^5.3.0",
     "@fontsource/lalezar": "^5.3.0",

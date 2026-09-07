@@ -134,6 +134,8 @@ export type BodyAnalysisExperienceRegion = {
   supporting_views: BodyPhotoView[];
 };
 
+export type VisualAssessmentStatus = "complete" | "partial";
+
 export type BodyAnalysisExperienceV4 = {
   schema_version: "4.0";
   presentation_version: "body-analysis-experience-v2";
@@ -203,8 +205,6 @@ export type NormalizedBodyAnalysis = {
   requires_coach_review: true;
   requires_doctor_review: true;
 };
-
-export type VisualAssessmentStatus = "complete" | "partial";
 
 export type VisualPhysiqueFinding = {
   area: BodyArea;
@@ -475,4 +475,3 @@ export type BodyProgressTimelineResponse = {
   schema_version: "1.0";
   items: BodyProgressTimelineItem[];
 };
-export type * from "@fitician/core/body-photos";

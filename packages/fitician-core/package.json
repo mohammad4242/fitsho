@@ -9,6 +9,34 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "import": "./dist/auth.js"
+    },
+    "./body-photos": {
+      "types": "./dist/body-photos.d.ts",
+      "import": "./dist/body-photos.js"
+    },
+    "./exercises": {
+      "types": "./dist/exercises.d.ts",
+      "import": "./dist/exercises.js"
+    },
+    "./nutrition": {
+      "types": "./dist/nutrition.d.ts",
+      "import": "./dist/nutrition.js"
+    },
+    "./profile": {
+      "types": "./dist/profile.d.ts",
+      "import": "./dist/profile.js"
+    },
+    "./workout-reviews": {
+      "types": "./dist/workout-reviews.d.ts",
+      "import": "./dist/workout-reviews.js"
+    },
+    "./workouts": {
+      "types": "./dist/workouts.d.ts",
+      "import": "./dist/workouts.js"
     }
   },
   "scripts": {

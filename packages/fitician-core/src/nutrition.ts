@@ -76,6 +76,7 @@ export type NutritionTarget = {
   source_ids: string[];
   explanation_codes: string[];
 };
+
 export type NutritionMicronutrientTarget = {
   reference_kind: string;
   target_value: number;
@@ -199,7 +200,17 @@ export type WeeklyPlan = {
   created_at: string;
 };
 
-export type WeeklyPlanHistoryItem = Pick<WeeklyPlan, "id" | "revision" | "lifecycle_status" | "review_status" | "weekly_cost_irr" | "weekly_budget_irr" | "budget_status" | "created_at">;
+export type WeeklyPlanHistoryItem = Pick<
+  WeeklyPlan,
+  | "id"
+  | "revision"
+  | "lifecycle_status"
+  | "review_status"
+  | "weekly_cost_irr"
+  | "weekly_budget_irr"
+  | "budget_status"
+  | "created_at"
+>;
 
 export type ShoppingList = {
   plan_id: string;
@@ -232,25 +243,21 @@ export type PlanComparison = {
   ideal_plan_monthly_cost_irr: number | null;
   minimum_feasible_monthly_cost_irr: number | null;
   monthly_cost_gap_irr: number | null;
-
   calorie_gap?: PlanComparisonMetric | null;
   protein_gap?: PlanComparisonMetric | null;
   carbohydrate_gap?: PlanComparisonMetric | null;
   fat_gap?: PlanComparisonMetric | null;
   fibre_gap?: PlanComparisonMetric | null;
-
   calorie_gap_kcal_per_day?: number | null;
   protein_gap_g_per_day?: number | null;
   carbohydrate_gap_g_per_day?: number | null;
   fat_gap_g_per_day?: number | null;
   fibre_gap_g_per_day?: number | null;
-
   micronutrient_gaps_improved: string[];
   unique_meal_count_budget: number | null;
   unique_meal_count_ideal: number | null;
   unique_protein_sources_budget: number | null;
   unique_protein_sources_ideal: number | null;
-
   meaningful_quality_improvement: boolean;
   show_ideal_plan: boolean;
   reason_codes: string[];
@@ -381,4 +388,3 @@ export type NutritionProfile = NutritionProfileInput & {
   created_at: string;
   updated_at: string;
 };
-export type * from "@fitician/core/nutrition";
