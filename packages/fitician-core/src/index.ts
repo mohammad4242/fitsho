@@ -63,6 +63,10 @@ export type {
   NormalizedBodyLandmark,
 } from "./body-ghost-pose";
 export type * from "./profile-validation";
+export type {
+  MobileAuthTokens,
+  RefreshTokenStorage,
+} from "./auth";
 export { ApiError } from "./transport";
 export type {
   ApiErrorObject,

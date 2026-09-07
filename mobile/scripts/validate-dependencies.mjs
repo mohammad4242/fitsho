@@ -11,12 +11,14 @@ const lock = JSON.parse(await readFile(lockPath, "utf8"));
 
 assert.equal(lock.lockfileVersion, 3, "root npm lockfile must use lockfile version 3");
 const expected = {
+  "@fitician/core": { declared: "0.1.0", version: /^0\.1\./ },
   expo: { declared: "~57.0.0", version: /^57\./ },
   "expo-build-properties": { declared: "~57.0.2", version: /^57\./ },
   "expo-constants": { declared: "~57.0.2", version: /^57\./ },
   "expo-dev-client": { declared: "~57.0.2", version: /^57\./ },
   "expo-linking": { declared: "~57.0.1", version: /^57\./ },
   "expo-router": { declared: "~57.0.2", version: /^57\./ },
+  "expo-secure-store": { declared: "~57.0.3", version: /^57\./ },
   "expo-splash-screen": { declared: "~57.0.1", version: /^57\./ },
   "expo-status-bar": { declared: "~57.0.0", version: /^57\./ },
   "expo-system-ui": { declared: "~57.0.0", version: /^57\./ },
@@ -34,7 +36,9 @@ const expected = {
 for (const [name, requirement] of Object.entries(expected)) {
   const declared = mobilePackage.dependencies[name];
   assert.equal(declared, requirement.declared, `${name} declaration drifted`);
-  const locked = lock.packages[`node_modules/${name}`]?.version;
+  const locked = name === "@fitician/core"
+    ? lock.packages["packages/fitician-core"]?.version
+    : lock.packages[`node_modules/${name}`]?.version;
   assert.equal(typeof locked, "string", `${name} must be resolved in the root lockfile`);
   assert.match(locked, requirement.version, `${name} resolved outside the SDK-57 pin`);
 }

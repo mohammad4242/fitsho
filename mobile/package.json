@@ -8,17 +8,20 @@
     "start": "expo start",
     "android": "expo run:android",
     "prebuild": "expo prebuild",
+    "test:auth": "vitest run auth/*.test.ts",
     "test:foundation": "node --test scripts/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "validate": "node scripts/validate-foundation.mjs && node scripts/validate-environments.mjs && node scripts/validate-dependencies.mjs"
   },
   "dependencies": {
+    "@fitician/core": "0.1.0",
     "expo": "~57.0.0",
     "expo-build-properties": "~57.0.2",
     "expo-constants": "~57.0.2",
     "expo-dev-client": "~57.0.2",
     "expo-linking": "~57.0.1",
     "expo-router": "~57.0.2",
+    "expo-secure-store": "~57.0.3",
     "expo-splash-screen": "~57.0.1",
     "expo-status-bar": "~57.0.0",
     "expo-system-ui": "~57.0.0",
@@ -35,6 +38,7 @@
   "devDependencies": {
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
-    "typescript": "~6.0.2"
+    "typescript": "~6.0.2",
+    "vitest": "4.1.10"
   }
 }

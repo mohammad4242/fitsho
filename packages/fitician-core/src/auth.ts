@@ -19,3 +19,18 @@ export type Credentials = {
   email: string;
   password: string;
 };
+
+export type MobileAuthTokens = {
+  access_token: string;
+  refresh_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+  refresh_expires_in: number;
+  user: User;
+};
+
+export interface RefreshTokenStorage {
+  read(): Promise<string | null>;
+  write(token: string): Promise<void>;
+  clear(): Promise<void>;
+}
