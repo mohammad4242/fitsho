@@ -1,5 +1,5 @@
-import { RouteEntryScreen } from "../../../ui/navigation/RouteEntryScreen";
+import { PhysicianNutritionReviewScreen } from "../../../physician/PhysicianNutritionReviewScreen";
 
 export default function PhysicianEntryScreen() {
-  return <RouteEntryScreen description="صف بررسی و تصمیم‌های پزشکی" title="فضای پزشک" />;
+  return <PhysicianNutritionReviewScreen />;
 }
