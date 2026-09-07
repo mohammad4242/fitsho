@@ -146,6 +146,7 @@ def test_replacing_photo_removes_only_the_previous_private_object(
     assert not old_path.exists()
     assert (private_root / new_row.storage_key).exists()
     assert second.json()["mime_type"] == "image/jpeg"
+    assert second.json()["profile_photo_url"] != first.json()["profile_photo_url"]
 
 
 def test_invalid_profile_photo_is_rejected_without_creating_a_row(

@@ -232,13 +232,13 @@ def _owner_photo_url(db: Session, user_id: UUID) -> str | None:
     photo = db.scalar(select(UserProfilePhoto).where(UserProfilePhoto.user_id == user_id))
     if photo is None:
         return None
-    return profile_photo_url(user_id, photo.updated_at)
+    return profile_photo_url(user_id, photo.updated_at, photo.storage_key)
 
 
 def _photo_response(photo: UserProfilePhoto) -> ProfilePhotoResponse:
     return ProfilePhotoResponse(
         id=photo.id,
-        profile_photo_url=profile_photo_url(photo.user_id, photo.updated_at),
+        profile_photo_url=profile_photo_url(photo.user_id, photo.updated_at, photo.storage_key),
         mime_type=photo.mime_type,  # type: ignore[arg-type]
         byte_size=photo.byte_size,
         width=photo.width,

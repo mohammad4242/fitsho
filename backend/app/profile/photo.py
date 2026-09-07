@@ -229,8 +229,17 @@ class ProfilePhotoStorage:
             raise ProfilePhotoStorageError("Private storage is temporarily unavailable") from error
 
 
-def profile_photo_url(user_id: UUID, updated_at: datetime | None = None) -> str:
-    suffix = f"?v={int(updated_at.timestamp())}" if updated_at is not None else ""
+def profile_photo_url(
+    user_id: UUID,
+    updated_at: datetime | None = None,
+    version: str | None = None,
+) -> str:
+    cache_token = version
+    if cache_token is not None:
+        cache_token = PurePosixPath(cache_token).stem
+    if cache_token is None and updated_at is not None:
+        cache_token = str(int(updated_at.timestamp() * 1_000_000))
+    suffix = f"?v={cache_token}" if cache_token is not None else ""
     return f"/api/v1/profile/photo/{user_id}{suffix}"
 
 
@@ -319,7 +328,7 @@ def authorized_profile_photo_url(
     if not can_view_profile_photo(db, viewer_id, owner_id):
         return None
     row = db.scalar(select(UserProfilePhoto).where(UserProfilePhoto.user_id == owner_id))
-    return profile_photo_url(owner_id, row.updated_at) if row is not None else None
+    return profile_photo_url(owner_id, row.updated_at, row.storage_key) if row is not None else None
 
 
 class ProfilePhotoService:

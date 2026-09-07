@@ -72,7 +72,10 @@ class User(Base):
         if photo is None:
             return None
         version = photo.updated_at or photo.created_at
-        suffix = f"?v={int(version.timestamp())}" if version is not None else ""
+        cache_token = photo.storage_key or (
+            str(int(version.timestamp() * 1_000_000)) if version is not None else None
+        )
+        suffix = f"?v={cache_token}" if cache_token is not None else ""
         return f"/api/v1/profile/photo/{self.id}{suffix}"
 
 
