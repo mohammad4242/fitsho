@@ -1083,6 +1083,55 @@ class NutritionTargetUpdateResponse(BaseModel):
     user_confirmed: bool
 
 
+class NutritionLabDocumentResponse(BaseModel):
+    id: UUID
+    original_filename: str
+    content_type: str
+    byte_size: int
+    test_date: date | None
+    laboratory_name: str | None
+    user_note: str | None
+    category: str | None
+    review_status: str
+    reviewed_at: datetime | None
+    reviewed_by_user_id: UUID | None
+    review_notes: str | None
+    request_id: UUID | None
+    uploaded_at: datetime
+    retained_until: date | None
+
+
+class NutritionLabUploadResponse(NutritionLabDocumentResponse):
+    duplicate: bool
+
+
+class NutritionLabRequestResponse(BaseModel):
+    id: UUID
+    plan_id: UUID
+    status: NutritionLabRequestStatus
+    requested_tests: list[str]
+    user_visible_reason: str | None
+    created_at: datetime
+    reviewed_at: datetime | None
+    cancelled_at: datetime | None
+
+
+class NutritionLabRequestMutationResponse(BaseModel):
+    id: UUID
+    status: NutritionLabRequestStatus
+
+
+class NutritionLabRequestCreatedResponse(BaseModel):
+    id: UUID
+    status: NutritionLabRequestStatus
+    requested_tests: list[str]
+
+
+class NutritionReviewClaimResponse(BaseModel):
+    review_id: UUID
+    status: str
+
+
 class WeeklyPlanDayResponse(BaseModel):
     day_index: int
     plan_date: date

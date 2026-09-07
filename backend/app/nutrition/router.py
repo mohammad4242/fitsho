@@ -219,12 +219,18 @@ from app.nutrition.schemas import (
     NutritionFoodPhotoConfirmationResponse,
     NutritionFoodPhotoEstimateResponse,
     NutritionFoodPhotoMacroPreviewResponse,
+    NutritionLabDocumentResponse,
+    NutritionLabRequestCreatedResponse,
+    NutritionLabRequestMutationResponse,
+    NutritionLabRequestResponse,
+    NutritionLabUploadResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
     NutritionProgramPageResponse,
     NutritionProgramResponse,
     NutritionProgramWrite,
     NutritionRecentFoodResponse,
+    NutritionReviewClaimResponse,
     NutritionTargetUpdateResponse,
     NutritionTrackingEntryResponse,
     PartialRegenerationInput,
@@ -2239,6 +2245,7 @@ def _clinical_error(error: ClinicalError) -> HTTPException:
 
 @router.post(
     "/labs",
+    response_model=NutritionLabUploadResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_trusted_origin)],
 )
@@ -2252,7 +2259,7 @@ async def create_lab_document(
     user_note: Annotated[str | None, Form()] = None,
     category: Annotated[str | None, Form()] = None,
     request_id: Annotated[UUID | None, Form()] = None,
-) -> dict[str, object]:
+) -> NutritionLabUploadResponse:
     try:
         consume_rate_limit(
             db,
@@ -2282,8 +2289,10 @@ async def create_lab_document(
         raise _clinical_error(error) from None
 
 
-@router.get("/labs")
-def read_lab_documents(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+@router.get("/labs", response_model=list[NutritionLabDocumentResponse])
+def read_lab_documents(
+    db: DatabaseSession, user: CurrentUser
+) -> list[NutritionLabDocumentResponse]:
     return list_labs(db, user.id)
 
 
@@ -2321,11 +2330,12 @@ def download_lab_document(
 
 @router.post(
     "/labs/{document_id}/access-grant",
+    response_model=PrivateAccessGrantResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def grant_lab_document_access(
     document_id: UUID, db: DatabaseSession, user: CurrentUser, settings: AppSettings
-) -> dict[str, object]:
+) -> PrivateAccessGrantResponse:
     try:
         authorize_lab_access(db, user.id, document_id)
     except ClinicalError as error:
@@ -2380,17 +2390,22 @@ def read_physician_access(db: DatabaseSession, user: CurrentUser) -> dict[str, b
     return {"authorized": True}
 
 
-@router.get("/lab-requests")
-def read_user_lab_requests(db: DatabaseSession, user: CurrentUser) -> list[dict[str, object]]:
+@router.get("/lab-requests", response_model=list[NutritionLabRequestResponse])
+def read_user_lab_requests(
+    db: DatabaseSession, user: CurrentUser
+) -> list[NutritionLabRequestResponse]:
     return list_lab_requests(db, user.id)
 
 
-@router.get("/physician/plans/{plan_id}/labs")
+@router.get(
+    "/physician/plans/{plan_id}/labs",
+    response_model=list[NutritionLabDocumentResponse],
+)
 def read_physician_lab_documents(
     plan_id: UUID,
     db: DatabaseSession,
     user: CurrentUser,
-) -> list[dict[str, object]]:
+) -> list[NutritionLabDocumentResponse]:
     try:
         return list_physician_labs(db, user.id, plan_id)
     except ClinicalError as error:
@@ -2399,6 +2414,7 @@ def read_physician_lab_documents(
 
 @router.put(
     "/physician/labs/{document_id}/review",
+    response_model=NutritionLabDocumentResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def update_physician_lab_review(
@@ -2406,7 +2422,7 @@ def update_physician_lab_review(
     payload: PhysicianLabReviewInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionLabDocumentResponse:
     try:
         return review_lab_document(
             db,
@@ -2421,6 +2437,7 @@ def update_physician_lab_review(
 
 @router.put(
     "/physician/lab-requests/{request_id}",
+    response_model=NutritionLabRequestMutationResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def update_physician_lab_request(
@@ -2428,7 +2445,7 @@ def update_physician_lab_request(
     payload: PhysicianLabRequestTransitionInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionLabRequestMutationResponse:
     if payload.status not in {
         NutritionLabRequestStatus.REVIEWED,
         NutritionLabRequestStatus.CANCELLED,
@@ -2442,11 +2459,12 @@ def update_physician_lab_request(
 
 @router.post(
     "/physician/reviews/{review_id}/claim",
+    response_model=NutritionReviewClaimResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def claim_physician_review(
     review_id: UUID, db: DatabaseSession, user: CurrentUser
-) -> dict[str, object]:
+) -> NutritionReviewClaimResponse:
     try:
         return claim_review(db, user.id, review_id)
     except ClinicalError as error:
@@ -2455,6 +2473,7 @@ def claim_physician_review(
 
 @router.post(
     "/physician/plans/{plan_id}/request-labs",
+    response_model=NutritionLabRequestCreatedResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def create_physician_lab_request(
@@ -2462,7 +2481,7 @@ def create_physician_lab_request(
     payload: PhysicianLabRequestInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionLabRequestCreatedResponse:
     try:
         return request_labs(
             db,
