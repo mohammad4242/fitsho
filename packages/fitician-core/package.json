@@ -38,6 +38,14 @@
       "types": "./dist/formatters.d.ts",
       "import": "./dist/formatters.js"
     },
+    "./i18n/en": {
+      "types": "./dist/i18n/en.d.ts",
+      "import": "./dist/i18n/en.js"
+    },
+    "./i18n/fa": {
+      "types": "./dist/i18n/fa.d.ts",
+      "import": "./dist/i18n/fa.js"
+    },
     "./workout-reviews": {
       "types": "./dist/workout-reviews.d.ts",
       "import": "./dist/workout-reviews.js"
