@@ -14,6 +14,7 @@ PRODUCTION_AUTH_DELIVERY = {
     "sms_provider": "kavenegar",
     "kavenegar_api_key": "test-kavenegar-key",
     "phone_otp_hmac_secret": "production-phone-otp-hmac-secret-for-tests",
+    "google_client_id": "fitsho-client-id.apps.googleusercontent.com",
 }
 
 
@@ -34,6 +35,8 @@ def test_settings_accept_explicit_environment_values() -> None:
     assert settings.phone_otp_ttl_seconds == 300
     assert settings.phone_otp_resend_cooldown_seconds == 60
     assert settings.phone_otp_max_attempts == 5
+    assert settings.email_verification_ttl_seconds == 86400
+    assert settings.kavenegar_verify_template == "fitsho-login"
 
 
 def test_delivery_credentials_are_redacted() -> None:
@@ -47,6 +50,23 @@ def test_delivery_credentials_are_redacted() -> None:
     assert "smtp-secret" not in rendered
     assert "sms-secret" not in rendered
     assert "otp-secret" not in rendered
+
+
+def test_production_requires_google_identity_configuration() -> None:
+    with pytest.raises(ValidationError, match="Google client ID"):
+        Settings(
+            app_env="production",
+            frontend_origin="https://fitsho.example",
+            cookie_secure=True,
+            session_cookie_name="__Host-fitsho_session",
+            private_file_signing_key="production-private-file-signing-key-for-tests",
+            email_provider="smtp",
+            smtp_host="smtp.example.com",
+            smtp_from_address="no-reply@fitsho.example",
+            sms_provider="kavenegar",
+            kavenegar_api_key="test-kavenegar-key",
+            phone_otp_hmac_secret="production-phone-otp-hmac-secret-for-tests",
+        )
 
 
 def test_production_rejects_fake_auth_delivery_providers() -> None:

@@ -33,6 +33,18 @@ class ResetPasswordRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class GoogleAuthRequest(BaseModel):
+    credential: str = Field(min_length=1, max_length=8192)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class EmailVerificationRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class GenericMessageResponse(BaseModel):
     message: str
 

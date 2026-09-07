@@ -23,10 +23,12 @@ class Settings(BaseSettings):
     smtp_from_address: str | None = None
     smtp_use_tls: bool = True
     password_reset_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    email_verification_ttl_seconds: int = Field(default=86400, ge=300, le=604800)
     sms_provider: Literal["fake", "kavenegar"] = "fake"
     kavenegar_api_key: SecretStr | None = Field(default=None, repr=False)
     kavenegar_base_url: str = "https://api.kavenegar.com/v1"
     kavenegar_sender: str | None = None
+    kavenegar_verify_template: str = "fitsho-login"
     sms_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
     phone_otp_hmac_secret: SecretStr = Field(
         default=SecretStr("fitsho-local-phone-otp-secret-change-me"), repr=False
@@ -34,6 +36,15 @@ class Settings(BaseSettings):
     phone_otp_ttl_seconds: int = Field(default=300, ge=60, le=900)
     phone_otp_resend_cooldown_seconds: int = Field(default=60, ge=10, le=600)
     phone_otp_max_attempts: int = Field(default=5, ge=1, le=10)
+    google_client_id: str | None = None
+    auth_rate_limit_window_seconds: int = Field(default=3600, ge=60, le=86400)
+    auth_phone_otp_ip_limit: int = Field(default=10, ge=1, le=1000)
+    auth_phone_otp_identifier_limit: int = Field(default=10, ge=1, le=1000)
+    auth_forgot_password_ip_limit: int = Field(default=20, ge=1, le=1000)
+    auth_forgot_password_identifier_limit: int = Field(default=5, ge=1, le=1000)
+    auth_email_verification_ip_limit: int = Field(default=10, ge=1, le=1000)
+    auth_email_verification_user_limit: int = Field(default=5, ge=1, le=1000)
+    auth_google_ip_limit: int = Field(default=30, ge=1, le=1000)
     media_root: Path = Path("var/media")
     media_public_path: str = "/media"
     media_max_bytes: int = 20 * 1024 * 1024
@@ -197,6 +208,10 @@ class Settings(BaseSettings):
             raise ValueError("Production requires a configured SMTP email provider")
         if self.sms_provider != "kavenegar" or self.kavenegar_api_key is None:
             raise ValueError("Production requires a configured Kavenegar SMS provider")
+        if not self.kavenegar_verify_template.strip():
+            raise ValueError("Production requires a Kavenegar verification template")
+        if not self.google_client_id:
+            raise ValueError("Production requires a Google client ID")
         otp_secret = self.phone_otp_hmac_secret.get_secret_value()
         if otp_secret == "fitsho-local-phone-otp-secret-change-me" or len(otp_secret) < 32:
             raise ValueError("Production requires a strong phone OTP HMAC secret")

@@ -13,7 +13,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.admin.router import router as admin_router
-from app.auth.providers import build_email_provider, build_sms_provider
+from app.auth.providers import (
+    build_email_provider,
+    build_google_identity_provider,
+    build_sms_provider,
+)
 from app.auth.router import router as auth_router
 from app.body_analysis.admin_config.crypto import CredentialEncryptionError
 from app.body_analysis.admin_config.router import router as admin_ai_settings_router
@@ -102,6 +106,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Fitsho API", lifespan=lifespan)
     app.state.email_provider = build_email_provider(active_settings)
     app.state.sms_provider = build_sms_provider(active_settings)
+    app.state.google_identity_provider = build_google_identity_provider(active_settings)
     app.dependency_overrides[get_settings] = lambda: active_settings
     app.add_middleware(
         CORSMiddleware,

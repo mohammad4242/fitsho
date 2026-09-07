@@ -46,6 +46,19 @@ def make_password_reset_token() -> tuple[str, str]:
     return raw_token, hash_password_reset_token(raw_token)
 
 
+def hash_email_verification_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def make_email_verification_token() -> tuple[str, str]:
+    raw_token = secrets.token_urlsafe(32)
+    return raw_token, hash_email_verification_token(raw_token)
+
+
+def hash_rate_limit_actor(actor: str, secret: str) -> str:
+    return hmac.new(secret.encode(), actor.encode(), hashlib.sha256).hexdigest()
+
+
 def make_otp_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 

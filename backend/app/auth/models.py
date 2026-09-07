@@ -8,7 +8,9 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
+    UniqueConstraint,
     false,
     func,
     text,
@@ -22,12 +24,9 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint(
-            "email IS NOT NULL OR phone_number IS NOT NULL",
+            "(email IS NOT NULL AND password_hash IS NOT NULL) "
+            "OR phone_number IS NOT NULL OR google_sub IS NOT NULL",
             name="ck_users_login_identifier_required",
-        ),
-        CheckConstraint(
-            "email IS NULL OR password_hash IS NOT NULL",
-            name="ck_users_email_requires_password",
         ),
     )
 
@@ -35,6 +34,10 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
     phone_number: Mapped[str | None] = mapped_column(String(13), unique=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     is_admin: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
@@ -81,6 +84,21 @@ class PasswordResetToken(Base):
     )
 
 
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class PhoneOtpChallenge(Base):
     __tablename__ = "phone_otp_challenges"
     __table_args__ = (
@@ -105,4 +123,25 @@ class PhoneOtpChallenge(Base):
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AuthOperationRateLimit(Base):
+    __tablename__ = "auth_operation_rate_limits"
+    __table_args__ = (
+        UniqueConstraint(
+            "actor_hash",
+            "operation",
+            "window_started_at",
+            name="uq_auth_operation_rate_window",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    actor_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    operation: Mapped[str] = mapped_column(String(64), nullable=False)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    request_count: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from google.auth.exceptions import GoogleAuthError
 from sqlalchemy.orm import Session
 
 from app.auth.cookies import (
@@ -10,14 +11,18 @@ from app.auth.cookies import (
 )
 from app.auth.dependencies import get_current_user
 from app.auth.exceptions import (
+    AuthRateLimitError,
     EmailAlreadyRegisteredError,
+    GoogleAccountConflictError,
     InvalidCredentialsError,
 )
 from app.auth.models import User
-from app.auth.providers import EmailProvider, SmsProvider
+from app.auth.providers import EmailProvider, GoogleIdentityProvider, SmsProvider
 from app.auth.schemas import (
+    EmailVerificationRequest,
     ForgotPasswordRequest,
     GenericMessageResponse,
+    GoogleAuthRequest,
     LoginRequest,
     PhoneOtpSentResponse,
     PhoneSendOtpRequest,
@@ -27,12 +32,17 @@ from app.auth.schemas import (
     UserResponse,
 )
 from app.auth.service import (
+    authenticate_google,
+    consume_auth_rate_limit,
     login_user,
     logout_session,
+    normalize_email,
     register_user,
+    request_email_verification,
     request_password_reset,
     reset_password,
     send_phone_otp,
+    verify_email,
     verify_phone_otp,
 )
 from app.config import Settings, get_settings
@@ -46,6 +56,8 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 FORGOT_PASSWORD_MESSAGE = "If the account exists, a reset link has been sent."
 PHONE_OTP_MESSAGE = "If the number can receive messages, an OTP has been sent."
+EMAIL_VERIFICATION_MESSAGE = "If verification is available, an email has been sent."
+AUTH_RATE_LIMIT_MESSAGE = "Too many authentication requests"
 
 
 def get_email_provider(request: Request) -> EmailProvider:
@@ -62,6 +74,45 @@ def get_sms_provider(request: Request) -> SmsProvider:
 SmsDelivery = Annotated[SmsProvider, Depends(get_sms_provider)]
 
 
+def get_google_identity_provider(request: Request) -> GoogleIdentityProvider:
+    return request.app.state.google_identity_provider  # type: ignore[no-any-return]
+
+
+GoogleIdentityDelivery = Annotated[
+    GoogleIdentityProvider,
+    Depends(get_google_identity_provider),
+]
+
+
+def _client_actor(request: Request) -> str:
+    return request.client.host if request.client is not None else "unknown"
+
+
+def _consume_limit(
+    db: Session,
+    settings: Settings,
+    *,
+    actor: str,
+    operation: str,
+    limit: int,
+) -> None:
+    try:
+        consume_auth_rate_limit(
+            db,
+            actor=actor,
+            operation=operation,
+            limit=limit,
+            window_seconds=settings.auth_rate_limit_window_seconds,
+            hmac_secret=settings.phone_otp_hmac_secret.get_secret_value(),
+        )
+    except AuthRateLimitError as error:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=AUTH_RATE_LIMIT_MESSAGE,
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from None
+
+
 @router.post(
     "/register",
     response_model=UserResponse,
@@ -73,9 +124,17 @@ def register(
     response: Response,
     db: DatabaseSession,
     settings: AppSettings,
+    email_provider: EmailDelivery,
 ) -> UserResponse:
     try:
-        result = register_user(db, payload, settings.session_ttl_seconds)
+        result = register_user(
+            db,
+            payload,
+            settings.session_ttl_seconds,
+            settings.email_verification_ttl_seconds,
+            settings.frontend_origin,
+            email_provider,
+        )
     except EmailAlreadyRegisteredError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -108,6 +167,44 @@ def login(
 
 
 @router.post(
+    "/google",
+    response_model=UserResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def google_auth(
+    payload: GoogleAuthRequest,
+    request: Request,
+    response: Response,
+    db: DatabaseSession,
+    settings: AppSettings,
+    provider: GoogleIdentityDelivery,
+) -> UserResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="google",
+        limit=settings.auth_google_ip_limit,
+    )
+    try:
+        identity = provider.verify(payload.credential)
+    except (GoogleAuthError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google authentication failed",
+        ) from None
+    try:
+        result = authenticate_google(db, identity, settings.session_ttl_seconds)
+    except GoogleAccountConflictError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Unable to use this Google account",
+        ) from None
+    set_session_cookie(response, result.raw_token, settings)
+    return UserResponse.model_validate(result.user)
+
+
+@router.post(
     "/forgot-password",
     response_model=GenericMessageResponse,
     status_code=status.HTTP_202_ACCEPTED,
@@ -115,10 +212,25 @@ def login(
 )
 def forgot_password(
     payload: ForgotPasswordRequest,
+    request: Request,
     db: DatabaseSession,
     settings: AppSettings,
     email_provider: EmailDelivery,
 ) -> GenericMessageResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="forgot-password-ip",
+        limit=settings.auth_forgot_password_ip_limit,
+    )
+    _consume_limit(
+        db,
+        settings,
+        actor=f"email:{normalize_email(str(payload.email))}",
+        operation="forgot-password-email",
+        limit=settings.auth_forgot_password_identifier_limit,
+    )
     request_password_reset(
         db,
         str(payload.email),
@@ -146,6 +258,60 @@ def reset_password_endpoint(
 
 
 @router.post(
+    "/email/send-verification",
+    response_model=GenericMessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def email_send_verification(
+    request: Request,
+    user: CurrentUser,
+    db: DatabaseSession,
+    settings: AppSettings,
+    email_provider: EmailDelivery,
+) -> GenericMessageResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="email-verification-ip",
+        limit=settings.auth_email_verification_ip_limit,
+    )
+    _consume_limit(
+        db,
+        settings,
+        actor=f"user:{user.id}",
+        operation="email-verification-user",
+        limit=settings.auth_email_verification_user_limit,
+    )
+    request_email_verification(
+        db,
+        user,
+        settings.email_verification_ttl_seconds,
+        settings.frontend_origin,
+        email_provider,
+    )
+    return GenericMessageResponse(message=EMAIL_VERIFICATION_MESSAGE)
+
+
+@router.post(
+    "/email/verify",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def email_verify(
+    payload: EmailVerificationRequest,
+    db: DatabaseSession,
+    email_provider: EmailDelivery,
+) -> None:
+    if not verify_email(db, payload.token, email_provider):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token",
+        )
+
+
+@router.post(
     "/phone/send-otp",
     response_model=PhoneOtpSentResponse,
     status_code=status.HTTP_202_ACCEPTED,
@@ -153,10 +319,25 @@ def reset_password_endpoint(
 )
 def phone_send_otp(
     payload: PhoneSendOtpRequest,
+    request: Request,
     db: DatabaseSession,
     settings: AppSettings,
     sms_provider: SmsDelivery,
 ) -> PhoneOtpSentResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="phone-otp-ip",
+        limit=settings.auth_phone_otp_ip_limit,
+    )
+    _consume_limit(
+        db,
+        settings,
+        actor=f"phone:{payload.phone_number}",
+        operation="phone-otp-phone",
+        limit=settings.auth_phone_otp_identifier_limit,
+    )
     result = send_phone_otp(
         db,
         payload.phone_number,

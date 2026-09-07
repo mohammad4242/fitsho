@@ -1,29 +1,50 @@
 import hmac
+import logging
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from urllib.parse import quote
+from uuid import uuid4
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import Table, delete, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.auth.exceptions import EmailAlreadyRegisteredError, InvalidCredentialsError
-from app.auth.models import AuthSession, PasswordResetToken, PhoneOtpChallenge, User
-from app.auth.providers import EmailProvider, SmsProvider
+from app.auth.exceptions import (
+    AuthRateLimitError,
+    EmailAlreadyRegisteredError,
+    GoogleAccountConflictError,
+    InvalidCredentialsError,
+)
+from app.auth.models import (
+    AuthOperationRateLimit,
+    AuthSession,
+    EmailVerificationToken,
+    PasswordResetToken,
+    PhoneOtpChallenge,
+    User,
+)
+from app.auth.providers import EmailProvider, GoogleIdentity, SmsProvider
 from app.auth.schemas import LoginRequest, RegisterRequest
 from app.auth.security import (
     DUMMY_PASSWORD_HASH,
+    hash_email_verification_token,
     hash_otp_code,
     hash_password,
     hash_password_reset_token,
+    hash_rate_limit_actor,
     hash_session_token,
+    make_email_verification_token,
     make_otp_code,
     make_password_reset_token,
     make_session_token,
     normalize_iranian_phone,
     verify_password,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -41,24 +62,58 @@ def normalize_email(email: str) -> str:
     return email.strip().casefold()
 
 
+def _new_session(user: User, ttl_seconds: int, now: datetime) -> tuple[AuthSession, str]:
+    raw_token, token_hash = make_session_token()
+    return (
+        AuthSession(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=now + timedelta(seconds=ttl_seconds),
+        ),
+        raw_token,
+    )
+
+
+def _verification_url(frontend_origin: str, raw_token: str) -> str:
+    return f"{frontend_origin.rstrip('/')}/verify-email?token={quote(raw_token)}"
+
+
+def _deliver_email_verification(
+    provider: EmailProvider,
+    recipient: str,
+    verification_url: str,
+) -> None:
+    try:
+        provider.send_email_verification(recipient, verification_url)
+    except Exception:
+        logger.warning("Authentication email verification delivery failed")
+
+
 def register_user(
     db: Session,
     payload: RegisterRequest,
     ttl_seconds: int,
+    email_verification_ttl_seconds: int,
+    frontend_origin: str,
+    provider: EmailProvider,
 ) -> AuthResult:
-    raw_token, token_hash = make_session_token()
+    now = datetime.now(UTC)
+    verification_raw_token, verification_hash = make_email_verification_token()
+    recipient = normalize_email(str(payload.email))
     user = User(
-        email=normalize_email(str(payload.email)),
+        email=recipient,
         password_hash=hash_password(payload.password),
     )
     db.add(user)
     try:
         db.flush()
+        auth_session, raw_token = _new_session(user, ttl_seconds, now)
+        db.add(auth_session)
         db.add(
-            AuthSession(
+            EmailVerificationToken(
                 user_id=user.id,
-                token_hash=token_hash,
-                expires_at=datetime.now(UTC) + timedelta(seconds=ttl_seconds),
+                token_hash=verification_hash,
+                expires_at=now + timedelta(seconds=email_verification_ttl_seconds),
             )
         )
         db.commit()
@@ -69,6 +124,11 @@ def register_user(
     except SQLAlchemyError:
         db.rollback()
         raise
+    _deliver_email_verification(
+        provider,
+        recipient,
+        _verification_url(frontend_origin, verification_raw_token),
+    )
     return AuthResult(user=user, raw_token=raw_token)
 
 
@@ -88,16 +148,74 @@ def login_user(
     if user is None or not password_is_valid:
         raise InvalidCredentialsError
 
-    raw_token, token_hash = make_session_token()
-    db.add(
-        AuthSession(
-            user_id=user.id,
-            token_hash=token_hash,
-            expires_at=datetime.now(UTC) + timedelta(seconds=ttl_seconds),
-        )
-    )
+    auth_session, raw_token = _new_session(user, ttl_seconds, datetime.now(UTC))
+    db.add(auth_session)
     try:
         db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return AuthResult(user=user, raw_token=raw_token)
+
+
+def authenticate_google(
+    db: Session,
+    identity: GoogleIdentity,
+    session_ttl_seconds: int,
+) -> AuthResult:
+    now = datetime.now(UTC)
+    normalized_google_email = (
+        normalize_email(identity.email) if identity.email is not None else None
+    )
+    try:
+        user = db.scalar(select(User).where(User.google_sub == identity.sub).with_for_update())
+        if user is None:
+            email_user = (
+                db.scalar(
+                    select(User).where(User.email == normalized_google_email).with_for_update()
+                )
+                if normalized_google_email is not None
+                else None
+            )
+            if identity.email_verified and normalized_google_email is not None:
+                if email_user is not None:
+                    if email_user.google_sub not in {None, identity.sub}:
+                        raise GoogleAccountConflictError
+                    user = email_user
+                    user.google_sub = identity.sub
+                    user.email_verified_at = user.email_verified_at or now
+                else:
+                    user = User(
+                        email=normalized_google_email,
+                        google_sub=identity.sub,
+                        email_verified_at=now,
+                    )
+                    db.add(user)
+                    db.flush()
+            else:
+                if email_user is not None:
+                    raise GoogleAccountConflictError
+                user = User(google_sub=identity.sub)
+                db.add(user)
+                db.flush()
+        elif (
+            identity.email_verified
+            and normalized_google_email is not None
+            and user.email == normalized_google_email
+            and user.email_verified_at is None
+        ):
+            user.email_verified_at = now
+
+        auth_session, raw_token = _new_session(user, session_ttl_seconds, now)
+        db.add(auth_session)
+        db.commit()
+        db.refresh(user)
+    except GoogleAccountConflictError:
+        db.rollback()
+        raise
+    except IntegrityError as error:
+        db.rollback()
+        raise GoogleAccountConflictError from error
     except SQLAlchemyError:
         db.rollback()
         raise
@@ -144,11 +262,10 @@ def request_password_reset(
     frontend_origin: str,
     provider: EmailProvider,
 ) -> None:
-    raw_token, token_hash = make_password_reset_token()
     user = db.scalar(select(User).where(User.email == normalize_email(email)))
     if user is None or user.email is None:
         return
-
+    raw_token, token_hash = make_password_reset_token()
     now = datetime.now(UTC)
     db.execute(
         update(PasswordResetToken)
@@ -172,8 +289,7 @@ def request_password_reset(
     try:
         provider.send_password_reset(user.email, reset_url)
     except Exception:
-        # Delivery failures must not turn this endpoint into an account-enumeration oracle.
-        return
+        logger.warning("Authentication password reset delivery failed")
 
 
 def reset_password(db: Session, raw_token: str, new_password: str) -> bool:
@@ -201,6 +317,77 @@ def reset_password(db: Session, raw_token: str, new_password: str) -> bool:
     except SQLAlchemyError:
         db.rollback()
         raise
+    return True
+
+
+def request_email_verification(
+    db: Session,
+    user: User,
+    ttl_seconds: int,
+    frontend_origin: str,
+    provider: EmailProvider,
+) -> None:
+    if user.email is None or user.email_verified_at is not None:
+        return
+    now = datetime.now(UTC)
+    raw_token, token_hash = make_email_verification_token()
+    db.execute(
+        update(EmailVerificationToken)
+        .where(
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.used_at.is_(None),
+        )
+        .values(used_at=now)
+    )
+    db.add(
+        EmailVerificationToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=now + timedelta(seconds=ttl_seconds),
+        )
+    )
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    _deliver_email_verification(
+        provider,
+        user.email,
+        _verification_url(frontend_origin, raw_token),
+    )
+
+
+def verify_email(db: Session, raw_token: str, provider: EmailProvider) -> bool:
+    now = datetime.now(UTC)
+    token = db.scalar(
+        select(EmailVerificationToken)
+        .where(EmailVerificationToken.token_hash == hash_email_verification_token(raw_token))
+        .with_for_update()
+    )
+    if token is None or token.used_at is not None or token.expires_at <= now:
+        return False
+    user = db.get(User, token.user_id)
+    if user is None or user.email is None:
+        return False
+    user.email_verified_at = user.email_verified_at or now
+    db.execute(
+        update(EmailVerificationToken)
+        .where(
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.used_at.is_(None),
+        )
+        .values(used_at=now)
+    )
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    try:
+        provider.send_welcome_email(user.email)
+    except Exception:
+        logger.warning("Authentication welcome email delivery failed")
     return True
 
 
@@ -260,8 +447,7 @@ def send_phone_otp(
     try:
         provider.send_login_otp(phone_number, code)
     except Exception:
-        # Delivery failures must not expose whether this number belongs to an account.
-        pass
+        logger.warning("Authentication SMS OTP delivery failed")
     return OtpSendResult(retry_after_seconds=cooldown_seconds)
 
 
@@ -313,14 +499,8 @@ def verify_phone_otp(
         user = User(phone_number=phone_number)
         db.add(user)
         db.flush()
-    raw_token, token_hash = make_session_token()
-    db.add(
-        AuthSession(
-            user_id=user.id,
-            token_hash=token_hash,
-            expires_at=now + timedelta(seconds=session_ttl_seconds),
-        )
-    )
+    auth_session, raw_token = _new_session(user, session_ttl_seconds, now)
+    db.add(auth_session)
     try:
         db.commit()
         db.refresh(user)
@@ -328,3 +508,42 @@ def verify_phone_otp(
         db.rollback()
         raise
     return AuthResult(user=user, raw_token=raw_token)
+
+
+def consume_auth_rate_limit(
+    db: Session,
+    *,
+    actor: str,
+    operation: str,
+    limit: int,
+    window_seconds: int,
+    hmac_secret: str,
+    now: datetime | None = None,
+) -> None:
+    current = now or datetime.now(UTC)
+    epoch = int(current.timestamp())
+    window_epoch = epoch - (epoch % window_seconds)
+    window_start = datetime.fromtimestamp(window_epoch, UTC)
+    table = cast(Table, AuthOperationRateLimit.__table__)
+    statement = (
+        insert(table)
+        .values(
+            id=uuid4(),
+            actor_hash=hash_rate_limit_actor(actor, hmac_secret),
+            operation=operation,
+            window_started_at=window_start,
+            request_count=1,
+        )
+        .on_conflict_do_update(
+            constraint="uq_auth_operation_rate_window",
+            set_={
+                "request_count": table.c.request_count + 1,
+                "updated_at": current,
+            },
+        )
+        .returning(table.c.request_count)
+    )
+    count = int(db.execute(statement).scalar_one())
+    db.commit()
+    if count > limit:
+        raise AuthRateLimitError(window_epoch + window_seconds - epoch)
