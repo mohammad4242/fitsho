@@ -10608,6 +10608,241 @@
         "title": "MetabolicBasis",
         "type": "string"
       },
+      "MobileAuthResponse": {
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "refresh_expires_in": {
+            "title": "Refresh Expires In",
+            "type": "integer"
+          },
+          "refresh_token": {
+            "title": "Refresh Token",
+            "type": "string"
+          },
+          "token_type": {
+            "const": "Bearer",
+            "default": "Bearer",
+            "title": "Token Type",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponse"
+          }
+        },
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in",
+          "refresh_expires_in",
+          "user"
+        ],
+        "title": "MobileAuthResponse",
+        "type": "object"
+      },
+      "MobileGoogleLoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "app_version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "App Version",
+            "type": "string"
+          },
+          "credential": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "title": "Credential",
+            "type": "string"
+          },
+          "device_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Device Id",
+            "type": "string"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "platform": {
+            "enum": [
+              "android",
+              "ios"
+            ],
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "platform",
+          "app_version",
+          "credential"
+        ],
+        "title": "MobileGoogleLoginRequest",
+        "type": "object"
+      },
+      "MobilePasswordLoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "app_version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "App Version",
+            "type": "string"
+          },
+          "device_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Device Id",
+            "type": "string"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "email": {
+            "format": "email",
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Password",
+            "type": "string"
+          },
+          "platform": {
+            "enum": [
+              "android",
+              "ios"
+            ],
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "platform",
+          "app_version",
+          "email",
+          "password"
+        ],
+        "title": "MobilePasswordLoginRequest",
+        "type": "object"
+      },
+      "MobilePhoneSendOtpRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "phone_number": {
+            "maxLength": 14,
+            "minLength": 11,
+            "title": "Phone Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone_number"
+        ],
+        "title": "MobilePhoneSendOtpRequest",
+        "type": "object"
+      },
+      "MobilePhoneVerifyOtpRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "app_version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "App Version",
+            "type": "string"
+          },
+          "code": {
+            "pattern": "^\\d{6}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "device_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Device Id",
+            "type": "string"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "phone_number": {
+            "maxLength": 14,
+            "minLength": 11,
+            "title": "Phone Number",
+            "type": "string"
+          },
+          "platform": {
+            "enum": [
+              "android",
+              "ios"
+            ],
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "platform",
+          "app_version",
+          "phone_number",
+          "code"
+        ],
+        "title": "MobilePhoneVerifyOtpRequest",
+        "type": "object"
+      },
+      "MobileRefreshRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "refresh_token": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Refresh Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "refresh_token"
+        ],
+        "title": "MobileRefreshRequest",
+        "type": "object"
+      },
       "ModelCatalogItem": {
         "properties": {
           "available": {
@@ -21761,6 +21996,12 @@
         "title": "WorkoutReviewStatus",
         "type": "string"
       }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
@@ -21804,6 +22045,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Cancel Active Agent Authentication",
         "tags": [
           "admin-ai-settings"
@@ -21845,6 +22091,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Logout Agent Authentication",
         "tags": [
           "admin-ai-settings"
@@ -21886,6 +22137,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Start Agent Authentication",
         "tags": [
           "admin-ai-settings"
@@ -21929,6 +22185,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Cancel Agent Authentication",
         "tags": [
           "admin-ai-settings"
@@ -21970,6 +22231,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Agent Authentication",
         "tags": [
           "admin-ai-settings"
@@ -22023,6 +22289,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Submit Agent Authentication Input",
         "tags": [
           "admin-ai-settings"
@@ -22072,6 +22343,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Agent Service Capabilities",
         "tags": [
           "admin-ai-settings"
@@ -22093,6 +22369,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Agent Service Proxy",
         "tags": [
           "admin-ai-settings"
@@ -22132,6 +22413,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Agent Service Proxy",
         "tags": [
           "admin-ai-settings"
@@ -22173,6 +22459,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Test Agent Service Task",
         "tags": [
           "admin-ai-settings"
@@ -22214,6 +22505,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Test Agent Service Connection",
         "tags": [
           "admin-ai-settings"
@@ -22272,6 +22568,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Models",
         "tags": [
           "admin-ai-settings"
@@ -22293,6 +22594,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Refresh Models",
         "tags": [
           "admin-ai-settings"
@@ -22318,6 +22624,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Providers",
         "tags": [
           "admin-ai-settings"
@@ -22359,6 +22670,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Test Provider",
         "tags": [
           "admin-ai-settings"
@@ -22384,6 +22700,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Task Configs",
         "tags": [
           "admin-ai-settings"
@@ -22435,6 +22756,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Task Config",
         "tags": [
           "admin-ai-settings"
@@ -22478,6 +22804,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Retry Analysis As Admin",
         "tags": [
           "admin-body-analyses"
@@ -22731,6 +23062,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Admin Exercises",
         "tags": [
           "admin"
@@ -22770,6 +23106,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Exercise",
         "tags": [
           "admin"
@@ -22806,6 +23147,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Delete Exercise",
         "tags": [
           "admin"
@@ -22847,6 +23193,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Admin Exercise",
         "tags": [
           "admin"
@@ -22898,6 +23249,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Exercise",
         "tags": [
           "admin"
@@ -22975,6 +23331,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Training Program Structures",
         "tags": [
           "admin"
@@ -23014,6 +23375,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Structure",
         "tags": [
           "admin"
@@ -23050,6 +23416,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Delete Structure",
         "tags": [
           "admin"
@@ -23091,6 +23462,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Training Program Structure",
         "tags": [
           "admin"
@@ -23142,6 +23518,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Structure",
         "tags": [
           "admin"
@@ -23185,6 +23566,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Activate Structure",
         "tags": [
           "admin"
@@ -23228,6 +23614,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Deactivate Structure",
         "tags": [
           "admin"
@@ -23328,6 +23719,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Training Program Templates",
         "tags": [
           "admin"
@@ -23367,6 +23763,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Training Template",
         "tags": [
           "admin"
@@ -23403,6 +23804,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Delete Training Template",
         "tags": [
           "admin"
@@ -23444,6 +23850,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Training Program Template",
         "tags": [
           "admin"
@@ -23495,6 +23906,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Training Template",
         "tags": [
           "admin"
@@ -23558,6 +23974,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Delete Training Template Slot",
         "tags": [
           "admin"
@@ -23629,6 +24050,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Training Template Slot",
         "tags": [
           "admin"
@@ -23650,6 +24076,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Email Send Verification",
         "tags": [
           "auth"
@@ -23842,7 +24273,255 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/google": {
+      "post": {
+        "operationId": "mobile_google_auth_api_v1_auth_mobile_google_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileGoogleLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileAuthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mobile Google Auth",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/logout": {
+      "post": {
+        "operationId": "mobile_logout_api_v1_auth_mobile_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mobile Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/logout-all": {
+      "post": {
+        "operationId": "mobile_logout_all_api_v1_auth_mobile_logout_all_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mobile Logout All",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/password": {
+      "post": {
+        "operationId": "mobile_password_login_api_v1_auth_mobile_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobilePasswordLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileAuthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mobile Password Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/phone/send-otp": {
+      "post": {
+        "operationId": "mobile_phone_send_otp_api_v1_auth_mobile_phone_send_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobilePhoneSendOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneOtpSentResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mobile Phone Send Otp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/phone/verify-otp": {
+      "post": {
+        "operationId": "mobile_phone_verify_otp_api_v1_auth_mobile_phone_verify_otp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobilePhoneVerifyOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileAuthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mobile Phone Verify Otp",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/refresh": {
+      "post": {
+        "operationId": "mobile_refresh_api_v1_auth_mobile_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileRefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileAuthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mobile Refresh",
         "tags": [
           "auth"
         ]
@@ -24020,6 +24699,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "List Sessions",
         "tags": [
           "body-photos"
@@ -24059,6 +24743,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Session",
         "tags": [
           "body-photos"
@@ -24095,6 +24784,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Delete Session",
         "tags": [
           "body-photos"
@@ -24136,6 +24830,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Get Session",
         "tags": [
           "body-photos"
@@ -24187,6 +24886,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Get Session Analysis",
         "tags": [
           "body-analysis"
@@ -24238,6 +24942,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Start Session Analysis",
         "tags": [
           "body-analysis"
@@ -24298,6 +25007,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Retry Session Analysis",
         "tags": [
           "body-analysis"
@@ -24349,6 +25063,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Get Session Comparison",
         "tags": [
           "body-progress"
@@ -24402,6 +25121,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Record Training Consent",
         "tags": [
           "body-photos"
@@ -24463,6 +25187,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Upload Photo",
         "tags": [
           "body-photos"
@@ -24512,6 +25241,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Get Photo Content",
         "tags": [
           "body-photos"
@@ -24565,6 +25299,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Submit Session",
         "tags": [
           "body-photos"
@@ -24586,6 +25325,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Get Body Progress Timeline",
         "tags": [
           "body-progress"
@@ -24632,6 +25376,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Queue",
         "tags": [
           "coach-workout-reviews"
@@ -24653,6 +25402,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Access",
         "tags": [
           "coach-workout-reviews"
@@ -24696,6 +25450,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Review",
         "tags": [
           "coach-workout-reviews"
@@ -24749,6 +25508,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Approve Review",
         "tags": [
           "coach-workout-reviews"
@@ -24792,6 +25556,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Claim Review",
         "tags": [
           "coach-workout-reviews"
@@ -24845,6 +25614,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Save Review Draft",
         "tags": [
           "coach-workout-reviews"
@@ -24888,6 +25662,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Renew Review",
         "tags": [
           "coach-workout-reviews"
@@ -24909,6 +25688,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Categories",
         "tags": [
           "exercises"
@@ -25107,6 +25891,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Exercises",
         "tags": [
           "exercises"
@@ -25165,6 +25954,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Exercise",
         "tags": [
           "exercises"
@@ -25186,6 +25980,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Adaptive Preferences",
         "tags": [
           "nutrition"
@@ -25239,6 +26038,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Adherence",
         "tags": [
           "nutrition"
@@ -25329,6 +26133,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Admin Food Catalogue",
         "tags": [
           "nutrition"
@@ -25370,6 +26179,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Or Update Catalogue Food",
         "tags": [
           "nutrition"
@@ -25405,6 +26219,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Retire Food",
         "tags": [
           "nutrition"
@@ -25457,6 +26276,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Upload Catalogue Food Image",
         "tags": [
           "nutrition"
@@ -25509,6 +26333,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Food Price Override",
         "tags": [
           "nutrition"
@@ -25561,6 +26390,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Research Single Food Price",
         "tags": [
           "nutrition"
@@ -25610,6 +26444,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Catalogue Meals",
         "tags": [
           "nutrition"
@@ -25649,6 +26488,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Catalogue Meal",
         "tags": [
           "nutrition"
@@ -25690,6 +26534,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Preview Catalogue Prepared Recipe",
         "tags": [
           "nutrition"
@@ -25726,6 +26575,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Remove Catalogue Meal",
         "tags": [
           "nutrition"
@@ -25767,6 +26621,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Catalogue Meal",
         "tags": [
           "nutrition"
@@ -25818,6 +26677,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Replace Catalogue Meal",
         "tags": [
           "nutrition"
@@ -25871,6 +26735,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Upload Catalogue Meal Image",
         "tags": [
           "nutrition"
@@ -25894,6 +26763,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Nutrition Monitoring",
         "tags": [
           "nutrition"
@@ -25917,6 +26791,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Trigger Manual Price Refresh",
         "tags": [
           "nutrition"
@@ -25981,6 +26860,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Nutrition Programs",
         "tags": [
           "nutrition"
@@ -26020,6 +26904,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Nutrition Program",
         "tags": [
           "nutrition"
@@ -26056,6 +26945,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Archive Nutrition Program",
         "tags": [
           "nutrition"
@@ -26097,6 +26991,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Nutrition Program",
         "tags": [
           "nutrition"
@@ -26148,6 +27047,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Replace Nutrition Program",
         "tags": [
           "nutrition"
@@ -26191,6 +27095,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Restore Nutrition Program",
         "tags": [
           "nutrition"
@@ -26232,6 +27141,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Supplement Catalogue",
         "tags": [
           "nutrition"
@@ -26253,6 +27167,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Generate Estimate",
         "tags": [
           "nutrition"
@@ -26274,6 +27193,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Current Estimate",
         "tags": [
           "nutrition"
@@ -26364,6 +27288,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Member Food Catalogue",
         "tags": [
           "nutrition"
@@ -26389,6 +27318,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Verified Foods",
         "tags": [
           "nutrition"
@@ -26414,6 +27348,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read User Lab Requests",
         "tags": [
           "nutrition"
@@ -26439,6 +27378,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Lab Documents",
         "tags": [
           "nutrition"
@@ -26478,6 +27422,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Lab Document",
         "tags": [
           "nutrition"
@@ -26514,6 +27463,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Remove Lab Document",
         "tags": [
           "nutrition"
@@ -26557,6 +27511,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Grant Lab Document Access",
         "tags": [
           "nutrition"
@@ -26614,6 +27573,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Download Lab Document",
         "tags": [
           "nutrition"
@@ -26678,6 +27642,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Shared Meal Catalogue",
         "tags": [
           "nutrition"
@@ -26703,6 +27672,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Physician Access",
         "tags": [
           "nutrition"
@@ -26756,6 +27730,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Physician Lab Request",
         "tags": [
           "nutrition"
@@ -26809,6 +27788,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Physician Lab Review",
         "tags": [
           "nutrition"
@@ -26852,6 +27836,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Physician Plan",
         "tags": [
           "nutrition"
@@ -26905,6 +27894,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Review Plan",
         "tags": [
           "nutrition"
@@ -26958,6 +27952,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Physician Edit Food Quantity",
         "tags": [
           "nutrition"
@@ -27011,6 +28010,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Physician Edit Remove Meal",
         "tags": [
           "nutrition"
@@ -27064,6 +28068,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Physician Edit Food Replacement",
         "tags": [
           "nutrition"
@@ -27111,6 +28120,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Physician Lab Documents",
         "tags": [
           "nutrition"
@@ -27164,6 +28178,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Physician Lab Request",
         "tags": [
           "nutrition"
@@ -27211,6 +28230,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Physician Supplement Orders",
         "tags": [
           "nutrition"
@@ -27262,6 +28286,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Physician Supplement Order",
         "tags": [
           "nutrition"
@@ -27314,6 +28343,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Physician Queue",
         "tags": [
           "nutrition"
@@ -27357,6 +28391,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Claim Physician Review",
         "tags": [
           "nutrition"
@@ -27410,6 +28449,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Modify Physician Supplement Order",
         "tags": [
           "nutrition"
@@ -27463,6 +28507,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Supplement Order Status",
         "tags": [
           "nutrition"
@@ -27492,6 +28541,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Latest Plan Bundle",
         "tags": [
           "nutrition"
@@ -27544,6 +28598,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Select Plan In Bundle",
         "tags": [
           "nutrition"
@@ -27565,6 +28624,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Generate Plan",
         "tags": [
           "nutrition"
@@ -27586,6 +28650,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Active Plan",
         "tags": [
           "nutrition"
@@ -27611,6 +28680,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Plan History",
         "tags": [
           "nutrition"
@@ -27632,6 +28706,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Latest Plan",
         "tags": [
           "nutrition"
@@ -27674,6 +28753,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Plan Revision",
         "tags": [
           "nutrition"
@@ -27727,6 +28811,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Regenerate Plan Partially",
         "tags": [
           "nutrition"
@@ -27780,6 +28869,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Confirm Meal Removal",
         "tags": [
           "nutrition"
@@ -27833,6 +28927,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Preview Meal Removal",
         "tags": [
           "nutrition"
@@ -27886,6 +28985,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Confirm Food Replacement",
         "tags": [
           "nutrition"
@@ -27939,6 +29043,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Preview Food Replacement",
         "tags": [
           "nutrition"
@@ -27992,6 +29101,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Confirm Meal Replacement",
         "tags": [
           "nutrition"
@@ -28045,6 +29159,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Preview Meal Replacement",
         "tags": [
           "nutrition"
@@ -28088,6 +29207,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Meal Feedback",
         "tags": [
           "nutrition"
@@ -28151,6 +29275,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Food Replacement Options",
         "tags": [
           "nutrition"
@@ -28204,6 +29333,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Meal Replacement Options",
         "tags": [
           "nutrition"
@@ -28267,6 +29401,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Meal Feedback",
         "tags": [
           "nutrition"
@@ -28330,6 +29469,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Meal Lock",
         "tags": [
           "nutrition"
@@ -28371,6 +29515,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Download Nutrition Plan Pdf",
         "tags": [
           "nutrition"
@@ -28414,6 +29563,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Shopping List",
         "tags": [
           "nutrition"
@@ -28435,6 +29589,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Nutrition Profile",
         "tags": [
           "nutrition"
@@ -28474,6 +29633,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Nutrition Profile",
         "tags": [
           "nutrition"
@@ -28495,6 +29659,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Review Requirement",
         "tags": [
           "nutrition"
@@ -28516,6 +29685,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Safety",
         "tags": [
           "nutrition"
@@ -28555,6 +29729,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Safety",
         "tags": [
           "nutrition"
@@ -28617,6 +29796,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Structured Exercise",
         "tags": [
           "nutrition"
@@ -28656,6 +29840,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Structured Exercise",
         "tags": [
           "nutrition"
@@ -28681,6 +29870,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read User Supplement Orders",
         "tags": [
           "nutrition"
@@ -28734,6 +29928,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Acknowledge Supplement Order",
         "tags": [
           "nutrition"
@@ -28759,6 +29958,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Supplement Catalogue",
         "tags": [
           "nutrition"
@@ -28800,6 +30004,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Confirmed Target",
         "tags": [
           "nutrition"
@@ -28841,6 +30050,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Daily Check In",
         "tags": [
           "nutrition"
@@ -28884,6 +30098,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Daily Tracking",
         "tags": [
           "nutrition"
@@ -28925,6 +30144,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Catalogue Consumption",
         "tags": [
           "nutrition"
@@ -28966,6 +30190,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Quick Consumption",
         "tags": [
           "nutrition"
@@ -29002,6 +30231,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Remove Consumption Entry",
         "tags": [
           "nutrition"
@@ -29053,6 +30287,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Consumption Entry",
         "tags": [
           "nutrition"
@@ -29106,6 +30345,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Free Meal Consumption",
         "tags": [
           "nutrition"
@@ -29163,6 +30407,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Tracking History",
         "tags": [
           "nutrition"
@@ -29257,6 +30506,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Food Photo Estimate",
         "tags": [
           "nutrition"
@@ -29293,6 +30547,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Remove Food Photo Estimate",
         "tags": [
           "nutrition"
@@ -29336,6 +30595,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Grant Food Photo Access",
         "tags": [
           "nutrition"
@@ -29393,6 +30657,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Confirm Food Photo Estimate",
         "tags": [
           "nutrition"
@@ -29450,6 +30719,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Download Food Photo",
         "tags": [
           "nutrition"
@@ -29493,6 +30767,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Confirm Free Meal Photo Preview",
         "tags": [
           "nutrition"
@@ -29555,6 +30834,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Correct Food Photo Estimate Item",
         "tags": [
           "nutrition"
@@ -29608,6 +30892,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update Planned Meal Tracking",
         "tags": [
           "nutrition"
@@ -29657,6 +30946,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Recent Foods",
         "tags": [
           "nutrition"
@@ -29678,6 +30972,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read",
         "tags": [
           "profile"
@@ -29717,6 +31016,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Update",
         "tags": [
           "profile"
@@ -29756,6 +31060,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create",
         "tags": [
           "profile"
@@ -29797,6 +31106,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Select Mode",
         "tags": [
           "profile"
@@ -29811,6 +31125,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Delete Profile Photo",
         "tags": [
           "profile"
@@ -29828,6 +31147,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Profile Photo",
         "tags": [
           "profile"
@@ -29867,6 +31191,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Upload Profile Photo",
         "tags": [
           "profile"
@@ -29908,6 +31237,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Related Profile Photo",
         "tags": [
           "profile"
@@ -29929,6 +31263,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Shared Profile",
         "tags": [
           "profile"
@@ -29968,6 +31307,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Save Shared Profile",
         "tags": [
           "profile"
@@ -29989,6 +31333,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Status",
         "tags": [
           "profile"
@@ -30032,6 +31381,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Get Specialist Review Detail",
         "tags": [
           "body-analysis-reviews"
@@ -30085,6 +31439,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Submit Specialist Review",
         "tags": [
           "body-analysis-reviews"
@@ -30106,6 +31465,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Current Cycle",
         "tags": [
           "workout-cycles"
@@ -30127,6 +31491,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Current Completion Feedback",
         "tags": [
           "workout-cycles"
@@ -30166,6 +31535,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Submit Current Completion Feedback Route",
         "tags": [
           "workout-cycles"
@@ -30207,6 +31581,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create Current Cycle Replacement",
         "tags": [
           "workout-cycles"
@@ -30228,6 +31607,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Current Weekly Check In",
         "tags": [
           "workout-cycles"
@@ -30267,6 +31651,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Upsert Current Weekly Check In Route",
         "tags": [
           "workout-cycles"
@@ -30310,6 +31699,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Cycle Body Progress Comparison",
         "tags": [
           "workout-cycles"
@@ -30353,6 +31747,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Cycle Exercise Feedback Suggestions",
         "tags": [
           "workout-cycles"
@@ -30396,6 +31795,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Cycle Feedback Body Progress Context",
         "tags": [
           "workout-cycles"
@@ -30417,6 +31821,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Active Plan",
         "tags": [
           "workout-plans"
@@ -30465,6 +31874,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Generate Plan",
         "tags": [
           "workout-plans"
@@ -30490,6 +31904,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Plan History",
         "tags": [
           "workout-plans"
@@ -30533,6 +31952,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read Plan",
         "tags": [
           "workout-plans"
@@ -30572,6 +31996,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Download Plan Pdf",
         "tags": [
           "workout-plans"

@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_cookie_name: str = "__Host-fitsho_session"
     session_ttl_seconds: int = 60 * 60 * 24 * 7
+    mobile_access_token_ttl_seconds: int = Field(default=900, ge=60, le=3600)
+    mobile_refresh_token_ttl_seconds: int = Field(
+        default=30 * 24 * 60 * 60, ge=3600, le=365 * 24 * 60 * 60
+    )
     email_provider: Literal["fake", "smtp"] = "fake"
     smtp_host: str | None = None
     smtp_port: int = Field(default=587, ge=1, le=65535)

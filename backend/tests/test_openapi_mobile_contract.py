@@ -16,3 +16,13 @@ def test_member_and_specialist_json_success_responses_are_structured() -> None:
                 if schema and schema.get("additionalProperties") is True:
                     loose.append(f"{method.upper()} {path}")
     assert loose == []
+
+
+def test_openapi_publishes_native_bearer_security() -> None:
+    document = app.openapi()
+    scheme = document["components"]["securitySchemes"]["HTTPBearer"]
+
+    assert scheme == {"type": "http", "scheme": "bearer"}
+    assert document["paths"]["/api/v1/auth/mobile/logout"]["post"]["security"] == [
+        {"HTTPBearer": []}
+    ]

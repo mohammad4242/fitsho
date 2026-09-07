@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -78,3 +79,57 @@ class UserResponse(BaseModel):
     profile_photo_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MobileClientMetadata(BaseModel):
+    device_id: str = Field(min_length=1, max_length=128)
+    platform: Literal["android", "ios"]
+    app_version: str = Field(min_length=1, max_length=64)
+    device_name: str | None = Field(default=None, max_length=128)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MobilePasswordLoginRequest(MobileClientMetadata):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class MobileGoogleLoginRequest(MobileClientMetadata):
+    credential: str = Field(min_length=1, max_length=8192)
+
+
+class MobilePhoneVerifyOtpRequest(MobileClientMetadata):
+    phone_number: str = Field(min_length=11, max_length=14)
+    code: str = Field(pattern=r"^\d{6}$")
+
+    @field_validator("phone_number")
+    @classmethod
+    def normalize_phone_number(cls, value: str) -> str:
+        return normalize_iranian_phone(value)
+
+
+class MobilePhoneSendOtpRequest(BaseModel):
+    phone_number: str = Field(min_length=11, max_length=14)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("phone_number")
+    @classmethod
+    def normalize_phone_number(cls, value: str) -> str:
+        return normalize_iranian_phone(value)
+
+
+class MobileRefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1, max_length=256)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MobileAuthResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: Literal["Bearer"] = "Bearer"
+    expires_in: int
+    refresh_expires_in: int
+    user: UserResponse

@@ -9,7 +9,7 @@ from app.auth.cookies import (
     require_trusted_origin,
     set_session_cookie,
 )
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_mobile_session, get_current_user
 from app.auth.exceptions import (
     AuthRateLimitError,
     EmailAlreadyRegisteredError,
@@ -24,6 +24,12 @@ from app.auth.schemas import (
     GenericMessageResponse,
     GoogleAuthRequest,
     LoginRequest,
+    MobileAuthResponse,
+    MobileGoogleLoginRequest,
+    MobilePasswordLoginRequest,
+    MobilePhoneSendOtpRequest,
+    MobilePhoneVerifyOtpRequest,
+    MobileRefreshRequest,
     PhoneOtpSentResponse,
     PhoneSendOtpRequest,
     PhoneVerifyOtpRequest,
@@ -32,15 +38,24 @@ from app.auth.schemas import (
     UserResponse,
 )
 from app.auth.service import (
+    MobileAccessContext,
+    MobileAuthResult,
     authenticate_google,
+    authenticate_mobile_google,
+    authenticate_mobile_phone_otp,
+    authenticate_password_user,
     consume_auth_rate_limit,
+    issue_mobile_tokens,
     login_user,
     logout_session,
     normalize_email,
+    refresh_mobile_tokens,
     register_user,
     request_email_verification,
     request_password_reset,
     reset_password,
+    revoke_all_mobile_token_families,
+    revoke_mobile_token_family,
     send_phone_otp,
     verify_email,
     verify_phone_otp,
@@ -53,6 +68,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
+CurrentMobileSession = Annotated[MobileAccessContext, Depends(get_current_mobile_session)]
 
 FORGOT_PASSWORD_MESSAGE = "If the account exists, a reset link has been sent."
 PHONE_OTP_MESSAGE = "If the number can receive messages, an OTP has been sent."
@@ -113,6 +129,16 @@ def _consume_limit(
         ) from None
 
 
+def _mobile_auth_response(result: MobileAuthResult) -> MobileAuthResponse:
+    return MobileAuthResponse(
+        access_token=result.raw_access_token,
+        refresh_token=result.raw_refresh_token,
+        expires_in=result.access_expires_in,
+        refresh_expires_in=result.refresh_expires_in,
+        user=UserResponse.model_validate(result.user),
+    )
+
+
 @router.post(
     "/register",
     response_model=UserResponse,
@@ -167,6 +193,40 @@ def login(
 
 
 @router.post(
+    "/mobile/password",
+    response_model=MobileAuthResponse,
+)
+def mobile_password_login(
+    payload: MobilePasswordLoginRequest,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> MobileAuthResponse:
+    try:
+        user = authenticate_password_user(
+            db,
+            LoginRequest(email=payload.email, password=payload.password),
+        )
+    except InvalidCredentialsError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
+    return _mobile_auth_response(
+        issue_mobile_tokens(
+            db,
+            user,
+            device_id=payload.device_id,
+            platform=payload.platform,
+            app_version=payload.app_version,
+            device_name=payload.device_name,
+            access_ttl_seconds=settings.mobile_access_token_ttl_seconds,
+            refresh_ttl_seconds=settings.mobile_refresh_token_ttl_seconds,
+        )
+    )
+
+
+@router.post(
     "/google",
     response_model=UserResponse,
     dependencies=[Depends(require_trusted_origin)],
@@ -202,6 +262,160 @@ def google_auth(
         ) from None
     set_session_cookie(response, result.raw_token, settings)
     return UserResponse.model_validate(result.user)
+
+
+@router.post(
+    "/mobile/google",
+    response_model=MobileAuthResponse,
+)
+def mobile_google_auth(
+    payload: MobileGoogleLoginRequest,
+    db: DatabaseSession,
+    settings: AppSettings,
+    provider: GoogleIdentityDelivery,
+) -> MobileAuthResponse:
+    try:
+        identity = provider.verify(payload.credential)
+    except (GoogleAuthError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google authentication failed",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
+    try:
+        result = authenticate_mobile_google(
+            db,
+            identity,
+            device_id=payload.device_id,
+            platform=payload.platform,
+            app_version=payload.app_version,
+            device_name=payload.device_name,
+            access_ttl_seconds=settings.mobile_access_token_ttl_seconds,
+            refresh_ttl_seconds=settings.mobile_refresh_token_ttl_seconds,
+        )
+    except GoogleAccountConflictError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Unable to use this Google account",
+        ) from None
+    return _mobile_auth_response(result)
+
+
+@router.post(
+    "/mobile/phone/send-otp",
+    response_model=PhoneOtpSentResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def mobile_phone_send_otp(
+    payload: MobilePhoneSendOtpRequest,
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+    sms_provider: SmsDelivery,
+) -> PhoneOtpSentResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="mobile-phone-otp-ip",
+        limit=settings.auth_phone_otp_ip_limit,
+    )
+    _consume_limit(
+        db,
+        settings,
+        actor=f"phone:{payload.phone_number}",
+        operation="mobile-phone-otp-phone",
+        limit=settings.auth_phone_otp_identifier_limit,
+    )
+    result = send_phone_otp(
+        db,
+        payload.phone_number,
+        settings.phone_otp_ttl_seconds,
+        settings.phone_otp_resend_cooldown_seconds,
+        settings.phone_otp_max_attempts,
+        settings.phone_otp_hmac_secret.get_secret_value(),
+        sms_provider,
+    )
+    return PhoneOtpSentResponse(
+        message=PHONE_OTP_MESSAGE,
+        retry_after_seconds=result.retry_after_seconds,
+    )
+
+
+@router.post(
+    "/mobile/phone/verify-otp",
+    response_model=MobileAuthResponse,
+)
+def mobile_phone_verify_otp(
+    payload: MobilePhoneVerifyOtpRequest,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> MobileAuthResponse:
+    result = authenticate_mobile_phone_otp(
+        db,
+        payload.phone_number,
+        payload.code,
+        settings.phone_otp_hmac_secret.get_secret_value(),
+        device_id=payload.device_id,
+        platform=payload.platform,
+        app_version=payload.app_version,
+        device_name=payload.device_name,
+        access_ttl_seconds=settings.mobile_access_token_ttl_seconds,
+        refresh_ttl_seconds=settings.mobile_refresh_token_ttl_seconds,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired OTP",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return _mobile_auth_response(result)
+
+
+@router.post(
+    "/mobile/refresh",
+    response_model=MobileAuthResponse,
+)
+def mobile_refresh(
+    payload: MobileRefreshRequest,
+    db: DatabaseSession,
+    settings: AppSettings,
+) -> MobileAuthResponse:
+    result = refresh_mobile_tokens(
+        db,
+        payload.refresh_token,
+        access_ttl_seconds=settings.mobile_access_token_ttl_seconds,
+        refresh_ttl_seconds=settings.mobile_refresh_token_ttl_seconds,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return _mobile_auth_response(result)
+
+
+@router.post(
+    "/mobile/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def mobile_logout(
+    session: CurrentMobileSession,
+    db: DatabaseSession,
+) -> None:
+    revoke_mobile_token_family(db, session.family, reason="logout")
+
+
+@router.post(
+    "/mobile/logout-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def mobile_logout_all(
+    session: CurrentMobileSession,
+    db: DatabaseSession,
+) -> None:
+    revoke_all_mobile_token_families(db, session.user.id, reason="logout_all")
 
 
 @router.post(
