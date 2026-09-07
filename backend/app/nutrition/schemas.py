@@ -1372,6 +1372,28 @@ class PhysicianReviewQueueItemResponse(BaseModel):
     overdue: bool
 
 
+class PhysicianMedicalConditionResponse(BaseModel):
+    code: MedicalConditionCode
+    details: str | None
+
+
+class PhysicianMedicationResponse(BaseModel):
+    name: str
+    dosage: str | None
+    notes: str | None
+
+
+class PhysicianMedicalContextResponse(BaseModel):
+    conditions: list[PhysicianMedicalConditionResponse]
+    medications: list[PhysicianMedicationResponse]
+    flags: dict[str, bool]
+    physician_dietary_restrictions: str | None
+    other_relevant_condition: str | None
+    safety_outcome: SafetyOutcome
+    safety_reason_codes: list[str]
+    medical_condition_policy_version: str
+
+
 class PhysicianFoodQuantityInput(BaseModel):
     expected_plan_revision_id: UUID
     meal_id: UUID

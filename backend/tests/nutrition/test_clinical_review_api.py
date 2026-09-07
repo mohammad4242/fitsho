@@ -162,6 +162,61 @@ def test_assigned_review_cannot_be_taken_over_or_approved_by_another_physician(
     assert persisted.physician_user_id != second.id
 
 
+def test_assigned_physician_can_read_current_medical_context_only_for_the_assigned_case(
+    client: TestClient,
+    db: Session,
+) -> None:
+    plan = _member_plan(client, db)
+    safety = client.put(
+        "/api/v1/nutrition/safety",
+        headers=ORIGIN,
+        json={
+            "conditions": [{"code": "kidney_disease", "details": "مرحله دوم"}],
+            "medications": [{"name": "داروی نمونه", "dosage": "10 mg", "notes": "صبح"}],
+            "dangerous_food_reaction_history": False,
+            "pregnant": False,
+            "breastfeeding": False,
+            "eating_disorder_diagnosed": False,
+            "eating_disorder_active_symptoms": False,
+            "emergency_or_danger_symptoms": False,
+            "complex_medication_food_interaction": False,
+            "physician_dietary_restrictions": "نمک کم",
+            "other_relevant_condition": "فشار خون",
+        },
+    )
+    assert safety.status_code == 200, safety.text
+
+    _login_physician(client, db, "context-physician@example.com")
+    review = next(
+        item
+        for item in client.get("/api/v1/nutrition/physician/reviews").json()
+        if item["plan_id"] == plan["id"]
+    )
+    assert (
+        client.post(
+            f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
+            headers=ORIGIN,
+        ).status_code
+        == 200
+    )
+
+    context = client.get(f"/api/v1/nutrition/physician/plans/{plan['id']}/medical-context")
+
+    assert context.status_code == 200, context.text
+    assert context.json()["conditions"] == [{"code": "kidney_disease", "details": "مرحله دوم"}]
+    assert context.json()["medications"] == [
+        {"name": "داروی نمونه", "dosage": "10 mg", "notes": "صبح"}
+    ]
+    assert context.json()["physician_dietary_restrictions"] == "نمک کم"
+    assert context.json()["other_relevant_condition"] == "فشار خون"
+    assert context.json()["safety_reason_codes"]
+
+    _login_physician(client, db, "unassigned-context-physician@example.com")
+    denied = client.get(f"/api/v1/nutrition/physician/plans/{plan['id']}/medical-context")
+    assert denied.status_code == 409
+    assert denied.json()["detail"]["code"] == "REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN"
+
+
 def test_approval_requires_claim_and_activates_exact_due_revision(
     client: TestClient,
     db: Session,

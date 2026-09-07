@@ -54,6 +54,7 @@ from app.nutrition.clinical_service import (
     list_labs,
     list_physician_labs,
     open_lab,
+    physician_medical_context,
     request_labs,
     require_physician,
     review_lab_document,
@@ -240,6 +241,7 @@ from app.nutrition.schemas import (
     PhysicianLabRequestInput,
     PhysicianLabRequestTransitionInput,
     PhysicianLabReviewInput,
+    PhysicianMedicalContextResponse,
     PhysicianPlanActionInput,
     PhysicianQueueView,
     PhysicianReviewQueueItemResponse,
@@ -1759,6 +1761,21 @@ def read_physician_plan(
         return physician_plan(db, user.id, plan_id)
     except PlanEditError as error:
         raise _plan_edit_error(error) from None
+
+
+@router.get(
+    "/physician/plans/{plan_id}/medical-context",
+    response_model=PhysicianMedicalContextResponse,
+)
+def read_physician_medical_context(
+    plan_id: UUID, db: DatabaseSession, user: CurrentUser
+) -> PhysicianMedicalContextResponse:
+    try:
+        return PhysicianMedicalContextResponse.model_validate(
+            physician_medical_context(db, user.id, plan_id)
+        )
+    except ClinicalError as error:
+        raise _clinical_error(error) from None
 
 
 @router.post(

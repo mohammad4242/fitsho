@@ -1743,6 +1743,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/physician/plans/{plan_id}/medical-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Physician Medical Context */
+        get: operations["read_physician_medical_context_api_v1_nutrition_physician_plans__plan_id__medical_context_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/physician/plans/{plan_id}/request-labs": {
         parameters: {
             query?: never;
@@ -7964,6 +7981,41 @@ export type components = {
             notes?: string | null;
             /** Review Status */
             review_status: string;
+        };
+        /** PhysicianMedicalConditionResponse */
+        PhysicianMedicalConditionResponse: {
+            code: components["schemas"]["MedicalConditionCode"];
+            /** Details */
+            details: string | null;
+        };
+        /** PhysicianMedicalContextResponse */
+        PhysicianMedicalContextResponse: {
+            /** Conditions */
+            conditions: components["schemas"]["PhysicianMedicalConditionResponse"][];
+            /** Flags */
+            flags: {
+                [key: string]: boolean;
+            };
+            /** Medical Condition Policy Version */
+            medical_condition_policy_version: string;
+            /** Medications */
+            medications: components["schemas"]["PhysicianMedicationResponse"][];
+            /** Other Relevant Condition */
+            other_relevant_condition: string | null;
+            /** Physician Dietary Restrictions */
+            physician_dietary_restrictions: string | null;
+            safety_outcome: components["schemas"]["SafetyOutcome"];
+            /** Safety Reason Codes */
+            safety_reason_codes: string[];
+        };
+        /** PhysicianMedicationResponse */
+        PhysicianMedicationResponse: {
+            /** Dosage */
+            dosage: string | null;
+            /** Name */
+            name: string;
+            /** Notes */
+            notes: string | null;
         };
         /** PhysicianPlanActionInput */
         PhysicianPlanActionInput: {
@@ -14349,6 +14401,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NutritionLabDocumentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_physician_medical_context_api_v1_nutrition_physician_plans__plan_id__medical_context_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhysicianMedicalContextResponse"];
                 };
             };
             /** @description Validation Error */

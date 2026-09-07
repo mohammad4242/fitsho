@@ -26,8 +26,12 @@ from app.nutrition.enums import (
 from app.nutrition.models import (
     NutritionLabDocument,
     NutritionLabRequest,
+    NutritionMedicalCondition,
+    NutritionMedicalProfile,
+    NutritionMedication,
     NutritionPlanPhysicianReview,
     NutritionReviewAuditEvent,
+    NutritionSafetyDecision,
     NutritionWeeklyPlan,
 )
 from app.nutrition.schemas import PhysicianQueueView
@@ -268,6 +272,56 @@ def list_physician_labs(
             .order_by(NutritionLabDocument.uploaded_at.desc())
         )
     ]
+
+
+def physician_medical_context(
+    db: Session,
+    physician_id: UUID,
+    plan_id: UUID,
+) -> dict[str, object]:
+    plan = _assigned_plan(db, physician_id, plan_id)
+    medical = db.get(NutritionMedicalProfile, plan.user_id)
+    safety = db.scalar(
+        select(NutritionSafetyDecision)
+        .where(NutritionSafetyDecision.id == plan.safety_decision_id)
+        .options(selectinload(NutritionSafetyDecision.reasons))
+    )
+    if medical is None or safety is None:
+        raise ClinicalError("MEDICAL_CONTEXT_NOT_FOUND")
+    conditions = db.scalars(
+        select(NutritionMedicalCondition)
+        .where(NutritionMedicalCondition.user_id == plan.user_id)
+        .order_by(NutritionMedicalCondition.code)
+    ).all()
+    medications = db.scalars(
+        select(NutritionMedication)
+        .where(NutritionMedication.user_id == plan.user_id)
+        .order_by(NutritionMedication.name)
+    ).all()
+    return {
+        "conditions": [
+            {"code": condition.code, "details": condition.details}
+            for condition in conditions
+        ],
+        "medications": [
+            {"name": medication.name, "dosage": medication.dosage, "notes": medication.notes}
+            for medication in medications
+        ],
+        "flags": {
+            "dangerous_food_reaction_history": medical.dangerous_food_reaction_history,
+            "pregnant": medical.pregnant,
+            "breastfeeding": medical.breastfeeding,
+            "eating_disorder_diagnosed": medical.eating_disorder_diagnosed,
+            "eating_disorder_active_symptoms": medical.eating_disorder_active_symptoms,
+            "emergency_or_danger_symptoms": medical.emergency_or_danger_symptoms,
+            "complex_medication_food_interaction": medical.complex_medication_food_interaction,
+        },
+        "physician_dietary_restrictions": medical.physician_dietary_restrictions,
+        "other_relevant_condition": medical.other_relevant_condition,
+        "safety_outcome": safety.outcome,
+        "safety_reason_codes": [reason.code for reason in safety.reasons],
+        "medical_condition_policy_version": safety.medical_condition_policy_version,
+    }
 
 
 def review_lab_document(

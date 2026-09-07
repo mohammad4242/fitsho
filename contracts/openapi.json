@@ -14462,6 +14462,140 @@
         "title": "PhysicianLabReviewInput",
         "type": "object"
       },
+      "PhysicianMedicalConditionResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/MedicalConditionCode"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          }
+        },
+        "required": [
+          "code",
+          "details"
+        ],
+        "title": "PhysicianMedicalConditionResponse",
+        "type": "object"
+      },
+      "PhysicianMedicalContextResponse": {
+        "properties": {
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/PhysicianMedicalConditionResponse"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "flags": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Flags",
+            "type": "object"
+          },
+          "medical_condition_policy_version": {
+            "title": "Medical Condition Policy Version",
+            "type": "string"
+          },
+          "medications": {
+            "items": {
+              "$ref": "#/components/schemas/PhysicianMedicationResponse"
+            },
+            "title": "Medications",
+            "type": "array"
+          },
+          "other_relevant_condition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Relevant Condition"
+          },
+          "physician_dietary_restrictions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Physician Dietary Restrictions"
+          },
+          "safety_outcome": {
+            "$ref": "#/components/schemas/SafetyOutcome"
+          },
+          "safety_reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Safety Reason Codes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "conditions",
+          "medications",
+          "flags",
+          "physician_dietary_restrictions",
+          "other_relevant_condition",
+          "safety_outcome",
+          "safety_reason_codes",
+          "medical_condition_policy_version"
+        ],
+        "title": "PhysicianMedicalContextResponse",
+        "type": "object"
+      },
+      "PhysicianMedicationResponse": {
+        "properties": {
+          "dosage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dosage"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "required": [
+          "name",
+          "dosage",
+          "notes"
+        ],
+        "title": "PhysicianMedicationResponse",
+        "type": "object"
+      },
       "PhysicianPlanActionInput": {
         "properties": {
           "action": {
@@ -28208,6 +28342,54 @@
           }
         ],
         "summary": "Read Physician Lab Documents",
+        "tags": [
+          "nutrition"
+        ]
+      }
+    },
+    "/api/v1/nutrition/physician/plans/{plan_id}/medical-context": {
+      "get": {
+        "operationId": "read_physician_medical_context_api_v1_nutrition_physician_plans__plan_id__medical_context_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhysicianMedicalContextResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Physician Medical Context",
         "tags": [
           "nutrition"
         ]
