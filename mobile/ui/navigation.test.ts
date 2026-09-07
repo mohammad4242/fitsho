@@ -149,3 +149,13 @@ it("keeps weekly nutrition plans inside the native nutrition surface", async () 
   const screen = resolve(dirname(appRoot), "nutrition/NutritionFoundationScreen.tsx");
   await expect(readFile(screen, "utf8")).resolves.toMatch(/NutritionPlanSection/);
 });
+
+it("keeps member catalogue browsing and shopping prices inside approved nutrition surfaces", async () => {
+  const foundation = resolve(dirname(appRoot), "nutrition/NutritionFoundationScreen.tsx");
+  const plan = resolve(dirname(appRoot), "nutrition/NutritionPlanSection.tsx");
+  const catalogue = resolve(dirname(appRoot), "nutrition/NutritionCatalogueSection.tsx");
+
+  await expect(readFile(foundation, "utf8")).resolves.toMatch(/NutritionCatalogueSection/);
+  await expect(readFile(plan, "utf8")).resolves.toMatch(/NutritionShoppingList/);
+  await expect(readFile(catalogue, "utf8")).resolves.not.toMatch(/\/admin\//);
+});

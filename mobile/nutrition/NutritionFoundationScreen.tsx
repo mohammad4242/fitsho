@@ -35,6 +35,7 @@ import {
   type StructuredExercise,
 } from "./nutritionApi";
 import { NutritionPlanSection } from "./NutritionPlanSection";
+import { NutritionCatalogueSection } from "./NutritionCatalogueSection";
 
 type ChoiceOption = { readonly label: string; readonly value: string };
 
@@ -133,6 +134,7 @@ export function NutritionFoundationScreen() {
         state={estimateState}
       />
       <NutritionPlanSection safety={safety ?? null} />
+      <NutritionCatalogueSection />
     </Screen>
   );
 }

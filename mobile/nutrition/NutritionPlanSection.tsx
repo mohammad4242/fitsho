@@ -47,6 +47,7 @@ import {
   type StoredNutritionPlanPdf,
 } from "./nutritionPlanPdfStore";
 import type { SafetyDecision } from "./nutritionApi";
+import { NutritionShoppingList } from "./NutritionShoppingList";
 
 type PdfStatus = "checking" | "downloading" | "error" | "idle" | "ready";
 type BundleRole = "budget" | "ideal";
@@ -356,6 +357,13 @@ function NutritionPlanCard({
       ) : (
         <Notice message="برای این نسخه هنوز روزی ثبت نشده است." variant="info" />
       )}
+      <NutritionShoppingList
+        api={api}
+        connectivityStatus={connectivityStatus}
+        executable={executable}
+        historical={historical}
+        planId={currentPlan.id}
+      />
       <NutritionPlanPdf api={api} connectivityStatus={connectivityStatus} pdfStore={pdfStore} planId={plan.id} />
     </View>
   );
