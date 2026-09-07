@@ -135,5 +135,5 @@ function isSafeIdentifier(value: unknown): value is string {
   return typeof value === "string"
     && value.length > 0
     && value.length <= 200
-    && !/[\u0000-\u001f\u007f\s]/u.test(value);
+    && !/[\p{Cc}\s]/u.test(value);
 }

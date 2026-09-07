@@ -38,7 +38,7 @@ function storageKey(userId: string): string {
   if (
     userId.length === 0
     || userId.length > 200
-    || /[\u0000-\u001f\u007f]/u.test(userId)
+    || /\p{Cc}/u.test(userId)
   ) {
     throw new TypeError("A valid user id is required for body-photo storage");
   }
