@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -6,6 +6,7 @@ import { AuthShell } from "../../shared/AuthShell";
 import * as api from "./api";
 import { authErrorMessage } from "./authError";
 import { useAuth } from "./AuthContext";
+import { GoogleSignInButton } from "./GoogleSignInButton";
 
 type LoginMode = "email" | "phone";
 type PhoneStep = "request" | "verify";
@@ -13,7 +14,7 @@ type PhoneStep = "request" | "verify";
 export function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { login, loginWithPhone } = useAuth();
+  const { login, loginWithPhone, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState<LoginMode>("email");
   const [phoneStep, setPhoneStep] = useState<PhoneStep>("request");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -82,6 +83,24 @@ export function LoginPage() {
       )
       .finally(() => setBusy(false));
   }
+
+  const handleGoogleCredential = useCallback(
+    (credential: string) => {
+      setBusy(true);
+      setError(null);
+      void loginWithGoogle(credential)
+        .then(
+          () => navigate("/dashboard", { replace: true }),
+          (requestError: unknown) => setError(authErrorMessage(requestError, t)),
+        )
+        .finally(() => setBusy(false));
+    },
+    [loginWithGoogle, navigate, t],
+  );
+
+  const handleGoogleError = useCallback(() => {
+    setError(t("errors.generic"));
+  }, [t]);
 
   return (
     <AuthShell>
@@ -201,6 +220,17 @@ export function LoginPage() {
           </button>
         </form>
       )}
+
+      <div className="auth-social">
+        <div className="auth-divider">
+          <span>{t("login.or")}</span>
+        </div>
+        <GoogleSignInButton
+          onCredential={handleGoogleCredential}
+          onError={handleGoogleError}
+          disabled={busy}
+        />
+      </div>
 
       <p className="form-alternative">
         {t("login.noAccount")}{" "}

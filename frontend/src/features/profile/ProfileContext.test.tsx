@@ -73,6 +73,7 @@ beforeEach(() => {
     register: vi.fn(),
     login: vi.fn(),
     loginWithPhone: vi.fn(),
+    loginWithGoogle: vi.fn(),
     logout: vi.fn(),
   }));
 });

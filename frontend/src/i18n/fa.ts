@@ -157,6 +157,7 @@ const fa = {
       resendCountdown: "ارسال مجدد تا {{seconds}} ثانیه",
       submit: "ورود به فیتشو",
       submitting: "در حال ورود…",
+      or: "یا",
       noAccount: "هنوز حساب نداری؟",
       registerLink: "حساب بساز",
     },

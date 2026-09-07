@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from "./AuthContext";
 afterEach(() => vi.restoreAllMocks());
 
 function Probe() {
-  const { user, loading, startupError, login, loginWithPhone } = useAuth();
+  const { user, loading, startupError, login, loginWithPhone, loginWithGoogle } = useAuth();
   return (
     <div>
       <span>
@@ -26,6 +26,9 @@ function Probe() {
       </button>
       <button type="button" onClick={() => loginWithPhone("09123456789", "123456")}>
         phone login
+      </button>
+      <button type="button" onClick={() => loginWithGoogle("signed-google-id-token")}>
+        google login
       </button>
     </div>
   );
@@ -116,4 +119,27 @@ it("stores the authenticated user after phone OTP verification", async () => {
 
   expect(api.verifyPhoneOtp).toHaveBeenCalledWith("09123456789", "123456");
   expect(await screen.findByText("+989123456789")).toBeInTheDocument();
+});
+
+it("stores the authenticated user after Google authentication", async () => {
+  vi.spyOn(api, "getCurrentUser").mockResolvedValue(null);
+  vi.spyOn(api, "loginWithGoogle").mockResolvedValue({
+    id: "4",
+    email: "google@example.com",
+    phone_number: null,
+    created_at: "2026-09-07T00:00:00Z",
+    is_admin: false,
+  });
+  const user = userEvent.setup();
+
+  render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  );
+  await waitFor(() => expect(screen.getByText("guest")).toBeInTheDocument());
+  await user.click(screen.getByRole("button", { name: "google login" }));
+
+  expect(api.loginWithGoogle).toHaveBeenCalledWith("signed-google-id-token");
+  expect(await screen.findByText("google@example.com")).toBeInTheDocument();
 });

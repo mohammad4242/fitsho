@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import * as authApi from "./api";
-import { getCurrentUser, login, logout, register } from "./api";
+import { getCurrentUser, login, loginWithGoogle, logout, register } from "./api";
 
 const user = {
   id: "018f0000-0000-7000-8000-000000000001",
@@ -52,6 +52,25 @@ describe("auth api", () => {
       login({ email: user.email, password: "long password" }),
     ).resolves.toEqual(user);
     await expect(logout()).resolves.toBeUndefined();
+  });
+
+  it("sends the Google credential to the backend", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(user), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await expect(loginWithGoogle("signed-google-id-token")).resolves.toEqual(user);
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/v1/auth/google",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ credential: "signed-google-id-token" }),
+      }),
+    );
   });
 
   it("calls password recovery and phone OTP endpoints", async () => {

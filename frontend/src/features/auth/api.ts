@@ -15,6 +15,13 @@ export function login(credentials: Credentials): Promise<User> {
   });
 }
 
+export function loginWithGoogle(credential: string): Promise<User> {
+  return request<User>("/api/v1/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ credential }),
+  });
+}
+
 export function forgotPassword(email: string): Promise<GenericMessage> {
   return request<GenericMessage>("/api/v1/auth/forgot-password", {
     method: "POST",

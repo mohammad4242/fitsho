@@ -157,6 +157,7 @@ const en = {
       resendCountdown: "Resend in {{seconds}} seconds",
       submit: "Sign in to Fitsho",
       submitting: "Signing in…",
+      or: "or",
       noAccount: "New to Fitsho?",
       registerLink: "Create account",
     },

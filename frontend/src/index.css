@@ -591,6 +591,40 @@ html[dir="ltr"] .primary-button span:last-child {
   text-underline-offset: 0.25rem;
 }
 
+.auth-social {
+  display: grid;
+  gap: 1rem;
+  margin-block: 0 1.5rem;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+  content: "";
+}
+
+.google-sign-in-slot {
+  min-height: 44px;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.google-sign-in-slot[data-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
 .loading-screen {
   min-height: 100svh;
   display: grid;

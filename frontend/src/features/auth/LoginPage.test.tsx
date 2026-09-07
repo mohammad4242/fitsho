@@ -8,6 +8,8 @@ import { LoginPage } from "./LoginPage";
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
+  Reflect.deleteProperty(window, "google");
   vi.restoreAllMocks();
 });
 
@@ -38,6 +40,52 @@ it("keeps the login form usable without promotional media", () => {
     "href",
     "/forgot-password",
   );
+});
+
+it("uses the Google Identity credential and reaches the authenticated flow", async () => {
+  vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "fitsho-client-id.apps.googleusercontent.com");
+  let googleCallback: ((response: { credential: string }) => void) | undefined;
+  const initialize = vi.fn(
+    (options: { callback: (response: { credential: string }) => void }) => {
+      googleCallback = options.callback;
+    },
+  );
+  const renderButton = vi.fn();
+  Object.defineProperty(window, "google", {
+    configurable: true,
+    value: { accounts: { id: { initialize, renderButton } } },
+  });
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(new Response(null, { status: 401 }))
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: "google-user",
+          email: "google@example.com",
+          phone_number: null,
+          created_at: "2026-09-07T00:00:00Z",
+          is_admin: false,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+  renderPage();
+  await waitFor(() => expect(initialize).toHaveBeenCalledOnce());
+  expect(renderButton).toHaveBeenCalledOnce();
+  await act(async () => {
+    googleCallback?.({ credential: "signed-google-id-token" });
+  });
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/auth/google",
+    expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ credential: "signed-google-id-token" }),
+    }),
+  );
+  expect(await screen.findByText("dashboard reached")).toBeVisible();
 });
 
 it("shows a clear message for invalid credentials", async () => {
