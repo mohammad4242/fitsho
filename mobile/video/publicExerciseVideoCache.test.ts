@@ -94,6 +94,27 @@ it("deduplicates concurrent downloads for one public video", async () => {
   expect(storage.save).toHaveBeenCalledOnce();
 });
 
+it("finds a persisted video after process restart without downloading it again", async () => {
+  const storage = store();
+  const firstTransport = { download: vi.fn(async () => media(2)) };
+  const firstCache = new PublicExerciseVideoCache({ storage, transport: firstTransport });
+  const path = "/media/exercises/restart.mp4";
+
+  await firstCache.getOrDownload(path);
+
+  const restartedTransport = { download: vi.fn(async () => media(3)) };
+  const restartedCache = new PublicExerciseVideoCache({
+    storage,
+    transport: restartedTransport,
+  });
+
+  await expect(restartedCache.getCached(path)).resolves.toMatchObject({
+    sourcePath: path,
+    byteSize: 2,
+  });
+  expect(restartedTransport.download).not.toHaveBeenCalled();
+});
+
 it("does not treat API or empty responses as public exercise video cache entries", async () => {
   const storage = store();
   const transport = {

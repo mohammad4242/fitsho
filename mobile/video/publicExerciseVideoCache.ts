@@ -117,6 +117,31 @@ export class PublicExerciseVideoCache {
     }
   }
 
+  async getCached(path: string): Promise<PublicVideoCacheFile | null> {
+    const sourcePath = validatePublicExerciseVideoPath(path);
+    const cacheKey = await publicExerciseVideoCacheKey(sourcePath);
+    const current = this.entries.get(cacheKey);
+    if (current !== undefined) {
+      this.touch(current);
+      return current;
+    }
+
+    const persisted = await this.storage.read(cacheKey, sourcePath);
+    if (
+      persisted !== null &&
+      persisted.cacheKey === cacheKey &&
+      persisted.sourcePath === sourcePath &&
+      persisted.byteSize > 0
+    ) {
+      await this.remember(persisted);
+      return persisted;
+    }
+    if (persisted !== null) {
+      await this.storage.remove(cacheKey);
+    }
+    return null;
+  }
+
   async remove(path: string): Promise<void> {
     const cacheKey = await publicExerciseVideoCacheKey(path);
     const existing = this.entries.get(cacheKey);

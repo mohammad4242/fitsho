@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 
+import { createNativeTransport } from "../api/nativeTransport";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
 import { exerciseKeys } from "../data/queryKeys";
@@ -31,8 +32,15 @@ import {
   exerciseSecondaryTitle,
   exerciseTitle,
 } from "./exerciseCopy";
+import {
+  PublicExerciseVideoCache,
+  validatePublicExerciseVideoPath,
+  type PublicVideoCacheFile,
+} from "../video/publicExerciseVideoCache";
+import { ExpoPublicExerciseVideoStore } from "../video/publicExerciseVideoStore";
 
 type MediaPresentationChoice = "male" | "female";
+type VideoDownloadStatus = "checking" | "downloading" | "error" | "idle" | "ready";
 
 export function ExerciseDetailScreen() {
   const auth = useMobileAuth();
@@ -41,9 +49,19 @@ export function ExerciseDetailScreen() {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const api = useMemo(() => createExerciseApi(auth.request), [auth.request]);
   const runtime = useMemo(() => getMobileRuntimeConfig(), []);
+  const videoCache = useMemo(
+    () => new PublicExerciseVideoCache({
+      storage: new ExpoPublicExerciseVideoStore(),
+      transport: createNativeTransport({ apiBaseUrl: runtime.apiBaseUrl }),
+    }),
+    [runtime.apiBaseUrl],
+  );
   const connectivityStatus = useConnectivityStatus();
   const [presentation, setPresentation] = useState<MediaPresentationChoice | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
+  const [cachedVideo, setCachedVideo] = useState<PublicVideoCacheFile | null>(null);
+  const [videoDownloadError, setVideoDownloadError] = useState(false);
+  const [videoDownloadStatus, setVideoDownloadStatus] = useState<VideoDownloadStatus>("idle");
   const presentationQuery = presentation ?? undefined;
   const detailQuery = useQuery({
     enabled: slug !== undefined,
@@ -61,6 +79,9 @@ export function ExerciseDetailScreen() {
   );
   const selectedItem = mediaItems[mediaIndex] ?? mediaItems[0];
   const effectivePresentation = presentation ?? resolveMediaPresentation(detail);
+  const selectedCachedVideo = selectedItem !== undefined && cachedVideo?.sourcePath === selectedItem.mediaPath
+    ? cachedVideo
+    : null;
 
   useEffect(() => {
     setMediaIndex(0);
@@ -77,6 +98,30 @@ export function ExerciseDetailScreen() {
     }
   }, [detail, presentation]);
 
+  useEffect(() => {
+    let active = true;
+    setCachedVideo(null);
+    setVideoDownloadError(false);
+    if (selectedItem === undefined || selectedItem.mediaType !== "video") {
+      setVideoDownloadStatus("idle");
+      return () => {
+        active = false;
+      };
+    }
+    setVideoDownloadStatus("checking");
+    void videoCache.getCached(selectedItem.mediaPath).then((file) => {
+      if (!active) return;
+      setCachedVideo(file);
+      setVideoDownloadStatus(file === null ? "idle" : "ready");
+    }).catch(() => {
+      if (!active) return;
+      setVideoDownloadStatus("idle");
+    });
+    return () => {
+      active = false;
+    };
+  }, [selectedItem?.mediaPath, selectedItem?.mediaType, videoCache]);
+
   useAndroidBackHandler("wizard", () => {
     router.back();
     return true;
@@ -87,6 +132,36 @@ export function ExerciseDetailScreen() {
       setPresentation(next);
       setMediaIndex(0);
     }
+  }
+
+  async function downloadSelectedVideo() {
+    if (
+      selectedItem === undefined ||
+      selectedItem.mediaType !== "video" ||
+      !isDownloadableVideoPath(selectedItem.mediaPath) ||
+      videoDownloadStatus === "checking" ||
+      videoDownloadStatus === "downloading"
+    ) {
+      return;
+    }
+    setVideoDownloadStatus("downloading");
+    setVideoDownloadError(false);
+    try {
+      const file = await videoCache.getOrDownload(selectedItem.mediaPath);
+      setCachedVideo(file);
+      setVideoDownloadStatus("ready");
+    } catch {
+      setVideoDownloadError(true);
+      setVideoDownloadStatus("error");
+    }
+  }
+
+  async function removeSelectedVideo() {
+    if (selectedItem === undefined || selectedCachedVideo === null) return;
+    await videoCache.remove(selectedItem.mediaPath);
+    setCachedVideo(null);
+    setVideoDownloadError(false);
+    setVideoDownloadStatus("idle");
   }
 
   if (slug === undefined) {
@@ -127,12 +202,17 @@ export function ExerciseDetailScreen() {
             <Notice message={exerciseCopy.stale} variant="info" />
           ) : null}
           <ExerciseMediaPanel
+            cachedVideo={selectedCachedVideo}
             detail={detail}
+            downloadError={videoDownloadError}
+            downloadStatus={videoDownloadStatus}
             effectivePresentation={effectivePresentation}
             mediaIndex={mediaIndex}
             mediaItems={mediaItems}
+            onDownload={downloadSelectedVideo}
             runtimeApiBaseUrl={runtime.apiBaseUrl}
             selectedItem={selectedItem}
+            onRemoveDownload={removeSelectedVideo}
             onMediaIndexChange={setMediaIndex}
             onPresentationChange={choosePresentation}
           />
@@ -144,21 +224,31 @@ export function ExerciseDetailScreen() {
 }
 
 function ExerciseMediaPanel({
+  cachedVideo,
   detail,
+  downloadError,
+  downloadStatus,
   effectivePresentation,
   mediaIndex,
   mediaItems,
+  onDownload,
   onMediaIndexChange,
   onPresentationChange,
+  onRemoveDownload,
   runtimeApiBaseUrl,
   selectedItem,
 }: {
+  readonly cachedVideo: PublicVideoCacheFile | null;
   readonly detail: ExerciseDetail;
+  readonly downloadError: boolean;
+  readonly downloadStatus: VideoDownloadStatus;
   readonly effectivePresentation: MediaPresentationChoice;
   readonly mediaIndex: number;
   readonly mediaItems: ExerciseMediaItem[];
+  readonly onDownload: () => Promise<void>;
   readonly onMediaIndexChange: (index: number) => void;
   readonly onPresentationChange: (presentation: MediaPresentationChoice) => void;
+  readonly onRemoveDownload: () => Promise<void>;
   readonly runtimeApiBaseUrl: string;
   readonly selectedItem: ExerciseMediaItem | undefined;
 }) {
@@ -187,12 +277,40 @@ function ExerciseMediaPanel({
           item={selectedItem}
           name={name}
           runtimeApiBaseUrl={runtimeApiBaseUrl}
+          sourceUri={cachedVideo?.uri}
         />
       ) : (
         <View accessibilityRole="image" style={styles.mediaFallback}>
           <Text style={styles.mediaFallbackText}>{exerciseCopy.mediaUnavailable}</Text>
         </View>
       )}
+      {selectedItem?.mediaType === "video" && isDownloadableVideoPath(selectedItem.mediaPath) ? (
+        <View style={styles.downloadSection}>
+          {cachedVideo === null ? (
+            <Button
+              disabled={downloadStatus === "checking"}
+              label="ذخیره برای استفاده آفلاین"
+              loading={downloadStatus === "downloading"}
+              onPress={() => void onDownload()}
+              variant="secondary"
+            />
+          ) : (
+            <Button
+              label="حذف دانلود"
+              onPress={() => void onRemoveDownload()}
+              variant="ghost"
+            />
+          )}
+          <Text style={styles.downloadHint}>
+            {cachedVideo === null
+              ? "ویدئو فقط با انتخاب تو روی دستگاه ذخیره می‌شود."
+              : "این ویدئو برای مشاهده بدون اینترنت روی دستگاه ذخیره است."}
+          </Text>
+          {downloadStatus === "error" || downloadError ? (
+            <Notice message="ذخیرهٔ ویدئو انجام نشد. اتصال و فضای دستگاه را بررسی کن." variant="danger" />
+          ) : null}
+        </View>
+      ) : null}
       {mediaItems.length > 1 ? (
         <View style={styles.mediaSelector}>
           <Text style={styles.mediaCount}>
@@ -223,12 +341,14 @@ function NativeExerciseMedia({
   item,
   name,
   runtimeApiBaseUrl,
+  sourceUri,
 }: {
   readonly item: ExerciseMediaItem;
   readonly name: string;
   readonly runtimeApiBaseUrl: string;
+  readonly sourceUri?: string;
 }) {
-  const source = { uri: resolveExerciseMediaUrl(item.mediaPath, runtimeApiBaseUrl) };
+  const source = { uri: sourceUri ?? resolveExerciseMediaUrl(item.mediaPath, runtimeApiBaseUrl) };
   if (item.mediaType === "video") {
     return (
       <Media
@@ -367,6 +487,15 @@ function resolveMediaPresentation(detail: ExerciseDetail | null | undefined): Me
   return detail?.media_assets?.[0]?.presentation === "female" ? "female" : "male";
 }
 
+function isDownloadableVideoPath(path: string): boolean {
+  try {
+    validatePublicExerciseVideoPath(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function viewData<TData>(state: ReturnType<typeof getMobileViewState<TData>>): TData | undefined {
   if (state.status === "loading") return undefined;
   return "data" in state ? state.data : undefined;
@@ -386,6 +515,17 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  downloadHint: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  downloadSection: {
+    gap: fiticianTokens.spacing[2],
   },
   eyebrow: {
     color: fiticianTokens.colors.aqua,
