@@ -75,7 +75,7 @@ PHONE_OTP_RESEND_COOLDOWN_SECONDS=60
 PHONE_OTP_MAX_ATTEMPTS=5
 ```
 
-Create/approve the `fitsho-login` template in Kavenegar and include its token placeholder as
+Create/approve the `fitsho-login` template in Kavenegar and include the `%token` placeholder
 required by the provider. Fitsho calls Kavenegar's verification lookup endpoint with the
 normalized Iranian phone number, the six-digit token, and the template name; it does not send the
 OTP code through the frontend. See the [Kavenegar REST documentation](https://kavenegar.com/rest.html).
