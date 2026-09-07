@@ -49,6 +49,7 @@ it("defines the public, auth, onboarding, member, coach, and physician route gro
     "(member)/member/(tabs)/nutrition.tsx",
     "(member)/member/(tabs)/profile.tsx",
     "(member)/member/body-analysis.tsx",
+    "(member)/member/body-analysis-history.tsx",
     "(member)/member/exercises/index.tsx",
     "(member)/member/exercises/[slug].tsx",
     "(coach)/_layout.tsx",

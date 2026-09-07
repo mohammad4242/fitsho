@@ -8,6 +8,11 @@ export default function MemberHomeScreen() {
   return (
     <RouteEntryScreen description="برنامه امروز و پیشرفت شما" title="خانه">
       <Button label="تحلیل بدن" onPress={() => router.push("/member/body-analysis")} />
+      <Button
+        label="تاریخچه تحلیل بدن"
+        onPress={() => router.push("/member/body-analysis-history")}
+        variant="secondary"
+      />
     </RouteEntryScreen>
   );
 }
