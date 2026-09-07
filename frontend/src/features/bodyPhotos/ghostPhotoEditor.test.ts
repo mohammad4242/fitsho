@@ -150,7 +150,7 @@ describe("ghost photo transform", () => {
   it.each(["front", "side", "back"] as const)(
     "maps the visible %s privacy line to the source crop",
     (view) => {
-      const expectedSourceY = view === "front" ? 384 : 192;
+      const expectedSourceY = view === "front" ? 384 : view === "side" ? 240 : 144;
 
       expect(privacyCropSourceYForView(
         view,
@@ -187,11 +187,26 @@ describe("ghost photo transform", () => {
       GHOST_EDITOR_DEFAULT_TRANSFORM,
       "back",
     )).toMatchObject({
-      canvasHeight: 1656,
-      sourceCropY: 192,
-      privacyCutPixels: 144,
-      privacyLineDisplayY: 144,
-      draw: { translateX: 600, translateY: 756, rotationRadians: 0, scale: 0.75 },
+      canvasHeight: 1692,
+      sourceCropY: 144,
+      privacyCutPixels: 108,
+      privacyLineDisplayY: 108,
+      draw: { translateX: 600, translateY: 792, rotationRadians: 0, scale: 0.75 },
+    });
+  });
+
+  it("aligns the side render plan with the side privacy boundary", () => {
+    expect(createGhostPhotoRenderPlanForView(
+      1600,
+      2400,
+      GHOST_EDITOR_DEFAULT_TRANSFORM,
+      "side",
+    )).toMatchObject({
+      canvasHeight: 1620,
+      sourceCropY: 240,
+      privacyCutPixels: 180,
+      privacyLineDisplayY: 180,
+      draw: { translateX: 600, translateY: 720, rotationRadians: 0, scale: 0.75 },
     });
   });
 

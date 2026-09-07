@@ -51,7 +51,7 @@ it("applies only a uniform centered scale to the fixed Ghost asset frame", () =>
 
 it("places the back privacy line above the unchanged front line", () => {
   const back = render(<GhostOverlayGuide sex="female" view="back" />);
-  expect(back.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "8%" });
+  expect(back.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "6%" });
   back.unmount();
 
   const front = render(<GhostOverlayGuide sex="female" view="front" />);
@@ -104,13 +104,13 @@ it("keeps the privacy line attached when the Ghost is scaled", () => {
 it("places the side privacy cut line on the ghost neck and scales dynamically", () => {
   const defaultScale = render(<GhostOverlayGuide sex="female" view="side" ghostScale={1} />);
   expect(defaultScale.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
-    top: "8%",
+    top: "10%",
   });
   defaultScale.unmount();
 
   const scaledDown = render(<GhostOverlayGuide sex="female" view="side" ghostScale={0.8} />);
   expect(scaledDown.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
-    top: "16.4%",
+    top: "18%",
     left: "10%",
     width: "80%",
   });
@@ -118,11 +118,23 @@ it("places the side privacy cut line on the ghost neck and scales dynamically", 
 
   const scaledUp = render(<GhostOverlayGuide sex="female" view="side" ghostScale={1.15} />);
   expect(scaledUp.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
-    top: "1.7%",
+    top: "4%",
     left: "-7.5%",
     width: "115%",
   });
 });
+
+it.each(["male", "female"] as const)(
+  "aligns side and back privacy cuts for the %s Ghost",
+  (sex) => {
+    const side = render(<GhostOverlayGuide sex={sex} view="side" />);
+    expect(side.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "10%" });
+    side.unmount();
+
+    const back = render(<GhostOverlayGuide sex={sex} view="back" />);
+    expect(back.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "6%" });
+  },
+);
 
 it("mirrors only the side Ghost for a left profile", () => {
   const { container } = render(

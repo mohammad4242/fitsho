@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampGhostScale,
   getGhostGeometry,
+  ghostPrivacyCutRatioForView,
   ghostPrivacyLineGeometry,
   isPointInZone,
   pointZoneDistance,
@@ -58,7 +59,10 @@ describe("ghostGeometry", () => {
 
     const back = getGhostGeometry({ view: "back", ghostScale: 1.0 });
     expect(back.view).toBe("back");
-    // Back privacy line is higher (0.08 vs 0.16)
+    expect(ghostPrivacyCutRatioForView("front")).toBeCloseTo(0.16);
+    expect(ghostPrivacyCutRatioForView("side")).toBeCloseTo(0.10);
+    expect(ghostPrivacyCutRatioForView("back")).toBeCloseTo(0.06);
+    // Back privacy line is higher (0.06 vs 0.16)
     expect(back.privacyLine.anchor.y).toBeLessThan(front.privacyLine.anchor.y);
 
     const sideRight = getGhostGeometry({ view: "side", sideProfile: "right", ghostScale: 1.0 });

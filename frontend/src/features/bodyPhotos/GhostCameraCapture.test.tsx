@@ -254,8 +254,47 @@ it("captures the higher privacy crop for a back photo", async () => {
   const canvas = document.querySelector("canvas");
   expect(canvas).not.toBeNull();
   expect(canvas).toHaveProperty("width", 1280);
-  expect(canvas).toHaveProperty("height", 1766);
-  expect(drawImage).toHaveBeenCalledWith(video, 0, 154, 1280, 1766, 0, 0, 1280, 1766);
+  expect(canvas).toHaveProperty("height", 1805);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 115, 1280, 1805, 0, 0, 1280, 1805);
+
+  rendered.unmount();
+});
+
+it("captures the lower privacy crop for a side photo", async () => {
+  const drawImage = vi.fn();
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    save: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+    restore: vi.fn(),
+    drawImage,
+  } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation((callback) => {
+    callback(new Blob(["camera-jpeg"], { type: "image/jpeg" }));
+  });
+  const rendered = renderCamera(
+    vi.fn().mockResolvedValue(undefined),
+    "right",
+    "side",
+  );
+  await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1));
+  const video = prepareVideo();
+  await waitFor(() => expect(screen.getByRole("button", { name: /start five-second timer/i })).toBeEnabled());
+  vi.useFakeTimers();
+
+  fireEvent.click(screen.getByRole("button", { name: /start five-second timer/i }));
+  await act(async () => undefined);
+  for (let second = 0; second < 5; second += 1) {
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+  }
+
+  const canvas = document.querySelector("canvas");
+  expect(canvas).not.toBeNull();
+  expect(canvas).toHaveProperty("width", 1280);
+  expect(canvas).toHaveProperty("height", 1728);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 192, 1280, 1728, 0, 0, 1280, 1728);
 
   rendered.unmount();
 });
