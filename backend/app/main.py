@@ -31,6 +31,7 @@ from app.body_photos.router import router as body_photo_router
 from app.config import Settings, get_settings
 from app.database.session import get_engine
 from app.exercises.router import router as exercises_router
+from app.notifications.router import router as notifications_router
 from app.nutrition.price_scheduler import scheduler_loop
 from app.nutrition.retention_scheduler import retention_scheduler_loop
 from app.nutrition.router import router as nutrition_router
@@ -183,6 +184,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(body_progress_history_router)
     app.include_router(profile_router)
     app.include_router(nutrition_router)
+    app.include_router(notifications_router)
     app.include_router(workout_plans_router)
     app.include_router(workout_reviews_router)
     app.include_router(workout_cycles_router)

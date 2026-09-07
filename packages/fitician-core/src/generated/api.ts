@@ -1107,6 +1107,75 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Notification Devices */
+        get: operations["read_notification_devices_api_v1_notifications_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Notification Device */
+        delete: operations["remove_notification_device_api_v1_notifications_devices__device_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/devices/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Upsert Current Notification Device */
+        put: operations["upsert_current_notification_device_api_v1_notifications_devices_current_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Notification Preferences */
+        get: operations["read_notification_preferences_api_v1_notifications_preferences_get"];
+        /** Write Notification Preferences */
+        put: operations["write_notification_preferences_api_v1_notifications_preferences_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/adaptive-preferences": {
         parameters: {
             query?: never;
@@ -6885,6 +6954,85 @@ export type components = {
             visual_observation_notice_code: "standardized_photo_observation_not_direct_measurement";
             /** Visual Transitions */
             visual_transitions: components["schemas"]["BodyProgressVisualTransition"][];
+        };
+        /** NotificationDeviceResponse */
+        NotificationDeviceResponse: {
+            /** App Version */
+            app_version: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Device Id */
+            device_id: string;
+            /** Device Name */
+            device_name: string | null;
+            /** Has Active Token */
+            has_active_token: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Last Seen At
+             * Format: date-time
+             */
+            last_seen_at: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "ios";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** NotificationDeviceTokenUpsertRequest */
+        NotificationDeviceTokenUpsertRequest: {
+            /**
+             * Provider
+             * @default fcm
+             * @constant
+             */
+            provider: "fcm";
+            /** Token */
+            token: string;
+        };
+        /** NotificationPreferencesResponse */
+        NotificationPreferencesResponse: {
+            /** Approved Plans */
+            approved_plans: boolean;
+            /** Body Analysis */
+            body_analysis: boolean;
+            /** Cycle Reminders */
+            cycle_reminders: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Physician Decisions */
+            physician_decisions: boolean;
+            /** Required Reviews */
+            required_reviews: boolean;
+            /** Updated At */
+            updated_at: string | null;
+        };
+        /** NotificationPreferencesUpdateRequest */
+        NotificationPreferencesUpdateRequest: {
+            /** Approved Plans */
+            approved_plans: boolean;
+            /** Body Analysis */
+            body_analysis: boolean;
+            /** Cycle Reminders */
+            cycle_reminders: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Physician Decisions */
+            physician_decisions: boolean;
+            /** Required Reviews */
+            required_reviews: boolean;
         };
         /** NutritionAdaptivePreferencesResponse */
         NutritionAdaptivePreferencesResponse: {
@@ -13069,6 +13217,141 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExerciseDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_notification_devices_api_v1_notifications_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeviceResponse"][];
+                };
+            };
+        };
+    };
+    remove_notification_device_api_v1_notifications_devices__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upsert_current_notification_device_api_v1_notifications_devices_current_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationDeviceTokenUpsertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDeviceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_notification_preferences_api_v1_notifications_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferencesResponse"];
+                };
+            };
+        };
+    };
+    write_notification_preferences_api_v1_notifications_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationPreferencesUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferencesResponse"];
                 };
             };
             /** @description Validation Error */

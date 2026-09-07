@@ -11304,6 +11304,186 @@
         "title": "NormalizedBodyProgressComparisonV2",
         "type": "object"
       },
+      "NotificationDeviceResponse": {
+        "properties": {
+          "app_version": {
+            "title": "App Version",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "device_id": {
+            "title": "Device Id",
+            "type": "string"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "has_active_token": {
+            "title": "Has Active Token",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_seen_at": {
+            "format": "date-time",
+            "title": "Last Seen At",
+            "type": "string"
+          },
+          "platform": {
+            "enum": [
+              "android",
+              "ios"
+            ],
+            "title": "Platform",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "device_id",
+          "platform",
+          "app_version",
+          "device_name",
+          "has_active_token",
+          "created_at",
+          "updated_at",
+          "last_seen_at"
+        ],
+        "title": "NotificationDeviceResponse",
+        "type": "object"
+      },
+      "NotificationDeviceTokenUpsertRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "const": "fcm",
+            "default": "fcm",
+            "title": "Provider",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "NotificationDeviceTokenUpsertRequest",
+        "type": "object"
+      },
+      "NotificationPreferencesResponse": {
+        "properties": {
+          "approved_plans": {
+            "title": "Approved Plans",
+            "type": "boolean"
+          },
+          "body_analysis": {
+            "title": "Body Analysis",
+            "type": "boolean"
+          },
+          "cycle_reminders": {
+            "title": "Cycle Reminders",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "physician_decisions": {
+            "title": "Physician Decisions",
+            "type": "boolean"
+          },
+          "required_reviews": {
+            "title": "Required Reviews",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "enabled",
+          "approved_plans",
+          "required_reviews",
+          "body_analysis",
+          "cycle_reminders",
+          "physician_decisions",
+          "updated_at"
+        ],
+        "title": "NotificationPreferencesResponse",
+        "type": "object"
+      },
+      "NotificationPreferencesUpdateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "approved_plans": {
+            "title": "Approved Plans",
+            "type": "boolean"
+          },
+          "body_analysis": {
+            "title": "Body Analysis",
+            "type": "boolean"
+          },
+          "cycle_reminders": {
+            "title": "Cycle Reminders",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "physician_decisions": {
+            "title": "Physician Decisions",
+            "type": "boolean"
+          },
+          "required_reviews": {
+            "title": "Required Reviews",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "approved_plans",
+          "required_reviews",
+          "body_analysis",
+          "cycle_reminders",
+          "physician_decisions"
+        ],
+        "title": "NotificationPreferencesUpdateRequest",
+        "type": "object"
+      },
       "NutritionAdaptivePreferencesResponse": {
         "properties": {
           "avoid_meal_ids": {
@@ -26178,6 +26358,193 @@
         "summary": "Read Exercise",
         "tags": [
           "exercises"
+        ]
+      }
+    },
+    "/api/v1/notifications/devices": {
+      "get": {
+        "operationId": "read_notification_devices_api_v1_notifications_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDeviceResponse"
+                  },
+                  "title": "Response Read Notification Devices Api V1 Notifications Devices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Notification Devices",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/devices/current": {
+      "put": {
+        "operationId": "upsert_current_notification_device_api_v1_notifications_devices_current_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationDeviceTokenUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationDeviceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Upsert Current Notification Device",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/devices/{device_id}": {
+      "delete": {
+        "operationId": "remove_notification_device_api_v1_notifications_devices__device_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Notification Device",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/preferences": {
+      "get": {
+        "operationId": "read_notification_preferences_api_v1_notifications_preferences_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Notification Preferences",
+        "tags": [
+          "notifications"
+        ]
+      },
+      "put": {
+        "operationId": "write_notification_preferences_api_v1_notifications_preferences_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferencesUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Write Notification Preferences",
+        "tags": [
+          "notifications"
         ]
       }
     },
