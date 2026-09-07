@@ -7,6 +7,7 @@ import {
   type RefreshTokenStorage,
   type TransportRequest,
 } from "@fitician/core";
+import type { User } from "@fitician/core/auth";
 
 import { MemoryAccessTokenStore } from "./tokenStore";
 
@@ -35,6 +36,7 @@ export class MobileAuthClient {
   private refreshInFlight: Promise<RefreshOutcome> | null = null;
   private sessionExpiryInFlight: Promise<void> | null = null;
   private sessionExpiredNotified = false;
+  private user: User | null = null;
 
   constructor(options: MobileAuthClientOptions) {
     this.transport = options.transport;
@@ -50,7 +52,12 @@ export class MobileAuthClient {
   async setSession(tokens: MobileAuthTokens): Promise<void> {
     await this.refreshTokenStorage.write(tokens.refresh_token);
     this.accessTokenStore.set(tokens);
+    this.user = tokens.user;
     this.sessionExpiredNotified = false;
+  }
+
+  getUser(): User | null {
+    return this.user;
   }
 
   async restoreSession(): Promise<boolean> {
@@ -67,6 +74,7 @@ export class MobileAuthClient {
 
   async clearSession(): Promise<void> {
     this.accessTokenStore.clear();
+    this.user = null;
     await this.refreshTokenStorage.clear();
   }
 
@@ -218,6 +226,7 @@ export class MobileAuthClient {
 
   private async performSessionExpiry(): Promise<void> {
     this.accessTokenStore.clear();
+    this.user = null;
     await this.refreshTokenStorage.clear();
     if (this.sessionExpiredNotified) {
       return;
