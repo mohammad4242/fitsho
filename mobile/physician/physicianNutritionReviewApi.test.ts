@@ -10,8 +10,10 @@ import {
 afterEach(() => vi.restoreAllMocks());
 
 it("uses the role-scoped physician queue and access endpoints", async () => {
-  const request = vi.fn<AuthenticatedPhysicianRequest>().mockResolvedValue([]);
-  const api = createPhysicianNutritionReviewApi(request);
+  const request = vi.fn<AuthenticatedPhysicianRequest>(
+    async <TResponse>(_input: TransportRequest): Promise<TResponse> => [] as unknown as TResponse,
+  );
+  const api = createPhysicianNutritionReviewApi(request as unknown as AuthenticatedPhysicianRequest);
 
   await api.getAccess();
   await api.list("claimed");
@@ -33,8 +35,10 @@ it("uses the role-scoped physician queue and access endpoints", async () => {
 });
 
 it("sends the current plan revision for edits and decisions", async () => {
-  const request = vi.fn<AuthenticatedPhysicianRequest>().mockResolvedValue({});
-  const api = createPhysicianNutritionReviewApi(request);
+  const request = vi.fn<AuthenticatedPhysicianRequest>(
+    async <TResponse>(_input: TransportRequest): Promise<TResponse> => ({}) as TResponse,
+  );
+  const api = createPhysicianNutritionReviewApi(request as unknown as AuthenticatedPhysicianRequest);
 
   await api.action("plan-1", "plan-1", "request_changes", "Adjust the portions.", "Internal note");
   await api.adjustFoodQuantity("plan-1", "plan-1", "meal-1", "food-1", 150);
