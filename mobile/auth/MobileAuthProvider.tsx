@@ -11,7 +11,12 @@ import {
 } from "react";
 
 import type { Credentials, GenericMessage, User } from "@fitician/core/auth";
-import type { MultipartUploadRequest, TransportRequest } from "@fitician/core";
+import type {
+  BinaryDownload,
+  BinaryDownloadRequest,
+  MultipartUploadRequest,
+  TransportRequest,
+} from "@fitician/core";
 
 import { createNativeTransport } from "../api/nativeTransport";
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
@@ -27,6 +32,7 @@ export interface MobileAuthContextValue extends MobileAuthSessionSnapshot {
   readonly logout: () => Promise<void>;
   readonly logoutAll: () => Promise<void>;
   readonly register: (credentials: Credentials) => Promise<User>;
+  readonly download: (request: BinaryDownloadRequest) => Promise<BinaryDownload>;
   readonly request: <TResponse>(request: TransportRequest) => Promise<TResponse>;
   readonly upload: <TResponse>(request: MultipartUploadRequest) => Promise<TResponse>;
   readonly resetPassword: (token: string, password: string) => Promise<void>;
@@ -77,6 +83,10 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
   const logout = useCallback(() => activeSession.logout(), [activeSession]);
   const logoutAll = useCallback(() => activeSession.logoutAll(), [activeSession]);
   const register = useCallback((credentials: Credentials) => activeSession.register(credentials), [activeSession]);
+  const download = useCallback(
+    (requestInput: BinaryDownloadRequest) => activeSession.download(requestInput),
+    [activeSession],
+  );
   const request = useCallback(
     <TResponse,>(requestInput: TransportRequest) => activeSession.request<TResponse>(requestInput),
     [activeSession],
@@ -118,6 +128,7 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
       logout,
       logoutAll,
       register,
+      download,
       request,
       upload,
       resetPassword,
@@ -133,6 +144,7 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
       logout,
       logoutAll,
       register,
+      download,
       request,
       upload,
       resetPassword,

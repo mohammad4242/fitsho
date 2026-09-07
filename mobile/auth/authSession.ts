@@ -6,6 +6,8 @@ import type {
   User,
 } from "@fitician/core/auth";
 import type {
+  BinaryDownload,
+  BinaryDownloadRequest,
   FiticianTransport,
   MultipartUploadRequest,
   TransportRequest,
@@ -137,6 +139,10 @@ export class MobileAuthSession {
 
   async request<TResponse>(request: TransportRequest): Promise<TResponse> {
     return this.client.request<TResponse>(request);
+  }
+
+  async download(request: BinaryDownloadRequest): Promise<BinaryDownload> {
+    return this.client.download(request);
   }
 
   async upload<TResponse>(request: MultipartUploadRequest): Promise<TResponse> {
