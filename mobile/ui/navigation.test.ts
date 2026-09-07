@@ -110,3 +110,12 @@ it("uses the native onboarding flow instead of a route placeholder", async () =>
     readFile(resolve(appRoot, "(onboarding)/onboarding/index.tsx"), "utf8"),
   ).resolves.toMatch(/onboarding\/OnboardingScreen/);
 });
+
+it("uses the native profile editor inside the member profile tab", async () => {
+  await expect(
+    readFile(resolve(appRoot, "(member)/member/(tabs)/profile.tsx"), "utf8"),
+  ).resolves.toMatch(/ProfileScreen/);
+  await expect(
+    readFile(resolve(appRoot, "(member)/member/(tabs)/profile.tsx"), "utf8"),
+  ).resolves.not.toMatch(/RouteEntryScreen/);
+});

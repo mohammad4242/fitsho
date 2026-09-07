@@ -1,5 +1,5 @@
-import { RouteEntryScreen } from "../../../../ui/navigation/RouteEntryScreen";
+import { ProfileScreen } from "../../../../profile/ProfileScreen";
 
 export default function MemberProfileScreen() {
-  return <RouteEntryScreen description="اطلاعات و تنظیمات حساب شما" title="پروفایل" />;
+  return <ProfileScreen />;
 }
