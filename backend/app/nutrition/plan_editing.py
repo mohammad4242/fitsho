@@ -986,9 +986,13 @@ def physician_action(
         raise PlanEditError("REVIEW_NOT_CLAIMED")
     if action != "start_review" and plan.review.physician_user_id != physician_id:
         raise PlanEditError("REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN")
-    plan.review.user_visible_notes = notes
+    normalized_notes = notes.strip() if notes else None
+    normalized_internal_notes = internal_notes.strip() if internal_notes else None
+    if action in {"request_changes", "reject"} and not normalized_notes:
+        raise PlanEditError("REVIEW_NOTES_REQUIRED")
+    plan.review.user_visible_notes = normalized_notes
     if internal_notes is not None:
-        plan.review.internal_notes = internal_notes
+        plan.review.internal_notes = normalized_internal_notes
     if action == "start_review":
         if plan.review.status not in {
             NutritionPlanReviewStatus.PENDING,
@@ -1026,8 +1030,6 @@ def physician_action(
         else:
             plan.lifecycle_status = NutritionPlanLifecycleStatus.PHYSICIAN_APPROVED
     elif action == "request_changes":
-        if not notes:
-            raise PlanEditError("REVIEW_NOTES_REQUIRED")
         if plan.review.status not in {
             NutritionPlanReviewStatus.IN_REVIEW,
             NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,
@@ -1036,8 +1038,6 @@ def physician_action(
         plan.review.status = NutritionPlanReviewStatus.CHANGES_REQUESTED
         plan.lifecycle_status = NutritionPlanLifecycleStatus.CHANGES_REQUESTED
     elif action == "reject":
-        if not notes:
-            raise PlanEditError("REVIEW_NOTES_REQUIRED")
         if plan.review.status not in {
             NutritionPlanReviewStatus.IN_REVIEW,
             NutritionPlanReviewStatus.AWAITING_LAB_INFORMATION,

@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -11,6 +12,7 @@ from app.nutrition.models import (
     NutritionLabDocument,
     NutritionLabRequest,
     NutritionPlanPhysicianReview,
+    NutritionReviewAuditEvent,
     NutritionWeeklyPlan,
 )
 from tests.nutrition.test_weekly_plan_api import (
@@ -119,6 +121,130 @@ def test_non_physician_cannot_access_review_queue(client: TestClient, db: Sessio
     _member_plan(client, db)
     response = client.get("/api/v1/nutrition/physician/reviews")
     assert response.status_code == 403
+
+
+def test_admin_status_does_not_grant_physician_role(client: TestClient, db: Session) -> None:
+    _member_plan(client, db)
+    member = db.scalar(select(User).where(User.email == "clinical-member@example.com"))
+    assert member is not None
+    member.is_admin = True
+    db.flush()
+
+    response = client.get("/api/v1/nutrition/physician/reviews")
+
+    assert response.status_code == 403
+
+
+def test_physician_cannot_access_ai_price_administration_endpoints(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _member_plan(client, db)
+    _login_physician(client, db, "price-boundary-physician@example.com")
+
+    monitoring = client.get("/api/v1/nutrition/admin/monitoring")
+    price_research = client.post(
+        "/api/v1/nutrition/admin/foods/unknown/price-research",
+        headers=ORIGIN,
+    )
+
+    assert monitoring.status_code == 403
+    assert price_research.status_code == 403
+
+
+def test_mixed_physician_admin_keeps_both_explicit_capabilities(
+    client: TestClient,
+    db: Session,
+) -> None:
+    _member_plan(client, db)
+    physician = _login_physician(client, db, "mixed-physician-admin@example.com")
+    physician.is_admin = True
+    db.flush()
+
+    physician_queue = client.get("/api/v1/nutrition/physician/reviews")
+    admin_monitoring = client.get("/api/v1/nutrition/admin/monitoring")
+
+    assert physician_queue.status_code == 200
+    assert admin_monitoring.status_code == 200
+
+
+def test_physician_rejection_requires_current_revision_and_cannot_be_replayed(
+    client: TestClient,
+    db: Session,
+) -> None:
+    plan = _member_plan(client, db)
+    physician = _login_physician(client, db, "rejection-physician@example.com")
+    review = next(
+        item
+        for item in client.get("/api/v1/nutrition/physician/reviews").json()
+        if item["plan_id"] == plan["id"]
+    )
+    assert (
+        client.post(
+            f"/api/v1/nutrition/physician/reviews/{review['review_id']}/claim",
+            headers=ORIGIN,
+        ).status_code
+        == 200
+    )
+
+    stale = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
+        headers=ORIGIN,
+        json={
+            "expected_plan_revision_id": str(uuid4()),
+            "action": "reject",
+            "notes": "نسخهٔ قدیمی است",
+        },
+    )
+    missing_notes = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
+        headers=ORIGIN,
+        json={
+            "expected_plan_revision_id": plan["id"],
+            "action": "reject",
+            "notes": "  ",
+        },
+    )
+    rejected = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
+        headers=ORIGIN,
+        json={
+            "expected_plan_revision_id": plan["id"],
+            "action": "reject",
+            "notes": "به اطلاعات تکمیلی نیاز است",
+        },
+    )
+    replay = client.post(
+        f"/api/v1/nutrition/physician/plans/{plan['id']}/action",
+        headers=ORIGIN,
+        json={
+            "expected_plan_revision_id": plan["id"],
+            "action": "reject",
+            "notes": "تلاش تکراری",
+        },
+    )
+
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "STALE_PLAN_REVISION"
+    assert missing_notes.status_code == 409
+    assert missing_notes.json()["detail"]["code"] == "REVIEW_NOTES_REQUIRED"
+    assert rejected.status_code == 200
+    assert rejected.json()["review_status"] == "rejected"
+    assert replay.status_code == 409
+    assert replay.json()["detail"]["code"] == "REVIEW_NOT_IN_PROGRESS"
+
+    audit_rows = db.scalars(
+        select(NutritionReviewAuditEvent).where(
+            NutritionReviewAuditEvent.review_id == review["review_id"]
+        )
+    ).all()
+    rejection_events = [row for row in audit_rows if row.action == "reject"]
+    assert len(rejection_events) == 1
+    assert rejection_events[0].actor_user_id == physician.id
+    assert rejection_events[0].metadata_snapshot == {
+        "plan_id": plan["id"],
+        "revision": plan["revision"],
+    }
 
 
 def test_assigned_review_cannot_be_taken_over_or_approved_by_another_physician(
