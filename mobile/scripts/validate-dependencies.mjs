@@ -30,6 +30,7 @@ const expected = {
   "expo-status-bar": { declared: "~57.0.0", version: /^57\./ },
   "expo-system-ui": { declared: "~57.0.0", version: /^57\./ },
   "expo-task-manager": { declared: "~57.0.16", version: /^57\./ },
+  "expo-video": { declared: "~57.0.3", version: /^57\./ },
   react: { declared: "19.2.3", version: /^19\.2\./ },
   "react-dom": { declared: "19.2.3", version: /^19\.2\./ },
   "react-native": { declared: "0.86.3", version: /^0\.86\./ },

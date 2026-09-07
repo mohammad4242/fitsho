@@ -82,6 +82,7 @@ const config: ExpoConfig = {
     "expo-secure-store",
     ["expo-sqlite", { useSQLCipher: true }],
     "expo-background-task",
+    "expo-video",
     [
       "expo-build-properties",
       {
