@@ -36,6 +36,7 @@ const config: ExpoConfig = {
     "expo-dev-client",
     "expo-secure-store",
     ["expo-sqlite", { useSQLCipher: true }],
+    "expo-background-task",
     [
       "expo-build-properties",
       {

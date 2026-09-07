@@ -34,6 +34,7 @@ for (const required of [
   /autoVerify:\s*true/,
   /scheme:\s*["']https["']/,
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
+  /["']expo-background-task["']/,
 ]) {
   assert.match(appConfig, required);
 }
