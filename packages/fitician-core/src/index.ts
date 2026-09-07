@@ -37,6 +37,22 @@ export {
   PHOTO_SCALE_STEP,
   stepGhostScale,
 } from "./body-ghost-scale";
+export {
+  GHOST_EDITOR_DEFAULT_TRANSFORM,
+  GHOST_EDITOR_OUTPUT,
+  GHOST_EDITOR_TOLERANCE,
+  clampGhostPhotoTransform,
+  containImageRect,
+  createGhostPhotoRenderPlan,
+  isGhostFramingWithinTolerance,
+  privacyCropSourceYForView,
+} from "./body-ghost-editor";
+export type {
+  GhostContainedImageRect,
+  GhostDisplaySize,
+  GhostPhotoRenderPlan,
+  GhostPhotoTransform,
+} from "./body-ghost-editor";
 export type * from "./profile-validation";
 export { ApiError } from "./transport";
 export type {

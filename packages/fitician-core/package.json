@@ -54,6 +54,10 @@
       "types": "./dist/body-ghost-scale.d.ts",
       "import": "./dist/body-ghost-scale.js"
     },
+    "./body-ghost-editor": {
+      "types": "./dist/body-ghost-editor.d.ts",
+      "import": "./dist/body-ghost-editor.js"
+    },
     "./workout-reviews": {
       "types": "./dist/workout-reviews.d.ts",
       "import": "./dist/workout-reviews.js"
