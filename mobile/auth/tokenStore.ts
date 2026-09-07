@@ -18,7 +18,11 @@ export class MemoryAccessTokenStore {
   }
 
   get(): string | null {
-    if (this.accessToken === null || this.expiresAt <= this.now()) {
+    return this.getValid();
+  }
+
+  getValid(clockSkewMilliseconds = 0): string | null {
+    if (this.accessToken === null || this.expiresAt <= this.now() + clockSkewMilliseconds) {
       this.clear();
       return null;
     }

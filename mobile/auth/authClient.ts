@@ -1,0 +1,211 @@
+import {
+  ApiError,
+  type FiticianTransport,
+  type MobileAuthTokens,
+  type RefreshTokenStorage,
+  type TransportRequest,
+} from "@fitician/core";
+
+import { MemoryAccessTokenStore } from "./tokenStore";
+
+const DEFAULT_CLOCK_SKEW_MILLISECONDS = 30_000;
+const DEFAULT_REFRESH_PATH = "/api/v1/auth/mobile/refresh";
+
+type RefreshOutcome = "refreshed" | "missing" | "rejected";
+
+export interface MobileAuthClientOptions {
+  transport: FiticianTransport;
+  refreshTokenStorage: RefreshTokenStorage;
+  accessTokenStore?: MemoryAccessTokenStore;
+  now?: () => number;
+  clockSkewMilliseconds?: number;
+  refreshPath?: string;
+  onSessionExpired?: () => void | Promise<void>;
+}
+
+export class MobileAuthClient {
+  private readonly transport: FiticianTransport;
+  private readonly refreshTokenStorage: RefreshTokenStorage;
+  private readonly accessTokenStore: MemoryAccessTokenStore;
+  private readonly clockSkewMilliseconds: number;
+  private readonly refreshPath: string;
+  private readonly onSessionExpired: (() => void | Promise<void>) | undefined;
+  private refreshInFlight: Promise<RefreshOutcome> | null = null;
+  private sessionExpiryInFlight: Promise<void> | null = null;
+  private sessionExpiredNotified = false;
+
+  constructor(options: MobileAuthClientOptions) {
+    this.transport = options.transport;
+    this.refreshTokenStorage = options.refreshTokenStorage;
+    this.accessTokenStore =
+      options.accessTokenStore ?? new MemoryAccessTokenStore(options.now ?? Date.now);
+    this.clockSkewMilliseconds =
+      options.clockSkewMilliseconds ?? DEFAULT_CLOCK_SKEW_MILLISECONDS;
+    this.refreshPath = options.refreshPath ?? DEFAULT_REFRESH_PATH;
+    this.onSessionExpired = options.onSessionExpired;
+  }
+
+  async setSession(tokens: MobileAuthTokens): Promise<void> {
+    await this.refreshTokenStorage.write(tokens.refresh_token);
+    this.accessTokenStore.set(tokens);
+    this.sessionExpiredNotified = false;
+  }
+
+  async restoreSession(): Promise<boolean> {
+    if (this.accessTokenStore.getValid(this.clockSkewMilliseconds) !== null) {
+      return true;
+    }
+
+    const outcome = await this.refreshOnce();
+    if (outcome === "rejected") {
+      await this.expireSession();
+    }
+    return outcome === "refreshed";
+  }
+
+  async clearSession(): Promise<void> {
+    this.accessTokenStore.clear();
+    await this.refreshTokenStorage.clear();
+  }
+
+  async request<TResponse>(request: TransportRequest): Promise<TResponse> {
+    let accessToken = this.accessTokenStore.getValid(this.clockSkewMilliseconds);
+    let initialRefreshOutcome: RefreshOutcome | null = null;
+    if (accessToken === null) {
+      initialRefreshOutcome = await this.refreshOnce();
+      if (initialRefreshOutcome === "rejected") {
+        await this.expireSession();
+      }
+      accessToken = this.accessTokenStore.getValid(this.clockSkewMilliseconds);
+    }
+
+    try {
+      return await this.send<TResponse>(request, accessToken);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) {
+        throw error;
+      }
+
+      if (initialRefreshOutcome !== null) {
+        if (initialRefreshOutcome === "refreshed") {
+          await this.expireSession();
+        }
+        throw error;
+      }
+
+      const refreshOutcome = await this.refreshOnce();
+      if (refreshOutcome !== "refreshed") {
+        await this.expireSession();
+        throw error;
+      }
+
+      const retryToken = this.accessTokenStore.getValid(this.clockSkewMilliseconds);
+      if (retryToken === null) {
+        await this.expireSession();
+        throw error;
+      }
+
+      try {
+        return await this.send<TResponse>(request, retryToken);
+      } catch (retryError) {
+        if (retryError instanceof ApiError && retryError.status === 401) {
+          await this.expireSession();
+        }
+        throw retryError;
+      }
+    }
+  }
+
+  private async send<TResponse>(
+    request: TransportRequest,
+    accessToken: string | null,
+  ): Promise<TResponse> {
+    if (accessToken === null) {
+      return this.transport.request<TResponse>(request);
+    }
+
+    return this.transport.request<TResponse>({
+      ...request,
+      headers: {
+        ...request.headers,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  }
+
+  private refreshOnce(): Promise<RefreshOutcome> {
+    if (this.refreshInFlight !== null) {
+      return this.refreshInFlight;
+    }
+
+    const refreshPromise = this.performRefresh();
+    this.refreshInFlight = refreshPromise;
+    refreshPromise.then(
+      () => {
+        if (this.refreshInFlight === refreshPromise) {
+          this.refreshInFlight = null;
+        }
+      },
+      () => {
+        if (this.refreshInFlight === refreshPromise) {
+          this.refreshInFlight = null;
+        }
+      },
+    );
+    return refreshPromise;
+  }
+
+  private async performRefresh(): Promise<RefreshOutcome> {
+    const refreshToken = await this.refreshTokenStorage.read();
+    if (refreshToken === null) {
+      return "missing";
+    }
+
+    try {
+      const tokens = await this.transport.request<MobileAuthTokens>({
+        path: this.refreshPath,
+        method: "POST",
+        body: { refresh_token: refreshToken },
+      });
+      await this.setSession(tokens);
+      return "refreshed";
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        return "rejected";
+      }
+      throw error;
+    }
+  }
+
+  private expireSession(): Promise<void> {
+    if (this.sessionExpiryInFlight !== null) {
+      return this.sessionExpiryInFlight;
+    }
+
+    const expiryPromise = this.performSessionExpiry();
+    this.sessionExpiryInFlight = expiryPromise;
+    expiryPromise.then(
+      () => {
+        if (this.sessionExpiryInFlight === expiryPromise) {
+          this.sessionExpiryInFlight = null;
+        }
+      },
+      () => {
+        if (this.sessionExpiryInFlight === expiryPromise) {
+          this.sessionExpiryInFlight = null;
+        }
+      },
+    );
+    return expiryPromise;
+  }
+
+  private async performSessionExpiry(): Promise<void> {
+    this.accessTokenStore.clear();
+    await this.refreshTokenStorage.clear();
+    if (this.sessionExpiredNotified) {
+      return;
+    }
+    this.sessionExpiredNotified = true;
+    await this.onSessionExpired?.();
+  }
+}
