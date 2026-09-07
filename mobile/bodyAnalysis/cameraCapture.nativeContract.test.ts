@@ -4,11 +4,16 @@ import { resolve } from "node:path";
 
 it("uses the native VisionCamera photo and frame-output contracts", async () => {
   const source = await readFile(resolve(import.meta.dirname, "BodyPhotoCapture.tsx"), "utf8");
+  const encoderSource = await readFile(resolve(import.meta.dirname, "bodyPhotoEncoder.ts"), "utf8");
 
   expect(source).toMatch(/useCameraPermission/);
   expect(source).toMatch(/useCameraDevice/);
   expect(source).toMatch(/usePhotoOutput/);
   expect(source).toMatch(/capturePhotoToFile/);
+  expect(source).toMatch(/encodeBodyPhotoWithPrivacyCrop/);
+  expect(source).toMatch(/bodyPhotoPrivacyProcessingErrorMessage/);
+  expect(source).toMatch(/deleteLocalFile\(rawUri\)/);
+  expect(encoderSource).toMatch(/privacyCropApplied/);
   expect(source).toMatch(/useFrameOutput/);
   expect(source).toMatch(/scheduleOnRN/);
   expect(source).toMatch(/orientationSource="device"/);

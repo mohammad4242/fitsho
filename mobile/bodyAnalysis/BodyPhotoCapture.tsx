@@ -37,9 +37,11 @@ import {
   advanceBodyPhotoCountdown,
   bodyPhotoCaptureErrorMessage,
   bodyPhotoMimeTypeForAsset,
+  bodyPhotoPrivacyProcessingErrorMessage,
   filePathToUri,
   type BodyPhotoCapturedAsset,
 } from "./cameraCapture";
+import { encodeBodyPhotoWithPrivacyCrop } from "./bodyPhotoEncoder";
 
 export interface BodyPhotoCaptureProps {
   readonly initialCaptureMode?: "camera" | "library";
@@ -159,27 +161,33 @@ export function BodyPhotoCapture({
     if (!previewReady || busy || captured !== null) return;
     setBusy(true);
     setCameraError(null);
+    let rawUri: string | null = null;
+    let encodedUri: string | null = null;
     try {
       const photoFile = await photoOutput.capturePhotoToFile(
         { enableShutterSound: true, flashMode: "off" },
         {},
       );
-      const uri = filePathToUri(photoFile.filePath);
-      const { height, width } = await readImageDimensions(uri);
-      setCaptured({
+      rawUri = filePathToUri(photoFile.filePath);
+      const { height, width } = await readImageDimensions(rawUri);
+      const encoded = await encodeBodyPhotoWithPrivacyCrop({
         height,
-        mimeType: "image/jpeg",
         source: "camera",
-        uri,
+        uri: rawUri,
         width,
-      });
+      }, { ghostScale, sideProfile, view });
+      encodedUri = encoded.uri;
+      setCaptured(encoded);
       setPreviewReady(false);
     } catch (error) {
-      setCameraError(bodyPhotoCaptureErrorMessage(error));
+      setCameraError(rawUri === null
+        ? bodyPhotoCaptureErrorMessage(error)
+        : bodyPhotoPrivacyProcessingErrorMessage());
     } finally {
+      if (rawUri !== null && rawUri !== encodedUri) deleteLocalFile(rawUri);
       setBusy(false);
     }
-  }, [busy, captured, photoOutput, previewReady]);
+  }, [busy, captured, ghostScale, photoOutput, previewReady, sideProfile, view]);
 
   useEffect(() => {
     if (countdown !== 0) return;
@@ -225,29 +233,24 @@ export function BodyPhotoCapture({
       const mimeType = bodyPhotoMimeTypeForAsset(asset.mimeType, asset.uri);
       if (mimeType === null) throw new Error("Unsupported photo format");
       if (asset.width <= 0 || asset.height <= 0) throw new Error("Invalid photo dimensions");
-      setCaptured({
+      const encoded = await encodeBodyPhotoWithPrivacyCrop({
         height: asset.height,
-        mimeType,
         source: "library",
         uri: asset.uri,
         width: asset.width,
-      });
+      }, { ghostScale, sideProfile, view });
+      setCaptured(encoded);
     } catch (error) {
-      setConfirmError(bodyPhotoCaptureErrorMessage(error));
+      setConfirmError(error instanceof Error && error.message === "No photo selected"
+        ? bodyPhotoCaptureErrorMessage(error)
+        : bodyPhotoPrivacyProcessingErrorMessage());
     } finally {
       setBusy(false);
     }
   }
 
   function discardCaptured() {
-    if (captured?.source === "camera") {
-      try {
-        const file = new File(captured.uri);
-        if (file.exists) file.delete();
-      } catch {
-        // The temporary camera file is best-effort cleanup only.
-      }
-    }
+    if (captured !== null) deleteLocalFile(captured.uri);
     setCaptured(null);
     setConfirmError(null);
     setCameraError(null);
@@ -507,6 +510,15 @@ function readImageDimensions(uri: string): Promise<{ height: number; width: numb
   return new Promise((resolve, reject) => {
     Image.getSize(uri, (width, height) => resolve({ height, width }), reject);
   });
+}
+
+function deleteLocalFile(uri: string): void {
+  try {
+    const file = new File(uri);
+    if (file.exists) file.delete();
+  } catch {
+    // Temporary crop cleanup is best effort only.
+  }
 }
 
 const styles = StyleSheet.create({

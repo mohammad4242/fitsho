@@ -43,6 +43,7 @@ it("describes captured media without raw pixels", () => {
   const asset: BodyPhotoCapturedAsset = {
     height: 1280,
     mimeType: "image/jpeg",
+    privacyCropApplied: true,
     source: "camera",
     uri: "file:///camera.jpg",
     width: 720,

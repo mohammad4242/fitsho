@@ -6,6 +6,7 @@ export type BodyPhotoCaptureSource = "camera" | "library";
 export type BodyPhotoCapturedAsset = {
   readonly height: number;
   readonly mimeType: BodyPhotoMimeType;
+  readonly privacyCropApplied: true;
   readonly source: BodyPhotoCaptureSource;
   readonly uri: string;
   readonly width: number;
@@ -48,4 +49,8 @@ export function bodyPhotoCaptureErrorMessage(error: unknown): string {
     return "ثبت عکس انجام نشد. دوباره تلاش کن.";
   }
   return "دوربین در دسترس نیست. از انتخاب عکس استفاده کن یا دوباره تلاش کن.";
+}
+
+export function bodyPhotoPrivacyProcessingErrorMessage(): string {
+  return "پردازش امن عکس انجام نشد. عکس دیگری انتخاب کن یا دوباره تلاش کن.";
 }
