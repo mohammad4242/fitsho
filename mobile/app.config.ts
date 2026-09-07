@@ -105,6 +105,7 @@ const config: ExpoConfig = {
   ],
   android: {
     package: "com.fitician.app",
+    permissions: ["android.permission.CAMERA"],
     intentFilters: [
       {
         action: "VIEW",

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["fitician", "bodyvision"],
+  "ios": {
+    "iosModuleName": "FiticianBodyVision"
+  },
+  "android": {
+    "androidNamespace": ["fitician", "bodyvision"],
+    "androidCxxLibName": "FiticianBodyVision"
+  },
+  "autolinking": {
+    "FiticianBodyVision": {
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "FiticianBodyVision"
+      }
+    }
+  },
+  "ignorePaths": ["**/node_modules"]
+}
