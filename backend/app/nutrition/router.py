@@ -214,6 +214,9 @@ from app.nutrition.schemas import (
     MealReplacementPreviewResponse,
     NutritionDailyTrackingResponse,
     NutritionEstimateResponse,
+    NutritionFoodPhotoConfirmationResponse,
+    NutritionFoodPhotoEstimateResponse,
+    NutritionFoodPhotoMacroPreviewResponse,
     NutritionProfileInput,
     NutritionProfileResponse,
     NutritionProgramPageResponse,
@@ -236,6 +239,7 @@ from app.nutrition.schemas import (
     PlannedMealTrackingInput,
     PreparedRecipePreviewResponse,
     PreparedRecipeWrite,
+    PrivateAccessGrantResponse,
     QuickApproximationInput,
     RemoveMealConfirmationInput,
     ReplaceFoodInput,
@@ -2004,6 +2008,7 @@ def _food_photo_error(error: FoodPhotoError) -> HTTPException:
 
 @router.post(
     "/tracking/photo-estimates",
+    response_model=NutritionFoodPhotoEstimateResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_trusted_origin)],
 )
@@ -2017,7 +2022,7 @@ async def create_food_photo_estimate(
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
     accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
     language: str = Query(default="fa"),
-) -> dict[str, object]:
+) -> NutritionFoodPhotoEstimateResponse:
     try:
         if idempotency_key is not None and not 8 <= len(idempotency_key) <= 128:
             raise FoodPhotoError("INVALID_IDEMPOTENCY_KEY")
@@ -2059,6 +2064,7 @@ async def create_food_photo_estimate(
 
 @router.patch(
     "/tracking/photo-estimates/{estimate_id}/items/{item_id}",
+    response_model=NutritionFoodPhotoEstimateResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def correct_food_photo_estimate_item(
@@ -2067,7 +2073,7 @@ def correct_food_photo_estimate_item(
     payload: FoodPhotoItemCorrectionInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> NutritionFoodPhotoEstimateResponse:
     try:
         return correct_photo_item(
             db,
@@ -2088,6 +2094,7 @@ def correct_food_photo_estimate_item(
 
 @router.post(
     "/tracking/photo-estimates/{estimate_id}/confirm",
+    response_model=list[NutritionFoodPhotoConfirmationResponse],
     dependencies=[Depends(require_trusted_origin)],
 )
 def confirm_food_photo_estimate(
@@ -2095,7 +2102,7 @@ def confirm_food_photo_estimate(
     payload: FoodPhotoConfirmInput,
     db: DatabaseSession,
     user: CurrentUser,
-) -> list[dict[str, object]]:
+) -> list[NutritionFoodPhotoConfirmationResponse]:
     try:
         return confirm_photo(db, user.id, estimate_id, payload.entry_date)
     except FoodPhotoError as error:
@@ -2104,13 +2111,14 @@ def confirm_food_photo_estimate(
 
 @router.post(
     "/tracking/photo-estimates/{estimate_id}/free-meal-preview",
+    response_model=NutritionFoodPhotoMacroPreviewResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def confirm_free_meal_photo_preview(
     estimate_id: UUID,
     db: DatabaseSession,
     user: CurrentUser,
-) -> dict[str, float]:
+) -> NutritionFoodPhotoMacroPreviewResponse:
     try:
         return confirm_photo_macro_preview(db, user.id, estimate_id)
     except FoodPhotoError as error:
@@ -2133,11 +2141,12 @@ def remove_food_photo_estimate(
 
 @router.post(
     "/tracking/photo-estimates/{estimate_id}/access-grant",
+    response_model=PrivateAccessGrantResponse,
     dependencies=[Depends(require_trusted_origin)],
 )
 def grant_food_photo_access(
     estimate_id: UUID, db: DatabaseSession, user: CurrentUser, settings: AppSettings
-) -> dict[str, object]:
+) -> PrivateAccessGrantResponse:
     try:
         authorize_photo_access(db, user.id, estimate_id)
     except FoodPhotoError as error:

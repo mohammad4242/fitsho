@@ -989,6 +989,52 @@ class NutritionRecentFoodResponse(BaseModel):
     last_entry_date: date
 
 
+class NutritionFoodPhotoItemResponse(BaseModel):
+    item_id: str
+    name_guess: str
+    estimated_amount: float
+    unit: Literal["g", "ml", "item", "unknown"]
+    confidence: float
+    visible_evidence: list[str]
+    uncertainties: list[str]
+    calories: float
+    protein_g: float
+    carbohydrate_g: float
+    fat_g: float
+    food_id: UUID | None
+    food_slug: str | None
+    mapping_status: Literal["resolved", "unresolved"]
+
+
+class NutritionFoodPhotoEstimateResponse(BaseModel):
+    id: UUID
+    status: Literal["estimated", "confirmed", "deleted"]
+    items: list[NutritionFoodPhotoItemResponse]
+    overall_confidence: float | None
+    needs_user_confirmation: bool
+    model_id: str
+    expires_at: datetime
+    macro_totals: dict[str, float]
+    macro_totals_complete: bool
+
+
+class NutritionFoodPhotoConfirmationResponse(BaseModel):
+    id: UUID
+    display_name: str
+
+
+class PrivateAccessGrantResponse(BaseModel):
+    access_url: str
+    expires_in_seconds: int
+
+
+class NutritionFoodPhotoMacroPreviewResponse(BaseModel):
+    calories: float
+    protein_g: float
+    carbohydrate_g: float
+    fat_g: float
+
+
 class WeeklyPlanDayResponse(BaseModel):
     day_index: int
     plan_date: date
