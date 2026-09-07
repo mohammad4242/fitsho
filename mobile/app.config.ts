@@ -78,6 +78,7 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
     "expo-dev-client",
+    "expo-web-browser",
     ["expo-font", fiticianFontConfig],
     "expo-secure-store",
     ["expo-sqlite", { useSQLCipher: true }],
@@ -109,6 +110,8 @@ const config: ExpoConfig = {
     environment: process.env.APP_VARIANT || "development",
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || "http://10.0.2.2:8001",
     appLinkHost,
+    frontendOrigin: process.env.EXPO_PUBLIC_FRONTEND_ORIGIN || "http://localhost:5173",
+    googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || null,
   },
 };
 

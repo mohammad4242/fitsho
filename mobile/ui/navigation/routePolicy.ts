@@ -12,6 +12,7 @@ export interface MobileRouteSnapshot {
     readonly status: "loading" | "resolved";
   };
   readonly session: {
+    readonly sessionExpired?: boolean;
     readonly status: "loading" | "signed_in" | "signed_out";
     readonly user: User | null;
   };
@@ -24,7 +25,10 @@ export interface MobileRouteSnapshot {
 export type MobileRouteDecision =
   | { readonly status: "allow" }
   | { readonly status: "loading" }
-  | { readonly href: "/auth/sign-in" | "/member" | "/onboarding"; readonly status: "redirect" };
+  | {
+      readonly href: "/auth/sign-in" | "/auth/sign-in?reason=session-expired" | "/member" | "/onboarding";
+      readonly status: "redirect";
+    };
 
 export const defaultMobileRouteSnapshot: MobileRouteSnapshot = {
   profile: {
@@ -52,6 +56,10 @@ const onboardingStates: ReadonlySet<ProfileCompletionState> = new Set([
 
 function isSignedIn(snapshot: MobileRouteSnapshot): boolean {
   return snapshot.session.status === "signed_in" && snapshot.session.user !== null;
+}
+
+function signInHref(snapshot: MobileRouteSnapshot): "/auth/sign-in" | "/auth/sign-in?reason=session-expired" {
+  return snapshot.session.sessionExpired ? "/auth/sign-in?reason=session-expired" : "/auth/sign-in";
 }
 
 function hasIncompleteProfile(snapshot: MobileRouteSnapshot): boolean {
@@ -92,7 +100,7 @@ export function decideMobileRoute(
   }
 
   if (!isSignedIn(snapshot)) {
-    return { href: "/auth/sign-in", status: "redirect" };
+    return { href: signInHref(snapshot), status: "redirect" };
   }
 
   if (kind === "coach" || kind === "physician") {

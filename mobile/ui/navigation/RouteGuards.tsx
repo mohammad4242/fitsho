@@ -3,6 +3,8 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Redirect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useMobileAuth } from "../../auth/MobileAuthProvider";
+import { mobileRouteSnapshotFromAuth } from "../../auth/authContext";
 import { fiticianTokens } from "../tokens";
 import {
   decideMobileRoute,
@@ -27,6 +29,15 @@ export function MobileRouteStateProvider({
     <MobileRouteSnapshotContext.Provider value={snapshot}>
       {children}
     </MobileRouteSnapshotContext.Provider>
+  );
+}
+
+export function MobileRouteStateProviderFromAuth({ children }: { readonly children: ReactNode }) {
+  const auth = useMobileAuth();
+  return (
+    <MobileRouteStateProvider snapshot={mobileRouteSnapshotFromAuth(auth)}>
+      {children}
+    </MobileRouteStateProvider>
   );
 }
 

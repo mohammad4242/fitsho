@@ -114,3 +114,14 @@ it("requires backend-confirmed specialist access and never treats admin as a rol
     decideMobileRoute("coach", signedIn("both_ready", "both", { coach: "loading", physician: "denied" })),
   ).toEqual({ status: "loading" });
 });
+
+it("routes an expired session back to sign-in with an explicit recovery reason", () => {
+  expect(
+    decideMobileRoute(
+      "member",
+      snapshot({
+        session: { sessionExpired: true, status: "signed_out", user: null },
+      }),
+    ),
+  ).toEqual({ href: "/auth/sign-in?reason=session-expired", status: "redirect" });
+});

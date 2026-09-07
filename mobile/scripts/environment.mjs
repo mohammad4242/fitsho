@@ -43,6 +43,19 @@ export function validateEnvironment(expectedVariant, values, options = {}) {
     throw new Error("EXPO_PUBLIC_API_BASE_URL must use HTTPS outside development");
   }
 
+  const frontendOrigin = values.EXPO_PUBLIC_FRONTEND_ORIGIN;
+  if (!frontendOrigin) throw new Error("EXPO_PUBLIC_FRONTEND_ORIGIN is required");
+  const parsedFrontendOrigin = new URL(frontendOrigin);
+  if (
+    !parsedFrontendOrigin.hostname ||
+    parsedFrontendOrigin.pathname !== "/" ||
+    parsedFrontendOrigin.search ||
+    parsedFrontendOrigin.hash ||
+    (expectedVariant !== "development" && parsedFrontendOrigin.protocol !== "https:")
+  ) {
+    throw new Error("EXPO_PUBLIC_FRONTEND_ORIGIN must use HTTPS outside development");
+  }
+
   const appLinkHost = values.FITICIAN_APP_LINK_HOST;
   validateHostname(appLinkHost);
   if (expectedVariant === "production" && appLinkHost === APP_LINK_PLACEHOLDER && !options.allowPlaceholder) {

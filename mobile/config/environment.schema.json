@@ -3,7 +3,7 @@
   "title": "Fitician mobile environment",
   "type": "object",
   "additionalProperties": false,
-  "required": ["APP_VARIANT", "EXPO_PUBLIC_API_BASE_URL", "FITICIAN_APP_LINK_HOST"],
+  "required": ["APP_VARIANT", "EXPO_PUBLIC_API_BASE_URL", "EXPO_PUBLIC_FRONTEND_ORIGIN", "FITICIAN_APP_LINK_HOST"],
   "properties": {
     "APP_VARIANT": {
       "type": "string",
@@ -12,6 +12,13 @@
     "EXPO_PUBLIC_API_BASE_URL": {
       "type": "string",
       "format": "uri-reference"
+    },
+    "EXPO_PUBLIC_FRONTEND_ORIGIN": {
+      "type": "string",
+      "format": "uri-reference"
+    },
+    "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": {
+      "type": "string"
     },
     "FITICIAN_APP_LINK_HOST": {
       "type": "string",
