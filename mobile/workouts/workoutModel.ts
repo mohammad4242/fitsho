@@ -1,4 +1,4 @@
-import { formatPrescriptionTarget } from "@fitician/core";
+import { ApiError, formatPrescriptionTarget } from "@fitician/core";
 
 import type {
   WorkoutPlan,
@@ -6,7 +6,16 @@ import type {
   WorkoutPlanVersionSummary,
 } from "./workoutApi";
 
+export type WorkoutGenerationErrorKind = "cooldown" | "failed" | "in_progress" | "unsupported";
 export type WorkoutPlanSummaryStatus = "active" | "pending" | "inactive";
+
+export function classifyWorkoutGenerationError(error: unknown): WorkoutGenerationErrorKind {
+  if (!(error instanceof ApiError)) return "failed";
+  if (error.status === 429) return "cooldown";
+  if (error.status === 409) return "in_progress";
+  if (error.status === 422 || error.code !== null) return "unsupported";
+  return "failed";
+}
 
 export function getWorkoutPlanSummaryStatus(
   plan: WorkoutPlan,

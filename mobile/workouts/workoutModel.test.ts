@@ -1,8 +1,9 @@
 import { expect, it } from "vitest";
 
-import type { components } from "@fitician/core";
+import { ApiError, type components } from "@fitician/core";
 
 import {
+  classifyWorkoutGenerationError,
   findPendingWorkoutPlanId,
   getWorkoutPlanSummaryStatus,
   isWorkoutPlanExecutable,
@@ -51,6 +52,14 @@ it("distinguishes active, coach-pending, and historical plan summaries", () => {
     getWorkoutPlanSummaryStatus(plan({ coach_review: { state: "pending_coach_review" } })),
   ).toBe("pending");
   expect(getWorkoutPlanSummaryStatus(plan(), true)).toBe("inactive");
+});
+
+it("keeps generation failure states explicit", () => {
+  expect(classifyWorkoutGenerationError(new ApiError(429, "cooldown"))).toBe("cooldown");
+  expect(classifyWorkoutGenerationError(new ApiError(409, "in progress"))).toBe("in_progress");
+  expect(classifyWorkoutGenerationError(new ApiError(422, "invalid"))).toBe("unsupported");
+  expect(classifyWorkoutGenerationError(new ApiError(503, "provider"))).toBe("failed");
+  expect(classifyWorkoutGenerationError(new Error("offline"))).toBe("failed");
 });
 
 it("never exposes pending or historical plans as executable", () => {

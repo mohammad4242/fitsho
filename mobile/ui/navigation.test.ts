@@ -130,3 +130,10 @@ it("keeps the exercise library inside the completed member training boundary", a
     readFile(resolve(appRoot, "(member)/member/exercises/[slug].tsx"), "utf8"),
   ).resolves.toMatch(/requiredCapability="training"/);
 });
+
+it("uses the native workout plan screen inside the completed member training boundary", async () => {
+  const route = resolve(appRoot, "(member)/member/(tabs)/workouts.tsx");
+  await expect(readFile(route, "utf8")).resolves.toMatch(/WorkoutPlansScreen/);
+  await expect(readFile(route, "utf8")).resolves.not.toMatch(/RouteEntryScreen/);
+  await expect(readFile(route, "utf8")).resolves.toMatch(/requiredCapability="training"/);
+});
