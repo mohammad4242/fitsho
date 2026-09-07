@@ -1557,6 +1557,11 @@ const en = {
     },
     bodyAnalysis: {
       unavailable: "This reading is not available yet.",
+      tabs: {
+        overview: "Scan & Metrics",
+        muscles: "Body Analysis",
+        progress: "Progress & Reviews",
+      },
       topOverview: {
         title: "Body scan overview",
         front: "Front",

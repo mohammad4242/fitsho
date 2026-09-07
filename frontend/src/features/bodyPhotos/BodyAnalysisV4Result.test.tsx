@@ -170,17 +170,22 @@ it("renders exactly three display score indicators", () => {
   expect(screen.queryByText("Four useful signals")).not.toBeInTheDocument();
 });
 
-it("renders key weaknesses and key strengths summary cards", () => {
+it("renders key weaknesses and key strengths summary cards", async () => {
+  const user = userEvent.setup();
   render(<BodyAnalysisV4Result analysis={analysis} experience={experience} />);
 
+  await user.click(screen.getByRole("tab", { name: /body analysis|آنالیز عضلات/i }));
   expect(screen.getByRole("heading", { name: /key weaknesses|important weaknesses/i })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: /key strengths|important strengths/i })).toBeInTheDocument();
+
+  await user.click(screen.getByRole("tab", { name: /progress & reviews|روند و تخصصی/i }));
   expect(screen.getByText(/AI analysis can be wrong/i)).toBeInTheDocument();
   expect(screen.getByLabelText(/Coach review pending/i)).toBeInTheDocument();
   expect(screen.getByLabelText(/Doctor review pending/i)).toBeInTheDocument();
 });
 
-it("renders review colors from the real specialist decisions", () => {
+it("renders review colors from the real specialist decisions", async () => {
+  const user = userEvent.setup();
   const reviewedAnalysis = {
     ...analysis,
     coach_review: { ...analysis.coach_review, decision: "approved" as const },
@@ -188,9 +193,31 @@ it("renders review colors from the real specialist decisions", () => {
   };
   render(<BodyAnalysisV4Result analysis={reviewedAnalysis} experience={experience} />);
 
+  await user.click(screen.getByRole("tab", { name: /progress & reviews|روند و تخصصی/i }));
   expect(screen.getByLabelText(/Coach review approved/i)).toHaveClass("body-analysis-review--approved");
   expect(screen.getByLabelText(/Doctor review changes required/i)).toHaveClass("body-analysis-review--changes_required");
   expect(document.querySelector(".body-analysis-review--approved .body-analysis-review__dot")).toBeInTheDocument();
+});
+
+it("switches tabs between overview, muscles, and progress", async () => {
+  const user = userEvent.setup();
+  render(<BodyAnalysisV4Result analysis={analysis} experience={experience} />);
+
+  const overviewTab = screen.getByRole("tab", { name: /scan & metrics|اسکن و شاخص‌ها/i });
+  const musclesTab = screen.getByRole("tab", { name: /body analysis|آنالیز عضلات/i });
+  const progressTab = screen.getByRole("tab", { name: /progress & reviews|روند و تخصصی/i });
+
+  expect(overviewTab).toHaveAttribute("aria-selected", "true");
+  expect(musclesTab).toHaveAttribute("aria-selected", "false");
+  expect(progressTab).toHaveAttribute("aria-selected", "false");
+
+  await user.click(musclesTab);
+  expect(musclesTab).toHaveAttribute("aria-selected", "true");
+  expect(overviewTab).toHaveAttribute("aria-selected", "false");
+
+  await user.click(progressTab);
+  expect(progressTab).toHaveAttribute("aria-selected", "true");
+  expect(musclesTab).toHaveAttribute("aria-selected", "false");
 });
 
 it("leaves an unavailable display score neutral with a dash", () => {

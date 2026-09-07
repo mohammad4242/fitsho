@@ -1559,6 +1559,11 @@ const fa = {
     },
     bodyAnalysis: {
       unavailable: "این نتیجه هنوز در دسترس نیست.",
+      tabs: {
+        overview: "اسکن و شاخص‌ها",
+        muscles: "آنالیز عضلات",
+        progress: "روند و تخصصی",
+      },
       topOverview: {
         title: "نمای اسکن بدن",
         front: "روبه‌رو",

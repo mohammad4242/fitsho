@@ -2144,6 +2144,74 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   width: 100%;
 }
 
+/* 3-Tab Navigator */
+.body-analysis-v4__tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  background: rgb(8 22 27 / 85%);
+  border: 1px solid rgb(80 223 206 / 22%);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 30%);
+  width: fit-content;
+  margin-inline: auto;
+  max-width: 100%;
+}
+
+.body-analysis-v4__tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fitsho-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 180ms ease;
+  white-space: nowrap;
+}
+
+.body-analysis-v4__tab-btn:hover {
+  color: var(--fitsho-text);
+  background: rgb(255 255 255 / 5%);
+}
+
+.body-analysis-v4__tab-btn--active {
+  background: linear-gradient(135deg, rgb(80 223 206 / 25%), rgb(80 223 206 / 10%));
+  border-color: var(--fitsho-aqua);
+  color: #ffffff;
+  box-shadow: 0 0 1rem rgb(80 223 206 / 25%), inset 0 0 0 1px rgb(80 223 206 / 40%);
+}
+
+.body-analysis-v4__panel {
+  display: grid;
+  gap: 1.25rem;
+  width: 100%;
+  animation: fadeInPanel 220ms ease-out;
+}
+
+.body-analysis-v4__panel--hidden {
+  display: none !important;
+}
+
+@keyframes fadeInPanel {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* 1. TOP SCAN OVERVIEW */
 .fitsho-scan-overview {
   position: relative;
@@ -2430,19 +2498,30 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   box-shadow: 0 0.75rem 2rem rgb(0 0 0 / 35%);
 }
 
+.fitsho-score-strip__header {
+  margin-bottom: 0.75rem;
+}
+
+.fitsho-score-strip__header h2 {
+  margin: 0;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-weight: 850;
+  color: var(--fitsho-text);
+}
+
 .fitsho-score-strip__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(0.75rem, 2vw, 1.25rem);
+  gap: clamp(0.75rem, 1.8vw, 1.25rem);
 }
 
 .fitsho-score-ring-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  text-align: center;
-  gap: 0.65rem;
-  padding: 1rem 0.75rem;
+  text-align: start;
+  gap: 1rem;
+  padding: 0.95rem 1.15rem;
   border: 1px solid rgb(80 223 206 / 14%);
   border-radius: 1.15rem;
   background: rgb(9 26 31 / 60%);
@@ -2455,17 +2534,29 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   transform: translateY(-2px);
 }
 
+.fitsho-score-ring-card--balance {
+  border-color: rgb(80 223 206 / 20%);
+}
+
+.fitsho-score-ring-card--symmetry {
+  border-color: rgb(56 189 248 / 20%);
+}
+
+.fitsho-score-ring-card--upper_lower {
+  border-color: rgb(251 191 36 / 20%);
+}
+
 .fitsho-score-ring-card__ring-wrap {
   position: relative;
   display: grid;
   place-items: center;
-  width: 96px;
-  height: 96px;
+  flex-shrink: 0;
+  width: 76px;
+  height: 76px;
 }
 
 .fitsho-score-ring-card__svg {
   display: block;
-  transform: rotate(-90deg);
 }
 
 .fitsho-score-ring-card__track {
@@ -2478,6 +2569,21 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   transition: stroke-dashoffset 600ms ease-out;
 }
 
+.fitsho-score-ring-card__fill--balance {
+  stroke: #50dfce;
+  filter: drop-shadow(0 0 6px rgb(80 223 206 / 55%));
+}
+
+.fitsho-score-ring-card__fill--symmetry {
+  stroke: #38bdf8;
+  filter: drop-shadow(0 0 6px rgb(56 189 248 / 55%));
+}
+
+.fitsho-score-ring-card__fill--upper_lower {
+  stroke: #fbbf24;
+  filter: drop-shadow(0 0 6px rgb(251 191 36 / 55%));
+}
+
 .fitsho-score-ring-card__center {
   position: absolute;
   display: grid;
@@ -2485,29 +2591,90 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 }
 
 .fitsho-score-ring-card__score {
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 900;
   color: #ffffff;
   letter-spacing: -0.02em;
 }
 
 .fitsho-score-ring-card__meta {
-  display: grid;
-  gap: 0.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.fitsho-score-ring-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .fitsho-score-ring-card__title {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   font-weight: 850;
   color: var(--fitsho-text);
+  white-space: nowrap;
+}
+
+.fitsho-score-ring-card__info-btn {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fitsho-muted);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.fitsho-score-ring-card__info-btn:hover {
+  color: var(--fitsho-aqua);
+}
+
+.fitsho-score-ring-card__status-badge {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.fitsho-score-ring-card__status-badge--balance {
+  background: rgb(80 223 206 / 12%);
+  color: #50dfce;
+  border: 1px solid rgb(80 223 206 / 25%);
+}
+
+.fitsho-score-ring-card__status-badge--symmetry {
+  background: rgb(56 189 248 / 12%);
+  color: #38bdf8;
+  border: 1px solid rgb(56 189 248 / 25%);
+}
+
+.fitsho-score-ring-card__status-badge--upper_lower {
+  background: rgb(251 191 36 / 12%);
+  color: #fbbf24;
+  border: 1px solid rgb(251 191 36 / 25%);
 }
 
 .fitsho-score-ring-card__subtitle {
   margin: 0;
   color: var(--fitsho-muted);
-  font-size: 0.75rem;
-  line-height: 1.45;
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+
+.fitsho-score-ring-card__info-popover {
+  margin: 0.25rem 0 0;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.45rem;
+  background: rgb(4 12 15 / 90%);
+  border: 1px solid rgb(80 223 206 / 20%);
+  color: var(--fitsho-text);
+  font-size: 0.7rem;
 }
 
 /* 3. INTERACTIVE BODY SECTION */
