@@ -124,6 +124,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 22,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   noticeTitle: {
     color: fiticianTokens.colors.ink,
@@ -131,6 +133,8 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 24,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   skeleton: {
     backgroundColor: fiticianTokens.colors.surfaceRaised,

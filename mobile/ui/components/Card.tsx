@@ -63,6 +63,7 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.card,
     borderWidth: 1,
     elevation: fiticianTokens.shadows.card.elevation,
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
     padding: fiticianTokens.spacing[4],
     shadowColor: fiticianTokens.shadows.card.color,
     shadowOffset: fiticianTokens.shadows.card.offset,

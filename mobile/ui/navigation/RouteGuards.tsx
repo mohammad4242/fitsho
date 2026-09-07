@@ -1,6 +1,7 @@
 import { type ReactNode, createContext, useContext } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Redirect } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { fiticianTokens } from "../tokens";
 import {
@@ -54,9 +55,11 @@ export function RouteGuard({ children, kind, requiredCapability }: RouteGuardPro
 
 function RouteGuardLoading() {
   return (
-    <View accessibilityRole="progressbar" style={styles.loading}>
-      <ActivityIndicator accessibilityLabel="در حال بارگذاری" color={fiticianTokens.colors.aqua} />
-    </View>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.loading}>
+      <View accessibilityRole="progressbar">
+        <ActivityIndicator accessibilityLabel="در حال بارگذاری" color={fiticianTokens.colors.aqua} />
+      </View>
+    </SafeAreaView>
   );
 }
 

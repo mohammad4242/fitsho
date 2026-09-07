@@ -115,6 +115,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
+    minWidth: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[4],
     paddingVertical: fiticianTokens.spacing[3],
   },
@@ -127,6 +128,7 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 24,
     textAlign: "center",
+    writingDirection: "rtl",
   },
   pressed: {
     opacity: 0.86,

@@ -54,6 +54,7 @@ export interface TextFieldProps extends Omit<TextInputProps, "accessibilityLabel
   readonly label?: string;
   readonly required?: boolean;
   readonly style?: StyleProp<TextStyle>;
+  readonly textDirection?: "auto" | "ltr" | "rtl";
 }
 
 export function TextField({
@@ -63,8 +64,11 @@ export function TextField({
   label,
   required = false,
   style,
+  textDirection = "rtl",
   ...textInputProps
 }: TextFieldProps) {
+  const textAlign = textDirection === "rtl" ? "right" : textDirection === "ltr" ? "left" : undefined;
+
   return (
     <FormField error={error} description={hint} label={label} required={required}>
       <TextInput
@@ -76,6 +80,7 @@ export function TextField({
           styles.input,
           textInputProps.editable === false && styles.inputDisabled,
           error && styles.inputError,
+          { textAlign, writingDirection: textDirection },
           style,
         ]}
       />
@@ -104,6 +109,7 @@ const styles = StyleSheet.create({
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[4],
     paddingVertical: fiticianTokens.spacing[3],
+    writingDirection: "rtl",
   },
   inputDisabled: {
     opacity: 0.58,
@@ -116,6 +122,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.medium,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   required: {
     color: fiticianTokens.colors.coral,
@@ -124,5 +132,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
 });

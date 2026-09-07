@@ -9,6 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { type ReactNode } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { fiticianTokens } from "../tokens";
 import { Button } from "./Button";
@@ -50,7 +51,7 @@ export function Sheet({
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
-        <View style={[styles.sheet, style]}>
+        <SafeAreaView edges={["bottom"]} style={[styles.sheet, style]}>
           <View style={styles.header}>
             {title ? <Text style={styles.title}>{title}</Text> : <View />}
             <Pressable
@@ -66,7 +67,7 @@ export function Sheet({
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
-        </View>
+        </SafeAreaView>
       </View>
     </Modal>
   );
@@ -106,7 +107,7 @@ export function Dialog({
       transparent
       visible={visible}
     >
-      <View style={styles.dialogOverlay}>
+      <SafeAreaView edges={["top", "bottom"]} style={styles.dialogOverlay}>
         <View style={styles.dialog}>
           {title ? <Text style={styles.title}>{title}</Text> : null}
           <Text style={styles.message}>{message}</Text>
@@ -122,7 +123,7 @@ export function Dialog({
             ) : null}
           </View>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -211,5 +212,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.h3,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 28,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
 });

@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { Screen } from "../layout";
 import { fiticianTokens } from "../tokens";
 
 export interface RouteEntryScreenProps {
@@ -9,13 +10,13 @@ export interface RouteEntryScreenProps {
 
 export function RouteEntryScreen({ description, title }: RouteEntryScreenProps) {
   return (
-    <View style={styles.screen}>
+    <Screen contentContainerStyle={styles.screen} contentWidth="reading" scroll={false}>
       <View style={styles.content}>
         <Text style={styles.brand}>FITICIAN</Text>
         <Text accessibilityRole="header" style={styles.title}>{title}</Text>
         <Text style={styles.description}>{description}</Text>
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -26,6 +27,8 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     letterSpacing: 1.4,
+    textAlign: "left",
+    writingDirection: "ltr",
   },
   content: {
     gap: fiticianTokens.spacing[3],
@@ -37,17 +40,18 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 28,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   screen: {
-    backgroundColor: fiticianTokens.colors.canvas,
-    flex: 1,
     justifyContent: "center",
-    paddingHorizontal: fiticianTokens.layout.screenPadding,
   },
   title: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h1,
     lineHeight: 40,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
 });

@@ -41,6 +41,8 @@ vi.mock("expo-video", () => ({
   VideoView: native.View,
 }));
 
+vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: native.View }));
+
 import { Button } from "./components/Button";
 import { Card } from "./components/Card";
 import { Dialog, Sheet } from "./components/Overlay";
