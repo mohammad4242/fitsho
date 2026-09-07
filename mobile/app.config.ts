@@ -82,6 +82,14 @@ const config: ExpoConfig = {
     ["expo-font", fiticianFontConfig],
     "expo-secure-store",
     ["expo-sqlite", { useSQLCipher: true }],
+    [
+      "expo-image-picker",
+      {
+        cameraPermission: false,
+        microphonePermission: false,
+        photosPermission: false,
+      },
+    ],
     "expo-background-task",
     "expo-video",
     [

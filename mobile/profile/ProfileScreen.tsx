@@ -32,6 +32,7 @@ import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot, useRefreshMobileProfileStatus } from "../ui/navigation/RouteGuards";
 import { createProfileApi } from "./profileApi";
+import { ProfilePhotoControl } from "./ProfilePhotoControl";
 import {
   nutritionFormsForProfile,
   nutritionInputForEdit,
@@ -414,6 +415,15 @@ export function ProfileScreen() {
           <Text style={styles.mutedText}>{modeLabel(loaded.mode)}</Text>
         </View>
       </Card>
+      <ProfilePhotoControl
+        initialUrl={loaded.shared.profile_photo_url}
+        label={loaded.shared.display_name}
+        onChanged={(nextUrl) => {
+          setLoaded((current) => current === null
+            ? current
+            : { ...current, shared: { ...current.shared, profile_photo_url: nextUrl } });
+        }}
+      />
 
       {error !== null ? <Notice message={error} variant="danger" /> : null}
       {saveMessage !== null ? <Notice message={saveMessage} variant="success" /> : null}

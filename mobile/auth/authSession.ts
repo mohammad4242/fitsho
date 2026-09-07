@@ -5,7 +5,11 @@ import type {
   RefreshTokenStorage,
   User,
 } from "@fitician/core/auth";
-import type { FiticianTransport, TransportRequest } from "@fitician/core";
+import type {
+  FiticianTransport,
+  MultipartUploadRequest,
+  TransportRequest,
+} from "@fitician/core";
 
 import { MobileAuthClient } from "./authClient";
 import { createMobileAuthApi, type MobileAuthApi, type MobileClientMetadataSource } from "./authApi";
@@ -133,6 +137,10 @@ export class MobileAuthSession {
 
   async request<TResponse>(request: TransportRequest): Promise<TResponse> {
     return this.client.request<TResponse>(request);
+  }
+
+  async upload<TResponse>(request: MultipartUploadRequest): Promise<TResponse> {
+    return this.client.upload<TResponse>(request);
   }
 
   async logout(): Promise<void> {

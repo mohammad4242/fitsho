@@ -4,6 +4,7 @@ import {
   type BinaryDownloadRequest,
   type FiticianTransport,
   type MobileAuthTokens,
+  type MultipartUploadRequest,
   type RefreshTokenStorage,
   type TransportRequest,
 } from "@fitician/core";
@@ -87,6 +88,12 @@ export class MobileAuthClient {
   async download(request: BinaryDownloadRequest): Promise<BinaryDownload> {
     return this.executeWithAuthentication(request, (authenticatedRequest) =>
       this.transport.download(authenticatedRequest),
+    );
+  }
+
+  async upload<TResponse>(request: MultipartUploadRequest): Promise<TResponse> {
+    return this.executeWithAuthentication(request, (authenticatedRequest) =>
+      this.transport.upload<TResponse>(authenticatedRequest),
     );
   }
 

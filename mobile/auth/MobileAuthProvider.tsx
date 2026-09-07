@@ -11,7 +11,7 @@ import {
 } from "react";
 
 import type { Credentials, GenericMessage, User } from "@fitician/core/auth";
-import type { TransportRequest } from "@fitician/core";
+import type { MultipartUploadRequest, TransportRequest } from "@fitician/core";
 
 import { createNativeTransport } from "../api/nativeTransport";
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
@@ -28,6 +28,7 @@ export interface MobileAuthContextValue extends MobileAuthSessionSnapshot {
   readonly logoutAll: () => Promise<void>;
   readonly register: (credentials: Credentials) => Promise<User>;
   readonly request: <TResponse>(request: TransportRequest) => Promise<TResponse>;
+  readonly upload: <TResponse>(request: MultipartUploadRequest) => Promise<TResponse>;
   readonly resetPassword: (token: string, password: string) => Promise<void>;
   readonly sendEmailVerification: () => Promise<GenericMessage>;
   readonly sendPhoneOtp: (phoneNumber: string) => Promise<GenericMessage & { retry_after_seconds: number }>;
@@ -80,6 +81,10 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
     <TResponse,>(requestInput: TransportRequest) => activeSession.request<TResponse>(requestInput),
     [activeSession],
   );
+  const upload = useCallback(
+    <TResponse,>(requestInput: MultipartUploadRequest) => activeSession.upload<TResponse>(requestInput),
+    [activeSession],
+  );
   const resetPassword = useCallback(
     (token: string, password: string) => activeSession.resetPassword(token, password),
     [activeSession],
@@ -114,6 +119,7 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
       logoutAll,
       register,
       request,
+      upload,
       resetPassword,
       sendEmailVerification,
       sendPhoneOtp,
@@ -128,6 +134,7 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
       logoutAll,
       register,
       request,
+      upload,
       resetPassword,
       sendEmailVerification,
       sendPhoneOtp,

@@ -50,6 +50,9 @@ for (const required of [
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
   /["']expo-background-task["']/,
   /["']expo-font["']/,
+  /cameraPermission:\s*false/,
+  /microphonePermission:\s*false/,
+  /photosPermission:\s*false/,
 ]) {
   assert.match(appConfig, required);
 }
