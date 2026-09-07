@@ -198,13 +198,17 @@ def authenticate_google(
                 user = User(google_sub=identity.sub)
                 db.add(user)
                 db.flush()
-        elif (
-            identity.email_verified
-            and normalized_google_email is not None
-            and user.email == normalized_google_email
-            and user.email_verified_at is None
-        ):
-            user.email_verified_at = now
+        elif identity.email_verified and normalized_google_email is not None:
+            if user.email == normalized_google_email:
+                user.email_verified_at = user.email_verified_at or now
+            elif user.email is None:
+                email_user = db.scalar(
+                    select(User).where(User.email == normalized_google_email).with_for_update()
+                )
+                if email_user is not None and email_user.id != user.id:
+                    raise GoogleAccountConflictError
+                user.email = normalized_google_email
+                user.email_verified_at = now
 
         auth_session, raw_token = _new_session(user, session_ttl_seconds, now)
         db.add(auth_session)

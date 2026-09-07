@@ -157,6 +157,13 @@ class KavenegarSmsProvider:
         with httpx.Client(timeout=self._timeout, trust_env=False) as client:
             response = client.post(self._url, data=payload)
             response.raise_for_status()
+            try:
+                body = response.json()
+            except ValueError:
+                raise RuntimeError("Kavenegar delivery failed") from None
+            result = body.get("return") if isinstance(body, dict) else None
+            if not isinstance(result, dict) or result.get("status") != 200:
+                raise RuntimeError("Kavenegar delivery failed")
 
 
 class GoogleIdTokenProvider:

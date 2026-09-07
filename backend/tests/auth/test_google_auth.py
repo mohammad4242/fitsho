@@ -159,6 +159,28 @@ def test_unverified_google_identity_without_conflict_creates_google_only_user(
     assert user.email_verified_at is None
 
 
+def test_verified_email_completes_an_existing_google_only_user(
+    client: TestClient,
+    db: Session,
+) -> None:
+    first = _google_login(
+        client,
+        StubGoogleIdentityProvider(email=None, email_verified=False),
+    )
+    second = _google_login(
+        client,
+        StubGoogleIdentityProvider(email="verified@example.com", email_verified=True),
+    )
+
+    assert first.status_code == second.status_code == 200
+    assert first.json()["id"] == second.json()["id"]
+    user = db.scalar(select(User).where(User.google_sub == "google-sub-1"))
+    assert user is not None
+    assert user.email == "verified@example.com"
+    assert user.email_verified_at is not None
+    assert db.scalar(select(func.count()).select_from(User)) == 1
+
+
 @pytest.mark.parametrize(
     "provider_error",
     [

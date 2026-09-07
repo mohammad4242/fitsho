@@ -30,7 +30,22 @@ class FakeHttpClient:
     def post(self, url: str, *, data: dict[str, str]) -> httpx.Response:
         type(self).request_url = url
         type(self).request_data = data
-        return httpx.Response(200, request=httpx.Request("POST", url))
+        return httpx.Response(
+            200,
+            json={"return": {"status": 200}},
+            request=httpx.Request("POST", url),
+        )
+
+
+class ApplicationFailureHttpClient(FakeHttpClient):
+    def post(self, url: str, *, data: dict[str, str]) -> httpx.Response:
+        type(self).request_url = url
+        type(self).request_data = data
+        return httpx.Response(
+            200,
+            json={"return": {"status": 424}},
+            request=httpx.Request("POST", url),
+        )
 
 
 def test_kavenegar_provider_uses_verification_template_contract(
@@ -54,6 +69,22 @@ def test_kavenegar_provider_uses_verification_template_contract(
         "token": "123456",
         "template": "fitsho-login",
     }
+
+
+def test_kavenegar_provider_rejects_application_level_delivery_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(httpx, "Client", ApplicationFailureHttpClient)
+    provider = KavenegarSmsProvider(
+        Settings(
+            sms_provider="kavenegar",
+            kavenegar_api_key="api-key",
+            kavenegar_verify_template="fitsho-login",
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="Kavenegar delivery failed"):
+        provider.send_login_otp("+989123456789", "123456")
 
 
 class FakeSmtp:
