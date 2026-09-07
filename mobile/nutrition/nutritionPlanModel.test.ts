@@ -7,6 +7,7 @@ import {
   formatNutritionPlanMoney,
   getNutritionPlanStatus,
   isNutritionPlanExecutable,
+  selectNutritionPlan,
   nutritionPlanPdfFilename,
 } from "./nutritionPlanModel";
 
@@ -68,6 +69,20 @@ it("never marks historical or unapproved plans executable", () => {
   expect(isNutritionPlanExecutable(plan({ physician_approved: false }))).toBe(false);
   expect(isNutritionPlanExecutable(plan({ is_user_visible: false }))).toBe(false);
   expect(isNutritionPlanExecutable(plan({ lifecycle_status: "pending_physician_review" }))).toBe(false);
+});
+
+it("prefers the latest revision while preserving the active plan fallback", () => {
+  const active = plan({ id: "active-plan" });
+  const latest = plan({
+    id: "latest-plan",
+    lifecycle_status: "pending_physician_review",
+    physician_approved: false,
+    review_status: "pending",
+  });
+
+  expect(selectNutritionPlan(active, latest)).toEqual({ isLatest: true, plan: latest });
+  expect(selectNutritionPlan(active, null)).toEqual({ isLatest: false, plan: active });
+  expect(selectNutritionPlan(null, null)).toEqual({ isLatest: false, plan: null });
 });
 
 it("classifies backend generation outcomes and keeps money display rounding local", () => {

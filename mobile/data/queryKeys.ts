@@ -53,6 +53,7 @@ export const nutritionKeys = {
   ...createResourceQueryKeys("nutrition"),
   plans: () => ["nutrition", "plans"] as const,
   plan: (planId: string) => ["nutrition", "plan", planId] as const,
+  latestBundle: () => ["nutrition", "plan-bundle", "latest"] as const,
   profile: () => ["nutrition", "profile"] as const,
   reviewRequirement: () => ["nutrition", "review-requirement"] as const,
   safety: () => ["nutrition", "safety"] as const,

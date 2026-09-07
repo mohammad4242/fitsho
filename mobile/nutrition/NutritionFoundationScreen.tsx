@@ -34,6 +34,7 @@ import {
   type SafetyEvaluation,
   type StructuredExercise,
 } from "./nutritionApi";
+import { NutritionPlanSection } from "./NutritionPlanSection";
 
 type ChoiceOption = { readonly label: string; readonly value: string };
 
@@ -131,6 +132,7 @@ export function NutritionFoundationScreen() {
         onRetry={() => void estimateQuery.refetch()}
         state={estimateState}
       />
+      <NutritionPlanSection safety={safety ?? null} />
     </Screen>
   );
 }

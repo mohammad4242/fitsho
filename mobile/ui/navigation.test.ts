@@ -144,3 +144,8 @@ it("uses the native nutrition foundation inside the completed member nutrition b
   await expect(readFile(route, "utf8")).resolves.not.toMatch(/RouteEntryScreen/);
   await expect(readFile(route, "utf8")).resolves.toMatch(/requiredCapability="nutrition"/);
 });
+
+it("keeps weekly nutrition plans inside the native nutrition surface", async () => {
+  const screen = resolve(dirname(appRoot), "nutrition/NutritionFoundationScreen.tsx");
+  await expect(readFile(screen, "utf8")).resolves.toMatch(/NutritionPlanSection/);
+});

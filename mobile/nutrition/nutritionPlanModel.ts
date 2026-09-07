@@ -2,6 +2,11 @@ import { irrToRoundedToman } from "@fitician/core";
 
 import type { WeeklyPlan } from "./nutritionPlanApi";
 
+export type NutritionPlanSelection = {
+  readonly isLatest: boolean;
+  readonly plan: WeeklyPlan | null;
+};
+
 export type NutritionPlanStatus =
   | "active"
   | "archived"
@@ -52,6 +57,14 @@ export function isNutritionPlanExecutable(plan: WeeklyPlan, historical = false):
     && plan.lifecycle_status === "active"
     && plan.physician_approved
     && plan.review_status === "approved";
+}
+
+export function selectNutritionPlan(
+  active: WeeklyPlan | null,
+  latest: WeeklyPlan | null,
+): NutritionPlanSelection {
+  if (latest !== null) return { isLatest: true, plan: latest };
+  return { isLatest: false, plan: active };
 }
 
 export function classifyNutritionGenerationOutcome(outcome: string): NutritionGenerationStatus {
