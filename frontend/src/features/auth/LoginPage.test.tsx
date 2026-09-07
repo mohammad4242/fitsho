@@ -42,6 +42,20 @@ it("keeps the login form usable without promotional media", () => {
   );
 });
 
+it("keeps Google clickable while its client ID is not configured", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(null, { status: 401 }));
+  const user = userEvent.setup();
+
+  renderPage();
+  await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+
+  await user.click(screen.getByRole("button", { name: "Google" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "درخواست انجام نشد. دوباره تلاش کن.",
+  );
+});
+
 it("uses the Google Identity credential and reaches the authenticated flow", async () => {
   vi.stubEnv("VITE_GOOGLE_CLIENT_ID", "fitsho-client-id.apps.googleusercontent.com");
   let googleCallback: ((response: { credential: string }) => void) | undefined;

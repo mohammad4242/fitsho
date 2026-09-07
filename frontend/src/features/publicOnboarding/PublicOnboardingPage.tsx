@@ -6,7 +6,7 @@ import { AppIcon } from "../../shared/AppIcon";
 import * as authApi from "../auth/api";
 import { authErrorMessage } from "../auth/authError";
 import { useAuth } from "../auth/AuthContext";
-import { GoogleBrandIcon, GoogleSignInButton } from "../auth/GoogleSignInButton";
+import { GoogleSignInButton } from "../auth/GoogleSignInButton";
 import { NutritionOnboardingFlow } from "../nutrition/NutritionOnboardingFlow";
 import { toProfileInput, validateStep, type ProfileValidationErrors } from "../profile/profileValidation";
 import type { ProductMode, ProfileFormValue, ProfileFormValues } from "../profile/types";
@@ -360,10 +360,6 @@ function FinalAccountStep({ draft, language, onEdit }: { draft: OnboardingDraft;
 
         <div className="account-provider-grid" aria-label={text.providers}>
           <div className="account-provider account-provider--google">
-            <span className="account-provider__identity">
-              <GoogleBrandIcon className="account-provider__mark" />
-              <span>{text.google}</span>
-            </span>
             <GoogleSignInButton
               onCredential={handleGoogleCredential}
               onError={handleGoogleError}

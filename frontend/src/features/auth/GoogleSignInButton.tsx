@@ -30,13 +30,20 @@ declare global {
 const GOOGLE_SCRIPT_ID = "google-identity-services";
 const GOOGLE_SCRIPT_URL = "https://accounts.google.com/gsi/client";
 
-export function GoogleBrandIcon({ className }: { className?: string }) {
+export function GoogleBrandIcon({
+  className,
+  decorative = false,
+}: {
+  className?: string;
+  decorative?: boolean;
+}) {
   return (
     <svg
       className={className}
       viewBox="0 0 24 24"
-      role="img"
-      aria-label="Google"
+      role={decorative ? undefined : "img"}
+      aria-label={decorative ? undefined : "Google"}
+      aria-hidden={decorative || undefined}
     >
       <path
         fill="#4285F4"
@@ -128,7 +135,19 @@ export function GoogleSignInButton({
     };
   }, [clientId]);
 
-  if (!clientId) return null;
+  if (!clientId) {
+    return (
+      <button
+        className="google-sign-in-fallback"
+        type="button"
+        onClick={() => onErrorRef.current()}
+        disabled={disabled}
+      >
+        <GoogleBrandIcon className="google-sign-in-fallback__icon" decorative />
+        <span>Google</span>
+      </button>
+    );
+  }
   return (
     <div
       ref={container}

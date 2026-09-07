@@ -274,7 +274,7 @@ it("keeps the Google provider and brand icon visible before client ID setup", ()
   seedReadyTrainingDraft();
   render(<MemoryRouter><PublicOnboardingPage /></MemoryRouter>);
 
-  expect(screen.getByRole("img", { name: "Google" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Google" })).toBeEnabled();
   expect(screen.getByRole("button", { name: /Apple/ })).toBeDisabled();
 });
 
