@@ -63,6 +63,25 @@ export type {
   NormalizedBodyLandmark,
 } from "./body-ghost-pose";
 export type * from "./profile-validation";
+export {
+  canTransitionOnboardingState,
+  createInitialOnboardingState,
+  deserializeOnboardingState,
+  getOnboardingSteps,
+  isOnboardingState,
+  serializeOnboardingState,
+  transitionOnboardingState,
+  OnboardingTransitionError,
+} from "./onboarding";
+export type {
+  NutritionBasicsDraft,
+  OnboardingDraftLoadResult,
+  OnboardingEvent,
+  OnboardingState,
+  OnboardingStateStore,
+  OnboardingStep,
+  OnboardingTransitionErrorCode,
+} from "./onboarding";
 export type {
   MobileAuthTokens,
   RefreshTokenStorage,

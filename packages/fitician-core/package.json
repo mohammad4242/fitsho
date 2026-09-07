@@ -34,6 +34,10 @@
       "types": "./dist/profile-validation.d.ts",
       "import": "./dist/profile-validation.js"
     },
+    "./onboarding": {
+      "types": "./dist/onboarding.d.ts",
+      "import": "./dist/onboarding.js"
+    },
     "./formatters": {
       "types": "./dist/formatters.d.ts",
       "import": "./dist/formatters.js"
