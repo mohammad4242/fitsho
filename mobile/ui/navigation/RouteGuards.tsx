@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useMobileAuth } from "../../auth/MobileAuthProvider";
 import { mobileRouteSnapshotFromAuth } from "../../auth/authContext";
+import { loadSpecialistAccess, type SpecialistAccessSnapshot } from "../../auth/specialistAccess";
 import type { ProfileStatusResponse } from "@fitician/core/profile";
 import { fiticianTokens } from "../tokens";
 import {
@@ -54,7 +55,12 @@ export function MobileRouteStateProvider({
 export function MobileRouteStateProviderFromAuth({ children }: { readonly children: ReactNode }) {
   const auth = useMobileAuth();
   const [profile, setProfile] = useState<MobileProfileRouteState | null>(null);
+  const [specialistAccess, setSpecialistAccess] = useState<SpecialistAccessSnapshot>({
+    coach: "loading",
+    physician: "loading",
+  });
   const requestGeneration = useRef(0);
+  const specialistRequestGeneration = useRef(0);
   const userId = auth.user?.id ?? null;
   const refreshProfileStatus = useCallback(async () => {
     const generation = ++requestGeneration.current;
@@ -82,9 +88,26 @@ export function MobileRouteStateProviderFromAuth({ children }: { readonly childr
     }
   }, [auth.request, auth.status, userId]);
 
+  const refreshSpecialistAccess = useCallback(async () => {
+    const generation = ++specialistRequestGeneration.current;
+    if (auth.status !== "signed_in" || userId === null) {
+      setSpecialistAccess({ coach: "denied", physician: "denied" });
+      return;
+    }
+    setSpecialistAccess({ coach: "loading", physician: "loading" });
+    const access = await loadSpecialistAccess(auth.request);
+    if (generation === specialistRequestGeneration.current) {
+      setSpecialistAccess(access);
+    }
+  }, [auth.request, auth.status, userId]);
+
   useEffect(() => {
     void refreshProfileStatus();
   }, [refreshProfileStatus]);
+
+  useEffect(() => {
+    void refreshSpecialistAccess();
+  }, [refreshSpecialistAccess]);
 
   const profileSnapshot = profile ?? {
     completionState: null,
@@ -95,8 +118,9 @@ export function MobileRouteStateProviderFromAuth({ children }: { readonly childr
     () => ({
       ...mobileRouteSnapshotFromAuth(auth),
       profile: profileSnapshot,
+      specialistAccess,
     }),
-    [auth, profileSnapshot],
+    [auth, profileSnapshot, specialistAccess],
   );
   return (
     <MobileRouteSnapshotContext.Provider value={snapshot}>
