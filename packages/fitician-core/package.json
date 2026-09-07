@@ -30,6 +30,10 @@
       "types": "./dist/profile.d.ts",
       "import": "./dist/profile.js"
     },
+    "./profile-validation": {
+      "types": "./dist/profile-validation.d.ts",
+      "import": "./dist/profile-validation.js"
+    },
     "./workout-reviews": {
       "types": "./dist/workout-reviews.d.ts",
       "import": "./dist/workout-reviews.js"
