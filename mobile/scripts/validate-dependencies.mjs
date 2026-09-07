@@ -28,6 +28,7 @@ const expected = {
   "expo-linking": { declared: "~57.0.1", version: /^57\./ },
   "expo-image-picker": { declared: "~57.0.16", version: /^57\./ },
   "expo-image-manipulator": { declared: "~57.0.16", version: /^57\./ },
+  "expo-notifications": { declared: "~57.0.17", version: /^57\./ },
   "expo-router": { declared: "~57.0.2", version: /^57\./ },
   "expo-secure-store": { declared: "~57.0.3", version: /^57\./ },
   "expo-sqlite": { declared: "~57.0.2", version: /^57\./ },

@@ -91,6 +91,7 @@ const config: ExpoConfig = {
       },
     ],
     "expo-background-task",
+    "expo-notifications",
     "expo-video",
     [
       "expo-build-properties",

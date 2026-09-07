@@ -49,6 +49,7 @@ for (const required of [
   /pathPrefix:\s*["']\/link["']/,
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
   /["']expo-background-task["']/,
+  /["']expo-notifications["']/,
   /["']expo-font["']/,
   /cameraPermission:\s*["'][^"']+["']/,
   /microphonePermission:\s*false/,

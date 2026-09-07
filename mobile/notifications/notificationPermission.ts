@@ -1,0 +1,146 @@
+import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+
+export const NOTIFICATION_PERMISSION_REQUESTED_KEY = "fitician.notifications.permission-requested";
+
+export type NotificationPermissionStatus =
+  | "blocked"
+  | "denied"
+  | "granted"
+  | "not_required"
+  | "not_supported";
+
+export interface NotificationPermissionRequestStore {
+  read(): Promise<string | null>;
+  write(value: string): Promise<void>;
+}
+
+const securePermissionRequestStore: NotificationPermissionRequestStore = {
+  read: () => SecureStore.getItemAsync(NOTIFICATION_PERMISSION_REQUESTED_KEY),
+  write: (value) => SecureStore.setItemAsync(NOTIFICATION_PERMISSION_REQUESTED_KEY, value),
+};
+
+export const ANDROID_NOTIFICATION_CHANNELS: ReadonlyArray<{
+  readonly id: string;
+  readonly configuration: Notifications.NotificationChannelInput;
+}> = [
+  {
+    id: "fitician-activity",
+    configuration: {
+      name: "فعالیت‌های فیتیچیان",
+      description: "به‌روزرسانی‌های برنامه تمرینی و تغذیه‌ای",
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+      showBadge: true,
+      sound: "default",
+      vibrationPattern: [0, 250, 250, 250],
+      enableLights: true,
+      enableVibrate: true,
+      lightColor: "#7C5CFC",
+    },
+  },
+  {
+    id: "fitician-reminders",
+    configuration: {
+      name: "یادآوری‌های فیتیچیان",
+      description: "یادآوری‌های چرخه و بررسی‌های برنامه",
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+      showBadge: true,
+      sound: "default",
+      vibrationPattern: [0, 250, 250, 250],
+      enableLights: true,
+      enableVibrate: true,
+      lightColor: "#49D3A4",
+    },
+  },
+  {
+    id: "fitician-health",
+    configuration: {
+      name: "به‌روزرسانی‌های سلامت",
+      description: "نتیجه‌های تحلیل بدن و تصمیم‌های بالینی",
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+      showBadge: true,
+      sound: "default",
+      vibrationPattern: [0, 250, 250, 250],
+      enableLights: true,
+      enableVibrate: true,
+      lightColor: "#FFB86B",
+    },
+  },
+];
+
+export function androidApiLevel(version: unknown): number | null {
+  if (typeof version === "number" && Number.isFinite(version)) {
+    return Math.trunc(version);
+  }
+  if (typeof version === "string" && /^\d+$/.test(version)) {
+    return Number.parseInt(version, 10);
+  }
+  return null;
+}
+
+export function androidNotificationPermissionRequired(
+  version: unknown = Platform.Version,
+): boolean {
+  const apiLevel = androidApiLevel(version);
+  return Platform.OS === "android" && apiLevel !== null && apiLevel >= 33;
+}
+
+export async function configureAndroidNotificationChannels(): Promise<void> {
+  const apiLevel = androidApiLevel(Platform.Version);
+  if (Platform.OS !== "android" || (apiLevel !== null && apiLevel < 26)) {
+    return;
+  }
+  for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
+    await Notifications.setNotificationChannelAsync(channel.id, channel.configuration);
+  }
+}
+
+export async function requestAndroidNotificationPermission(
+  storage: NotificationPermissionRequestStore = securePermissionRequestStore,
+): Promise<NotificationPermissionStatus> {
+  if (Platform.OS !== "android") {
+    return "not_supported";
+  }
+  if (!androidNotificationPermissionRequired()) {
+    return "not_required";
+  }
+
+  const current = await Notifications.getPermissionsAsync();
+  if (current.granted) {
+    return "granted";
+  }
+  if (!current.canAskAgain) {
+    return "blocked";
+  }
+  if ((await storage.read()) === "1") {
+    return "denied";
+  }
+
+  const requested = await Notifications.requestPermissionsAsync();
+  await storage.write("1");
+  if (requested.granted) {
+    return "granted";
+  }
+  return requested.canAskAgain ? "denied" : "blocked";
+}
+
+export async function prepareAndroidNotifications(
+  storage: NotificationPermissionRequestStore = securePermissionRequestStore,
+): Promise<NotificationPermissionStatus> {
+  await configureAndroidNotificationChannels();
+  return requestAndroidNotificationPermission(storage);
+}
+
+export async function getAndroidFcmToken(): Promise<string | null> {
+  if (Platform.OS !== "android") {
+    return null;
+  }
+  const token = await Notifications.getDevicePushTokenAsync();
+  return token.type === "android" && typeof token.data === "string" && token.data.trim()
+    ? token.data
+    : null;
+}
