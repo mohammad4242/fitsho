@@ -256,7 +256,10 @@ it("offers email, phone, and Google while keeping Apple upcoming", () => {
   expect(screen.getByRole("button", { name: "Google" })).toBeEnabled();
   expect(screen.getByRole("button", { name: /Apple/ })).toBeDisabled();
   expect(screen.getByRole("tab", { name: "شماره تلفن" })).toBeEnabled();
+  expect(screen.getByRole("tab", { name: "ایمیل" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("tab", { name: "شماره تلفن" })).toHaveAttribute("aria-selected", "false");
   expect(screen.getByText("مسیر امن انتقال اطلاعات")).toBeInTheDocument();
+  expect(document.querySelector(".public-account-step__card")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "بازگشت و ویرایش پاسخ‌ها" })).toBeInTheDocument();
 });
 

@@ -446,7 +446,11 @@ function FinalAccountStep({ draft, language, onEdit }: { draft: OnboardingDraft;
             </button>
           </form>
         )}
-        <button className="text-button" type="button" onClick={() => setAccountMode((mode) => mode === "register" ? "login" : "register")}>{accountMode === "register" ? text.existing : text.newAccount}</button>
+        {method === "email" && (
+          <button className="text-button account-mode-toggle" type="button" onClick={() => setAccountMode((mode) => mode === "register" ? "login" : "register")}>
+            {accountMode === "register" ? text.existing : text.newAccount}
+          </button>
+        )}
       </section>
     </main>
   );
