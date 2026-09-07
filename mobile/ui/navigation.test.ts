@@ -92,4 +92,7 @@ it("places route guards at group boundaries and hides capability tabs", async ()
   await expect(readFile(resolve(appRoot, "_layout.tsx"), "utf8")).resolves.toContain(
     "MobileRouteStateProvider",
   );
+  await expect(readFile(resolve(appRoot, "_layout.tsx"), "utf8")).resolves.toContain(
+    "AndroidBackBehaviorProvider",
+  );
 });
