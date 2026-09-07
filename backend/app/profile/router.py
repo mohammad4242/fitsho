@@ -365,9 +365,10 @@ def save_shared_profile(
     user: CurrentUser,
 ) -> SharedProfileResponse:
     try:
+        photo_url = _owner_photo_url(db, user.id)
         return to_shared_response(
             upsert_shared_profile(db, user.id, payload),
-            _owner_photo_url(db, user.id),
+            photo_url,
         )
     except (AgeNotSupportedError, AgeOutOfRangeError) as error:
         raise_age_error(error)
@@ -406,7 +407,8 @@ def create(
     user: CurrentUser,
 ) -> ProfileResponse:
     try:
-        return to_response(create_profile(db, user.id, payload), _owner_photo_url(db, user.id))
+        photo_url = _owner_photo_url(db, user.id)
+        return to_response(create_profile(db, user.id, payload), photo_url)
     except (AgeNotSupportedError, AgeOutOfRangeError) as error:
         raise_age_error(error)
     except ProfileAlreadyExistsError:
@@ -440,7 +442,8 @@ def update(
     user: CurrentUser,
 ) -> ProfileResponse:
     try:
-        return to_response(update_profile(db, user.id, payload), _owner_photo_url(db, user.id))
+        photo_url = _owner_photo_url(db, user.id)
+        return to_response(update_profile(db, user.id, payload), photo_url)
     except (AgeNotSupportedError, AgeOutOfRangeError) as error:
         raise_age_error(error)
     except ProfileNotFoundError:
