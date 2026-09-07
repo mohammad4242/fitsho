@@ -54,6 +54,9 @@ export const nutritionKeys = {
   plans: () => ["nutrition", "plans"] as const,
   plan: (planId: string) => ["nutrition", "plan", planId] as const,
   profile: () => ["nutrition", "profile"] as const,
+  reviewRequirement: () => ["nutrition", "review-requirement"] as const,
+  safety: () => ["nutrition", "safety"] as const,
+  structuredExercise: () => ["nutrition", "structured-exercise"] as const,
   estimate: () => ["nutrition", "estimate"] as const,
   tracking: (date: string) => ["nutrition", "tracking", date] as const,
 };

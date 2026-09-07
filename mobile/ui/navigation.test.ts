@@ -137,3 +137,10 @@ it("uses the native workout plan screen inside the completed member training bou
   await expect(readFile(route, "utf8")).resolves.not.toMatch(/RouteEntryScreen/);
   await expect(readFile(route, "utf8")).resolves.toMatch(/requiredCapability="training"/);
 });
+
+it("uses the native nutrition foundation inside the completed member nutrition boundary", async () => {
+  const route = resolve(appRoot, "(member)/member/(tabs)/nutrition.tsx");
+  await expect(readFile(route, "utf8")).resolves.toMatch(/NutritionFoundationScreen/);
+  await expect(readFile(route, "utf8")).resolves.not.toMatch(/RouteEntryScreen/);
+  await expect(readFile(route, "utf8")).resolves.toMatch(/requiredCapability="nutrition"/);
+});
