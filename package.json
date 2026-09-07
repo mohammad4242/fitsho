@@ -14,6 +14,6 @@
     "build:core": "npm run build --workspace @fitician/core",
     "typecheck:mobile": "npm run typecheck --workspace @fitician/mobile",
     "validate:mobile": "npm run validate --workspace @fitician/mobile",
-    "test:mobile:foundation": "node --test mobile/scripts/foundation.test.mjs"
+    "test:mobile:foundation": "node --test mobile/scripts/*.test.mjs"
   }
 }

@@ -8,8 +8,9 @@
     "start": "expo start",
     "android": "expo run:android",
     "prebuild": "expo prebuild",
+    "test:foundation": "node --test scripts/*.test.mjs",
     "typecheck": "tsc --noEmit",
-    "validate": "node scripts/validate-foundation.mjs && node scripts/validate-dependencies.mjs"
+    "validate": "node scripts/validate-foundation.mjs && node scripts/validate-environments.mjs && node scripts/validate-dependencies.mjs"
   },
   "dependencies": {
     "expo": "~57.0.0",
