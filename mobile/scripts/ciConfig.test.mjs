@@ -70,3 +70,15 @@ test("CI installs uv before the shared OpenAPI check", async () => {
   assert.ok(sharedJob, "shared job must be present");
   assert.match(sharedJob, /uses:\s*astral-sh\/setup-uv@v6/u);
 });
+
+test("CI builds the shared core package before mobile tests", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const mobileJob = workflow.match(/\n  mobile:\n(?<body>[\s\S]*?)\n  android:/u)?.groups?.body;
+
+  assert.ok(mobileJob, "mobile job must be present");
+  const coreBuildIndex = mobileJob.indexOf("npm run build:core");
+  const mobileTestIndex = mobileJob.indexOf("npm run test --workspace @fitician/mobile");
+
+  assert.ok(coreBuildIndex >= 0, "mobile job must build core");
+  assert.ok(coreBuildIndex < mobileTestIndex, "core must be built before mobile tests");
+});

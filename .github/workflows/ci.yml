@@ -87,6 +87,7 @@ jobs:
           node-version: "20.19.0"
           cache: npm
       - run: npm ci
+      - run: npm run build:core
       - run: npm run test --workspace @fitician/mobile
       - run: npm run test:native --workspace @fitician/mobile
       - run: npm run test:mobile:foundation
