@@ -34,7 +34,8 @@ def _create_test_profile(
     cautions: list[TrainingCaution] | None = None,
 ) -> ProfileSpec:
     return ProfileSpec(
-        index=1,
+        profile_id=1,
+        seed=1,
         name="تست روتینگ",
         sex=Sex.MALE,
         birth_date=date(1998, 1, 1),
@@ -48,6 +49,7 @@ def _create_test_profile(
         session_duration_minutes=45,
         training_location=training_location,
         home_training_setup=home_setup,
+        resolved_equipment=[],
         priority_muscle=None,
         training_cautions=cautions or [],
         plan_duration_weeks=6,
@@ -101,7 +103,7 @@ def test_first_month_and_beginner_home_bodyweight_routes_to_fixed_template_witho
     )
 
     assert res["generation_path"] == "bodyweight_fixed_template"
-    assert res["status"] == "SUCCESS"
+    assert res["result_class"] == "SUCCESS"
     assert res["template_slug"] == expected_slug
     assert res["days_count"] == training_days
 
@@ -220,8 +222,8 @@ def test_intermediate_and_advanced_pure_bodyweight_rejects_without_calling_engin
         db=db,
     )
 
-    assert res["generation_path"] == "bodyweight_fixed_template"
-    assert res["status"] == "FAILED"
+    assert res["generation_path"] == "compatibility_rejection"
+    assert res["result_class"] == "UNSUPPORTED"
     assert res["failure_info"]["root_cause"] == "BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED"
 
 
@@ -257,5 +259,5 @@ def test_fixed_template_safety_or_caution_rejection_does_not_fall_through_to_eng
     )
 
     assert res["generation_path"] == "bodyweight_fixed_template"
-    assert res["status"] == "FAILED"
+    assert res["result_class"] == "FAILED"
     assert res["failure_info"]["root_cause"] == "BODYWEIGHT_TEMPLATE_EXERCISE_UNAVAILABLE"

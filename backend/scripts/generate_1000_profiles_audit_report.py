@@ -24,11 +24,10 @@ from app.workouts.benchmarks.cohort_generator import (
     generate_1000_profiles,
     validate_dataset_sanity,
 )
-from app.workouts.benchmarks.benchmark_evaluator import (
-    evaluate_single_profile,
-    format_program_days,
-)
+from app.workouts.benchmarks import benchmark_evaluator as _benchmark_evaluator
+from app.workouts.benchmarks.benchmark_evaluator import format_program_days
 from app.training_templates.engine_reference import load_template_references
+from app.workouts.program_engine.engine import generate_program
 from app.workouts.service import WorkoutGenerationService
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 
@@ -37,6 +36,29 @@ from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 _worker_catalog = None
 _worker_refs = None
 _worker_ex_map = None
+
+
+def evaluate_single_profile(
+    spec: ProfileSpec,
+    catalog: tuple[Any, ...],
+    references: tuple[Any, ...],
+    exercise_map: dict[UUID, Any],
+    ruleset: Any = RULESET,
+    db: Any | None = None,
+) -> dict[str, Any]:
+    """Evaluate a profile while preserving the script's patchable engine seam."""
+    original_generate_program = _benchmark_evaluator.generate_program
+    _benchmark_evaluator.generate_program = generate_program
+    try:
+        return _benchmark_evaluator.evaluate_single_profile(
+            spec,
+            catalog,
+            references,
+            exercise_map,
+            ruleset=ruleset,
+        )
+    finally:
+        _benchmark_evaluator.generate_program = original_generate_program
 
 
 def _init_worker(catalog, refs, ex_map):
