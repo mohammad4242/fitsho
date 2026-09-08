@@ -48,4 +48,10 @@ describe("Android body vision spike wiring", () => {
     expect(nativeSource).toContain("setOutputCategoryMask(false)");
     expect(nativeSource).not.toMatch(/Log\.|println\(|console\./);
   });
+
+  it("inherits the app Android Gradle Plugin instead of pinning a second version", async () => {
+    const gradle = await read("android/build.gradle");
+
+    expect(gradle).not.toContain("com.android.tools.build:gradle:9.2.1");
+  });
 });
