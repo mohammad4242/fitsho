@@ -8,12 +8,20 @@ import {
   type MultipartUploadRequest,
   type TransportRequest,
 } from "@fitician/core";
+import {
+  CORRELATION_ID_HEADER,
+  createCorrelationId,
+  mobileLogger,
+  type MobileLogger,
+} from "../platform/logging";
 
 export type NativeFetchLike = typeof fetch;
 
 export interface NativeTransportOptions {
   readonly apiBaseUrl: string;
+  readonly correlationIdFactory?: () => string;
   readonly fetchImpl?: NativeFetchLike;
+  readonly logger?: MobileLogger;
   readonly trustedOrigin?: string | null;
 }
 
@@ -35,6 +43,7 @@ function requestBody(body: TransportRequest["body"]): string | undefined {
 function requestHeaders(
   headers: TransportRequest["headers"],
   trustedOrigin: string | null | undefined,
+  correlationId: string,
   isMultipart: boolean,
 ): Headers {
   const result = new Headers(headers);
@@ -44,6 +53,9 @@ function requestHeaders(
   if (!isMultipart && !result.has("Content-Type")) {
     result.set("Content-Type", "application/json");
   }
+  if (!result.has(CORRELATION_ID_HEADER)) {
+    result.set(CORRELATION_ID_HEADER, correlationId);
+  }
   return result;
 }
 
@@ -51,11 +63,12 @@ function requestInit(
   request: TransportRequest,
   body: BodyInit | undefined,
   trustedOrigin: string | null | undefined,
+  correlationId: string,
   isMultipart = false,
 ): RequestInit {
   return {
     body,
-    headers: requestHeaders(request.headers, trustedOrigin, isMultipart),
+    headers: requestHeaders(request.headers, trustedOrigin, correlationId, isMultipart),
     method: request.method ?? "GET",
     signal: request.signal as AbortSignal | undefined,
   };
@@ -128,14 +141,47 @@ function multipartFormData(parts: readonly MultipartPart[]): FormData {
 
 export function createNativeTransport(options: NativeTransportOptions): FiticianTransport {
   const fetchRequest = options.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
+  const logger = options.logger ?? mobileLogger;
+  const correlationIdFactory = options.correlationIdFactory ?? createCorrelationId;
+
+  async function send(
+    request: TransportRequest,
+    body: BodyInit | undefined,
+    operation: "request" | "download" | "upload",
+    isMultipart = false,
+  ): Promise<Response> {
+    const correlationId = correlationIdFactory();
+    const startedAt = Date.now();
+    let response: Response | undefined;
+    try {
+      response = await fetchRequest(
+        requestUrl(options.apiBaseUrl, request.path),
+        requestInit(request, body, options.trustedOrigin, correlationId, isMultipart),
+      );
+      await ensureOk(response);
+      logger.captureMessage("native_request_completed", "info", {
+        correlation_id: correlationId,
+        duration_ms: Date.now() - startedAt,
+        http_status: response.status,
+        method: request.method ?? "GET",
+        operation,
+      });
+      return response;
+    } catch (error) {
+      logger.captureException("native_request_failed", error, {
+        correlation_id: correlationId,
+        duration_ms: Date.now() - startedAt,
+        http_status: response?.status ?? null,
+        method: request.method ?? "GET",
+        operation,
+      });
+      throw error;
+    }
+  }
 
   return {
     async request<TResponse>(request: TransportRequest): Promise<TResponse> {
-      const response = await fetchRequest(
-        requestUrl(options.apiBaseUrl, request.path),
-        requestInit(request, requestBody(request.body), options.trustedOrigin),
-      );
-      await ensureOk(response);
+      const response = await send(request, requestBody(request.body), "request");
       if (response.status === 204) {
         return undefined as TResponse;
       }
@@ -143,11 +189,7 @@ export function createNativeTransport(options: NativeTransportOptions): Fitician
     },
 
     async download(request: BinaryDownloadRequest): Promise<BinaryDownload> {
-      const response = await fetchRequest(
-        requestUrl(options.apiBaseUrl, request.path),
-        requestInit(request, requestBody(request.body), options.trustedOrigin),
-      );
-      await ensureOk(response);
+      const response = await send(request, requestBody(request.body), "download");
       return {
         bytes: new Uint8Array(await response.arrayBuffer()),
         contentType: response.headers.get("Content-Type"),
@@ -156,16 +198,12 @@ export function createNativeTransport(options: NativeTransportOptions): Fitician
     },
 
     async upload<TResponse>(request: MultipartUploadRequest): Promise<TResponse> {
-      const response = await fetchRequest(
-        requestUrl(options.apiBaseUrl, request.path),
-        requestInit(
-          request,
-          multipartFormData(request.parts),
-          options.trustedOrigin,
-          true,
-        ),
+      const response = await send(
+        request,
+        multipartFormData(request.parts),
+        "upload",
+        true,
       );
-      await ensureOk(response);
       if (response.status === 204) {
         return undefined as TResponse;
       }
