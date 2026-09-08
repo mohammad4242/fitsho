@@ -1,0 +1,40 @@
+name: Fitician Android release
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS release profile
+        required: true
+        type: choice
+        default: preview
+        options:
+          - development
+          - preview
+          - production
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ inputs.profile }} Android artifact
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.profile }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+      - run: npm ci
+      - name: Build signed EAS artifact
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: |
+          case "${{ inputs.profile }}" in
+            development) npm run build:android:debug --workspace @fitician/mobile ;;
+            preview) npm run build:android:internal --workspace @fitician/mobile ;;
+            production) npm run build:android:production --workspace @fitician/mobile ;;
+            *) echo "Unsupported release profile" >&2; exit 2 ;;
+          esac
