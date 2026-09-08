@@ -4,6 +4,41 @@
  */
 
 export type paths = {
+    "/api/v1/account-deletion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Status */
+        get: operations["get_status_api_v1_account_deletion_get"];
+        put?: never;
+        /** Request Deletion */
+        post: operations["request_deletion_api_v1_account_deletion_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/account-deletion/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Requested Deletion */
+        post: operations["cancel_requested_deletion_api_v1_account_deletion_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/ai/agent-service/auth/{session_id}": {
         parameters: {
             query?: never;
@@ -3069,6 +3104,44 @@ export type paths = {
 export type webhooks = Record<string, never>;
 export type components = {
     schemas: {
+        /** AccountDeletionCancelRequest */
+        AccountDeletionCancelRequest: {
+            /**
+             * Confirmation
+             * @constant
+             */
+            confirmation: "CANCEL";
+        };
+        /** AccountDeletionInitiateRequest */
+        AccountDeletionInitiateRequest: {
+            /**
+             * Confirmation
+             * @constant
+             */
+            confirmation: "DELETE";
+            /** Password */
+            password?: string | null;
+        };
+        /** AccountDeletionStatusResponse */
+        AccountDeletionStatusResponse: {
+            /** Cancelled At */
+            cancelled_at: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /** Grace Period Ends At */
+            grace_period_ends_at: string | null;
+            /** Reauthenticated At */
+            reauthenticated_at: string | null;
+            /** Request Id */
+            request_id: string | null;
+            /** Requested At */
+            requested_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "none" | "pending" | "cancelled" | "completed";
+        };
         /**
          * ActivityLevel
          * @enum {string}
@@ -4614,11 +4687,8 @@ export type components = {
              * Format: date-time
              */
             reviewed_at: string;
-            /**
-             * Reviewer Id
-             * Format: uuid
-             */
-            reviewer_id: string;
+            /** Reviewer Id */
+            reviewer_id: string | null;
             role: components["schemas"]["BodyAnalysisReviewerRole"];
         };
         /** BodyAnalysisStartRequest */
@@ -9354,11 +9424,8 @@ export type components = {
              * Format: date-time
              */
             reviewed_at: string;
-            /**
-             * Reviewer Id
-             * Format: uuid
-             */
-            reviewer_id: string;
+            /** Reviewer Id */
+            reviewer_id: string | null;
             role: components["schemas"]["BodyAnalysisReviewerRole"];
         };
         /** SpecialistReviewState */
@@ -10801,6 +10868,92 @@ export type components = {
 };
 export type $defs = Record<string, never>;
 export interface operations {
+    get_status_api_v1_account_deletion_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDeletionStatusResponse"];
+                };
+            };
+        };
+    };
+    request_deletion_api_v1_account_deletion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountDeletionInitiateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDeletionStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_requested_deletion_api_v1_account_deletion_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountDeletionCancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountDeletionStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     read_agent_authentication_api_v1_admin_ai_agent_service_auth__session_id__get: {
         parameters: {
             query?: never;

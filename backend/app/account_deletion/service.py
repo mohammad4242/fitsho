@@ -19,7 +19,7 @@ from app.auth.models import (
     User,
 )
 from app.auth.security import verify_password
-from app.body_photos.models import BodyPhoto, BodyPhotoSession
+from app.body_photos.models import BodyPhoto, BodyPhotoSession, BodyPhotoStorageCleanup
 from app.body_photos.storage import BodyPhotoStorage, BodyPhotoStorageError
 from app.config import Settings
 from app.nutrition.clinical_service import ClinicalError, lab_storage_path
@@ -179,11 +179,20 @@ def _unlink(path: Path, *, resource: str) -> None:
 
 def _delete_private_files(db: Session, settings: Settings, user_id: UUID) -> None:
     body_storage = BodyPhotoStorage(settings)
-    body_keys = db.scalars(
-        select(BodyPhoto.storage_key)
-        .join(BodyPhotoSession, BodyPhotoSession.id == BodyPhoto.session_id)
-        .where(BodyPhotoSession.user_id == user_id)
-    ).all()
+    body_keys = set(
+        db.scalars(
+            select(BodyPhoto.storage_key)
+            .join(BodyPhotoSession, BodyPhotoSession.id == BodyPhoto.session_id)
+            .where(BodyPhotoSession.user_id == user_id)
+        ).all()
+    )
+    body_keys.update(
+        db.scalars(
+            select(BodyPhotoStorageCleanup.storage_key)
+            .join(BodyPhotoSession, BodyPhotoSession.id == BodyPhotoStorageCleanup.session_id)
+            .where(BodyPhotoSession.user_id == user_id)
+        ).all()
+    )
     for key in body_keys:
         try:
             body_storage.delete(key)

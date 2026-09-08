@@ -377,6 +377,146 @@
         "title": "AITaskType",
         "type": "string"
       },
+      "AccountDeletionCancelRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "const": "CANCEL",
+            "title": "Confirmation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirmation"
+        ],
+        "title": "AccountDeletionCancelRequest",
+        "type": "object"
+      },
+      "AccountDeletionInitiateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmation": {
+            "const": "DELETE",
+            "title": "Confirmation",
+            "type": "string"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "required": [
+          "confirmation"
+        ],
+        "title": "AccountDeletionInitiateRequest",
+        "type": "object"
+      },
+      "AccountDeletionStatusResponse": {
+        "properties": {
+          "cancelled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "grace_period_ends_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grace Period Ends At"
+          },
+          "reauthenticated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reauthenticated At"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At"
+          },
+          "status": {
+            "enum": [
+              "none",
+              "pending",
+              "cancelled",
+              "completed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "request_id",
+          "requested_at",
+          "reauthenticated_at",
+          "grace_period_ends_at",
+          "cancelled_at",
+          "completed_at"
+        ],
+        "title": "AccountDeletionStatusResponse",
+        "type": "object"
+      },
       "ActivityLevel": {
         "enum": [
           "low",
@@ -4476,9 +4616,16 @@
             "type": "string"
           },
           "reviewer_id": {
-            "format": "uuid",
-            "title": "Reviewer Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
           },
           "role": {
             "$ref": "#/components/schemas/BodyAnalysisReviewerRole"
@@ -18444,9 +18591,16 @@
             "type": "string"
           },
           "reviewer_id": {
-            "format": "uuid",
-            "title": "Reviewer Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewer Id"
           },
           "role": {
             "$ref": "#/components/schemas/BodyAnalysisReviewerRole"
@@ -22348,6 +22502,122 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/account-deletion": {
+      "get": {
+        "operationId": "get_status_api_v1_account_deletion_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Status",
+        "tags": [
+          "account-deletion"
+        ]
+      },
+      "post": {
+        "operationId": "request_deletion_api_v1_account_deletion_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountDeletionInitiateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Deletion",
+        "tags": [
+          "account-deletion"
+        ]
+      }
+    },
+    "/api/v1/account-deletion/cancel": {
+      "post": {
+        "operationId": "cancel_requested_deletion_api_v1_account_deletion_cancel_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountDeletionCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancel Requested Deletion",
+        "tags": [
+          "account-deletion"
+        ]
+      }
+    },
     "/api/v1/admin/ai/agent-service/auth/cancel-active": {
       "post": {
         "operationId": "cancel_active_agent_authentication_api_v1_admin_ai_agent_service_auth_cancel_active_post",

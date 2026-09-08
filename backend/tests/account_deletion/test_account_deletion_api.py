@@ -10,10 +10,16 @@ from app.account_deletion.service import execute_due_account_deletions
 from app.auth.models import AuthSession, MobileTokenFamily, User
 from app.auth.security import hash_session_token, make_session_token
 from app.auth.service import issue_mobile_tokens
-from app.body_photos.enums import BodyPhotoPurpose, BodyPhotoView
-from app.body_photos.models import BodyPhoto, BodyPhotoSession
+from app.body_analysis.admin_config.enums import AIAuditAction
+from app.body_analysis.admin_config.models import AIAuditEvent
+from app.body_photos.enums import BodyPhotoCleanupReason, BodyPhotoPurpose, BodyPhotoView
+from app.body_photos.models import BodyPhoto, BodyPhotoSession, BodyPhotoStorageCleanup
 from app.config import Settings
-from app.nutrition.models import NutritionFoodPhotoEstimate, NutritionLabDocument
+from app.nutrition.models import (
+    NutritionFoodPhotoEstimate,
+    NutritionLabDocument,
+    NutritionSecurityAuditEvent,
+)
 from app.profile.models import UserProfilePhoto
 
 ORIGIN = {"Origin": "http://localhost:5173"}
@@ -155,6 +161,20 @@ def test_due_deletion_removes_user_and_revokes_all_auth_sessions(
     user = db.scalar(select(User).where(User.email == "execute-delete@example.com"))
     assert user is not None
     user_id = user.id
+    ai_audit = AIAuditEvent(
+        actor_user_id=user_id,
+        action=AIAuditAction.CONNECTION_TESTED,
+    )
+    security_audit = NutritionSecurityAuditEvent(
+        actor_user_id=user_id,
+        owner_user_id=user_id,
+        event_type="account_deletion_test",
+        resource_type="test",
+        outcome="success",
+        metadata_snapshot={"safe": True},
+    )
+    db.add_all([ai_audit, security_audit])
+    db.flush()
     mobile = issue_mobile_tokens(
         db,
         user,
@@ -189,6 +209,11 @@ def test_due_deletion_removes_user_and_revokes_all_auth_sessions(
     assert completed.status == "completed"
     assert completed.user_id is None
     assert completed.completed_at is not None
+    assert db.get(AIAuditEvent, ai_audit.id).actor_user_id is None
+    retained_security_audit = db.get(NutritionSecurityAuditEvent, security_audit.id)
+    assert retained_security_audit is not None
+    assert retained_security_audit.actor_user_id is None
+    assert retained_security_audit.owner_user_id is None
     assert client.get("/api/v1/auth/me").status_code == 401
     assert mobile.raw_access_token
 
@@ -210,11 +235,13 @@ def test_due_deletion_removes_every_private_media_object(
     now = datetime.now(UTC)
 
     body_key = "aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+    failed_upload_key = "ab/abababababababababababababababab.jpg"
     profile_key = "bb/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg"
     food_key = "cc/food-photo.jpg"
     lab_key = "dd/lab-report.pdf"
     for root, key in (
         (test_settings.body_photo_storage_root, body_key),
+        (test_settings.body_photo_storage_root, failed_upload_key),
         (test_settings.profile_photo_storage_root, profile_key),
         (test_settings.food_photo_storage_root, food_key),
         (test_settings.nutrition_lab_storage_root, lab_key),
@@ -238,6 +265,13 @@ def test_due_deletion_removes_every_private_media_object(
             byte_size=7,
             width=256,
             height=512,
+        )
+    )
+    db.add(
+        BodyPhotoStorageCleanup(
+            session_id=body_session.id,
+            storage_key=failed_upload_key,
+            reason=BodyPhotoCleanupReason.FAILED_UPLOAD_ROLLBACK,
         )
     )
     db.add(
@@ -295,6 +329,7 @@ def test_due_deletion_removes_every_private_media_object(
     )
 
     assert not (test_settings.body_photo_storage_root / body_key).exists()
+    assert not (test_settings.body_photo_storage_root / failed_upload_key).exists()
     assert not (test_settings.profile_photo_storage_root / profile_key).exists()
     assert not (test_settings.food_photo_storage_root / food_key).exists()
     assert not (test_settings.nutrition_lab_storage_root / lab_key).exists()
