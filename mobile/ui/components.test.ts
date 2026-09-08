@@ -68,6 +68,7 @@ it("renders token-based button variants and exposes busy state", () => {
   expect(result.props.accessibilityRole).toBe("button");
   expect(result.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
   expect(result.props.disabled).toBe(true);
+  expect(result.props.accessibilityLabel).toBe("Save");
   expect(element(result.props.children).type).toBe("ActivityIndicator");
 
   const style = (result.props.style as (state: { pressed: boolean }) => unknown)({ pressed: false });
@@ -86,6 +87,16 @@ it("renders fields through a shared form-field shell with error feedback", () =>
   expect(element(children[1]).type).toBe("TextInput");
   expect(element(children[2]).props.children).toBe("Invalid email");
   expect(element(children[1]).props.accessibilityHint).toBe("Invalid email");
+  expect(element(children[1]).props.allowFontScaling).toBe(true);
+});
+
+it("preserves font scaling and source order for the shared button label", () => {
+  const result = element(Button({ label: "Save", onPress: vi.fn() }));
+  const label = element(result.props.children);
+
+  expect(label.type).toBe("Text");
+  expect(label.props.allowFontScaling).toBe(true);
+  expect(label.props.children).toBe("Save");
 });
 
 it("supports reusable form-field content around non-text controls", () => {

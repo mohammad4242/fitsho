@@ -88,8 +88,10 @@ export function Button({
   return (
     <Pressable
       {...pressableProps}
+      accessibilityLabel={label ?? pressableProps.accessibilityLabel}
       accessibilityRole="button"
       accessibilityState={{ ...accessibilityState, busy: loading, disabled: unavailable }}
+      accessible
       disabled={unavailable}
       style={({ pressed }) => [
         styles.base,
@@ -102,7 +104,7 @@ export function Button({
       {loading ? (
         <ActivityIndicator accessibilityLabel="Loading" color={indicatorColor} size="small" />
       ) : (
-        <Text style={[styles.label, variantTextStyles[variant]]}>{text}</Text>
+        <Text allowFontScaling style={[styles.label, variantTextStyles[variant]]}>{text}</Text>
       )}
     </Pressable>
   );

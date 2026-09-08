@@ -73,6 +73,7 @@ export function TextField({
     <FormField error={error} description={hint} label={label} required={required}>
       <TextInput
         {...textInputProps}
+        allowFontScaling={textInputProps.allowFontScaling ?? true}
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityHint={error ?? textInputProps.accessibilityHint}
         placeholderTextColor={textInputProps.placeholderTextColor ?? fiticianTokens.colors.muted}
