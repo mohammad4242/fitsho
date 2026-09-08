@@ -1,7 +1,13 @@
+import { loadModuleSync } from "@expo/require-utils";
 import type { ExpoConfig } from "expo/config";
+import { resolve } from "node:path";
 
-import withAndroidHardening from "./plugins/withAndroidHardening.ts";
-import withAndroidReleaseSymbols from "./plugins/withAndroidReleaseSymbols.ts";
+const withAndroidHardening = loadModuleSync(
+  resolve(__dirname, "plugins/withAndroidHardening.ts"),
+).default;
+const withAndroidReleaseSymbols = loadModuleSync(
+  resolve(__dirname, "plugins/withAndroidReleaseSymbols.ts"),
+).default;
 
 const FITICIAN_APP_LINK_PLACEHOLDER = "app.fitician.example";
 

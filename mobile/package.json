@@ -26,6 +26,7 @@
     "validate": "node scripts/validate-foundation.mjs && node scripts/validate-environments.mjs && node scripts/validate-dependencies.mjs && node scripts/validate-device-matrix.mjs && node scripts/validate-maestro.mjs && node scripts/validate-release-config.mjs && node scripts/validate-store-readiness.mjs"
   },
   "dependencies": {
+    "@expo/require-utils": "~57.0.5",
     "@fitician/body-vision": "file:modules/fitician-body-vision",
     "@fitician/core": "0.1.0",
     "@react-native-community/netinfo": "^12.0.1",

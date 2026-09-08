@@ -99,3 +99,17 @@ test("CI uses the React Native Node floor and Expo CI prebuild mode", async () =
   const prebuildBlock = androidJob.slice(prebuildStart, gradleStart);
   assert.match(prebuildBlock, /env:\s*\n\s*CI:\s*["']1["']/u);
 });
+
+test("Expo config loads TypeScript plugins through the Expo loader", async () => {
+  const configSource = await readFile(resolve(root, "mobile/app.config.ts"), "utf8");
+  const mobilePackage = JSON.parse(
+    await readFile(resolve(root, "mobile/package.json"), "utf8"),
+  );
+
+  assert.equal(mobilePackage.dependencies["@expo/require-utils"], "~57.0.5");
+  assert.match(configSource, /loadModuleSync/u);
+  assert.match(configSource, /resolve\(__dirname,\s*["']plugins\/withAndroidHardening\.ts["']\)/u);
+  assert.match(configSource, /resolve\(__dirname,\s*["']plugins\/withAndroidReleaseSymbols\.ts["']\)/u);
+  assert.doesNotMatch(configSource, /from\s+["']\.\/plugins\/withAndroidHardening\.ts["']/u);
+  assert.doesNotMatch(configSource, /from\s+["']\.\/plugins\/withAndroidReleaseSymbols\.ts["']/u);
+});
