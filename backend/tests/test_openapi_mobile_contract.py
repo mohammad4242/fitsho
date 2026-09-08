@@ -26,3 +26,19 @@ def test_openapi_publishes_native_bearer_security() -> None:
     assert document["paths"]["/api/v1/auth/mobile/logout"]["post"]["security"] == [
         {"HTTPBearer": []}
     ]
+
+
+def test_openapi_keeps_mobile_account_and_specialist_boundaries_explicit() -> None:
+    paths = app.openapi()["paths"]
+
+    assert paths["/api/v1/account-deletion"]["get"]["security"] == [{"HTTPBearer": []}]
+    assert paths["/api/v1/account-deletion"]["post"]["security"] == [{"HTTPBearer": []}]
+    assert paths["/api/v1/account-deletion/cancel"]["post"]["security"] == [
+        {"HTTPBearer": []}
+    ]
+    assert paths["/api/v1/coach/workout-reviews/access"]["get"]["security"] == [
+        {"HTTPBearer": []}
+    ]
+    assert paths["/api/v1/nutrition/physician/access"]["get"]["security"] == [
+        {"HTTPBearer": []}
+    ]
