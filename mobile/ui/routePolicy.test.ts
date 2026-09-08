@@ -115,6 +115,30 @@ it("requires backend-confirmed specialist access and never treats admin as a rol
   ).toEqual({ status: "loading" });
 });
 
+it("surfaces profile and specialist transport failures instead of redirecting", () => {
+  const profileError = {
+    ...signedIn("both_ready"),
+    profile: { completionState: null, productMode: null, status: "error" as const },
+  };
+  expect(decideMobileRoute("member", profileError)).toEqual({
+    resource: "profile",
+    status: "error",
+  });
+  expect(decideMobileRoute("auth", profileError)).toEqual({
+    resource: "profile",
+    status: "error",
+  });
+
+  const specialistError = {
+    ...signedIn("both_ready"),
+    specialistAccess: { coach: "error" as const, physician: "denied" as const },
+  } as unknown as MobileRouteSnapshot;
+  expect(decideMobileRoute("coach", specialistError)).toEqual({
+    resource: "coach",
+    status: "error",
+  });
+});
+
 it("routes an expired session back to sign-in with an explicit recovery reason", () => {
   expect(
     decideMobileRoute(

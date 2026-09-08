@@ -15,22 +15,27 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMobileAuth } from "../../auth/MobileAuthProvider";
 import { mobileRouteSnapshotFromAuth } from "../../auth/authContext";
 import { loadSpecialistAccess, type SpecialistAccessSnapshot } from "../../auth/specialistAccess";
-import type { ProfileStatusResponse } from "@fitician/core/profile";
+import { Notice } from "../components";
 import { fiticianTokens } from "../tokens";
 import {
   decideMobileRoute,
   defaultMobileRouteSnapshot,
   type MobileProductCapability,
+  type MobileRouteErrorResource,
   type MobileRouteKind,
   type MobileRouteSnapshot,
 } from "./routePolicy";
 import {
-  mobileProfileStateFromStatus,
+  loadMobileProfileStatus,
+  mobileProfileLoadingState,
   type MobileProfileRouteState,
 } from "./profileRouteState";
 
 const MobileRouteSnapshotContext = createContext<MobileRouteSnapshot>(defaultMobileRouteSnapshot);
 const MobileProfileRefreshContext = createContext<() => Promise<void>>(
+  async () => undefined,
+);
+const MobileSpecialistRefreshContext = createContext<() => Promise<void>>(
   async () => undefined,
 );
 
@@ -46,7 +51,9 @@ export function MobileRouteStateProvider({
   return (
     <MobileRouteSnapshotContext.Provider value={snapshot}>
       <MobileProfileRefreshContext.Provider value={async () => undefined}>
-        {children}
+        <MobileSpecialistRefreshContext.Provider value={async () => undefined}>
+          {children}
+        </MobileSpecialistRefreshContext.Provider>
       </MobileProfileRefreshContext.Provider>
     </MobileRouteSnapshotContext.Provider>
   );
@@ -68,23 +75,10 @@ export function MobileRouteStateProviderFromAuth({ children }: { readonly childr
       setProfile(null);
       return;
     }
-    setProfile(null);
-    try {
-      const status = await auth.request<ProfileStatusResponse>({
-        method: "GET",
-        path: "/api/v1/profile/status",
-      });
-      if (generation === requestGeneration.current) {
-        setProfile(mobileProfileStateFromStatus(status));
-      }
-    } catch {
-      if (generation === requestGeneration.current) {
-        setProfile({
-          completionState: "product_mode_not_selected",
-          productMode: null,
-          status: "resolved",
-        });
-      }
+    setProfile(mobileProfileLoadingState);
+    const nextProfile = await loadMobileProfileStatus(auth.request);
+    if (generation === requestGeneration.current) {
+      setProfile(nextProfile);
     }
   }, [auth.request, auth.status, userId]);
 
@@ -110,9 +104,7 @@ export function MobileRouteStateProviderFromAuth({ children }: { readonly childr
   }, [refreshSpecialistAccess]);
 
   const profileSnapshot = profile ?? {
-    completionState: null,
-    productMode: null,
-    status: "loading" as const,
+    ...mobileProfileLoadingState,
   };
   const snapshot = useMemo(
     () => ({
@@ -125,7 +117,9 @@ export function MobileRouteStateProviderFromAuth({ children }: { readonly childr
   return (
     <MobileRouteSnapshotContext.Provider value={snapshot}>
       <MobileProfileRefreshContext.Provider value={refreshProfileStatus}>
-        {children}
+        <MobileSpecialistRefreshContext.Provider value={refreshSpecialistAccess}>
+          {children}
+        </MobileSpecialistRefreshContext.Provider>
       </MobileProfileRefreshContext.Provider>
     </MobileRouteSnapshotContext.Provider>
   );
@@ -139,6 +133,10 @@ export function useRefreshMobileProfileStatus(): () => Promise<void> {
   return useContext(MobileProfileRefreshContext);
 }
 
+export function useRefreshMobileSpecialistAccess(): () => Promise<void> {
+  return useContext(MobileSpecialistRefreshContext);
+}
+
 export interface RouteGuardProps {
   readonly children: ReactNode;
   readonly kind: MobileRouteKind;
@@ -147,6 +145,8 @@ export interface RouteGuardProps {
 
 export function RouteGuard({ children, kind, requiredCapability }: RouteGuardProps) {
   const snapshot = useMobileRouteSnapshot();
+  const refreshProfileStatus = useRefreshMobileProfileStatus();
+  const refreshSpecialistAccess = useRefreshMobileSpecialistAccess();
   const decision = decideMobileRoute(kind, snapshot, requiredCapability);
 
   if (decision.status === "loading") {
@@ -155,7 +155,23 @@ export function RouteGuard({ children, kind, requiredCapability }: RouteGuardPro
   if (decision.status === "redirect") {
     return <Redirect href={decision.href} />;
   }
+  if (decision.status === "error") {
+    return (
+      <RouteGuardError
+        onRetry={() => void retryForResource(decision.resource, refreshProfileStatus, refreshSpecialistAccess)}
+        resource={decision.resource}
+      />
+    );
+  }
   return <>{children}</>;
+}
+
+function retryForResource(
+  resource: MobileRouteErrorResource,
+  refreshProfileStatus: () => Promise<void>,
+  refreshSpecialistAccess: () => Promise<void>,
+): Promise<void> {
+  return resource === "profile" ? refreshProfileStatus() : refreshSpecialistAccess();
 }
 
 function RouteGuardLoading() {
@@ -168,11 +184,39 @@ function RouteGuardLoading() {
   );
 }
 
+function RouteGuardError({
+  onRetry,
+  resource,
+}: {
+  readonly onRetry: () => void;
+  readonly resource: MobileRouteErrorResource;
+}) {
+  const profile = resource === "profile";
+  return (
+    <SafeAreaView edges={["top", "bottom"]} style={styles.loading}>
+      <View style={styles.error}>
+        <Notice
+          actionLabel="دوباره تلاش کن"
+          message={profile ? "اطلاعات پروفایل دریافت نشد." : "دسترسی این بخش بررسی نشد."}
+          onAction={onRetry}
+          title={profile ? "اتصال به پروفایل برقرار نشد" : "بررسی دسترسی انجام نشد"}
+          variant="warning"
+        />
+      </View>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   loading: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.canvas,
     flex: 1,
     justifyContent: "center",
+  },
+  error: {
+    maxWidth: 520,
+    paddingHorizontal: fiticianTokens.spacing[4],
+    width: "100%",
   },
 });

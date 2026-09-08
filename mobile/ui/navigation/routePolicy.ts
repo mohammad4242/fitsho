@@ -3,13 +3,14 @@ import type { ProfileCompletionState, ProductMode } from "@fitician/core/profile
 
 export type MobileRouteKind = "public" | "auth" | "onboarding" | "account" | "member" | "coach" | "physician";
 export type MobileProductCapability = "training" | "nutrition";
-export type MobileSpecialistAccess = "loading" | "granted" | "denied";
+export type MobileSpecialistAccess = "loading" | "granted" | "denied" | "error";
+export type MobileRouteErrorResource = "profile" | "coach" | "physician";
 
 export interface MobileRouteSnapshot {
   readonly profile: {
     readonly completionState: ProfileCompletionState | null;
     readonly productMode: ProductMode | null;
-    readonly status: "loading" | "resolved";
+    readonly status: "loading" | "resolved" | "error";
   };
   readonly session: {
     readonly sessionExpired?: boolean;
@@ -28,7 +29,8 @@ export type MobileRouteDecision =
   | {
       readonly href: "/auth/sign-in" | "/auth/sign-in?reason=session-expired" | "/member" | "/onboarding";
       readonly status: "redirect";
-    };
+    }
+  | { readonly resource: MobileRouteErrorResource; readonly status: "error" };
 
 export const defaultMobileRouteSnapshot: MobileRouteSnapshot = {
   profile: {
@@ -81,6 +83,9 @@ function resolveSignedInLanding(snapshot: MobileRouteSnapshot): MobileRouteDecis
   if (snapshot.profile.status === "loading") {
     return { status: "loading" };
   }
+  if (snapshot.profile.status === "error") {
+    return { resource: "profile", status: "error" };
+  }
   return hasIncompleteProfile(snapshot)
     ? { href: "/onboarding", status: "redirect" }
     : { href: "/member", status: "redirect" };
@@ -109,15 +114,18 @@ export function decideMobileRoute(
 
   if (kind === "coach" || kind === "physician") {
     const access = snapshot.specialistAccess[kind];
-    return access === "loading"
-      ? { status: "loading" }
-      : access === "granted"
-        ? { status: "allow" }
-        : { href: "/member", status: "redirect" };
+    if (access === "loading") return { status: "loading" };
+    if (access === "error") return { resource: kind, status: "error" };
+    return access === "granted"
+      ? { status: "allow" }
+      : { href: "/member", status: "redirect" };
   }
 
   if (snapshot.profile.status === "loading") {
     return { status: "loading" };
+  }
+  if (snapshot.profile.status === "error") {
+    return { resource: "profile", status: "error" };
   }
 
   if (kind === "onboarding") {
