@@ -33,6 +33,7 @@ const fontFiles = [
 
 assert.deepEqual(rootPackage.workspaces, ["frontend", "mobile", "packages/fitician-core"]);
 assert.equal(mobilePackage.name, "@fitician/mobile");
+assert.equal(mobilePackage.scripts["audit:dependencies"], "node scripts/dependency-audit.mjs");
 assert.equal(corePackage.name, "@fitician/core");
 assert.match(mobilePackage.dependencies.expo, /^~?57\./);
 assert.match(mobilePackage.dependencies["expo-router"], /^~?57\./);
