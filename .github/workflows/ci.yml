@@ -78,6 +78,8 @@ jobs:
           DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho \
             uv run python -m app.exercises.seed
           DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho \
+            uv run python -m scripts.seed_benchmark_catalog
+          DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho \
             uv run python -m app.training_templates.seed
       - run: uv run pytest
         env:

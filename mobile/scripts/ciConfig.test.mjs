@@ -72,6 +72,7 @@ test("CI provisions backend test dependencies and dedicated benchmark databases"
   assert.match(backendJob, /fitsho_nutrition_audit/u);
   assert.match(backendJob, /DATABASE_URL: postgresql\+psycopg:\/\/fitsho:fitsho@localhost:5432\/fitsho\s*\n\s*TEST_DATABASE_URL:/u);
   assert.match(backendJob, /uv run python -m app\.exercises\.seed/u);
+  assert.match(backendJob, /uv run python -m scripts\.seed_benchmark_catalog/u);
   assert.match(backendJob, /uv run python -m app\.training_templates\.seed/u);
 });
 
