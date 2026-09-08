@@ -63,6 +63,18 @@ test("CI keeps the backend lockfile tracked for frozen installs", async () => {
   assert.match(workflow, /uv sync --frozen --extra dev/u);
 });
 
+test("CI provisions backend test dependencies and dedicated benchmark databases", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const backendJob = workflow.match(/\n  backend:\n(?<body>[\s\S]*?)\n  frontend:/u)?.groups?.body;
+
+  assert.ok(backendJob, "backend job must be present");
+  assert.match(backendJob, /apt-get install -y ffmpeg/u);
+  assert.match(backendJob, /fitsho_nutrition_audit/u);
+  assert.match(backendJob, /DATABASE_URL: postgresql\+psycopg:\/\/fitsho:fitsho@localhost:5432\/fitsho\s*\n\s*TEST_DATABASE_URL:/u);
+  assert.match(backendJob, /uv run python -m app\.exercises\.seed/u);
+  assert.match(backendJob, /uv run python -m app\.training_templates\.seed/u);
+});
+
 test("CI installs uv before the shared OpenAPI check", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
   const sharedJob = workflow.match(/\n  shared:\n(?<body>[\s\S]*?)\n  mobile:/u)?.groups?.body;

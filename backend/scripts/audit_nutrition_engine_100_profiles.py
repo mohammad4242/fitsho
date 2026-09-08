@@ -77,7 +77,10 @@ from app.profile.enums import FitnessGoal, ProductMode, Sex, TrainingIntensity
 from app.profile.models import BodyMeasurement, UserProfile
 from scripts.run_nutrition_100_profiles_audit import ProfileSpec, generate_100_profiles
 
-DEFAULT_DB_URL = "postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho_nutrition_audit"
+DEFAULT_DB_URL = os.environ.get(
+    "NUTRITION_AUDIT_DATABASE_URL",
+    "postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho_nutrition_audit",
+)
 
 # Persian translations
 FA_SEX = {"male": "مرد", "female": "زن"}

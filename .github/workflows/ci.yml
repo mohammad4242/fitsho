@@ -44,7 +44,46 @@ jobs:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
       - run: uv sync --frozen --extra dev
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Create dedicated benchmark databases
+        run: |
+          uv run python - <<'PY'
+          import psycopg
+          from psycopg import sql
+
+          with psycopg.connect(
+              "postgresql://fitsho:fitsho@localhost:5432/postgres",
+              autocommit=True,
+          ) as connection:
+              for database_name in ("fitsho", "fitsho_nutrition_audit"):
+                  exists = connection.execute(
+                      "SELECT 1 FROM pg_database WHERE datname = %s",
+                      (database_name,),
+                  ).fetchone()
+                  if exists is None:
+                      connection.execute(
+                          sql.SQL("CREATE DATABASE {}").format(
+                              sql.Identifier(database_name)
+                          )
+                      )
+          PY
+      - name: Migrate benchmark databases
+        run: |
+          DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho \
+            uv run alembic upgrade head
+          DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho_nutrition_audit \
+            uv run alembic upgrade head
+      - name: Seed workout benchmark database
+        run: |
+          DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho \
+            uv run python -m app.exercises.seed
+          DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho \
+            uv run python -m app.training_templates.seed
       - run: uv run pytest
+        env:
+          DATABASE_URL: postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho
+          TEST_DATABASE_URL: postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho_test
+          NUTRITION_AUDIT_DATABASE_URL: postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho_nutrition_audit
 
   frontend:
     name: Frontend tests, lint, and build
