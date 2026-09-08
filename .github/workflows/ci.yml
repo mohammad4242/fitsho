@@ -56,9 +56,9 @@ jobs:
           node-version: "20.19.0"
           cache: npm
       - run: npm ci
-      - run: npm run test --workspace @fitician/frontend
-      - run: npm run lint --workspace @fitician/frontend
-      - run: npm run build --workspace @fitician/frontend
+      - run: npm run test --workspace frontend
+      - run: npm run lint --workspace frontend
+      - run: npm run build --workspace frontend
 
   shared:
     name: Shared core and contract checks

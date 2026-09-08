@@ -10,9 +10,9 @@ test("CI covers every Phase 14 release gate", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
   for (const requiredCheck of [
     "uv run pytest",
-    "npm run test --workspace @fitician/frontend",
-    "npm run lint --workspace @fitician/frontend",
-    "npm run build --workspace @fitician/frontend",
+    "npm run test --workspace frontend",
+    "npm run lint --workspace frontend",
+    "npm run build --workspace frontend",
     "npm run test:core",
     "npm run test --workspace @fitician/mobile",
     "npm run test:native --workspace @fitician/mobile",
@@ -34,4 +34,17 @@ test("CI uses read-only permissions and a clean dependency install", async () =>
   const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
   assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/u);
   assert.match(workflow, /npm ci/u);
+});
+
+test("CI invokes the frontend workspace by its real package name", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const frontendPackage = JSON.parse(
+    await readFile(resolve(root, "frontend/package.json"), "utf8"),
+  );
+
+  assert.equal(frontendPackage.name, "frontend");
+  assert.match(workflow, /npm run test --workspace frontend/u);
+  assert.match(workflow, /npm run lint --workspace frontend/u);
+  assert.match(workflow, /npm run build --workspace frontend/u);
+  assert.doesNotMatch(workflow, /--workspace @fitician\/frontend/u);
 });
