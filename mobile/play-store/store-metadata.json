@@ -1,0 +1,41 @@
+{
+  "applicationId": "com.fitician.app",
+  "applicationName": "Fitician",
+  "developerName": "Fitician",
+  "locales": {
+    "fa": {
+      "title": "فیتیچیان: تمرین و تغذیه",
+      "shortDescription": "برنامه شخصی تمرین، تغذیه و پیگیری پیشرفت",
+      "fullDescription": "فیتیچیان همراه شما برای ساختن عادت‌های پایدار تمرین و تغذیه است.\n\nبرنامه تمرینی شخصی، آموزش حرکت‌ها، پیگیری چرخه تمرین و بازخورد هفتگی را در یک تجربه منظم دنبال کنید. با ثبت هدف‌ها و ترجیح‌های غذایی، برنامه تغذیه و فهرست خرید خود را بهتر مدیریت کنید.\n\nویژگی‌ها:\n• برنامه تمرین متناسب با هدف، سطح و امکانات شما\n• ویدئوی حرکت‌ها و راهنمای اجرای ایمن\n• برنامه و پیگیری تغذیه با اندازه‌گیری‌های قابل فهم\n• ثبت پیشرفت بدن با کنترل حریم خصوصی\n• بررسی برنامه‌های تغذیه در صورت فعال بودن مسیر متخصص\n• حذف حساب و مدیریت داده‌ها از داخل برنامه\n\nفیتیچیان ابزار سلامتی و تناسب‌اندام است و جایگزین تشخیص یا درمان پزشکی نیست. برای استفاده از قابلیت‌های متخصص، دسترسی معتبر و اطلاعات لازم باید از مسیر رسمی فراهم شود."
+    },
+    "en": {
+      "title": "Fitician: Fitness & Nutrition",
+      "shortDescription": "Personal training, nutrition, and progress tracking",
+      "fullDescription": "Fitician helps you build consistent training and nutrition habits in one focused experience.\n\nFollow a personal workout plan, learn each movement, track your training cycle, and use weekly feedback to stay on course. Add your goals and food preferences to manage nutrition plans and shopping lists with clear, practical portions.\n\nFeatures:\n• Training plans based on your goals, level, and equipment\n• Exercise videos and safer movement guidance\n• Nutrition planning and understandable progress tracking\n• Private body-progress records with user-controlled deletion\n• Nutrition review when an authorized specialist pathway is enabled\n• Account deletion and data controls inside the app\n\nFitician is a health and fitness companion, not a substitute for medical diagnosis or treatment. Specialist features require valid authorization and the information requested by the relevant workflow."
+    }
+  },
+  "links": {
+    "publicWebOriginEnv": "FITICIAN_PUBLIC_WEB_ORIGIN",
+    "privacyPath": "/privacy",
+    "accountDeletionPath": "/delete-account",
+    "supportEmailEnv": "FITICIAN_SUPPORT_EMAIL"
+  },
+  "contentRating": {
+    "status": "draft",
+    "questionnaire": "IARC",
+    "ads": false,
+    "basis": "General fitness and nutrition companion; no gambling, sexual content, violence, or public user-generated feed."
+  },
+  "screenshots": {
+    "phoneDirectory": "screenshots/phone",
+    "requiredLocales": ["fa", "en"],
+    "requiredViews": ["member-home", "workout-plan", "nutrition-plan", "body-progress"]
+  },
+  "documents": {
+    "privacyAndDeletion": "privacy-and-deletion.md",
+    "healthDeclaration": "health-declaration.md",
+    "dataSafety": "data-safety.md",
+    "contentRating": "content-rating.md",
+    "testerInstructions": "tester-instructions.md"
+  }
+}

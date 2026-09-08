@@ -80,11 +80,20 @@ const config: ExpoConfig = {
   version: "0.1.0",
   orientation: "portrait",
   scheme: "fitician",
+  icon: "./assets/branding/fitician-icon.png",
   userInterfaceStyle: "dark",
   plugins: [
     "expo-router",
     "expo-dev-client",
     "expo-web-browser",
+    [
+      "expo-splash-screen",
+      {
+        backgroundColor: "#020607",
+        image: "./assets/branding/fitician-splash.png",
+        resizeMode: "contain",
+      },
+    ],
     ["expo-font", fiticianFontConfig],
     "expo-secure-store",
     ["expo-sqlite", { useSQLCipher: true }],
@@ -124,6 +133,10 @@ const config: ExpoConfig = {
   android: {
     package: "com.fitician.app",
     permissions: ["android.permission.CAMERA"],
+    adaptiveIcon: {
+      foregroundImage: "./assets/branding/fitician-adaptive-foreground.png",
+      backgroundColor: "#020607",
+    },
     ...(googleServicesFile ? { googleServicesFile } : {}),
     intentFilters: [
       {

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Fitician app icon</title>
+  <rect width="1024" height="1024" rx="224" fill="#020607"/>
+  <circle cx="512" cy="512" r="274" fill="none" stroke="#50dfce" stroke-width="78"/>
+  <path d="M300 610 724 455" fill="none" stroke="#f67859" stroke-linecap="round" stroke-width="58"/>
+</svg>
