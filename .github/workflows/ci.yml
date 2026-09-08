@@ -56,6 +56,7 @@ jobs:
           node-version: "20.19.4"
           cache: npm
       - run: npm ci
+      - run: npm run build:core
       - run: npm run test --workspace frontend
       - run: npm run lint --workspace frontend
       - run: npm run build --workspace frontend

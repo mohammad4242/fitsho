@@ -83,6 +83,18 @@ test("CI builds the shared core package before mobile tests", async () => {
   assert.ok(coreBuildIndex < mobileTestIndex, "core must be built before mobile tests");
 });
 
+test("CI builds the shared core package before frontend tests", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const frontendJob = workflow.match(/\n  frontend:\n(?<body>[\s\S]*?)\n  shared:/u)?.groups?.body;
+
+  assert.ok(frontendJob, "frontend job must be present");
+  const coreBuildIndex = frontendJob.indexOf("npm run build:core");
+  const frontendTestIndex = frontendJob.indexOf("npm run test --workspace frontend");
+
+  assert.ok(coreBuildIndex >= 0, "frontend job must build core");
+  assert.ok(coreBuildIndex < frontendTestIndex, "core must be built before frontend tests");
+});
+
 test("CI uses the React Native Node floor and Expo CI prebuild mode", async () => {
   const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
   const rootPackage = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
