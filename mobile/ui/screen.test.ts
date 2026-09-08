@@ -63,6 +63,7 @@ it("uses tablet gutters and reading width for non-scroll content", () => {
   const style = content.props.style as readonly unknown[];
 
   expect(content.type).toBe("View");
+  expect(JSON.stringify(style)).toContain('"direction":"rtl"');
   expect(JSON.stringify(style)).toContain('"paddingHorizontal":32');
   expect(JSON.stringify(style)).toContain('"maxWidth":1088');
 });

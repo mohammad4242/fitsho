@@ -66,3 +66,15 @@ it("exits only after every handler is inactive and the current route is root", (
   expect(nav.goBack).not.toHaveBeenCalled();
   expect(nav.exitApp).toHaveBeenCalledOnce();
 });
+
+it("stops invoking a handler after its registration is removed", () => {
+  const nav = navigation(true);
+  const coordinator = new AndroidBackCoordinator(nav);
+  const overlay = vi.fn(() => true);
+  const removeOverlay = coordinator.register("overlay", overlay);
+
+  removeOverlay();
+  expect(coordinator.handleBack()).toBe(true);
+  expect(overlay).not.toHaveBeenCalled();
+  expect(nav.goBack).toHaveBeenCalledOnce();
+});

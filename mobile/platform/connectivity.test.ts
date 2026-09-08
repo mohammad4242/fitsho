@@ -69,3 +69,26 @@ it("updates subscribers and TanStack online state through one native listener", 
   monitor.stop();
   expect(emit).toBeNull();
 });
+
+it("keeps the native subscription idempotent and supports a clean restart", () => {
+  let subscriptionCount = 0;
+  const unsubscribers: Array<() => void> = [];
+  const monitor = new ConnectivityMonitor((listener) => {
+    subscriptionCount += 1;
+    const unsubscribe = () => undefined;
+    unsubscribers.push(unsubscribe);
+    void listener;
+    return unsubscribe;
+  });
+
+  monitor.start();
+  monitor.start();
+  expect(subscriptionCount).toBe(1);
+
+  monitor.stop();
+  monitor.stop();
+  monitor.start();
+
+  expect(subscriptionCount).toBe(2);
+  expect(unsubscribers).toHaveLength(2);
+});
