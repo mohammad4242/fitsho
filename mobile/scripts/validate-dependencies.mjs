@@ -36,6 +36,7 @@ const expected = {
   "expo-status-bar": { declared: "~57.0.0", version: /^57\./ },
   "expo-system-ui": { declared: "~57.0.0", version: /^57\./ },
   "expo-task-manager": { declared: "~57.0.16", version: /^57\./ },
+  "expo-updates": { declared: "~57.0.21", version: /^57\./ },
   "expo-video": { declared: "~57.0.3", version: /^57\./ },
   "expo-web-browser": { declared: "~57.0.2", version: /^57\./ },
   "react-hook-form": { declared: "^7.87.0", version: /^7\.87\./ },

@@ -69,6 +69,9 @@ function resolveAppLinkHost(rawHost: string | undefined, isProduction: boolean):
 }
 
 const isProduction = process.env.APP_VARIANT === "production";
+const updatesUrl = process.env.EXPO_UPDATES_URL?.trim();
+const easProjectId = process.env.EAS_PROJECT_ID?.trim();
+const googleServicesFile = process.env.GOOGLE_SERVICES_JSON?.trim();
 const appLinkHost = resolveAppLinkHost(process.env.FITICIAN_APP_LINK_HOST, isProduction);
 
 const config: ExpoConfig = {
@@ -95,6 +98,7 @@ const config: ExpoConfig = {
     ],
     "expo-background-task",
     "expo-notifications",
+    "expo-updates",
     "expo-video",
     [
       "expo-build-properties",
@@ -109,9 +113,18 @@ const config: ExpoConfig = {
     withAndroidHardening as never,
     withAndroidReleaseSymbols as never,
   ],
+  runtimeVersion: { policy: "appVersion" },
+  updates: updatesUrl
+    ? {
+        checkAutomatically: "ON_ERROR_RECOVERY",
+        fallbackToCacheTimeout: 0,
+        url: updatesUrl,
+      }
+    : undefined,
   android: {
     package: "com.fitician.app",
     permissions: ["android.permission.CAMERA"],
+    ...(googleServicesFile ? { googleServicesFile } : {}),
     intentFilters: [
       {
         action: "VIEW",
@@ -130,6 +143,7 @@ const config: ExpoConfig = {
     appLinkHost,
     frontendOrigin: process.env.EXPO_PUBLIC_FRONTEND_ORIGIN || "http://localhost:5173",
     googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || null,
+    ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
   },
 };
 

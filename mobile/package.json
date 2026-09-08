@@ -15,10 +15,11 @@
     "test:foundation": "node --test scripts/*.test.mjs",
     "validate:device-matrix": "node scripts/validate-device-matrix.mjs",
     "validate:maestro": "node scripts/validate-maestro.mjs",
+    "validate:release-config": "node scripts/validate-release-config.mjs",
     "export:android:source-maps": "node scripts/releaseArtifacts.mjs",
     "audit:dependencies": "node scripts/dependency-audit.mjs",
     "typecheck": "tsc --noEmit",
-    "validate": "node scripts/validate-foundation.mjs && node scripts/validate-environments.mjs && node scripts/validate-dependencies.mjs && node scripts/validate-device-matrix.mjs && node scripts/validate-maestro.mjs"
+    "validate": "node scripts/validate-foundation.mjs && node scripts/validate-environments.mjs && node scripts/validate-dependencies.mjs && node scripts/validate-device-matrix.mjs && node scripts/validate-maestro.mjs && node scripts/validate-release-config.mjs"
   },
   "dependencies": {
     "@fitician/body-vision": "file:modules/fitician-body-vision",
@@ -46,6 +47,7 @@
     "expo-status-bar": "~57.0.0",
     "expo-system-ui": "~57.0.0",
     "expo-task-manager": "~57.0.16",
+    "expo-updates": "~57.0.21",
     "expo-video": "~57.0.3",
     "expo-web-browser": "~57.0.2",
     "react": "19.2.3",
