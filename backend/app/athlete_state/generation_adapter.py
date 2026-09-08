@@ -16,19 +16,21 @@ class AthleteStateToGenerationOverridesAdapter:
         if state.schedule.next_session_duration_minutes is not None:
             values["session_duration_minutes"] = state.schedule.next_session_duration_minutes
 
-        safety_or_unavailable = set(state.pain_sensitive_exercises) | set(
-            state.unavailable_exercises
+        blocked_exercises = (
+            set(state.pain_sensitive_exercises)
+            | set(state.unavailable_exercises)
+            | set(state.uncomfortable_exercises)
         )
         preference_exercises = (
-            set(state.persistent_disliked_exercises) | set(state.uncomfortable_exercises)
-        ) - safety_or_unavailable
+            set(state.persistent_disliked_exercises) - blocked_exercises
+        )
         recent_training_history = AthleteStateToGenerationOverridesAdapter._recent_history(state)
 
         return ProgramGenerationOverrides.model_validate(
             {
                 **values,
                 "disliked_exercises": frozenset(preference_exercises),
-                "blocked_exercises": frozenset(safety_or_unavailable),
+                "blocked_exercises": frozenset(blocked_exercises),
                 "priority_muscles": frozenset(state.priority_muscles),
                 "recent_training_history": recent_training_history,
             }

@@ -82,7 +82,7 @@ def test_adapter_keeps_unknown_and_deferred_signals_neutral() -> None:
     assert overrides.recent_training_history is None
 
 
-def test_persistent_dislike_and_discomfort_map_to_disliked_exercises() -> None:
+def test_persistent_discomfort_maps_to_blocked_exercises() -> None:
     disliked_id = uuid4()
     uncomfortable_id = uuid4()
 
@@ -93,7 +93,8 @@ def test_persistent_dislike_and_discomfort_map_to_disliked_exercises() -> None:
         )
     )
 
-    assert overrides.disliked_exercises == frozenset({disliked_id, uncomfortable_id})
+    assert overrides.disliked_exercises == frozenset({disliked_id})
+    assert overrides.blocked_exercises == frozenset({uncomfortable_id})
 
 
 def test_temporary_replacement_does_not_reach_generation_overrides(db: Session) -> None:
