@@ -13,6 +13,7 @@ import {
 
 afterEach(() => {
   configureMobileTelemetry(null);
+  vi.unstubAllGlobals();
 });
 
 it("redacts tokens, credentials, identifiers, and sensitive media fields", () => {
@@ -107,17 +108,20 @@ it("logs safe development diagnostics without enabling production diagnostics", 
   const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
   const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
+  vi.stubGlobal("__DEV__", true);
   logDevelopmentDiagnostic("runtime_configuration", "info", {
     api_base_url: "https://user:password@api.fitician.example/v1?access_token=secret",
     environment: "development",
-  }, true);
+  });
+  vi.stubGlobal("__DEV__", false);
   logDevelopmentDiagnostic("runtime_configuration", "info", {
     api_base_url: "https://api.fitician.example",
-  }, false);
+  });
+  vi.stubGlobal("__DEV__", true);
   logDevelopmentDiagnostic("emulator_only_api_target", "warning", {
     api_base_url: "http://10.0.2.2:8001",
     access_token: "secret",
-  }, true);
+  });
 
   expect(info).toHaveBeenCalledWith(
     "[Fitician][runtime_configuration]",

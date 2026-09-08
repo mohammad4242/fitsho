@@ -143,9 +143,8 @@ export function logDevelopmentDiagnostic(
   event: MobileDiagnosticEvent,
   level: MobileTelemetryLevel,
   context: MobileTelemetryContext = {},
-  enabled = developmentDiagnosticsEnabled(),
 ): void {
-  if (!enabled) return;
+  if (!developmentDiagnosticsEnabled()) return;
   const safeContext = diagnosticContext(context);
   const message = `[Fitician][${event}]`;
   if (level === "error") {
