@@ -65,13 +65,50 @@ export const FITICIAN_NETWORK_SECURITY_CONFIG = `<?xml version="1.0" encoding="u
 </network-security-config>
 `;
 
+export const FITICIAN_DEVELOPMENT_NETWORK_SECURITY_CONFIG = `<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+`;
+
+export type AndroidBuildEnvironment = "development" | "preview" | "production";
+
+export function resolveAndroidBuildEnvironment(value: unknown): AndroidBuildEnvironment {
+  if (value === "development" || value === "preview" || value === "production") {
+    return value;
+  }
+  return "production";
+}
+
+export function networkSecurityConfigForEnvironment(
+  environment: AndroidBuildEnvironment,
+): string {
+  return environment === "development"
+    ? FITICIAN_DEVELOPMENT_NETWORK_SECURITY_CONFIG
+    : FITICIAN_NETWORK_SECURITY_CONFIG;
+}
+
 export const SCREENSHOT_POLICY_MARKER = "// Fitician sensitive-screen screenshot policy";
 const screenshotFlag =
   "window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)";
+const javaScreenshotFlag =
+  "getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);";
+
+export interface AndroidMainActivityProject {
+  readonly language: "java" | "kt";
+  contents: string;
+}
 
 type AndroidManifestLike = Pick<AndroidManifest, "manifest">;
 
-export function applyAndroidSecurityManifest<T extends AndroidManifestLike>(manifest: T): T {
+export function applyAndroidSecurityManifest<T extends AndroidManifestLike>(
+  manifest: T,
+  environment: AndroidBuildEnvironment = resolveAndroidBuildEnvironment(process.env.APP_VARIANT),
+): T {
   const root = manifest.manifest;
   root.$ = {
     ...root.$,
@@ -95,21 +132,36 @@ export function applyAndroidSecurityManifest<T extends AndroidManifestLike>(mani
       "android:dataExtractionRules": "@xml/fitician_data_extraction_rules",
       "android:fullBackupContent": "@xml/fitician_backup_rules",
       "android:networkSecurityConfig": "@xml/fitician_network_security_config",
-      "android:usesCleartextTraffic": "false",
+      "android:usesCleartextTraffic": environment === "development" ? "true" : "false",
     };
   }
 
   return manifest;
 }
 
-function withSecurityManifest(config: Parameters<ConfigPlugin>[0]): ReturnType<ConfigPlugin> {
+function configuredEnvironment(config: Parameters<ConfigPlugin>[0]): AndroidBuildEnvironment {
+  const extra = config.extra;
+  const configured = extra && typeof extra === "object" && "environment" in extra
+    ? (extra as { readonly environment?: unknown }).environment
+    : undefined;
+  const appVariant = process.env.APP_VARIANT?.trim();
+  return resolveAndroidBuildEnvironment(appVariant || configured);
+}
+
+function withSecurityManifest(
+  config: Parameters<ConfigPlugin>[0],
+  environment: AndroidBuildEnvironment,
+): ReturnType<ConfigPlugin> {
   return withAndroidManifest(config, (mod) => {
-    mod.modResults = applyAndroidSecurityManifest(mod.modResults);
+    mod.modResults = applyAndroidSecurityManifest(mod.modResults, environment);
     return mod;
   });
 }
 
-function withSecurityResources(config: Parameters<ConfigPlugin>[0]): ReturnType<ConfigPlugin> {
+function withSecurityResources(
+  config: Parameters<ConfigPlugin>[0],
+  environment: AndroidBuildEnvironment,
+): ReturnType<ConfigPlugin> {
   return withDangerousMod(config, ["android", async (mod) => {
     if (!mod.modRequest.introspect) {
       const xmlDirectory = join(
@@ -129,7 +181,7 @@ function withSecurityResources(config: Parameters<ConfigPlugin>[0]): ReturnType<
         ),
         writeFile(
           join(xmlDirectory, "fitician_network_security_config.xml"),
-          FITICIAN_NETWORK_SECURITY_CONFIG,
+          networkSecurityConfigForEnvironment(environment),
         ),
       ]);
     }
@@ -137,55 +189,85 @@ function withSecurityResources(config: Parameters<ConfigPlugin>[0]): ReturnType<
   }]);
 }
 
-function withScreenshotPolicy(config: Parameters<ConfigPlugin>[0]): ReturnType<ConfigPlugin> {
-  return withMainActivity(config, (mod) => {
-    const project = mod.modResults;
-    if (project.contents.includes(SCREENSHOT_POLICY_MARKER)) {
-      return mod;
-    }
+function removeScreenshotPolicyLines(contents: string): string {
+  const lines = contents.split(/\r?\n/u).filter((line) => {
+    const trimmed = line.trim();
+    return trimmed !== SCREENSHOT_POLICY_MARKER
+      && trimmed !== screenshotFlag
+      && trimmed !== javaScreenshotFlag;
+  });
+  const result = lines.join("\n");
+  return result.includes("WindowManager")
+    ? result
+    : result.split(/\r?\n/u)
+      .filter((line) => !/^\s*import android\.view\.WindowManager;?\s*$/u.test(line))
+      .join("\n");
+}
 
-    if (project.language === "kt") {
-      const contents = project.contents.includes("import android.view.WindowManager")
-        ? project.contents
-        : project.contents.replace(
-            "import android.os.Bundle",
-            "import android.os.Bundle\nimport android.view.WindowManager",
-          );
-      project.contents = contents.replace(
-        "  override fun onCreate(savedInstanceState: Bundle?) {",
-        `  override fun onCreate(savedInstanceState: Bundle?) {
+export function applyAndroidScreenshotPolicy<T extends AndroidMainActivityProject>(
+  project: T,
+  environment: AndroidBuildEnvironment,
+): T {
+  if (environment === "development") {
+    project.contents = removeScreenshotPolicyLines(project.contents);
+    return project;
+  }
+
+  if (project.contents.includes(SCREENSHOT_POLICY_MARKER)) {
+    return project;
+  }
+
+  if (project.language === "kt") {
+    const contents = project.contents.includes("import android.view.WindowManager")
+      ? project.contents
+      : project.contents.replace(
+          "import android.os.Bundle",
+          "import android.os.Bundle\nimport android.view.WindowManager",
+        );
+    project.contents = contents.replace(
+      "  override fun onCreate(savedInstanceState: Bundle?) {",
+      `  override fun onCreate(savedInstanceState: Bundle?) {
     ${SCREENSHOT_POLICY_MARKER}
     ${screenshotFlag}`,
-      );
-    } else {
-      const contents = project.contents.includes("import android.view.WindowManager;")
-        ? project.contents
-        : project.contents.replace(
-            "import android.os.Bundle;",
-            "import android.os.Bundle;\nimport android.view.WindowManager;",
-          );
-      project.contents = contents.replace(
-        "  protected void onCreate(Bundle savedInstanceState) {",
-        `  protected void onCreate(Bundle savedInstanceState) {
+    );
+  } else {
+    const contents = project.contents.includes("import android.view.WindowManager;")
+      ? project.contents
+      : project.contents.replace(
+          "import android.os.Bundle;",
+          "import android.os.Bundle;\nimport android.view.WindowManager;",
+        );
+    project.contents = contents.replace(
+      "  protected void onCreate(Bundle savedInstanceState) {",
+      `  protected void onCreate(Bundle savedInstanceState) {
     ${SCREENSHOT_POLICY_MARKER}
-    getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);`,
-      );
-    }
+    ${javaScreenshotFlag}`,
+    );
+  }
 
-    mod.modResults = project;
+  return project;
+}
+
+function withScreenshotPolicy(
+  config: Parameters<ConfigPlugin>[0],
+  environment: AndroidBuildEnvironment,
+): ReturnType<ConfigPlugin> {
+  return withMainActivity(config, (mod) => {
+    mod.modResults = applyAndroidScreenshotPolicy(mod.modResults, environment);
     return mod;
   });
 }
 
 const withAndroidHardening: ConfigPlugin = (config) => {
+  const environment = configuredEnvironment(config);
   let hardened = config;
   hardened = AndroidConfig.Permissions.withBlockedPermissions(
     hardened,
     [...ANDROID_BLOCKED_PERMISSIONS],
   );
-  hardened = withSecurityManifest(hardened);
-  hardened = withSecurityResources(hardened);
-  hardened = withScreenshotPolicy(hardened);
+  hardened = withSecurityManifest(hardened, environment);
+  hardened = withSecurityResources(hardened, environment);
+  hardened = withScreenshotPolicy(hardened, environment);
   return hardened;
 };
 

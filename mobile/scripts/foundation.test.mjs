@@ -33,6 +33,8 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(appConfig, /autoVerify:\s*true/);
   assert.match(appConfig, /pathPrefix:\s*["']\/link["']/);
   assert.match(appConfig, /scheme:\s*["']https["']/);
+  assert.match(appConfig, /associatedDomains/);
+  assert.match(appConfig, /EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID/);
   assert.match(appConfig, /withAndroidReleaseSymbols/);
   assert.match(releaseSymbolsPlugin, /android\.enableMinifyInReleaseBuilds/);
   assert.equal(mobilePackage.scripts["export:android:source-maps"], "node scripts/releaseArtifacts.mjs");

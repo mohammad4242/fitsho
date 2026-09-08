@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { parseEnvFile, validateEnvironment } from "./environment.mjs";
+
+const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 test("parses and validates each Fitician mobile environment", () => {
   const values = parseEnvFile(
@@ -33,4 +38,12 @@ test("requires a trusted HTTPS frontend origin outside development", () => {
       }),
     /EXPO_PUBLIC_FRONTEND_ORIGIN must use HTTPS outside development/,
   );
+});
+
+test("documents emulator and physical Android development API targets", async () => {
+  const example = await readFile(resolve(mobileRoot, ".env.development.example"), "utf8");
+
+  assert.match(example, /10\.0\.2\.2:8001/u);
+  assert.match(example, /physical Android|LAN|Tailscale|laptop/i);
+  assert.match(example, /<[^>]*(?:LAN|TAILSCALE|LAPTOP)[^>]*>.*:8001/iu);
 });

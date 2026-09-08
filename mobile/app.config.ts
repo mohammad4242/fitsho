@@ -10,6 +10,11 @@ const withAndroidReleaseSymbols = loadModuleSync(
 ).default;
 
 const FITICIAN_APP_LINK_PLACEHOLDER = "app.fitician.example";
+const supportedAppVariants = new Set(["development", "preview", "production"]);
+const appVariant = process.env.APP_VARIANT?.trim() || "development";
+if (!supportedAppVariants.has(appVariant)) {
+  throw new Error("APP_VARIANT must be development, preview, or production");
+}
 
 const fiticianFontConfig = {
   android: {
@@ -74,7 +79,7 @@ function resolveAppLinkHost(rawHost: string | undefined, isProduction: boolean):
   return parsed.hostname;
 }
 
-const isProduction = process.env.APP_VARIANT === "production";
+const isProduction = appVariant === "production";
 const updatesUrl = process.env.EXPO_UPDATES_URL?.trim();
 const easProjectId = process.env.EAS_PROJECT_ID?.trim();
 const googleServicesFile = process.env.GOOGLE_SERVICES_JSON?.trim();
@@ -155,13 +160,15 @@ const config: ExpoConfig = {
   },
   ios: {
     bundleIdentifier: "com.fitician.app",
+    associatedDomains: [`applinks:${appLinkHost}`],
   },
   extra: {
-    environment: process.env.APP_VARIANT || "development",
+    environment: appVariant,
     apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || "http://10.0.2.2:8001",
     appLinkHost,
     frontendOrigin: process.env.EXPO_PUBLIC_FRONTEND_ORIGIN || "http://localhost:5173",
     googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || null,
+    googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || null,
     ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
   },
 };

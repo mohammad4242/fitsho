@@ -21,6 +21,10 @@ const androidReleaseSymbols = await readFile(
   "utf8",
 );
 const androidManifestPath = resolve(mobileRoot, "android/app/src/main/AndroidManifest.xml");
+const androidMainActivityPath = resolve(
+  mobileRoot,
+  "android/app/src/main/java/com/fitician/app/MainActivity.kt",
+);
 const tsconfig = await readJson(resolve(mobileRoot, "tsconfig.json"));
 const fontFiles = [
   "Vazirmatn-Regular.ttf",
@@ -59,6 +63,8 @@ for (const required of [
   /targetSdkVersion:\s*36/,
   /autoVerify:\s*true/,
   /scheme:\s*["']https["']/,
+  /associatedDomains/,
+  /EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID/,
   /pathPrefix:\s*["']\/link["']/,
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
   /["']expo-background-task["']/,
@@ -75,7 +81,9 @@ for (const required of [
 assert.match(androidReleaseSymbols, /android\.enableMinifyInReleaseBuilds/);
 for (const required of [
   /android:allowBackup["']?:\s*["']false["']/,
-  /android:usesCleartextTraffic["']?:\s*["']false["']/,
+  /android:usesCleartextTraffic/u,
+  /environment\s*===\s*["']development["']/u,
+  /cleartextTrafficPermitted="false"/u,
   /fitician_backup_rules/,
   /FLAG_SECURE/,
 ]) {
@@ -86,7 +94,12 @@ try {
   assert.match(androidManifest, /android:scheme="fitician"/);
   assert.match(androidManifest, /android:autoVerify="true"/);
   assert.match(androidManifest, /android:allowBackup="false"/);
-  assert.match(androidManifest, /android:usesCleartextTraffic="false"/);
+  const appVariant = process.env.APP_VARIANT?.trim() || "development";
+  assert.ok(["development", "preview", "production"].includes(appVariant));
+  assert.match(
+    androidManifest,
+    new RegExp(`android:usesCleartextTraffic="${appVariant === "development" ? "true" : "false"}"`),
+  );
   for (const permission of [
     "READ_EXTERNAL_STORAGE",
     "WRITE_EXTERNAL_STORAGE",
@@ -108,6 +121,16 @@ try {
       false,
       `generated Android manifest contains ${identifier}`,
     );
+  }
+  try {
+    const mainActivity = await readFile(androidMainActivityPath, "utf8");
+    if (appVariant === "development") {
+      assert.doesNotMatch(mainActivity, /FLAG_SECURE/u);
+    } else {
+      assert.match(mainActivity, /FLAG_SECURE/u);
+    }
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
   }
 } catch (error) {
   if (error?.code !== "ENOENT") {
