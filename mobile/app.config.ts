@@ -1,5 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
+import withAndroidHardening from "./plugins/withAndroidHardening.ts";
+
 const FITICIAN_APP_LINK_PLACEHOLDER = "app.fitician.example";
 
 const fiticianFontConfig = {
@@ -103,6 +105,7 @@ const config: ExpoConfig = {
         },
       },
     ],
+    withAndroidHardening as never,
   ],
   android: {
     package: "com.fitician.app",
@@ -115,6 +118,9 @@ const config: ExpoConfig = {
         data: [{ scheme: "https", host: appLinkHost, pathPrefix: "/link" }],
       },
     ],
+  },
+  ios: {
+    bundleIdentifier: "com.fitician.app",
   },
   extra: {
     environment: process.env.APP_VARIANT || "development",

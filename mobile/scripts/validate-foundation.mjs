@@ -12,6 +12,10 @@ const rootPackage = await readJson(resolve(projectRoot, "package.json"));
 const mobilePackage = await readJson(resolve(mobileRoot, "package.json"));
 const corePackage = await readJson(resolve(projectRoot, "packages/fitician-core/package.json"));
 const appConfig = await readFile(resolve(mobileRoot, "app.config.ts"), "utf8");
+const androidHardening = await readFile(
+  resolve(mobileRoot, "plugins/withAndroidHardening.ts"),
+  "utf8",
+);
 const androidManifestPath = resolve(mobileRoot, "android/app/src/main/AndroidManifest.xml");
 const tsconfig = await readJson(resolve(mobileRoot, "tsconfig.json"));
 const fontFiles = [
@@ -54,13 +58,39 @@ for (const required of [
   /cameraPermission:\s*["'][^"']+["']/,
   /microphonePermission:\s*false/,
   /photosPermission:\s*false/,
+  /withAndroidHardening/,
 ]) {
   assert.match(appConfig, required);
+}
+for (const required of [
+  /android:allowBackup["']?:\s*["']false["']/,
+  /android:usesCleartextTraffic["']?:\s*["']false["']/,
+  /fitician_backup_rules/,
+  /FLAG_SECURE/,
+]) {
+  assert.match(androidHardening, required);
 }
 try {
   const androidManifest = await readFile(androidManifestPath, "utf8");
   assert.match(androidManifest, /android:scheme="fitician"/);
   assert.match(androidManifest, /android:autoVerify="true"/);
+  assert.match(androidManifest, /android:allowBackup="false"/);
+  assert.match(androidManifest, /android:usesCleartextTraffic="false"/);
+  for (const permission of [
+    "READ_EXTERNAL_STORAGE",
+    "WRITE_EXTERNAL_STORAGE",
+    "READ_MEDIA_IMAGES",
+    "READ_MEDIA_VIDEO",
+    "READ_MEDIA_AUDIO",
+    "READ_MEDIA_VISUAL_USER_SELECTED",
+    "RECORD_AUDIO",
+    "SYSTEM_ALERT_WINDOW",
+  ]) {
+    assert.match(
+      androidManifest,
+      new RegExp(`android:name="android\\.permission\\.${permission}"[^>]*tools:node="remove"`),
+    );
+  }
   for (const identifier of ["Fitsho", "Fitition"]) {
     assert.equal(
       androidManifest.includes(identifier),
