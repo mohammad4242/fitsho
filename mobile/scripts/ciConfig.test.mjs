@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,4 +48,17 @@ test("CI invokes the frontend workspace by its real package name", async () => {
   assert.match(workflow, /npm run lint --workspace frontend/u);
   assert.match(workflow, /npm run build --workspace frontend/u);
   assert.doesNotMatch(workflow, /--workspace @fitician\/frontend/u);
+});
+
+test("CI keeps the backend lockfile tracked for frozen installs", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const trackedFiles = execFileSync(
+    "git",
+    ["ls-files", "--error-unmatch", "backend/uv.lock"],
+    { cwd: root, encoding: "utf8" },
+  );
+
+  assert.match(trackedFiles, /^backend\/uv\.lock\s*$/u);
+  assert.match(workflow, /cache-dependency-glob:\s*backend\/uv\.lock/u);
+  assert.match(workflow, /uv sync --frozen --extra dev/u);
 });
