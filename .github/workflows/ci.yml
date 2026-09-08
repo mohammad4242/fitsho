@@ -69,6 +69,9 @@ jobs:
         with:
           node-version: "20.19.0"
           cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
       - run: npm ci
       - run: npm run test:core
       - run: npm run check:openapi

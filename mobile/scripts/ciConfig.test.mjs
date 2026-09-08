@@ -62,3 +62,11 @@ test("CI keeps the backend lockfile tracked for frozen installs", async () => {
   assert.match(workflow, /cache-dependency-glob:\s*backend\/uv\.lock/u);
   assert.match(workflow, /uv sync --frozen --extra dev/u);
 });
+
+test("CI installs uv before the shared OpenAPI check", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const sharedJob = workflow.match(/\n  shared:\n(?<body>[\s\S]*?)\n  mobile:/u)?.groups?.body;
+
+  assert.ok(sharedJob, "shared job must be present");
+  assert.match(sharedJob, /uses:\s*astral-sh\/setup-uv@v6/u);
+});
