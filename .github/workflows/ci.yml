@@ -73,6 +73,10 @@ jobs:
             uv run alembic upgrade head
           DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho_nutrition_audit \
             uv run alembic upgrade head
+      - name: Seed nutrition benchmark database
+        run: |
+          DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho_nutrition_audit \
+            uv run python -m scripts.seed_nutrition_benchmark
       - name: Seed workout benchmark database
         run: |
           DATABASE_URL=postgresql+psycopg://fitsho:fitsho@localhost:5432/fitsho \
