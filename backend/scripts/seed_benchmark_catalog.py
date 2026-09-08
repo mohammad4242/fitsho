@@ -180,6 +180,8 @@ def seed_benchmark_catalog(db: Session, slugs: Iterable[str] | None = None) -> i
                 or not exercise.is_programmable
             ):
                 raise ValueError(f"Existing benchmark movement is not programmable: {slug}")
+            if exercise.source == BENCHMARK_SOURCE:
+                exercise.difficulty = Difficulty.BEGINNER
             continue
 
         target_muscles, pattern = all_specs[slug]
@@ -198,7 +200,9 @@ def seed_benchmark_catalog(db: Session, slugs: Iterable[str] | None = None) -> i
             body_region=_body_region(primary_muscle),
             primary_muscle=primary_muscle,
             muscle_focus=focus,
-            difficulty=Difficulty.INTERMEDIATE,
+            # Beginner keeps the deterministic benchmark catalog eligible for
+            # both first-month and beginner cohort profiles.
+            difficulty=Difficulty.BEGINNER,
             movement_pattern=pattern,
             exercise_type=_exercise_type(pattern),
             instructions_en=[
