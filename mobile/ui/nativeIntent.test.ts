@@ -1,0 +1,29 @@
+import { expect, it, vi } from "vitest";
+
+const runtime = vi.hoisted(() => ({
+  getMobileRuntimeConfig: vi.fn(() => ({
+    apiBaseUrl: "https://api.fitician.example",
+    appLinkHost: "preview.fitician.example",
+    frontendOrigin: "https://fitician.example",
+    googleAndroidClientId: null,
+  })),
+}));
+
+vi.mock("../config/nativeRuntimeConfig", () => runtime);
+
+import { redirectSystemPath } from "../app/+native-intent";
+
+it("passes verified App Link intents through the authenticated native route filter", async () => {
+  await expect(
+    redirectSystemPath({
+      initial: true,
+      path: "https://preview.fitician.example/link/member/plans/plan-1",
+    }),
+  ).resolves.toBe("/member/workouts?planId=plan-1");
+  await expect(
+    redirectSystemPath({
+      initial: false,
+      path: "https://app.fitician.example/link/member/plans/plan-1",
+    }),
+  ).resolves.toBe("/");
+});

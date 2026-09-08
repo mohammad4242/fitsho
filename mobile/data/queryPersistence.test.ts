@@ -65,3 +65,49 @@ it("clears memory without opening encrypted storage for signed-out users", async
   expect(queryClient.getQueryData(["workouts", "plan", "active"])).toBeUndefined();
   expect(openDatabase).not.toHaveBeenCalled();
 });
+
+it("restores allowlisted state through a fresh persistence instance after process death", async () => {
+  const persisted = new Map<string, unknown>();
+  const queryClientBeforeDeath = new QueryClient();
+  const databaseBeforeDeath = openedDatabase("member-1");
+  const databaseAfterRestart = openedDatabase("member-1");
+  const cacheBeforeDeath = {
+    persist: vi.fn(async (client: QueryClient) => {
+      persisted.set("workout-plan", client.getQueryData(["workouts", "plan", "active"]));
+    }),
+    restore: vi.fn(async (client: QueryClient) => {
+      const value = persisted.get("workout-plan");
+      if (value !== undefined) client.setQueryData(["workouts", "plan", "active"], value);
+    }),
+  };
+  const cacheAfterRestart = {
+    persist: vi.fn().mockResolvedValue(undefined),
+    restore: vi.fn(async (client: QueryClient) => {
+      const value = persisted.get("workout-plan");
+      if (value !== undefined) client.setQueryData(["workouts", "plan", "active"], value);
+    }),
+  };
+
+  const firstPersistence = new UserQueryCachePersistence({
+    createCache: () => cacheBeforeDeath,
+    openDatabase: async () => databaseBeforeDeath,
+  });
+  await firstPersistence.setUser("member-1", queryClientBeforeDeath);
+  queryClientBeforeDeath.setQueryData(["workouts", "plan", "active"], { status: "active" });
+  await firstPersistence.flush();
+  await firstPersistence.dispose(queryClientBeforeDeath);
+
+  const queryClientAfterRestart = new QueryClient();
+  const restartedPersistence = new UserQueryCachePersistence({
+    createCache: () => cacheAfterRestart,
+    openDatabase: async () => databaseAfterRestart,
+  });
+  await restartedPersistence.setUser("member-1", queryClientAfterRestart);
+
+  expect(queryClientAfterRestart.getQueryData(["workouts", "plan", "active"])).toEqual({
+    status: "active",
+  });
+  expect(cacheAfterRestart.restore).toHaveBeenCalledWith(queryClientAfterRestart);
+
+  await restartedPersistence.dispose(queryClientAfterRestart);
+});
