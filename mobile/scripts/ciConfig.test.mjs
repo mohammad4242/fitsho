@@ -82,3 +82,20 @@ test("CI builds the shared core package before mobile tests", async () => {
   assert.ok(coreBuildIndex >= 0, "mobile job must build core");
   assert.ok(coreBuildIndex < mobileTestIndex, "core must be built before mobile tests");
 });
+
+test("CI uses the React Native Node floor and Expo CI prebuild mode", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const rootPackage = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+  const androidJob = workflow.match(/\n  android:\n(?<body>[\s\S]*?)\n  dependencies:/u)?.groups?.body;
+
+  assert.equal(rootPackage.engines.node, ">=20.19.4");
+  assert.doesNotMatch(workflow, /node-version:\s*["']20\.19\.0["']/u);
+  assert.match(workflow, /node-version:\s*["']20\.19\.4["']/u);
+  assert.ok(androidJob, "android job must be present");
+  assert.doesNotMatch(androidJob, /--non-interactive/u);
+
+  const prebuildStart = androidJob.indexOf("npm run prebuild");
+  const gradleStart = androidJob.indexOf("./gradlew", prebuildStart);
+  const prebuildBlock = androidJob.slice(prebuildStart, gradleStart);
+  assert.match(prebuildBlock, /env:\s*\n\s*CI:\s*["']1["']/u);
+});
