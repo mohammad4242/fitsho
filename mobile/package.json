@@ -13,6 +13,7 @@
     "test:native": "jest --config jest.config.cjs --runInBand",
     "test:auth": "vitest run auth/*.test.ts",
     "test:foundation": "node --test scripts/*.test.mjs",
+    "export:android:source-maps": "node scripts/releaseArtifacts.mjs",
     "audit:dependencies": "node scripts/dependency-audit.mjs",
     "typecheck": "tsc --noEmit",
     "validate": "node scripts/validate-foundation.mjs && node scripts/validate-environments.mjs && node scripts/validate-dependencies.mjs"

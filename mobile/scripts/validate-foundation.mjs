@@ -16,6 +16,10 @@ const androidHardening = await readFile(
   resolve(mobileRoot, "plugins/withAndroidHardening.ts"),
   "utf8",
 );
+const androidReleaseSymbols = await readFile(
+  resolve(mobileRoot, "plugins/withAndroidReleaseSymbols.ts"),
+  "utf8",
+);
 const androidManifestPath = resolve(mobileRoot, "android/app/src/main/AndroidManifest.xml");
 const tsconfig = await readJson(resolve(mobileRoot, "tsconfig.json"));
 const fontFiles = [
@@ -34,6 +38,10 @@ const fontFiles = [
 assert.deepEqual(rootPackage.workspaces, ["frontend", "mobile", "packages/fitician-core"]);
 assert.equal(mobilePackage.name, "@fitician/mobile");
 assert.equal(mobilePackage.scripts["audit:dependencies"], "node scripts/dependency-audit.mjs");
+assert.equal(
+  mobilePackage.scripts["export:android:source-maps"],
+  "node scripts/releaseArtifacts.mjs",
+);
 assert.equal(corePackage.name, "@fitician/core");
 assert.match(mobilePackage.dependencies.expo, /^~?57\./);
 assert.match(mobilePackage.dependencies["expo-router"], /^~?57\./);
@@ -60,9 +68,11 @@ for (const required of [
   /microphonePermission:\s*false/,
   /photosPermission:\s*false/,
   /withAndroidHardening/,
+  /withAndroidReleaseSymbols/,
 ]) {
   assert.match(appConfig, required);
 }
+assert.match(androidReleaseSymbols, /android\.enableMinifyInReleaseBuilds/);
 for (const required of [
   /android:allowBackup["']?:\s*["']false["']/,
   /android:usesCleartextTraffic["']?:\s*["']false["']/,

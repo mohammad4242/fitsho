@@ -13,6 +13,10 @@ test("declares the Fitician workspace and native foundation", async () => {
   const mobilePackage = await readJson("mobile/package.json");
   const corePackage = await readJson("packages/fitician-core/package.json");
   const appConfig = await readFile(new URL("mobile/app.config.ts", projectRoot), "utf8");
+  const releaseSymbolsPlugin = await readFile(
+    new URL("mobile/plugins/withAndroidReleaseSymbols.ts", projectRoot),
+    "utf8",
+  );
   const mobileTsconfig = await readJson("mobile/tsconfig.json");
 
   assert.deepEqual(rootPackage.workspaces, ["frontend", "mobile", "packages/fitician-core"]);
@@ -29,6 +33,9 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(appConfig, /autoVerify:\s*true/);
   assert.match(appConfig, /pathPrefix:\s*["']\/link["']/);
   assert.match(appConfig, /scheme:\s*["']https["']/);
+  assert.match(appConfig, /withAndroidReleaseSymbols/);
+  assert.match(releaseSymbolsPlugin, /android\.enableMinifyInReleaseBuilds/);
+  assert.equal(mobilePackage.scripts["export:android:source-maps"], "node scripts/releaseArtifacts.mjs");
   assert.equal(mobileTsconfig.compilerOptions.strict, true);
   assert.doesNotMatch(appConfig, /Fitsho|Fitition/);
 });

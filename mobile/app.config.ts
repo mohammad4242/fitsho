@@ -1,6 +1,7 @@
 import type { ExpoConfig } from "expo/config";
 
 import withAndroidHardening from "./plugins/withAndroidHardening.ts";
+import withAndroidReleaseSymbols from "./plugins/withAndroidReleaseSymbols.ts";
 
 const FITICIAN_APP_LINK_PLACEHOLDER = "app.fitician.example";
 
@@ -106,6 +107,7 @@ const config: ExpoConfig = {
       },
     ],
     withAndroidHardening as never,
+    withAndroidReleaseSymbols as never,
   ],
   android: {
     package: "com.fitician.app",
