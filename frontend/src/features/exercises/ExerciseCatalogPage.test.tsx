@@ -195,7 +195,9 @@ describe("catalog selection flow", () => {
     const breadcrumb = await screen.findByRole("navigation", {
       name: "مسیر کتابخانه حرکات",
     });
-    await user.click(within(breadcrumb).getByRole("button", { name: "بالاتنه" }));
+    await user.click(
+      await within(breadcrumb).findByRole("button", { name: "بالاتنه" }),
+    );
     expect(locationValue()).toBe("/exercises?body_region=upper_body");
 
     await user.click(within(breadcrumb).getByRole("button", { name: "کتابخانه حرکات" }));

@@ -154,9 +154,8 @@ it("fetches persisted feedback and explicit replacement candidates", async () =>
 });
 
 it("downloads nutrition plan PDF blob", async () => {
-  const fakeBlob = new Blob(["%PDF-mock"], { type: "application/pdf" });
   vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-    new Response(fakeBlob, {
+    new Response("%PDF-mock", {
       headers: { "Content-Type": "application/pdf" },
     }),
   );
