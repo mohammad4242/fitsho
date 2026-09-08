@@ -2,6 +2,7 @@ import { expect, it, vi } from "vitest";
 
 import { ApiError } from "@fitician/core";
 import type { UploadExecutor, UploadOperation } from "./uploadManager";
+import { MobilePerformanceRecorder } from "../platform/performance";
 
 import {
   createTransportUploadExecutor,
@@ -99,6 +100,29 @@ it("keeps a retryable safe upload queued with the same key", async () => {
   await expect(handle.promise).resolves.toEqual({ uploaded: true });
   expect(executor).toHaveBeenCalledTimes(2);
   expect(executor.mock.calls[0]?.[0]).toEqual(executor.mock.calls[1]?.[0]);
+});
+
+it("records upload duration without retaining multipart payloads", async () => {
+  const performance = new MobilePerformanceRecorder(() => 0);
+  const manager = new UploadManager({
+    executor: async <TResponse>() => ({ uploaded: true }) as TResponse,
+    isOnline: () => true,
+    performanceRecorder: performance,
+  });
+
+  const handle = manager.enqueue({ ...job(), idempotencyKey: "tracking-key-performance" });
+  await expect(handle.promise).resolves.toEqual({ uploaded: true });
+
+  expect(performance.getSamples()).toEqual([
+    {
+      budget: 30_000,
+      metric: "upload",
+      passed: true,
+      unit: "ms",
+      value: 0,
+    },
+  ]);
+  expect(JSON.stringify(performance.getSamples())).not.toContain("payload.bin");
 });
 
 it("reports progress through the default transport upload adapter", async () => {

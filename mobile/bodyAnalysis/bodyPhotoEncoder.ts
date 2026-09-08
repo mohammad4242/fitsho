@@ -6,6 +6,10 @@ import {
   validateEncodedBodyPhoto,
   type BodyPhotoPrivacyCropRequest,
 } from "./privacyCropEncoder";
+import {
+  mobilePerformanceRecorder,
+  type MobilePerformanceRecorder,
+} from "../platform/performance";
 
 export type BodyPhotoEncoderSource = {
   readonly height: number;
@@ -14,20 +18,29 @@ export type BodyPhotoEncoderSource = {
   readonly width: number;
 };
 
-export type BodyPhotoEncoderOptions = Omit<BodyPhotoPrivacyCropRequest, "sourceSize">;
+export type BodyPhotoEncoderOptions = Omit<BodyPhotoPrivacyCropRequest, "sourceSize"> & {
+  readonly performanceRecorder?: MobilePerformanceRecorder;
+};
 
 export async function encodeBodyPhotoWithPrivacyCrop(
   source: BodyPhotoEncoderSource,
   options: BodyPhotoEncoderOptions,
 ): Promise<BodyPhotoCapturedAsset> {
+  const {
+    performanceRecorder = mobilePerformanceRecorder,
+    ...cropOptions
+  } = options;
   const cropRequest: BodyPhotoPrivacyCropRequest = {
-    ...options,
+    ...cropOptions,
     sourceSize: { height: source.height, width: source.width },
   };
-  const result = await manipulateAsync(
-    source.uri,
-    [createBodyPhotoCropAction(cropRequest)],
-    { base64: false, compress: 0.92, format: SaveFormat.JPEG },
+  const result = await performanceRecorder.measureAsync(
+    "image_processing",
+    () => manipulateAsync(
+      source.uri,
+      [createBodyPhotoCropAction(cropRequest)],
+      { base64: false, compress: 0.92, format: SaveFormat.JPEG },
+    ),
   );
   const encoded = validateEncodedBodyPhoto({
     height: result.height,

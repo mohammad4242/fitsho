@@ -1,6 +1,10 @@
 import { CryptoDigestAlgorithm, digestStringAsync } from "expo-crypto";
 
 import type { BinaryDownload, FiticianTransport } from "@fitician/core";
+import {
+  mobilePerformanceRecorder,
+  type MobilePerformanceRecorder,
+} from "../platform/performance";
 
 const VIDEO_EXTENSIONS = new Set([".mp4", ".webm"]);
 
@@ -27,6 +31,7 @@ export interface PublicVideoStore {
 }
 
 export interface PublicExerciseVideoCacheOptions {
+  readonly performanceRecorder?: MobilePerformanceRecorder;
   readonly transport: Pick<FiticianTransport, "download">;
   readonly storage: PublicVideoStore;
   readonly maxBytes?: number;
@@ -75,6 +80,7 @@ export class PublicExerciseVideoCache {
   private readonly storage: PublicVideoStore;
   private readonly maxBytes: number;
   private readonly maxEntries: number;
+  private readonly performanceRecorder: MobilePerformanceRecorder;
   private readonly entries = new Map<string, PublicVideoCacheFile>();
   private readonly inFlight = new Map<string, Promise<PublicVideoCacheFile>>();
   private totalBytes = 0;
@@ -90,6 +96,7 @@ export class PublicExerciseVideoCache {
       options.maxEntries ?? DEFAULT_PUBLIC_VIDEO_CACHE_MAX_ENTRIES,
       "Public video cache entry limit",
     );
+    this.performanceRecorder = options.performanceRecorder ?? mobilePerformanceRecorder;
   }
 
   async getOrDownload(path: string): Promise<PublicVideoCacheFile> {
@@ -126,7 +133,10 @@ export class PublicExerciseVideoCache {
       return current;
     }
 
-    const persisted = await this.storage.read(cacheKey, sourcePath);
+    const persisted = await this.performanceRecorder.measureAsync(
+      "video_cache_hit",
+      () => this.storage.read(cacheKey, sourcePath),
+    );
     if (
       persisted !== null &&
       persisted.cacheKey === cacheKey &&

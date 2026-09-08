@@ -1,12 +1,18 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
+import { InteractionManager } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { createMobileQueryClient } from "../data/queryClient";
 import { MobileQueryCacheBoundary } from "../data/MobileQueryCacheBoundary";
 import { MobileAuthProvider, useMobileAuth } from "../auth/MobileAuthProvider";
 import { connectivityMonitor } from "../platform/connectivity";
+import {
+  completeMobileColdStart,
+  mobilePerformanceRecorder,
+  type PerformanceMeasurement,
+} from "../platform/performance";
 import {
   getAndroidFcmToken,
   prepareAndroidNotifications,
@@ -44,14 +50,46 @@ function NotificationPermissionBootstrap() {
   return null;
 }
 
+function ScreenTransitionPerformanceBootstrap() {
+  const pathname = usePathname();
+  const previousPathname = useRef(pathname);
+  const pendingMeasurement = useRef<(() => PerformanceMeasurement) | null>(null);
+
+  useEffect(() => {
+    if (previousPathname.current === pathname) {
+      return undefined;
+    }
+    previousPathname.current = pathname;
+    const complete = mobilePerformanceRecorder.start("screen_transition");
+    pendingMeasurement.current = complete;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (pendingMeasurement.current === complete) {
+        pendingMeasurement.current = null;
+        complete();
+      }
+    });
+    return () => {
+      task.cancel();
+      if (pendingMeasurement.current === complete) {
+        pendingMeasurement.current = null;
+        complete();
+      }
+    };
+  }, [pathname]);
+
+  return null;
+}
+
 export default function RootLayout() {
   useEffect(() => {
+    completeMobileColdStart();
     connectivityMonitor.start();
     return () => connectivityMonitor.stop();
   }, []);
 
   return (
     <SafeAreaProvider>
+      <ScreenTransitionPerformanceBootstrap />
       <MobileAuthProvider>
         <NotificationPermissionBootstrap />
         <NotificationRoutingBootstrap />

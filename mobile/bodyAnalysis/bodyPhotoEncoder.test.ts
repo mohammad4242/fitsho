@@ -8,8 +8,10 @@ vi.mock("expo-image-manipulator", () => ({
 }));
 
 import { encodeBodyPhotoWithPrivacyCrop } from "./bodyPhotoEncoder";
+import { MobilePerformanceRecorder } from "../platform/performance";
 
 it("encodes a JPEG from the protected crop boundary without base64", async () => {
+  const performance = new MobilePerformanceRecorder(() => 0);
   manipulateAsync.mockResolvedValue({
     height: 2016,
     uri: "file:///cache/body-front-cropped.jpg",
@@ -21,7 +23,7 @@ it("encodes a JPEG from the protected crop boundary without base64", async () =>
     source: "camera",
     uri: "file:///cache/body-raw.jpg",
     width: 1600,
-  }, { view: "front" })).resolves.toEqual({
+  }, { performanceRecorder: performance, view: "front" })).resolves.toEqual({
     height: 2016,
     mimeType: "image/jpeg",
     privacyCropApplied: true,
@@ -35,6 +37,15 @@ it("encodes a JPEG from the protected crop boundary without base64", async () =>
     [{ crop: { height: 2016, originX: 0, originY: 384, width: 1600 } }],
     { base64: false, compress: 0.92, format: "jpeg" },
   );
+  expect(performance.getSamples()).toEqual([
+    {
+      budget: 1_500,
+      metric: "image_processing",
+      passed: true,
+      unit: "ms",
+      value: 0,
+    },
+  ]);
 });
 
 it("rejects an encoded result that exposes pixels above the privacy line", async () => {

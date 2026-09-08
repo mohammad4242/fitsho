@@ -8,6 +8,7 @@ import {
   type PublicVideoCacheFile,
   type PublicVideoStore,
 } from "./publicExerciseVideoCache";
+import { MobilePerformanceRecorder } from "../platform/performance";
 
 vi.mock("expo-crypto", () => ({
   CryptoDigestAlgorithm: { SHA256: "SHA-256" },
@@ -95,6 +96,7 @@ it("deduplicates concurrent downloads for one public video", async () => {
 });
 
 it("finds a persisted video after process restart without downloading it again", async () => {
+  const performance = new MobilePerformanceRecorder(() => 0);
   const storage = store();
   const firstTransport = { download: vi.fn(async () => media(2)) };
   const firstCache = new PublicExerciseVideoCache({ storage, transport: firstTransport });
@@ -104,6 +106,7 @@ it("finds a persisted video after process restart without downloading it again",
 
   const restartedTransport = { download: vi.fn(async () => media(3)) };
   const restartedCache = new PublicExerciseVideoCache({
+    performanceRecorder: performance,
     storage,
     transport: restartedTransport,
   });
@@ -113,6 +116,15 @@ it("finds a persisted video after process restart without downloading it again",
     byteSize: 2,
   });
   expect(restartedTransport.download).not.toHaveBeenCalled();
+  expect(performance.getSamples()).toEqual([
+    {
+      budget: 150,
+      metric: "video_cache_hit",
+      passed: true,
+      unit: "ms",
+      value: 0,
+    },
+  ]);
 });
 
 it("does not treat API or empty responses as public exercise video cache entries", async () => {

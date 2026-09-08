@@ -26,6 +26,7 @@ import type {
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { exerciseKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
+import { PerformanceMeasuredCommit } from "../platform/performanceMeasuredCommit";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { Button, Card, EmptyState, Notice, Skeleton, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
@@ -407,9 +408,11 @@ function ExerciseResults({
         <Notice message={exerciseCopy.stale} variant="info" />
       ) : null}
       <Text style={styles.resultCount}>{formatExerciseCount(page.total)} نتیجه</Text>
-      {page.items.map((exercise) => (
-        <ExerciseCard key={exercise.id} exercise={exercise} onPress={() => onOpen(exercise)} />
-      ))}
+      <PerformanceMeasuredCommit key={`exercise-page-${page.page}`} metric="large_list_render">
+        {page.items.map((exercise) => (
+          <ExerciseCard key={exercise.id} exercise={exercise} onPress={() => onOpen(exercise)} />
+        ))}
+      </PerformanceMeasuredCommit>
       {page.total_pages > 1 ? (
         <View style={styles.pagination}>
           <Button

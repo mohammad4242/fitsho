@@ -9,6 +9,10 @@ import {
   type RequestHeaders,
 } from "@fitician/core";
 import { onlineManager } from "@tanstack/react-query";
+import {
+  mobilePerformanceRecorder,
+  type MobilePerformanceRecorder,
+} from "../platform/performance";
 
 const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const RETRYABLE_API_STATUSES = new Set([408, 425, 429]);
@@ -66,6 +70,7 @@ export interface UploadManagerOptions {
   isOnline?: () => boolean;
   idempotencyKeyFactory?: () => string;
   onProgress?: (progress: UploadProgress) => void;
+  performanceRecorder?: MobilePerformanceRecorder;
 }
 
 export class UploadValidationError extends Error {
@@ -207,6 +212,7 @@ export class UploadManager {
   private readonly isOnline: () => boolean;
   private readonly idempotencyKeyFactory: () => string;
   private readonly onProgress: ((progress: UploadProgress) => void) | undefined;
+  private readonly performanceRecorder: MobilePerformanceRecorder;
   private readonly entries = new Map<string, UploadEntry<unknown>>();
 
   constructor(options: UploadManagerOptions) {
@@ -214,6 +220,7 @@ export class UploadManager {
     this.isOnline = options.isOnline ?? (() => onlineManager.isOnline());
     this.idempotencyKeyFactory = options.idempotencyKeyFactory ?? randomUUID;
     this.onProgress = options.onProgress;
+    this.performanceRecorder = options.performanceRecorder ?? mobilePerformanceRecorder;
   }
 
   enqueue<TResponse>(job: UploadJob): UploadHandle<TResponse> {
@@ -320,6 +327,7 @@ export class UploadManager {
       signal: entry.cancellation.signal,
     };
 
+    const completeUploadMeasurement = this.performanceRecorder.start("upload");
     try {
       const response = await this.executor<TResponse>(
         request,
@@ -354,6 +362,8 @@ export class UploadManager {
       this.entries.delete(entry.idempotencyKey);
       this.emit(entry);
       entry.reject(error);
+    } finally {
+      completeUploadMeasurement();
     }
   }
 }
