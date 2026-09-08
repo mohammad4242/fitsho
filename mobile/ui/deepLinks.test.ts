@@ -60,3 +60,11 @@ it("uses the build-time verified App Link host", () => {
     }),
   ).toBe("/");
 });
+
+it("leaves Expo Development Client control URLs for Expo Router", () => {
+  expect(
+    normalizeNativeDeepLinkPath(
+      "fitician://expo-development-client/?url=exp%3A%2F%2F10.0.2.2%3A8081",
+    ),
+  ).toBeNull();
+});

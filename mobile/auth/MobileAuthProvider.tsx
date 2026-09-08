@@ -20,6 +20,7 @@ import type {
 
 import { createNativeTransport } from "../api/nativeTransport";
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
+import { logDevelopmentDiagnostic } from "../platform/logging";
 import { createSecureRefreshTokenStore } from "./tokenStore";
 import { resolveMobileClientMetadata } from "./deviceMetadata";
 import {
@@ -75,7 +76,25 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
 
   useEffect(() => {
     const unsubscribe = activeSession.subscribe(setSnapshot);
-    void activeSession.restore();
+    const restoreSession = async (): Promise<void> => {
+      try {
+        await activeSession.restore();
+        if (activeSession.getSnapshot().startupError) {
+          logDevelopmentDiagnostic("auth_restore_failed", "error", {
+            error_type: "AuthRestoreError",
+            operation: "auth_restore",
+            status: activeSession.getSnapshot().status,
+          });
+        }
+      } catch (error) {
+        logDevelopmentDiagnostic("auth_restore_failed", "error", {
+          error_type: error instanceof Error && error.name.length > 0 ? error.name : typeof error,
+          operation: "auth_restore",
+          status: activeSession.getSnapshot().status,
+        });
+      }
+    };
+    void restoreSession();
     return unsubscribe;
   }, [activeSession]);
 

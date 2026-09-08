@@ -7,6 +7,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createMobileQueryClient } from "../data/queryClient";
 import { MobileQueryCacheBoundary } from "../data/MobileQueryCacheBoundary";
 import { MobileAuthProvider, useMobileAuth } from "../auth/MobileAuthProvider";
+import { logMobileRuntimeConfiguration } from "../config/nativeRuntimeConfig";
 import { E2ERoleNavigator } from "../e2e/RoleNavigator";
 import { connectivityMonitor } from "../platform/connectivity";
 import {
@@ -84,6 +85,7 @@ function ScreenTransitionPerformanceBootstrap() {
 export default function RootLayout() {
   useEffect(() => {
     completeMobileColdStart();
+    logMobileRuntimeConfiguration();
     connectivityMonitor.start();
     return () => connectivityMonitor.stop();
   }, []);

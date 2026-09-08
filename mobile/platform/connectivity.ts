@@ -1,6 +1,8 @@
 import NetInfo, { type NetInfoState } from "@react-native-community/netinfo";
 import { onlineManager } from "@tanstack/react-query";
 
+import { logDevelopmentDiagnostic } from "./logging";
+
 export type ConnectivityStatus = "unknown" | "offline" | "online";
 
 export type ConnectivitySnapshot = {
@@ -42,6 +44,7 @@ export function connectivitySnapshotFromNetInfo(state: NetInfoState): Connectivi
 
 export class ConnectivityMonitor {
   private snapshot: ConnectivitySnapshot = UNKNOWN_SNAPSHOT;
+  private lastDiagnosticStatus: ConnectivityStatus | null = null;
   private unsubscribeNative: (() => void) | null = null;
   private readonly listeners = new Set<(snapshot: ConnectivitySnapshot) => void>();
 
@@ -76,6 +79,14 @@ export class ConnectivityMonitor {
   private update(state: NetInfoState): void {
     this.snapshot = connectivitySnapshotFromNetInfo(state);
     this.setQueryOnline(this.snapshot.isOnline);
+    if (this.lastDiagnosticStatus !== this.snapshot.status) {
+      this.lastDiagnosticStatus = this.snapshot.status;
+      logDevelopmentDiagnostic("connectivity_changed", "info", {
+        is_online: this.snapshot.isOnline,
+        network_type: this.snapshot.type,
+        status: this.snapshot.status,
+      });
+    }
     for (const listener of this.listeners) {
       listener(this.snapshot);
     }

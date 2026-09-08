@@ -6,6 +6,8 @@ const runtime = vi.hoisted(() => ({
     appLinkHost: "preview.fitician.example",
     frontendOrigin: "https://fitician.example",
     googleAndroidClientId: null,
+    googleIosClientId: null,
+    environment: "preview",
   })),
 }));
 
@@ -26,4 +28,13 @@ it("passes verified App Link intents through the authenticated native route filt
       path: "https://app.fitician.example/link/member/plans/plan-1",
     }),
   ).resolves.toBe("/");
+});
+
+it("leaves the Expo Development Client URL unmodified", async () => {
+  await expect(
+    redirectSystemPath({
+      initial: true,
+      path: "fitician://expo-development-client/?url=exp%3A%2F%2F10.0.2.2%3A8081",
+    }),
+  ).resolves.toBeNull();
 });

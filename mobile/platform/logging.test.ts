@@ -4,6 +4,7 @@ import {
   MobileTelemetryLogger,
   configureMobileTelemetry,
   createCorrelationId,
+  logDevelopmentDiagnostic,
   mobileLogger,
   redactLogData,
   redactLogMessage,
@@ -100,4 +101,38 @@ it("uses a UUID-shaped correlation id and the singleton can be configured", () =
     operation: "request",
     correlation_id: expect.any(String),
   });
+});
+
+it("logs safe development diagnostics without enabling production diagnostics", () => {
+  const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+  logDevelopmentDiagnostic("runtime_configuration", "info", {
+    api_base_url: "https://user:password@api.fitician.example/v1?access_token=secret",
+    environment: "development",
+  }, true);
+  logDevelopmentDiagnostic("runtime_configuration", "info", {
+    api_base_url: "https://api.fitician.example",
+  }, false);
+  logDevelopmentDiagnostic("emulator_only_api_target", "warning", {
+    api_base_url: "http://10.0.2.2:8001",
+    access_token: "secret",
+  }, true);
+
+  expect(info).toHaveBeenCalledWith(
+    "[Fitician][runtime_configuration]",
+    expect.objectContaining({
+      api_base_url: "https://api.fitician.example/v1",
+      environment: "development",
+    }),
+  );
+  expect(warn).toHaveBeenCalledWith(
+    "[Fitician][emulator_only_api_target]",
+    expect.objectContaining({ api_base_url: "http://10.0.2.2:8001" }),
+  );
+  const output = JSON.stringify([...info.mock.calls, ...warn.mock.calls]);
+  expect(output).not.toContain("password");
+  expect(output).not.toContain("access_token");
+  expect(output).not.toContain("secret");
+  expect(info).toHaveBeenCalledTimes(1);
 });

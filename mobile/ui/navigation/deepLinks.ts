@@ -18,7 +18,9 @@ export interface NativeDeepLinkOptions {
 export function normalizeNativeDeepLinkPath(
   path: string,
   options: NativeDeepLinkOptions = {},
-): string {
+): string | null {
+  if (isExpoDevelopmentClientIntent(path)) return null;
+
   const parsed = parseDeepLink(path);
   if (parsed === null || !isAllowedNativeLink(parsed, options.appLinkHost ?? DEFAULT_APP_LINK_HOST)) {
     return "/";
@@ -36,6 +38,18 @@ export function normalizeNativeDeepLinkPath(
   const token = tokens.length === 1 ? tokens[0]?.trim() : undefined;
   if (token === undefined || token.length === 0 || token.length > 512) return "/";
   return `/auth/${authRoute}?token=${encodeURIComponent(token)}`;
+}
+
+function isExpoDevelopmentClientIntent(path: string): boolean {
+  try {
+    const parsed = new URL(path);
+    return parsed.protocol === "fitician:"
+      && parsed.hostname === "expo-development-client"
+      && parsed.pathname === "/"
+      && parsed.searchParams.has("url");
+  } catch {
+    return false;
+  }
 }
 
 function parseDeepLink(path: string): URL | null {
