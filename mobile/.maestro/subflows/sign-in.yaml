@@ -1,0 +1,9 @@
+- tapOn: "ورود"
+- tapOn: "ایمیل"
+- inputText: ${FITICIAN_TEST_EMAIL}
+- tapOn: "رمز عبور"
+- inputText: ${FITICIAN_TEST_PASSWORD}
+- tapOn: "ورود"
+- extendedWaitUntil:
+    visible: "خانه"
+    timeout: 20000

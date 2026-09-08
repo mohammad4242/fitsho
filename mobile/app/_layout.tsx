@@ -7,6 +7,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createMobileQueryClient } from "../data/queryClient";
 import { MobileQueryCacheBoundary } from "../data/MobileQueryCacheBoundary";
 import { MobileAuthProvider, useMobileAuth } from "../auth/MobileAuthProvider";
+import { E2ERoleNavigator } from "../e2e/RoleNavigator";
 import { connectivityMonitor } from "../platform/connectivity";
 import {
   completeMobileColdStart,
@@ -91,6 +92,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ScreenTransitionPerformanceBootstrap />
       <MobileAuthProvider>
+        <E2ERoleNavigator />
         <NotificationPermissionBootstrap />
         <NotificationRoutingBootstrap />
         <MobileRouteStateProviderFromAuth>

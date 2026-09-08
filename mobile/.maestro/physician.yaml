@@ -1,0 +1,13 @@
+appId: com.fitician.app
+env:
+  FITICIAN_TEST_EMAIL: ${FITICIAN_TEST_PHYSICIAN_EMAIL}
+  FITICIAN_TEST_PASSWORD: ${FITICIAN_TEST_PHYSICIAN_PASSWORD}
+---
+- clearState
+- launchApp
+- runFlow:
+    file: subflows/sign-in.yaml
+- tapOn: "E2E: پزشک"
+- extendedWaitUntil:
+    visible: "صف بررسی برنامه‌های تغذیه"
+    timeout: 20000

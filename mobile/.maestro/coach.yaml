@@ -1,0 +1,13 @@
+appId: com.fitician.app
+env:
+  FITICIAN_TEST_EMAIL: ${FITICIAN_TEST_COACH_EMAIL}
+  FITICIAN_TEST_PASSWORD: ${FITICIAN_TEST_COACH_PASSWORD}
+---
+- clearState
+- launchApp
+- runFlow:
+    file: subflows/sign-in.yaml
+- tapOn: "E2E: مربی"
+- extendedWaitUntil:
+    visible: "بازبینی برنامه‌های تمرینی"
+    timeout: 20000

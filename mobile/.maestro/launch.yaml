@@ -1,0 +1,7 @@
+appId: com.fitician.app
+---
+- clearState
+- launchApp
+- assertVisible: "FITICIAN"
+- assertVisible: "ورود"
+- assertVisible: "ساخت حساب جدید"
