@@ -18,7 +18,8 @@
     "test:contracts": "node --test scripts/openapi_generation.test.mjs",
     "typecheck:mobile": "npm run typecheck --workspace @fitician/mobile",
     "validate:mobile": "npm run validate --workspace @fitician/mobile",
-    "test:mobile:foundation": "node --test mobile/scripts/*.test.mjs"
+    "test:mobile:foundation": "node --test mobile/scripts/*.test.mjs",
+    "security:secrets": "node mobile/scripts/secret-scan.mjs"
   },
   "devDependencies": {
     "jsdom": "29.1.1",

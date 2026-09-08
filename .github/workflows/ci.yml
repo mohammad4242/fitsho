@@ -1,0 +1,133 @@
+name: Fitician CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fitician-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fitsho
+          POSTGRES_PASSWORD: fitsho
+          POSTGRES_DB: fitsho_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fitsho -d fitsho_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --frozen
+      - run: uv run pytest
+
+  frontend:
+    name: Frontend tests, lint, and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+      - run: npm ci
+      - run: npm run test --workspace @fitician/frontend
+      - run: npm run lint --workspace @fitician/frontend
+      - run: npm run build --workspace @fitician/frontend
+
+  shared:
+    name: Shared core and contract checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+      - run: npm ci
+      - run: npm run test:core
+      - run: npm run check:openapi
+      - run: npm run test:contracts
+
+  mobile:
+    name: Mobile tests and validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+      - run: npm ci
+      - run: npm run test --workspace @fitician/mobile
+      - run: npm run test:native --workspace @fitician/mobile
+      - run: npm run test:mobile:foundation
+      - run: npm run typecheck:mobile
+      - run: npm run validate:mobile
+
+  android:
+    name: Android debug build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: npm ci
+      - run: npm run prebuild --workspace @fitician/mobile -- --platform android --no-install --non-interactive
+      - run: ./gradlew :app:assembleDebug
+        working-directory: mobile/android
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+          cache: npm
+      - run: npm ci
+      - run: npm run audit:dependencies --workspace @fitician/mobile
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.0"
+      - run: npm run security:secrets
