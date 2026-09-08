@@ -118,6 +118,22 @@ it("shows the meal catalogue for training-only members", () => {
   expect(within(productGroup).queryByRole("link", { name: /کاتالوگ مواد غذایی/ })).not.toBeInTheDocument();
 });
 
+it("shows public privacy and deletion controls in the account group", () => {
+  auth.isAdmin = false;
+
+  render(<MemoryRouter><MorePage /></MemoryRouter>);
+
+  const accountGroup = screen.getByRole("region", { name: "حساب" });
+  expect(within(accountGroup).getByRole("link", { name: /حذف حساب/ })).toHaveAttribute(
+    "href",
+    "/delete-account",
+  );
+  expect(within(accountGroup).getByRole("link", { name: /سیاست حریم خصوصی/ })).toHaveAttribute(
+    "href",
+    "/privacy",
+  );
+});
+
 it("shows single meal catalogue in product and no duplicate in workspaces for administrators", () => {
   auth.isAdmin = true;
   profileState.productMode = "both";

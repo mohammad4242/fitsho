@@ -1,0 +1,205 @@
+.public-account-page {
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 12% 8%, rgb(80 223 206 / 12%), transparent 28rem),
+    var(--fitsho-canvas);
+  color: var(--fitsho-ink);
+}
+
+.public-account-page__container {
+  width: min(100% - 2rem, 56rem);
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--fitsho-space-6);
+  margin-inline: auto;
+  padding-block: 1rem 1.5rem;
+}
+
+.public-account-page__header,
+.public-account-page__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.public-account-page__header .brand-mark {
+  color: var(--fitsho-ink);
+}
+
+.public-account-page__header .language-switcher {
+  border-color: var(--fitsho-line);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface);
+}
+
+.public-account-page__footer {
+  justify-content: center;
+  flex-wrap: wrap;
+  color: var(--fitsho-muted);
+  font-size: 0.78rem;
+}
+
+.public-account-page__footer a {
+  text-underline-offset: 0.2em;
+}
+
+.public-account-card {
+  align-self: center;
+  width: 100%;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-xl);
+  background: linear-gradient(145deg, rgb(80 223 206 / 8%), var(--fitsho-surface) 35%);
+  box-shadow: var(--fitsho-shadow);
+}
+
+.public-account-card--reading {
+  align-self: start;
+  margin-block: auto;
+}
+
+.public-account-card__eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--fitsho-aqua);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.public-account-card h1 {
+  margin: 0;
+  color: var(--fitsho-mist);
+  font-size: clamp(1.8rem, 6vw, 3.1rem);
+}
+
+.public-account-card h2 {
+  margin: 1.7rem 0 0.45rem;
+  color: var(--fitsho-mist);
+  font-size: 1rem;
+}
+
+.public-account-card p {
+  color: var(--fitsho-muted);
+  line-height: 1.9;
+}
+
+.public-account-card__lead {
+  max-width: 48rem;
+  margin: 1rem 0 0;
+  font-size: 0.95rem;
+}
+
+.public-account-card__updated {
+  margin-block-start: 2rem;
+  font-size: 0.75rem;
+}
+
+.public-account-card__text-link {
+  display: inline-flex;
+  margin-block-start: 0.45rem;
+  color: var(--fitsho-aqua);
+  font-weight: 750;
+}
+
+.public-account-state {
+  display: grid;
+  gap: 0.85rem;
+  margin-block-start: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--fitsho-line);
+  border-radius: var(--fitsho-radius-lg);
+  background: var(--fitsho-surface-subtle);
+}
+
+.public-account-state p {
+  margin: 0;
+}
+
+.public-account-state h2 {
+  margin: 0;
+}
+
+.public-account-state--warning {
+  border-color: rgb(242 184 91 / 35%);
+  background: rgb(242 184 91 / 7%);
+}
+
+.public-account-form {
+  display: grid;
+  gap: 0.65rem;
+  margin-block-start: 1.5rem;
+}
+
+.public-account-form > p {
+  margin: 0 0 0.45rem;
+  font-size: 0.82rem;
+}
+
+.public-account-form label {
+  color: var(--fitsho-mist);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.public-account-form input {
+  width: 100%;
+  min-height: 3rem;
+  padding-inline: 0.85rem;
+  border: 1px solid var(--fitsho-line-strong);
+  border-radius: var(--fitsho-radius-md);
+  color: var(--fitsho-ink);
+  background: var(--fitsho-surface-subtle);
+}
+
+.public-account-button {
+  min-height: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 1.1rem;
+  border: 1px solid var(--fitsho-aqua);
+  border-radius: var(--fitsho-radius-md);
+  color: var(--fitsho-canvas);
+  background: var(--fitsho-aqua);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.public-account-button:disabled,
+.public-account-text-button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.public-account-button--secondary {
+  color: var(--fitsho-ink);
+  background: transparent;
+}
+
+.public-account-text-button {
+  justify-self: start;
+  border: 0;
+  color: var(--fitsho-aqua);
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.public-account-card__error {
+  margin: 0.25rem 0;
+  color: #ffad98 !important;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 600px) {
+  .public-account-page__container {
+    width: min(100% - 1.25rem, 56rem);
+    gap: var(--fitsho-space-4);
+  }
+}

@@ -32,6 +32,7 @@ const AdminTrainingProgramStructureEditorPage = lazy(() => import("./features/ad
 const BodyAnalysisResultPage = lazy(() => import("./features/bodyPhotos/BodyAnalysisResultPage").then(({ BodyAnalysisResultPage }) => ({ default: BodyAnalysisResultPage })));
 const BodyPhotoWizard = lazy(() => import("./features/bodyPhotos/BodyPhotoWizard").then(({ BodyPhotoWizard }) => ({ default: BodyPhotoWizard })));
 const BodyProgressPage = lazy(() => import("./features/bodyPhotos/BodyProgressPage").then(({ BodyProgressPage }) => ({ default: BodyProgressPage })));
+const AccountDeletionPage = lazy(() => import("./features/accountDeletion/AccountDeletionPage").then(({ AccountDeletionPage }) => ({ default: AccountDeletionPage })));
 const CoachWorkoutReviewPage = lazy(() => import("./features/workoutReviews/CoachWorkoutReviewPage").then(({ CoachWorkoutReviewPage }) => ({ default: CoachWorkoutReviewPage })));
 const DashboardPage = lazy(() => import("./pages/DashboardPage").then(({ DashboardPage }) => ({ default: DashboardPage })));
 const ExerciseCatalogPage = lazy(() => import("./features/exercises/ExerciseCatalogPage").then(({ ExerciseCatalogPage }) => ({ default: ExerciseCatalogPage })));
@@ -50,6 +51,7 @@ const PhysicianNutritionReviewPage = lazy(() => import("./features/nutrition/Phy
 const ProfilePage = lazy(() => import("./features/profile/ProfilePage").then(({ ProfilePage }) => ({ default: ProfilePage })));
 const PublicLandingRoute = lazy(() => import("./features/landing/PublicLandingRoute").then(({ PublicLandingRoute }) => ({ default: PublicLandingRoute })));
 const PublicOnboardingPage = lazy(() => import("./features/publicOnboarding/PublicOnboardingPage").then(({ PublicOnboardingPage }) => ({ default: PublicOnboardingPage })));
+const PrivacyPolicyPage = lazy(() => import("./features/accountDeletion/PrivacyPolicyPage").then(({ PrivacyPolicyPage }) => ({ default: PrivacyPolicyPage })));
 const RegisterPage = lazy(() => import("./features/auth/RegisterPage").then(({ RegisterPage }) => ({ default: RegisterPage })));
 const ResetPasswordPage = lazy(() => import("./features/auth/ResetPasswordPage").then(({ ResetPasswordPage }) => ({ default: ResetPasswordPage })));
 const VerifyEmailPage = lazy(() => import("./features/auth/VerifyEmailPage").then(({ VerifyEmailPage }) => ({ default: VerifyEmailPage })));
@@ -58,6 +60,8 @@ const WorkoutPlanPage = lazy(() => import("./features/workouts/WorkoutPlanPage")
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/delete-account" element={deferred(<AccountDeletionPage />)} />
+      <Route path="/privacy" element={deferred(<PrivacyPolicyPage />)} />
       <Route path="/verify-email" element={deferred(<VerifyEmailPage />)} />
       <Route element={<GuestRoute />}>
         <Route path="/login" element={deferred(<LoginPage />)} />

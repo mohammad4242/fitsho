@@ -13,13 +13,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderPage() {
+function renderPage(initialEntries = ["/login"]) {
   return render(
     <AuthProvider>
-      <MemoryRouter initialEntries={["/login"]}>
+      <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/dashboard" element={<div>dashboard reached</div>} />
+          <Route path="/delete-account" element={<div>deletion page reached</div>} />
         </Routes>
       </MemoryRouter>
     </AuthProvider>,
@@ -230,4 +231,30 @@ it("shows a generic error for invalid or expired OTP codes", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "کد واردشده معتبر نیست یا منقضی شده است",
   );
+});
+
+it("returns to the external deletion page after a requested login", async () => {
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(new Response(null, { status: 401 }))
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: "member",
+          email: "member@example.com",
+          phone_number: null,
+          created_at: "2026-09-08T00:00:00Z",
+          is_admin: false,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+  const user = userEvent.setup();
+  renderPage(["/login?returnTo=%2Fdelete-account"]);
+
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+  await user.type(screen.getByLabelText("ایمیل"), "member@example.com");
+  await user.type(screen.getByLabelText("رمز عبور"), "long password");
+  await user.click(screen.getByRole("button", { name: "ورود به فیتشو" }));
+
+  expect(await screen.findByText("deletion page reached")).toBeInTheDocument();
 });

@@ -1,12 +1,13 @@
 import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AuthShell } from "../../shared/AuthShell";
 import * as api from "./api";
 import { authErrorMessage } from "./authError";
 import { useAuth } from "./AuthContext";
 import { GoogleSignInButton } from "./GoogleSignInButton";
+import { authPath, safeReturnTo } from "./returnTo";
 
 type LoginMode = "email" | "phone";
 type PhoneStep = "request" | "verify";
@@ -14,7 +15,12 @@ type PhoneStep = "request" | "verify";
 export function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login, loginWithPhone, loginWithGoogle } = useAuth();
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
+  const forgotPasswordPath = returnTo === "/dashboard"
+    ? "/forgot-password"
+    : `/forgot-password?returnTo=${encodeURIComponent(returnTo)}`;
   const [mode, setMode] = useState<LoginMode>("email");
   const [phoneStep, setPhoneStep] = useState<PhoneStep>("request");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -45,7 +51,7 @@ export function LoginPage() {
         password: String(data.get("password") ?? ""),
       })
       .then(
-        () => navigate("/dashboard", { replace: true }),
+        () => navigate(returnTo, { replace: true }),
         (requestError: unknown) => {
           setError(authErrorMessage(requestError, t));
         },
@@ -78,7 +84,7 @@ export function LoginPage() {
     setError(null);
     void loginWithPhone(phoneNumber, String(data.get("code") ?? ""))
       .then(
-        () => navigate("/dashboard", { replace: true }),
+        () => navigate(returnTo, { replace: true }),
         () => setError(t("errors.invalidOtp")),
       )
       .finally(() => setBusy(false));
@@ -90,12 +96,12 @@ export function LoginPage() {
       setError(null);
       void loginWithGoogle(credential)
         .then(
-          () => navigate("/dashboard", { replace: true }),
+          () => navigate(returnTo, { replace: true }),
           (requestError: unknown) => setError(authErrorMessage(requestError, t)),
         )
         .finally(() => setBusy(false));
     },
-    [loginWithGoogle, navigate, t],
+    [loginWithGoogle, navigate, returnTo, t],
   );
 
   const handleGoogleError = useCallback(() => {
@@ -143,7 +149,9 @@ export function LoginPage() {
 
           <div className="auth-field-heading">
             <label htmlFor="login-password">{t("common.password")}</label>
-            <Link to="/forgot-password">{t("login.forgotPassword")}</Link>
+            <Link to={forgotPasswordPath}>
+              {t("login.forgotPassword")}
+            </Link>
           </div>
           <input
             id="login-password"
@@ -234,7 +242,7 @@ export function LoginPage() {
 
       <p className="form-alternative">
         {t("login.noAccount")}{" "}
-        <Link to="/register">{t("login.registerLink")}</Link>
+        <Link to={authPath("/register", returnTo)}>{t("login.registerLink")}</Link>
       </p>
     </AuthShell>
   );

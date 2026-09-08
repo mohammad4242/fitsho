@@ -83,6 +83,8 @@ export function MorePage() {
 
           <MoreGroup title={l("حساب", "Account")}>
             <MoreLink to="/profile" icon="profile" title={l("اطلاعات پروفایل", "Profile information")} subtitle={l("مشخصات و تنظیمات برنامه", "Details and plan preferences")} />
+            <MoreLink to="/delete-account" icon="lock" title={l("حذف حساب", "Delete account")} subtitle={l("مدیریت درخواست حذف و مهلت بازگشت", "Manage deletion and the grace period")} />
+            <MoreLink to="/privacy" icon="shield" title={l("سیاست حریم خصوصی", "Privacy policy")} subtitle={l("نحوه استفاده و کنترل داده‌ها", "How data is used and controlled")} />
             <div className="more-language-row"><div><strong>{l("زبان", "Language")}</strong><span>{l("فارسی و English", "English and فارسی")}</span></div><LanguageSwitcher /></div>
           </MoreGroup>
 

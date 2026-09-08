@@ -1,15 +1,18 @@
 import { type FormEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AuthShell } from "../../shared/AuthShell";
 import { authErrorMessage } from "./authError";
 import { useAuth } from "./AuthContext";
+import { authPath, safeReturnTo } from "./returnTo";
 
 export function RegisterPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { register } = useAuth();
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +32,7 @@ export function RegisterPage() {
     setError(null);
     void register({ email, password })
       .then(
-        () => navigate("/dashboard", { replace: true }),
+        () => navigate(returnTo, { replace: true }),
         (requestError: unknown) => {
           setError(authErrorMessage(requestError, t));
         },
@@ -96,7 +99,7 @@ export function RegisterPage() {
       </form>
 
       <p className="form-alternative">
-        {t("register.hasAccount")} <Link to="/login">{t("register.loginLink")}</Link>
+        {t("register.hasAccount")} <Link to={authPath("/login", returnTo)}>{t("register.loginLink")}</Link>
       </p>
     </AuthShell>
   );

@@ -585,6 +585,22 @@ function renderRoute(path: string) {
   );
 }
 
+it("keeps the account deletion page public for signed-out visitors", async () => {
+  renderRoute("/delete-account");
+
+  expect(await screen.findByRole("heading", { name: "حذف حساب فیتشو" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "ورود برای ادامه" })).toHaveAttribute(
+    "href",
+    "/login?returnTo=%2Fdelete-account",
+  );
+});
+
+it("keeps the privacy policy public for signed-out visitors", async () => {
+  renderRoute("/privacy");
+
+  expect(await screen.findByRole("heading", { name: "سیاست حریم خصوصی" })).toBeInTheDocument();
+});
+
 it("lets a normal authenticated completed member open the meal catalogue route", async () => {
   setReadyMember();
   renderRoute("/meal-catalogue");
