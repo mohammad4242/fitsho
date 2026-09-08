@@ -28,7 +28,7 @@ async function routeFiles(directory: string): Promise<string[]> {
   return files;
 }
 
-it("defines the public, auth, onboarding, member, coach, and physician route groups", async () => {
+it("defines the public, auth, onboarding, account, member, coach, and physician route groups", async () => {
   const requiredRoutes = [
     "(public)/_layout.tsx",
     "(public)/index.tsx",
@@ -41,6 +41,8 @@ it("defines the public, auth, onboarding, member, coach, and physician route gro
     "(auth)/auth/verify-email.tsx",
     "(onboarding)/_layout.tsx",
     "(onboarding)/onboarding/index.tsx",
+    "(account)/_layout.tsx",
+    "(account)/account-deletion.tsx",
     "(member)/_layout.tsx",
     "(member)/member/_layout.tsx",
     "(member)/member/(tabs)/_layout.tsx",
@@ -69,6 +71,7 @@ it("uses native stack and tab navigators without an admin route", async () => {
     "(public)/_layout.tsx",
     "(auth)/_layout.tsx",
     "(onboarding)/_layout.tsx",
+    "(account)/_layout.tsx",
     "(member)/_layout.tsx",
     "(coach)/_layout.tsx",
     "(physician)/_layout.tsx",
@@ -92,6 +95,7 @@ it("places route guards at group boundaries and hides capability tabs", async ()
     "(onboarding)/_layout.tsx": 'kind="onboarding"',
     "(physician)/_layout.tsx": 'kind="physician"',
     "(public)/_layout.tsx": 'kind="public"',
+    "(account)/_layout.tsx": 'kind="account"',
   };
   for (const [layout, marker] of Object.entries(guardedLayouts)) {
     await expect(readFile(resolve(appRoot, layout), "utf8")).resolves.toContain(marker);
@@ -105,6 +109,13 @@ it("places route guards at group boundaries and hides capability tabs", async ()
   await expect(readFile(resolve(appRoot, "_layout.tsx"), "utf8")).resolves.toContain(
     "AndroidBackBehaviorProvider",
   );
+});
+
+it("keeps account deletion available to any signed-in role without admin routes", async () => {
+  await expect(readFile(resolve(appRoot, "(account)/account-deletion.tsx"), "utf8"))
+    .resolves.toMatch(/AccountDeletionScreen/);
+  await expect(readFile(resolve(appRoot, "(account)/_layout.tsx"), "utf8"))
+    .resolves.not.toMatch(/AdminRoute|admin/);
 });
 
 it("uses the native onboarding flow instead of a route placeholder", async () => {

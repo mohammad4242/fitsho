@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { components } from "@fitician/core";
 
+import { AccountPrivacyLinks } from "../accountDeletion/AccountPrivacyLinks";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { physicianKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
@@ -347,6 +348,7 @@ export function PhysicianNutritionReviewScreen() {
           ) : null}
         </View>
       </View>
+      <AccountPrivacyLinks />
     </Screen>
   );
 }

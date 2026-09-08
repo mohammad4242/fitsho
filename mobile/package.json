@@ -8,7 +8,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "prebuild": "expo prebuild",
-    "test": "vitest run api/*.test.ts auth/*.test.ts bodyAnalysis/*.test.ts coach/*.test.ts config/*.test.ts data/*.test.ts exercises/*.test.ts media/*.test.ts notifications/*.test.ts nutrition/*.test.ts onboarding/*.test.ts physician/*.test.ts platform/*.test.ts profile/*.test.ts ui/*.test.ts upload/*.test.ts video/*.test.ts workouts/*.test.ts",
+    "test": "vitest run accountDeletion/*.test.ts api/*.test.ts auth/*.test.ts bodyAnalysis/*.test.ts coach/*.test.ts config/*.test.ts data/*.test.ts exercises/*.test.ts media/*.test.ts notifications/*.test.ts nutrition/*.test.ts onboarding/*.test.ts physician/*.test.ts platform/*.test.ts profile/*.test.ts ui/*.test.ts upload/*.test.ts video/*.test.ts workouts/*.test.ts",
     "test:auth": "vitest run auth/*.test.ts",
     "test:foundation": "node --test scripts/*.test.mjs",
     "audit:dependencies": "node scripts/dependency-audit.mjs",

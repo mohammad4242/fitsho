@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { components } from "@fitician/core";
 
+import { AccountPrivacyLinks } from "../accountDeletion/AccountPrivacyLinks";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { coachKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
@@ -229,6 +230,7 @@ export function CoachWorkoutReviewScreen() {
           ) : null}
         </View>
       </View>
+      <AccountPrivacyLinks />
     </Screen>
   );
 }

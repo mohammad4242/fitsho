@@ -33,6 +33,7 @@ import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot, useRefreshMobileProfileStatus } from "../ui/navigation/RouteGuards";
 import { createProfileApi } from "./profileApi";
 import { ProfilePhotoControl } from "./ProfilePhotoControl";
+import { AccountPrivacyLinks } from "../accountDeletion/AccountPrivacyLinks";
 import {
   nutritionFormsForProfile,
   nutritionInputForEdit,
@@ -470,6 +471,7 @@ export function ProfileScreen() {
         />
       ) : null}
 
+      <AccountPrivacyLinks />
       <View style={styles.actions}>
         <Button disabled={busy} label={section === "personal" ? "بستن" : "بازگشت"} onPress={goBackOrClose(goBack, section, router)} variant="secondary" />
         <Button disabled={busy} label="ذخیره تغییرات" loading={busy} onPress={() => void saveCurrentSection()} />

@@ -1,7 +1,7 @@
 import type { User } from "@fitician/core/auth";
 import type { ProfileCompletionState, ProductMode } from "@fitician/core/profile";
 
-export type MobileRouteKind = "public" | "auth" | "onboarding" | "member" | "coach" | "physician";
+export type MobileRouteKind = "public" | "auth" | "onboarding" | "account" | "member" | "coach" | "physician";
 export type MobileProductCapability = "training" | "nutrition";
 export type MobileSpecialistAccess = "loading" | "granted" | "denied";
 
@@ -101,6 +101,10 @@ export function decideMobileRoute(
 
   if (!isSignedIn(snapshot)) {
     return { href: signInHref(snapshot), status: "redirect" };
+  }
+
+  if (kind === "account") {
+    return { status: "allow" };
   }
 
   if (kind === "coach" || kind === "physician") {
