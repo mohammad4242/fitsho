@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "build:core": "npm run build --workspace @fitician/core",
+    "test:core": "npm run test --workspace @fitician/core",
     "check:openapi": "node scripts/generate-openapi.mjs --check",
     "generate:openapi": "node scripts/generate-openapi.mjs",
     "test:contracts": "node --test scripts/openapi_generation.test.mjs",
