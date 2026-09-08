@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "appId": "com.fitician.app",
+  "minSdkVersion": 24,
+  "targetSdkVersion": 36,
+  "apiLevels": [24, 29, 33, 36],
+  "physicalDeviceTiers": ["low", "mid"],
+  "requiredFlows": ["launch", "member", "coach", "physician", "role-boundary"],
+  "profiles": [
+    {
+      "id": "api24-low",
+      "apiLevel": 24,
+      "device": "Nexus 5X",
+      "tier": "low",
+      "physicalTier": "low"
+    },
+    {
+      "id": "api29-low",
+      "apiLevel": 29,
+      "device": "Pixel 2",
+      "tier": "low",
+      "physicalTier": "low"
+    },
+    {
+      "id": "api33-mid",
+      "apiLevel": 33,
+      "device": "Pixel 5",
+      "tier": "mid",
+      "physicalTier": "mid"
+    },
+    {
+      "id": "api36-mid",
+      "apiLevel": 36,
+      "device": "Pixel 8",
+      "tier": "mid",
+      "physicalTier": "mid"
+    }
+  ]
+}
