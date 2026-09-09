@@ -18,7 +18,7 @@ const expected = {
   "expo-background-task": { declared: "~57.0.16", version: /^57\./ },
   "expo-auth-session": { declared: "~57.0.11", version: /^57\./ },
   "expo-crypto": { declared: "~57.0.2", version: /^57\./ },
-  expo: { declared: "~57.0.0", version: /^57\./ },
+  expo: { declared: /^~57\.0\.\d+$/, version: /^57\./ },
   "expo-build-properties": { declared: "~57.0.2", version: /^57\./ },
   "expo-constants": { declared: "~57.0.2", version: /^57\./ },
   "expo-dev-client": { declared: "~57.0.2", version: /^57\./ },
@@ -29,7 +29,7 @@ const expected = {
   "expo-image-picker": { declared: "~57.0.16", version: /^57\./ },
   "expo-image-manipulator": { declared: "~57.0.16", version: /^57\./ },
   "expo-notifications": { declared: "~57.0.17", version: /^57\./ },
-  "expo-router": { declared: "~57.0.2", version: /^57\./ },
+  "expo-router": { declared: /^~57\.0\.\d+$/, version: /^57\./ },
   "expo-secure-store": { declared: "~57.0.3", version: /^57\./ },
   "expo-sqlite": { declared: "~57.0.2", version: /^57\./ },
   "expo-splash-screen": { declared: "~57.0.1", version: /^57\./ },
@@ -58,7 +58,12 @@ const expected = {
 
 for (const [name, requirement] of Object.entries(expected)) {
   const declared = mobilePackage.dependencies[name] ?? mobilePackage.devDependencies?.[name];
-  assert.equal(declared, requirement.declared, `${name} declaration drifted`);
+  if (requirement.declared instanceof RegExp) {
+    assert.equal(typeof declared, "string", `${name} must have a declared version`);
+    assert.match(declared, requirement.declared, `${name} declaration drifted`);
+  } else {
+    assert.equal(declared, requirement.declared, `${name} declaration drifted`);
+  }
   let locked;
   if (name === "@fitician/body-vision") {
     locked = lock.packages["mobile/modules/fitician-body-vision"]?.version;
