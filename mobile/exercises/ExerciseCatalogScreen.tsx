@@ -28,7 +28,16 @@ import { exerciseKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { PerformanceMeasuredCommit } from "../platform/performanceMeasuredCommit";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
-import { Button, Card, EmptyState, Notice, Skeleton, TextField } from "../ui/components";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Notice,
+  ScreenHeader,
+  Sheet,
+  Skeleton,
+  TextField,
+} from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -74,6 +83,7 @@ export function ExerciseCatalogScreen() {
   const connectivityStatus = useConnectivityStatus();
   const [selection, setSelection] = useState<CatalogSelection>(initialSelection);
   const [page, setPage] = useState(1);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const filters = useMemo<ExerciseFilters>(() => {
     const next: ExerciseFilters = {
@@ -119,6 +129,12 @@ export function ExerciseCatalogScreen() {
   const availableFocuses = categories === undefined || selection.primaryMuscle === null
     ? []
     : categories.muscle_focuses[selection.primaryMuscle] ?? [];
+  const activeFilterCount = [
+    selection.search.trim(),
+    selection.equipment,
+    selection.difficulty,
+    selection.exerciseType,
+  ].filter((value) => value !== null && value !== "").length;
 
   useEffect(() => {
     if (
@@ -169,16 +185,22 @@ export function ExerciseCatalogScreen() {
   }
 
   return (
-    <Screen contentWidth="reading">
-      <View style={styles.header}>
-        <Text style={styles.brand}>FITICIAN</Text>
-        <Text accessibilityRole="header" style={styles.title}>{exerciseCopy.library}</Text>
-        <Text style={styles.intro}>{exerciseCopy.catalogIntro}</Text>
-      </View>
-
-      <View style={styles.actions}>
-        <Button label={exerciseCopy.clearFilters} onPress={clearFilters} variant="ghost" />
-      </View>
+    <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
+      <ScreenHeader
+        action={
+          <Button
+            accessibilityLabel="باز کردن فیلترها"
+            label={activeFilterCount > 0 ? `فیلترها · ${activeFilterCount}` : "فیلترها"}
+            onPress={() => setFiltersOpen(true)}
+            style={styles.filterButton}
+            variant="secondary"
+          />
+        }
+        compact
+        eyebrow="حرکت مناسب امروزت را پیدا کن"
+        subtitle={exerciseCopy.catalogIntro}
+        title={exerciseCopy.library}
+      />
 
       <Card style={styles.filterCard}>
         <Text style={styles.sectionTitle}>{exerciseCopy.specialFilters}</Text>
@@ -285,8 +307,20 @@ export function ExerciseCatalogScreen() {
         </>
       ) : null}
 
-      <Card style={styles.filterCard}>
-        <Text style={styles.sectionTitle}>{exerciseCopy.filters}</Text>
+      <Text accessibilityRole="header" style={styles.resultsTitle}>نتایج حرکات</Text>
+      <ExerciseResults
+        canLoad={canLoadExercises}
+        page={exercisePage}
+        state={exercisesState}
+        onOpen={openExercise}
+        onPageChange={setPage}
+        onRetry={() => void exercisesQuery.refetch()}
+      />
+      <Sheet
+        onClose={() => setFiltersOpen(false)}
+        title="فیلترهای پیشرفته"
+        visible={filtersOpen}
+      >
         <TextField
           accessibilityLabel={exerciseCopy.search}
           label={exerciseCopy.search}
@@ -343,16 +377,11 @@ export function ExerciseCatalogScreen() {
             />
           ))}
         </ChoiceRow>
-      </Card>
-
-      <ExerciseResults
-        canLoad={canLoadExercises}
-        page={exercisePage}
-        state={exercisesState}
-        onOpen={openExercise}
-        onPageChange={setPage}
-        onRetry={() => void exercisesQuery.refetch()}
-      />
+        <View style={styles.sheetActions}>
+          <Button label={exerciseCopy.clearFilters} onPress={clearFilters} variant="ghost" />
+          <Button label="نمایش نتایج" onPress={() => setFiltersOpen(false)} />
+        </View>
+      </Sheet>
     </Screen>
   );
 }
@@ -589,19 +618,6 @@ const exerciseTypeOptions: readonly ExerciseType[] = [
 ];
 
 const styles = StyleSheet.create({
-  actions: {
-    alignItems: "flex-start",
-    marginBottom: fiticianTokens.spacing[3],
-  },
-  brand: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    letterSpacing: 1.4,
-    textAlign: "left",
-    writingDirection: "ltr",
-  },
   cardCopy: {
     flex: 1,
     gap: fiticianTokens.spacing[1],
@@ -707,22 +723,14 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     marginBottom: fiticianTokens.spacing[4],
   },
+  filterButton: {
+    minHeight: 42,
+    paddingHorizontal: fiticianTokens.spacing[3],
+  },
   filterLabel: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  header: {
-    gap: fiticianTokens.spacing[2],
-    marginBottom: fiticianTokens.spacing[4],
-  },
-  intro: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    lineHeight: 27,
     textAlign: "right",
     writingDirection: "rtl",
   },
@@ -782,6 +790,14 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     marginTop: fiticianTokens.spacing[3],
   },
+  resultsTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 28,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   sectionTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
@@ -789,6 +805,15 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  screen: {
+    gap: fiticianTokens.spacing[3],
+    paddingBottom: fiticianTokens.spacing[7],
+    paddingTop: fiticianTokens.spacing[3],
+  },
+  sheetActions: {
+    gap: fiticianTokens.spacing[2],
+    marginTop: fiticianTokens.spacing[2],
   },
   stage: {
     gap: fiticianTokens.spacing[2],
@@ -799,14 +824,6 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 23,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h1,
-    lineHeight: 40,
     textAlign: "right",
     writingDirection: "rtl",
   },

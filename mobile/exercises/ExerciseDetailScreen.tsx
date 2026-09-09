@@ -14,7 +14,15 @@ import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
 import { exerciseKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { Button, Card, EmptyState, Notice, Skeleton, Media } from "../ui/components";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Media,
+  Notice,
+  ScreenHeader,
+  Skeleton,
+} from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
@@ -173,11 +181,14 @@ export function ExerciseDetailScreen() {
   }
 
   return (
-    <Screen contentWidth="reading">
-      <View style={styles.header}>
-        <Button label="بازگشت" onPress={() => router.back()} variant="ghost" />
-        <Text style={styles.eyebrow}>{exerciseCopy.library}</Text>
-      </View>
+    <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
+      <ScreenHeader
+        action={<Button label="بازگشت" onPress={() => router.back()} style={styles.backButton} variant="ghost" />}
+        compact
+        eyebrow={exerciseCopy.library}
+        subtitle="رسانه، مشخصات و نکات اجرای ایمن"
+        title={detail === undefined || detail === null ? "راهنمای حرکت" : exerciseTitle(detail.name_fa, detail.name_en)}
+      />
 
       {detailState.status === "loading" ? <DetailSkeleton /> : null}
       {detailState.status === "error" ? (
@@ -254,7 +265,7 @@ function ExerciseMediaPanel({
 }) {
   const name = exerciseTitle(detail.name_fa, detail.name_en);
   return (
-    <Card style={styles.mediaCard}>
+    <Card style={styles.mediaCard} variant="hero">
       {selectedItem !== undefined && selectedItem.mediaType !== "placeholder" ? (
         <NativeExerciseMedia
           item={selectedItem}
@@ -527,13 +538,6 @@ const styles = StyleSheet.create({
   downloadSection: {
     gap: fiticianTokens.spacing[2],
   },
-  eyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
   filterLabel: {
     color: fiticianTokens.colors.muted,
     flex: 1,
@@ -541,11 +545,6 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.sm,
     textAlign: "right",
     writingDirection: "rtl",
-  },
-  header: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[2],
-    marginBottom: fiticianTokens.spacing[4],
   },
   infoCard: {
     gap: fiticianTokens.spacing[3],
@@ -706,6 +705,15 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  backButton: {
+    minHeight: 42,
+    paddingHorizontal: fiticianTokens.spacing[3],
+  },
+  screen: {
+    gap: fiticianTokens.spacing[3],
+    paddingBottom: fiticianTokens.spacing[7],
+    paddingTop: fiticianTokens.spacing[3],
   },
   skeletonGroup: {
     gap: fiticianTokens.spacing[3],
