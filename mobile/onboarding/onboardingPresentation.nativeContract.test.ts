@@ -15,6 +15,10 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(source).toMatch(/modeIcon/);
   expect(source).toMatch(/variant="glass"/);
   expect(source).toMatch(/writingDirection: "rtl"/);
+  expect(source).toMatch(/بیشتر در چه زمینه‌ای به کمک نیاز داری؟/);
+  expect(source).toMatch(/برنامه شخصی براساس بدن، هدف، سطح، زمان و تجهیزات/);
+  expect(source).toMatch(/getOnboardingStageProgress/);
+  expect(source).toMatch(/logout/);
   expect(publicSource).toMatch(/SecurePublicOnboardingDraftStore/);
   expect(publicSource).toMatch(/PUBLIC_ONBOARDING_SOURCE/);
   expect(publicSource).toMatch(/StateSkeleton/);

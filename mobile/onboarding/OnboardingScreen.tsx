@@ -45,6 +45,7 @@ import {
   type OnboardingFormValidationError,
 } from "./onboardingForms";
 import {
+  getOnboardingStageProgress,
   getQuestionProgress,
   nextQuestionIndex,
   previousQuestionIndex,
@@ -199,6 +200,22 @@ const productModeOptions: readonly {
   { description: "یک مسیر هماهنگ برای تمرین و تغذیه", icon: "target", label: "تمرین و تغذیه", mode: "both" },
 ];
 
+const authenticatedModeCopy = {
+  description: "مسیرت را انتخاب کن؛ فقط همان سؤال‌هایی را می‌پرسیم که برای برنامه‌ات لازم است.",
+  descriptions: {
+    both: "یک برنامه هماهنگ برای نتیجه بهتر",
+    nutrition: "برنامه غذایی متناسب با هدف، نیاز بدن، مواد در دسترس و بودجه",
+    training: "برنامه شخصی براساس بدن، هدف، سطح، زمان و تجهیزات",
+  },
+  eyebrow: "شروع با مربی فیتشو",
+  labels: {
+    both: "تمرین و تغذیه",
+    nutrition: "تغذیه",
+    training: "تمرین",
+  },
+  title: "بیشتر در چه زمینه‌ای به کمک نیاز داری؟",
+} as const;
+
 type ChoiceOption = { readonly label: string; readonly value: string };
 
 function firstParam(value: string | string[] | undefined): string {
@@ -220,6 +237,16 @@ export function OnboardingScreen() {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const logout = useCallback(() => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    void auth.logout()
+      .then(() => router.replace("/"))
+      .catch((logoutError) => setError(onboardingErrorMessage(logoutError)))
+      .finally(() => setBusy(false));
+  }, [auth.logout, busy, router]);
 
   useEffect(() => {
     let active = true;
@@ -367,19 +394,34 @@ export function OnboardingScreen() {
     );
   }
 
+  const persistedProgress = getOnboardingStageProgress(state.mode, state.step);
+  const progressSummary = persistedProgress.total === 0
+    ? "شروع شخصی‌سازی"
+    : `پاسخ‌های ثبت‌شده ${persistedProgress.completed} از ${persistedProgress.total}`;
+
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <View style={styles.brandRow}>
         <Text style={styles.brand}>FITICIAN</Text>
-        {state.step !== "product_mode" ? (
-          <Pressable accessibilityRole="button" disabled={busy} onPress={goBack}>
-            <Text style={styles.backLink}>بازگشت</Text>
+        <View style={styles.topActions}>
+          {state.step !== "product_mode" ? (
+            <Pressable accessibilityLabel="بازگشت" accessibilityRole="button" disabled={busy} onPress={goBack}>
+              <Text style={styles.backLink}>بازگشت</Text>
+            </Pressable>
+          ) : null}
+          <Pressable accessibilityLabel="خروج" accessibilityRole="button" disabled={busy} onPress={logout}>
+            <Text style={styles.backLink}>خروج</Text>
           </Pressable>
-        ) : null}
+        </View>
       </View>
-      <ProgressBar label="پیشرفت مسیر شخصی‌سازی" progress={onboardingProgressValue(state)} />
+      <View style={styles.progressBlock}>
+        <Text style={styles.progressSummary}>{progressSummary}</Text>
+        <ProgressBar label="پیشرفت مسیر شخصی‌سازی" progress={onboardingProgressValue(state)} />
+      </View>
       {error ? <Notice message={error} variant="danger" /> : null}
-      {state.step === "product_mode" ? <ModeStage busy={busy} onSelect={selectMode} /> : null}
+      {state.step === "product_mode" ? (
+        <ModeStage busy={busy} copy={authenticatedModeCopy} onSelect={selectMode} />
+      ) : null}
       {state.step === "shared_profile" ? (
         <SharedProfileStage
           busy={busy}
@@ -446,6 +488,7 @@ export function OnboardingScreen() {
 
 export interface ModeStageCopy {
   readonly description?: string;
+  readonly descriptions?: Partial<Record<ProductMode, string>>;
   readonly eyebrow?: string;
   readonly labels?: Partial<Record<ProductMode, string>>;
   readonly showDescriptions?: boolean;
@@ -489,7 +532,9 @@ export function ModeStage({
             <View style={styles.modeContent}>
               {option.mode === "both" ? <Text style={styles.recommended}>پیشنهاد فیتشو</Text> : null}
               <Text style={styles.modeTitle}>{copy?.labels?.[option.mode] ?? option.label}</Text>
-              {copy?.showDescriptions === false ? null : <Text style={styles.modeDescription}>{option.description}</Text>}
+              {copy?.showDescriptions === false ? null : (
+                <Text style={styles.modeDescription}>{copy?.descriptions?.[option.mode] ?? option.description}</Text>
+              )}
             </View>
           </Pressable>
         ))}
@@ -1463,11 +1508,8 @@ export function safetyFormValuesForState(safety: SafetyProfileInput | null): Saf
 }
 
 function onboardingProgressValue(state: OnboardingState): number {
-  if (state.mode === null || state.step === "product_mode") return 0;
-  const steps = getOnboardingSteps(state.mode);
-  const index = steps.indexOf(state.step);
-  if (index <= 0) return 0;
-  return Math.min(1, index / Math.max(1, steps.length - 1));
+  if (state.mode !== null && !getOnboardingSteps(state.mode).includes(state.step)) return 0;
+  return getOnboardingStageProgress(state.mode, state.step).progress;
 }
 
 export function exerciseFormValuesForState(exercise: StructuredExerciseInput | null): ExerciseFormValues {
@@ -1704,6 +1746,16 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.xs,
     writingDirection: "rtl",
   },
+  progressBlock: {
+    gap: fiticianTokens.spacing[2],
+  },
+  progressSummary: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   questionCard: {
     minHeight: 220,
   },
@@ -1789,6 +1841,11 @@ const styles = StyleSheet.create({
   stage: {
     gap: fiticianTokens.spacing[5],
     width: "100%",
+  },
+  topActions: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
   },
   title: {
     color: fiticianTokens.colors.ink,
