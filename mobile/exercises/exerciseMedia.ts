@@ -69,3 +69,12 @@ export function resolveExerciseMediaUrl(path: string, apiBaseUrl: string): strin
   if (/^https?:\/\//i.test(path)) return path;
   return `${apiBaseUrl.replace(/\/+$/u, "")}/${path.replace(/^\/+/, "")}`;
 }
+
+export function isExerciseMediaRenderable(
+  path: string,
+  mediaType: components["schemas"]["MediaType"],
+): boolean {
+  return path.trim() !== ""
+    && mediaType !== "placeholder"
+    && !path.toLowerCase().includes("placeholder");
+}

@@ -11,7 +11,7 @@ import { type ReactNode } from "react";
 
 import { fiticianTokens } from "../tokens";
 
-export type CardVariant = "default" | "raised" | "interactive";
+export type CardVariant = "default" | "raised" | "interactive" | "hero" | "glass";
 
 export interface CardProps extends Omit<ViewProps, "style"> {
   readonly children: ReactNode;
@@ -31,6 +31,14 @@ const variantStyles: Record<CardVariant, ViewStyle> = {
   },
   raised: {
     backgroundColor: fiticianTokens.colors.surfaceRaised,
+    borderColor: fiticianTokens.colors.line,
+  },
+  hero: {
+    backgroundColor: fiticianTokens.colors.hero,
+    borderColor: fiticianTokens.colors.lineStrong,
+  },
+  glass: {
+    backgroundColor: fiticianTokens.colors.surfaceTranslucent,
     borderColor: fiticianTokens.colors.line,
   },
 };

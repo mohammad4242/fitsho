@@ -145,6 +145,12 @@ it("uses the native profile editor inside the member profile tab", async () => {
   ).resolves.not.toMatch(/RouteEntryScreen/);
 });
 
+it("uses the data-driven member home instead of the route-entry placeholder", async () => {
+  const route = resolve(appRoot, "(member)/member/(tabs)/index.tsx");
+  await expect(readFile(route, "utf8")).resolves.toMatch(/MemberHomeScreen/);
+  await expect(readFile(route, "utf8")).resolves.not.toMatch(/RouteEntryScreen/);
+});
+
 it("uses the native body-analysis wizard inside the member boundary", async () => {
   const route = resolve(appRoot, "(member)/member/body-analysis.tsx");
   await expect(readFile(route, "utf8")).resolves.toMatch(/BodyAnalysisWizard/);

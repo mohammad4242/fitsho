@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildExerciseMediaItems, resolveExerciseMediaUrl } from "./exerciseMedia";
+import {
+  buildExerciseMediaItems,
+  isExerciseMediaRenderable,
+  resolveExerciseMediaUrl,
+} from "./exerciseMedia";
 
 describe("native exercise media", () => {
   it("preserves backend ordering and pins the backend primary asset", () => {
@@ -57,6 +61,14 @@ describe("native exercise media", () => {
     expect(resolveExerciseMediaUrl("https://cdn.fitician.test/video.mp4", "https://api.fitician.test")).toBe(
       "https://cdn.fitician.test/video.mp4",
     );
+  });
+
+  it("accepts real GIF, image, and video media but rejects placeholders", () => {
+    expect(isExerciseMediaRenderable("/media/row.gif", "gif")).toBe(true);
+    expect(isExerciseMediaRenderable("/media/row.webp", "image")).toBe(true);
+    expect(isExerciseMediaRenderable("/media/row.mp4", "video")).toBe(true);
+    expect(isExerciseMediaRenderable("/exercises/exercise-placeholder.svg", "placeholder")).toBe(false);
+    expect(isExerciseMediaRenderable("", "gif")).toBe(false);
   });
 });
 

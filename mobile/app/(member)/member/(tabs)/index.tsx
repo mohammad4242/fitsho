@@ -1,18 +1,5 @@
-import { useRouter } from "expo-router";
+import { MemberHomeScreen } from "../../../../home/MemberHomeScreen";
 
-import { Button } from "../../../../ui/components";
-import { RouteEntryScreen } from "../../../../ui/navigation/RouteEntryScreen";
-
-export default function MemberHomeScreen() {
-  const router = useRouter();
-  return (
-    <RouteEntryScreen description="برنامه امروز و پیشرفت شما" title="خانه">
-      <Button label="تحلیل بدن" onPress={() => router.push("/member/body-analysis")} />
-      <Button
-        label="تاریخچه تحلیل بدن"
-        onPress={() => router.push("/member/body-analysis-history")}
-        variant="secondary"
-      />
-    </RouteEntryScreen>
-  );
+export default function MemberHomeRoute() {
+  return <MemberHomeScreen />;
 }
