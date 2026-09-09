@@ -11,6 +11,9 @@ import type {
 import type { MobileLanguage } from "../ui/rtl";
 
 export const exerciseCopy = {
+  advancedFilters: "فیلترهای پیشرفته",
+  allExercises: "همه حرکات",
+  allMuscleFocuses: "همه بخش‌های این عضله",
   bodyRegion: "ناحیه بدن",
   bodyRegions: {
     core: "میان‌تنه",
@@ -48,12 +51,14 @@ export const exerciseCopy = {
   error: "حرکات دریافت نشدند.",
   filters: "فیلترها",
   focus: "تمرکز عضلانی",
+  focusIntro: "اگر می‌خواهی، بخش دقیق عضله را انتخاب کن.",
   fullBody: "تمام بدن",
   guides: "راهنماها",
   library: "کتابخانه حرکات",
   loading: "در حال دریافت حرکات…",
   mediaUnavailable: "رسانهٔ این حرکت در دسترس نیست.",
   mobility: "تحرک و کشش",
+  moreFilters: "فیلترهای بیشتر",
   muscle: "عضله هدف",
   muscleIntro: "عضله هدف را انتخاب کن تا فهرست دقیق‌تر شود.",
   noResults: "حرکتی با این فیلترها پیدا نشد.",
@@ -61,7 +66,11 @@ export const exerciseCopy = {
   nextPage: "صفحه بعد",
   previousPage: "صفحه قبل",
   retry: "تلاش دوباره",
+  resultsTitle: "نتایج حرکات",
   search: "جستجوی حرکت",
+  searchPlaceholder: "مثلاً پرس سینه",
+  selectMusclePrompt: "حالا عضله هدفت را انتخاب کن.",
+  selectRegionPrompt: "برای شروع، بالاتنه، پایین‌تنه یا میان‌تنه را انتخاب کن.",
   safety: "نکات ایمنی",
   secondaryMuscles: "عضلات کمکی",
   specialFilters: "فیلترهای ویژه",

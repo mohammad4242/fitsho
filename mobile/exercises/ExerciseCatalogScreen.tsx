@@ -100,6 +100,7 @@ export function ExerciseCatalogScreen() {
   const [selection, setSelection] = useState<CatalogSelection>(initialSelection);
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const filters = useMemo<ExerciseFilters>(() => {
     const next: ExerciseFilters = {
@@ -123,7 +124,12 @@ export function ExerciseCatalogScreen() {
     queryFn: api.getCategories,
     queryKey: exerciseKeys.categories(),
   });
+  const hasSearch = selection.search.trim().length > 0;
+  const hasSpecialFilter = selection.label !== null || selection.exerciseType === "mobility";
+  const hasGuidedSelection = selection.bodyRegion !== null && selection.primaryMuscle !== null;
+  const canLoadExercises = showAll || hasSearch || hasSpecialFilter || hasGuidedSelection;
   const exercisesQuery = useQuery({
+    enabled: canLoadExercises,
     queryFn: () => api.list(filters),
     queryKey: exerciseKeys.list(filters),
   });
@@ -144,7 +150,8 @@ export function ExerciseCatalogScreen() {
     () => getActiveFilters(selection, categories),
     [categories, selection],
   );
-  const activeFilterCount = activeFilters.length;
+  const advancedFilterCount = [selection.equipment, selection.difficulty, selection.exerciseType]
+    .filter((value) => value !== null && value !== "mobility").length;
 
   useEffect(() => {
     if (
@@ -162,6 +169,7 @@ export function ExerciseCatalogScreen() {
   }
 
   function chooseBodyRegion(bodyRegion: BodyRegion) {
+    setShowAll(false);
     updateSelection({
       bodyRegion,
       contentType: "exercise",
@@ -173,10 +181,12 @@ export function ExerciseCatalogScreen() {
   }
 
   function chooseMuscle(primaryMuscle: MuscleGroup) {
+    setShowAll(false);
     updateSelection({ muscleFocus: null, primaryMuscle });
   }
 
   function chooseSpecialFilter(changes: Pick<CatalogSelection, "exerciseType" | "label">) {
+    setShowAll(false);
     updateSelection({
       ...changes,
       bodyRegion: null,
@@ -186,6 +196,13 @@ export function ExerciseCatalogScreen() {
   }
 
   function clearFilters() {
+    setShowAll(false);
+    setSelection(initialSelection);
+    setPage(1);
+  }
+
+  function showAllExercises() {
+    setShowAll(true);
     setSelection(initialSelection);
     setPage(1);
   }
@@ -233,65 +250,139 @@ export function ExerciseCatalogScreen() {
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <ScreenHeader
-        action={
-          <Button
-            accessibilityLabel="باز کردن فیلترها"
-            label={activeFilterCount > 0 ? `فیلترها · ${activeFilterCount}` : "فیلترها"}
-            onPress={() => setFiltersOpen(true)}
-            style={styles.filterButton}
-            variant="secondary"
-          />
-        }
         compact
         eyebrow="حرکت مناسب امروزت را پیدا کن"
         subtitle={exerciseCopy.catalogIntro}
         title={exerciseCopy.library}
       />
 
-        <TextField
-          accessibilityLabel={exerciseCopy.search}
-          label={exerciseCopy.search}
-          onChangeText={(search) => updateSelection({ search })}
-          placeholder="مثلاً پرس سینه"
-          returnKeyType="search"
-          value={selection.search}
-        />
-      <View style={styles.filterCard}>
+      <TextField
+        accessibilityLabel={exerciseCopy.search}
+        label={exerciseCopy.search}
+        onChangeText={(search) => updateSelection({ search })}
+        placeholder={exerciseCopy.searchPlaceholder}
+        returnKeyType="search"
+        value={selection.search}
+      />
 
-        <ChoiceRow>
-          <ChoiceChip label="همه حرکات" selected={activeFilterCount === 0} onPress={clearFilters} />
-          <ChoiceChip
+      <View style={styles.discoveryPanel}>
+        <View style={styles.quickFilterRow}>
+          <QuickFilterChip
+            label={exerciseCopy.allExercises}
+            selected={showAll}
+            onPress={showAllExercises}
+          />
+          <QuickFilterChip
             label={exerciseCopy.fullBody}
             selected={selection.label === "full_body"}
             onPress={() => chooseSpecialFilter({ exerciseType: null, label: "full_body" })}
           />
-          <ChoiceChip
+          <QuickFilterChip
             label={exerciseCopy.labels.cardio}
             selected={selection.label === "cardio"}
             onPress={() => chooseSpecialFilter({ exerciseType: null, label: "cardio" })}
           />
-          <ChoiceChip
+          <QuickFilterChip
             label={exerciseCopy.mobility}
             selected={selection.exerciseType === "mobility"}
             onPress={() => chooseSpecialFilter({ exerciseType: "mobility", label: null })}
           />
-        </ChoiceRow>
-      </View>
+        </View>
 
-      <View style={styles.filterCard}>
+        {categoriesState.status === "loading" && <Skeleton height={96} />}
+        {categoriesState.status === "error" && (
+          <Notice
+            actionLabel={exerciseCopy.retry}
+            message={exerciseCopy.categoriesError}
+            onAction={() => void categoriesQuery.refetch()}
+            variant="danger"
+          />
+        )}
+        {categoriesState.status === "offline" && categories === undefined && (
+          <Notice message="برای دریافت دسته‌بندی‌ها به اینترنت وصل شو." variant="offline" />
+        )}
 
-        <ChoiceRow>
-          <ChoiceChip
-            label={exerciseCopy.contentTypes.exercise}
-            selected={selection.contentType === "exercise"}
-            onPress={() => updateSelection({ contentType: "exercise", muscleFocus: null })}
+        {categories !== undefined ? (
+          <>
+            <DiscoveryStage
+              stage="01"
+              title={exerciseCopy.bodyRegion}
+              description={exerciseCopy.bodyRegionIntro}
+            >
+              <View style={styles.regionOptionRow}>
+                {categories.body_regions.map((category) => (
+                  <RegionOption
+                    key={category.value}
+                    category={category}
+                    selected={selection.bodyRegion === category.value}
+                    onPress={() => chooseBodyRegion(category.value)}
+                  />
+                ))}
+              </View>
+            </DiscoveryStage>
+
+            {selection.bodyRegion !== null ? (
+              <DiscoveryStage
+                stage="02"
+                title={exerciseCopy.muscle}
+                description={exerciseCopy.muscleIntro}
+              >
+                <View style={styles.wrappedOptionRow}>
+                  {availableMuscles.map((category) => (
+                    <MuscleOption
+                      key={category.value}
+                      category={category}
+                      selected={selection.primaryMuscle === category.value}
+                      onPress={() => chooseMuscle(category.value)}
+                    />
+                  ))}
+                </View>
+              </DiscoveryStage>
+            ) : null}
+
+            {selection.primaryMuscle !== null ? (
+              <DiscoveryStage
+                stage="03"
+                title={exerciseCopy.focus}
+                description={exerciseCopy.focusIntro}
+              >
+                <ContentTypeSwitcher
+                  value={selection.contentType}
+                  onChange={(contentType) => updateSelection({ contentType, muscleFocus: null })}
+                />
+                {selection.contentType === "exercise" ? (
+                  <View style={styles.wrappedOptionRow}>
+                    <FocusOption
+                      label={exerciseCopy.allMuscleFocuses}
+                      selected={selection.muscleFocus === null}
+                      onPress={() => updateSelection({ muscleFocus: null })}
+                    />
+                    {availableFocuses.map((category) => (
+                      <FocusOption
+                        key={category.value}
+                        category={category}
+                        selected={selection.muscleFocus === category.value}
+                        onPress={() => updateSelection({ muscleFocus: category.value })}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </DiscoveryStage>
+            ) : null}
+          </>
+        ) : null}
+
+        <View style={styles.discoveryPanelFooter}>
+          <Button
+            hitSlop={fiticianTokens.spacing[1]}
+            label={advancedFilterCount > 0
+              ? `${exerciseCopy.moreFilters} · ${formatExerciseCount(advancedFilterCount)}`
+              : exerciseCopy.moreFilters}
+            onPress={() => setFiltersOpen(true)}
+            style={styles.moreFiltersButton}
+            variant="ghost"
           />
-          <ChoiceChip
-            label={exerciseCopy.contentTypes.guide}
-            selected={selection.contentType === "guide"}
-            onPress={() => updateSelection({ contentType: "guide", muscleFocus: null })}
-          />
-        </ChoiceRow>
+        </View>
       </View>
 
       {activeFilters.length > 0 ? (
@@ -313,87 +404,30 @@ export function ExerciseCatalogScreen() {
         </View>
       ) : null}
 
-      <Text accessibilityRole="header" style={styles.resultsTitle}>نتایج حرکات</Text>
-      <ExerciseResults
-        page={exercisePage}
-        state={exercisesState}
-        onOpen={openExercise}
-        onPageChange={setPage}
-        onRetry={() => void exercisesQuery.refetch()}
-      />
-      <Sheet
-        onClose={() => setFiltersOpen(false)}
-        title="فیلترهای پیشرفته"
-        visible={filtersOpen}
-      >
-      {categoriesState.status === "loading" && <Skeleton height={96} />}
-      {categoriesState.status === "error" && (
-        <Notice
-          actionLabel={exerciseCopy.retry}
-          message={exerciseCopy.categoriesError}
-          onAction={() => void categoriesQuery.refetch()}
-          variant="danger"
+      {canLoadExercises ? (
+        <>
+          <Text accessibilityRole="header" style={styles.resultsTitle}>{exerciseCopy.resultsTitle}</Text>
+          <ExerciseResults
+            page={exercisePage}
+            state={exercisesState}
+            onOpen={openExercise}
+            onPageChange={setPage}
+            onRetry={() => void exercisesQuery.refetch()}
+          />
+        </>
+      ) : (
+        <DiscoveryPrompt
+          message={selection.bodyRegion === null
+            ? exerciseCopy.selectRegionPrompt
+            : exerciseCopy.selectMusclePrompt}
         />
       )}
-      {categoriesState.status === "offline" && categories === undefined && (
-        <Notice message="برای دریافت دسته‌بندی‌ها به اینترنت وصل شو." variant="offline" />
-      )}
 
-      {categories !== undefined ? (
-        <>
-          <FilterStage title={exerciseCopy.bodyRegion} description={exerciseCopy.bodyRegionIntro}>
-            <ChoiceRow>
-              {categories.body_regions.map((category) => (
-                <ChoiceChip
-                  key={category.value}
-                  label={category.name_fa}
-                  secondaryLabel={category.name_en}
-                  selected={selection.bodyRegion === category.value}
-                  onPress={() => chooseBodyRegion(category.value)}
-                />
-              ))}
-            </ChoiceRow>
-          </FilterStage>
-
-          {selection.bodyRegion !== null ? (
-            <FilterStage title={exerciseCopy.muscle} description={exerciseCopy.muscleIntro}>
-              <ChoiceRow>
-                {availableMuscles.map((category) => (
-                  <ChoiceChip
-                    key={category.value}
-                    label={category.name_fa}
-                    secondaryLabel={category.name_en}
-                    selected={selection.primaryMuscle === category.value}
-                    onPress={() => chooseMuscle(category.value)}
-                  />
-                ))}
-              </ChoiceRow>
-            </FilterStage>
-          ) : null}
-
-          {selection.primaryMuscle !== null && selection.contentType === "exercise" ? (
-            <FilterStage title={exerciseCopy.focus}>
-              <ChoiceRow>
-                <ChoiceChip
-                  label="همه تمرکزها"
-                  selected={selection.muscleFocus === null}
-                  onPress={() => updateSelection({ muscleFocus: null })}
-                />
-                {availableFocuses.map((category) => (
-                  <ChoiceChip
-                    key={category.value}
-                    label={category.name_fa}
-                    secondaryLabel={category.name_en}
-                    selected={selection.muscleFocus === category.value}
-                    onPress={() => updateSelection({ muscleFocus: category.value })}
-                  />
-                ))}
-              </ChoiceRow>
-            </FilterStage>
-          ) : null}
-        </>
-      ) : null}
-
+      <Sheet
+        onClose={() => setFiltersOpen(false)}
+        title={exerciseCopy.advancedFilters}
+        visible={filtersOpen}
+      >
         <Text style={styles.filterLabel}>{exerciseCopy.equipment}</Text>
         <ChoiceRow>
           <ChoiceChip
@@ -577,34 +611,209 @@ function ExerciseCard({
   );
 }
 
-function FilterStage({
+function DiscoveryStage({
   children,
   description,
+  stage,
   title,
 }: {
   readonly children: React.ReactNode;
   readonly description?: string;
+  readonly stage: string;
   readonly title: string;
 }) {
   return (
-    <View style={styles.stage}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {description ? <Text style={styles.stageDescription}>{description}</Text> : null}
+    <View style={styles.discoveryStage}>
+      <View style={styles.discoveryStageHeading}>
+        <View style={styles.stageNumber}>
+          <Text style={styles.stageNumberText}>{stage}</Text>
+        </View>
+        <View style={styles.stageCopy}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          {description ? <Text style={styles.stageDescription}>{description}</Text> : null}
+        </View>
+      </View>
       {children}
     </View>
   );
 }
 
-function ChoiceRow({ children }: { readonly children: React.ReactNode }) {
+function DiscoveryPrompt({ message }: { readonly message: string }) {
   return (
-    <ScrollView
-      contentContainerStyle={styles.choiceRow}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-    >
-      {children}
-    </ScrollView>
+    <View style={styles.discoveryPrompt}>
+      <Text style={styles.discoveryPromptText}>{message}</Text>
+    </View>
   );
+}
+
+function QuickFilterChip({
+  label,
+  onPress,
+  selected,
+}: {
+  readonly label: string;
+  readonly onPress: () => void;
+  readonly selected: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      hitSlop={{ bottom: 6, left: 4, right: 4, top: 6 }}
+      onPress={onPress}
+      style={({ pressed }: PressableStateCallbackType) => [
+        styles.quickFilterChip,
+        selected && styles.quickFilterChipSelected,
+        pressed && styles.quickFilterChipPressed,
+      ]}
+    >
+      <Text style={[styles.quickFilterLabel, selected && styles.quickFilterLabelSelected]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function RegionOption({
+  category,
+  onPress,
+  selected,
+}: {
+  readonly category: { name_en: string; name_fa: string };
+  readonly onPress: () => void;
+  readonly selected: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={category.name_fa}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }: PressableStateCallbackType) => [
+        styles.regionOption,
+        selected && styles.regionOptionSelected,
+        pressed && styles.categoryOptionPressed,
+      ]}
+    >
+      <Text style={[styles.regionOptionLabel, selected && styles.regionOptionLabelSelected]}>
+        {category.name_fa}
+      </Text>
+      <Text style={[styles.regionOptionSecondary, selected && styles.regionOptionSecondarySelected]}>
+        {category.name_en}
+      </Text>
+    </Pressable>
+  );
+}
+
+function MuscleOption({
+  category,
+  onPress,
+  selected,
+}: {
+  readonly category: { name_en: string; name_fa: string };
+  readonly onPress: () => void;
+  readonly selected: boolean;
+}) {
+  return <CategoryOption category={category} kind="muscle" onPress={onPress} selected={selected} />;
+}
+
+function FocusOption({
+  category,
+  label,
+  onPress,
+  selected,
+}: {
+  readonly category?: { name_en: string; name_fa: string };
+  readonly label?: string;
+  readonly onPress: () => void;
+  readonly selected: boolean;
+}) {
+  const option = category ?? { name_en: "", name_fa: label ?? "" };
+  return <CategoryOption category={option} kind="focus" onPress={onPress} selected={selected} />;
+}
+
+function CategoryOption({
+  category,
+  kind,
+  onPress,
+  selected,
+}: {
+  readonly category: { name_en: string; name_fa: string };
+  readonly kind: "focus" | "muscle";
+  readonly onPress: () => void;
+  readonly selected: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={category.name_fa}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }: PressableStateCallbackType) => [
+        styles.categoryOption,
+        kind === "focus" && styles.focusOption,
+        selected && styles.categoryOptionSelected,
+        pressed && styles.categoryOptionPressed,
+      ]}
+    >
+      <Text style={[styles.categoryOptionLabel, selected && styles.categoryOptionLabelSelected]}>
+        {category.name_fa}
+      </Text>
+      {category.name_en ? (
+        <Text style={[styles.categoryOptionSecondary, selected && styles.categoryOptionSecondarySelected]}>
+          {category.name_en}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function ContentTypeSwitcher({
+  onChange,
+  value,
+}: {
+  readonly onChange: (value: ExerciseContentType) => void;
+  readonly value: ExerciseContentType;
+}) {
+  return (
+    <View style={styles.contentSwitcher}>
+      <Pressable
+        accessibilityLabel={exerciseCopy.contentTypes.exercise}
+        accessibilityRole="button"
+        accessibilityState={{ selected: value === "exercise" }}
+        hitSlop={fiticianTokens.spacing[1]}
+        onPress={() => onChange("exercise")}
+        style={({ pressed }: PressableStateCallbackType) => [
+          styles.contentSwitcherOption,
+          value === "exercise" && styles.contentSwitcherOptionSelected,
+          pressed && styles.categoryOptionPressed,
+        ]}
+      >
+        <Text style={[styles.contentSwitcherLabel, value === "exercise" && styles.contentSwitcherLabelSelected]}>
+          {exerciseCopy.contentTypes.exercise}
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityLabel={exerciseCopy.contentTypes.guide}
+        accessibilityRole="button"
+        accessibilityState={{ selected: value === "guide" }}
+        hitSlop={fiticianTokens.spacing[1]}
+        onPress={() => onChange("guide")}
+        style={({ pressed }: PressableStateCallbackType) => [
+          styles.contentSwitcherOption,
+          value === "guide" && styles.contentSwitcherOptionSelected,
+          pressed && styles.categoryOptionPressed,
+        ]}
+      >
+        <Text style={[styles.contentSwitcherLabel, value === "guide" && styles.contentSwitcherLabelSelected]}>
+          {exerciseCopy.contentTypes.guide}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ChoiceRow({ children }: { readonly children: React.ReactNode }) {
+  return <View style={styles.choiceRow}>{children}</View>;
 }
 
 function ChoiceChip({
@@ -622,6 +831,7 @@ function ChoiceChip({
 }) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
@@ -683,11 +893,8 @@ function getActiveFilters(
   if (selection.difficulty !== null) {
     active.push({ key: "difficulty", label: `سختی: ${exerciseCopy.difficulties[selection.difficulty]}` });
   }
-  if (selection.exerciseType !== null) {
+  if (selection.exerciseType !== null && selection.exerciseType !== "mobility") {
     active.push({ key: "exerciseType", label: `نوع حرکت: ${exerciseCopy.exerciseTypes[selection.exerciseType]}` });
-  }
-  if (selection.label !== null) {
-    active.push({ key: "label", label: `برچسب: ${exerciseCopy.labels[selection.label]}` });
   }
   return active;
 }
@@ -732,6 +939,49 @@ const exerciseTypeOptions: readonly ExerciseType[] = [
 ];
 
 const styles = StyleSheet.create({
+  categoryOption: {
+    alignItems: "flex-end",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    flexBasis: "46%",
+    flexGrow: 1,
+    flexShrink: 1,
+    justifyContent: "center",
+    minHeight: 56,
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  categoryOptionLabel: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  categoryOptionLabelSelected: {
+    color: fiticianTokens.colors.canvas,
+  },
+  categoryOptionPressed: {
+    opacity: 0.82,
+  },
+  categoryOptionSecondary: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "ltr",
+  },
+  categoryOptionSecondarySelected: {
+    color: fiticianTokens.colors.petrol,
+  },
+  categoryOptionSelected: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderColor: fiticianTokens.colors.aqua,
+  },
   activeFilterChip: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceRaised,
@@ -797,7 +1047,6 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
     justifyContent: "center",
-    marginEnd: fiticianTokens.spacing[2],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     minWidth: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[3],
@@ -829,6 +1078,8 @@ const styles = StyleSheet.create({
   },
   choiceRow: {
     flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[2],
   },
   contentBadge: {
@@ -860,14 +1111,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "ltr",
   },
-  filterCard: {
-    gap: fiticianTokens.spacing[3],
-    marginBottom: fiticianTokens.spacing[4],
-  },
-  filterButton: {
-    minHeight: 42,
-    paddingHorizontal: fiticianTokens.spacing[3],
-  },
   filterLabel: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -888,6 +1131,169 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  contentSwitcher: {
+    alignSelf: "stretch",
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[1],
+    padding: fiticianTokens.spacing[1],
+  },
+  contentSwitcherLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  contentSwitcherLabelSelected: {
+    color: fiticianTokens.colors.canvas,
+  },
+  contentSwitcherOption: {
+    alignItems: "center",
+    borderRadius: fiticianTokens.radii.pill,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 40,
+    paddingHorizontal: fiticianTokens.spacing[2],
+  },
+  contentSwitcherOptionSelected: {
+    backgroundColor: fiticianTokens.colors.aqua,
+  },
+  discoveryPanel: {
+    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.extraLarge,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.soft.elevation,
+    gap: fiticianTokens.spacing[4],
+    padding: fiticianTokens.spacing[4],
+    shadowColor: fiticianTokens.shadows.soft.color,
+    shadowOffset: fiticianTokens.shadows.soft.offset,
+    shadowOpacity: fiticianTokens.shadows.soft.opacity,
+    shadowRadius: fiticianTokens.shadows.soft.radius,
+  },
+  discoveryPanelFooter: {
+    alignItems: "flex-end",
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+    paddingTop: fiticianTokens.spacing[3],
+  },
+  discoveryPrompt: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    paddingHorizontal: fiticianTokens.spacing[4],
+    paddingVertical: fiticianTokens.spacing[3],
+  },
+  discoveryPromptText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    lineHeight: 23,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  discoveryStage: {
+    gap: fiticianTokens.spacing[3],
+  },
+  discoveryStageHeading: {
+    alignItems: "flex-start",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+  },
+  focusOption: {
+    minHeight: 48,
+  },
+  moreFiltersButton: {
+    minHeight: 40,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  quickFilterChip: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+  },
+  quickFilterChipPressed: {
+    opacity: 0.82,
+  },
+  quickFilterChipSelected: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  quickFilterLabel: {
+    color: fiticianTokens.colors.mist,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.medium,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  quickFilterLabelSelected: {
+    color: fiticianTokens.colors.canvas,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+  },
+  quickFilterRow: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+  },
+  regionOption: {
+    alignItems: "flex-end",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    justifyContent: "center",
+    minHeight: 70,
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  regionOptionLabel: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  regionOptionLabelSelected: {
+    color: fiticianTokens.colors.canvas,
+  },
+  regionOptionRow: {
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+  },
+  regionOptionSecondary: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "ltr",
+  },
+  regionOptionSecondarySelected: {
+    color: fiticianTokens.colors.petrol,
+  },
+  regionOptionSelected: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderColor: fiticianTokens.colors.aqua,
   },
   mediaDifficulty: {
     backgroundColor: "rgba(2,6,7,0.74)",
@@ -959,6 +1365,28 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  stageCopy: {
+    alignItems: "flex-end",
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+  },
+  stageNumber: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.aquaAtmosphere,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  stageNumberText: {
+    color: fiticianTokens.colors.amber,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    writingDirection: "ltr",
+  },
   screen: {
     gap: fiticianTokens.spacing[3],
     paddingBottom: fiticianTokens.spacing[7],
@@ -968,10 +1396,6 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
     marginTop: fiticianTokens.spacing[2],
   },
-  stage: {
-    gap: fiticianTokens.spacing[2],
-    marginBottom: fiticianTokens.spacing[4],
-  },
   stageDescription: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -979,5 +1403,10 @@ const styles = StyleSheet.create({
     lineHeight: 23,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  wrappedOptionRow: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
   },
 });

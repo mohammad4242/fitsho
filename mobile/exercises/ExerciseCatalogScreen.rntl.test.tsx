@@ -276,11 +276,13 @@ test("primary selectors are not duplicated inside the advanced Sheet", () => {
 
   fireEvent.press(screen.getByRole("button", { name: "بالاتنه" }));
   fireEvent.press(screen.getByRole("button", { name: "سینه" }));
+  expect(screen.queryAllByRole("button", { name: /^بالاتنه$/ })).toHaveLength(1);
+
   fireEvent.press(screen.getByRole("button", { name: "فیلترهای بیشتر" }));
 
-  expect(screen.queryAllByRole("button", { name: "بالاتنه" })).toHaveLength(1);
-  expect(screen.queryAllByRole("button", { name: "سینه" })).toHaveLength(1);
-  expect(screen.queryAllByText("تمرکز عضلانی")).toHaveLength(1);
+  expect(screen.getByText("فیلترهای پیشرفته")).toBeTruthy();
+  expect(screen.queryByText("ناحیه بدن")).toBeNull();
+  expect(screen.queryByText("عضله هدف")).toBeNull();
 });
 
 test("clear filters returns to guided discovery instead of all exercises", () => {
@@ -290,6 +292,7 @@ test("clear filters returns to guided discovery instead of all exercises", () =>
   fireEvent.press(screen.getByRole("button", { name: "سینه" }));
   fireEvent.press(screen.getByRole("button", { name: "فیلترهای بیشتر" }));
   fireEvent.press(screen.getByRole("button", { name: "پاک کردن فیلترها" }));
+  fireEvent.press(screen.getAllByRole("button", { name: "Close" })[1]);
 
   expect(screen.getByText("برای شروع، بالاتنه، پایین‌تنه یا میان‌تنه را انتخاب کن.")).toBeTruthy();
   expect(screen.queryByText("نتایج حرکات")).toBeNull();
