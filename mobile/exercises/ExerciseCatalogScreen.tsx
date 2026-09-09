@@ -62,6 +62,22 @@ type CatalogSelection = {
   readonly search: string;
 };
 
+type ActiveFilterKey =
+  | "bodyRegion"
+  | "contentType"
+  | "difficulty"
+  | "equipment"
+  | "exerciseType"
+  | "label"
+  | "muscleFocus"
+  | "primaryMuscle"
+  | "search";
+
+type ActiveFilter = {
+  readonly key: ActiveFilterKey;
+  readonly label: string;
+};
+
 const initialSelection: CatalogSelection = {
   bodyRegion: null,
   contentType: "exercise",
@@ -107,12 +123,7 @@ export function ExerciseCatalogScreen() {
     queryFn: api.getCategories,
     queryKey: exerciseKeys.categories(),
   });
-  const canLoadExercises =
-    selection.primaryMuscle !== null ||
-    selection.label !== null ||
-    selection.exerciseType !== null;
   const exercisesQuery = useQuery({
-    enabled: canLoadExercises,
     queryFn: () => api.list(filters),
     queryKey: exerciseKeys.list(filters),
   });
@@ -129,12 +140,11 @@ export function ExerciseCatalogScreen() {
   const availableFocuses = categories === undefined || selection.primaryMuscle === null
     ? []
     : categories.muscle_focuses[selection.primaryMuscle] ?? [];
-  const activeFilterCount = [
-    selection.search.trim(),
-    selection.equipment,
-    selection.difficulty,
-    selection.exerciseType,
-  ].filter((value) => value !== null && value !== "").length;
+  const activeFilters = useMemo(
+    () => getActiveFilters(selection, categories),
+    [categories, selection],
+  );
+  const activeFilterCount = activeFilters.length;
 
   useEffect(() => {
     if (
@@ -180,6 +190,42 @@ export function ExerciseCatalogScreen() {
     setPage(1);
   }
 
+  function removeFilter(key: ActiveFilterKey) {
+    if (key === "bodyRegion") {
+      updateSelection({ bodyRegion: null, muscleFocus: null, primaryMuscle: null });
+      return;
+    }
+    if (key === "primaryMuscle") {
+      updateSelection({ muscleFocus: null, primaryMuscle: null });
+      return;
+    }
+    if (key === "contentType") {
+      updateSelection({ contentType: "exercise" });
+      return;
+    }
+    if (key === "search") {
+      updateSelection({ search: "" });
+      return;
+    }
+    if (key === "difficulty") {
+      updateSelection({ difficulty: null });
+      return;
+    }
+    if (key === "equipment") {
+      updateSelection({ equipment: null });
+      return;
+    }
+    if (key === "exerciseType") {
+      updateSelection({ exerciseType: null });
+      return;
+    }
+    if (key === "label") {
+      updateSelection({ label: null });
+      return;
+    }
+    updateSelection({ muscleFocus: null });
+  }
+
   function openExercise(exercise: ExerciseSummary) {
     router.push({ pathname: "/member/exercises/[slug]", params: { slug: exercise.slug } });
   }
@@ -202,9 +248,18 @@ export function ExerciseCatalogScreen() {
         title={exerciseCopy.library}
       />
 
-      <Card style={styles.filterCard}>
-        <Text style={styles.sectionTitle}>{exerciseCopy.specialFilters}</Text>
+        <TextField
+          accessibilityLabel={exerciseCopy.search}
+          label={exerciseCopy.search}
+          onChangeText={(search) => updateSelection({ search })}
+          placeholder="مثلاً پرس سینه"
+          returnKeyType="search"
+          value={selection.search}
+        />
+      <View style={styles.filterCard}>
+
         <ChoiceRow>
+          <ChoiceChip label="همه حرکات" selected={activeFilterCount === 0} onPress={clearFilters} />
           <ChoiceChip
             label={exerciseCopy.fullBody}
             selected={selection.label === "full_body"}
@@ -221,10 +276,10 @@ export function ExerciseCatalogScreen() {
             onPress={() => chooseSpecialFilter({ exerciseType: "mobility", label: null })}
           />
         </ChoiceRow>
-      </Card>
+      </View>
 
-      <Card style={styles.filterCard}>
-        <Text style={styles.sectionTitle}>{exerciseCopy.contentType}</Text>
+      <View style={styles.filterCard}>
+
         <ChoiceRow>
           <ChoiceChip
             label={exerciseCopy.contentTypes.exercise}
@@ -237,8 +292,40 @@ export function ExerciseCatalogScreen() {
             onPress={() => updateSelection({ contentType: "guide", muscleFocus: null })}
           />
         </ChoiceRow>
-      </Card>
+      </View>
 
+      {activeFilters.length > 0 ? (
+        <View style={styles.activeFilters}>
+          <Text accessibilityRole="header" style={styles.filterLabel}>فیلترهای فعال</Text>
+          <ScrollView
+            contentContainerStyle={styles.activeFilterRow}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {activeFilters.map((filter) => (
+              <ActiveFilterChip
+                key={filter.key}
+                label={filter.label}
+                onRemove={() => removeFilter(filter.key)}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
+
+      <Text accessibilityRole="header" style={styles.resultsTitle}>نتایج حرکات</Text>
+      <ExerciseResults
+        page={exercisePage}
+        state={exercisesState}
+        onOpen={openExercise}
+        onPageChange={setPage}
+        onRetry={() => void exercisesQuery.refetch()}
+      />
+      <Sheet
+        onClose={() => setFiltersOpen(false)}
+        title="فیلترهای پیشرفته"
+        visible={filtersOpen}
+      >
       {categoriesState.status === "loading" && <Skeleton height={96} />}
       {categoriesState.status === "error" && (
         <Notice
@@ -307,28 +394,6 @@ export function ExerciseCatalogScreen() {
         </>
       ) : null}
 
-      <Text accessibilityRole="header" style={styles.resultsTitle}>نتایج حرکات</Text>
-      <ExerciseResults
-        canLoad={canLoadExercises}
-        page={exercisePage}
-        state={exercisesState}
-        onOpen={openExercise}
-        onPageChange={setPage}
-        onRetry={() => void exercisesQuery.refetch()}
-      />
-      <Sheet
-        onClose={() => setFiltersOpen(false)}
-        title="فیلترهای پیشرفته"
-        visible={filtersOpen}
-      >
-        <TextField
-          accessibilityLabel={exerciseCopy.search}
-          label={exerciseCopy.search}
-          onChangeText={(search) => updateSelection({ search })}
-          placeholder="مثلاً پرس سینه"
-          returnKeyType="search"
-          value={selection.search}
-        />
         <Text style={styles.filterLabel}>{exerciseCopy.equipment}</Text>
         <ChoiceRow>
           <ChoiceChip
@@ -387,23 +452,18 @@ export function ExerciseCatalogScreen() {
 }
 
 function ExerciseResults({
-  canLoad,
   onOpen,
   onPageChange,
   onRetry,
   page,
   state,
 }: {
-  readonly canLoad: boolean;
   readonly onOpen: (exercise: ExerciseSummary) => void;
   readonly onPageChange: (page: number) => void;
   readonly onRetry: () => void;
   readonly page: PaginatedExercises | undefined;
   readonly state: MobileViewState<PaginatedExercises>;
 }) {
-  if (!canLoad) {
-    return <Notice message={exerciseCopy.noSelection} variant="info" />;
-  }
   if (state.status === "loading") {
     return (
       <View style={styles.results}>
@@ -578,6 +638,60 @@ function ChoiceChip({
   );
 }
 
+function ActiveFilterChip({ label, onRemove }: { readonly label: string; readonly onRemove: () => void }) {
+  return (
+    <View style={styles.activeFilterChip}>
+      <Text style={styles.activeFilterText}>{label}</Text>
+      <Pressable
+        accessibilityLabel={`حذف فیلتر: ${label}`}
+        accessibilityRole="button"
+        hitSlop={fiticianTokens.spacing[2]}
+        onPress={onRemove}
+        style={styles.removeFilterButton}
+      >
+        <Text accessible={false} style={styles.removeFilterGlyph}>×</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function getActiveFilters(
+  selection: CatalogSelection,
+  categories: ExerciseCategories | undefined,
+): ActiveFilter[] {
+  const active: ActiveFilter[] = [];
+  const search = selection.search.trim();
+  if (search) active.push({ key: "search", label: `جست‌وجو: ${search}` });
+  if (selection.contentType !== "exercise") {
+    active.push({ key: "contentType", label: `نوع محتوا: ${exerciseCopy.contentTypes[selection.contentType]}` });
+  }
+  if (selection.bodyRegion !== null) {
+    active.push({
+      key: "bodyRegion",
+      label: `ناحیه بدن: ${categories?.body_regions.find((item) => item.value === selection.bodyRegion)?.name_fa ?? exerciseCopy.bodyRegions[selection.bodyRegion]}`,
+    });
+  }
+  if (selection.primaryMuscle !== null) {
+    active.push({ key: "primaryMuscle", label: `عضله: ${exerciseCopy.muscles[selection.primaryMuscle]}` });
+  }
+  if (selection.muscleFocus !== null) {
+    active.push({ key: "muscleFocus", label: `تمرکز: ${exerciseCopy.muscleFocuses[selection.muscleFocus]}` });
+  }
+  if (selection.equipment !== null) {
+    active.push({ key: "equipment", label: `تجهیزات: ${exerciseCopy.equipments[selection.equipment]}` });
+  }
+  if (selection.difficulty !== null) {
+    active.push({ key: "difficulty", label: `سختی: ${exerciseCopy.difficulties[selection.difficulty]}` });
+  }
+  if (selection.exerciseType !== null) {
+    active.push({ key: "exerciseType", label: `نوع حرکت: ${exerciseCopy.exerciseTypes[selection.exerciseType]}` });
+  }
+  if (selection.label !== null) {
+    active.push({ key: "label", label: `برچسب: ${exerciseCopy.labels[selection.label]}` });
+  }
+  return active;
+}
+
 function musclesForRegion(categories: ExerciseCategories, region: BodyRegion) {
   if (region === "upper_body") return categories.upper_body;
   if (region === "lower_body") return categories.lower_body;
@@ -618,6 +732,33 @@ const exerciseTypeOptions: readonly ExerciseType[] = [
 ];
 
 const styles = StyleSheet.create({
+  activeFilterChip: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    borderColor: fiticianTokens.colors.aqua,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[1],
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingStart: fiticianTokens.spacing[3],
+    paddingEnd: fiticianTokens.spacing[2],
+  },
+  activeFilterRow: {
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+  },
+  activeFilters: {
+    gap: fiticianTokens.spacing[1],
+  },
+  activeFilterText: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   cardCopy: {
     flex: 1,
     gap: fiticianTokens.spacing[1],
@@ -777,6 +918,18 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
     justifyContent: "space-between",
     marginTop: fiticianTokens.spacing[2],
+  },
+  removeFilterButton: {
+    alignItems: "center",
+    height: fiticianTokens.layout.minimumTouchTarget,
+    justifyContent: "center",
+    width: fiticianTokens.layout.minimumTouchTarget,
+  },
+  removeFilterGlyph: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 24,
   },
   resultCount: {
     color: fiticianTokens.colors.muted,
