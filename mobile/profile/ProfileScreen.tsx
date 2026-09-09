@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -34,8 +34,6 @@ import {
   FormField,
   Notice,
   PageHeading,
-  SectionHeader,
-  SegmentedControl,
   TextField,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
@@ -72,8 +70,6 @@ type ProfileFieldErrors = Record<string, string>;
 const sexOptions = [
   { label: "زن", value: "female" },
   { label: "مرد", value: "male" },
-  { label: "سایر", value: "other" },
-  { label: "ترجیح می‌دهم نگویم", value: "prefer_not_to_say" },
 ] as const;
 
 const goalOptions = [
@@ -81,7 +77,7 @@ const goalOptions = [
   { label: "افزایش وزن", value: "gain_weight" },
   { label: "چربی‌سوزی", value: "fat_loss" },
   { label: "عضله‌سازی", value: "build_muscle" },
-  { label: "بازترکیب بدنی", value: "body_recomposition" },
+  { label: "ریکامپ", value: "body_recomposition" },
   { label: "افزایش قدرت", value: "strength" },
 ] as const;
 
@@ -411,11 +407,7 @@ export function ProfileScreen() {
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <PageHeading
-        eyebrow="تنظیمات شخصی"
-        supportingText="اطلاعاتت را به‌روز نگه دار تا مسیر تمرین با شرایط فعلی تو هماهنگ بماند."
-        title="پروفایل ورزشی"
-      />
+      <PageHeading title="پروفایل ورزشی" />
 
       <ProfileOverviewCard
         email={auth.user?.email ?? null}
@@ -448,18 +440,16 @@ export function ProfileScreen() {
       {error !== null ? <Notice message={error} variant="danger" /> : null}
       {saveMessage !== null ? <Notice message={saveMessage} variant="success" /> : null}
 
-      <SegmentedControl
+      <ProfileSectionProgress
         accessibilityLabel="بخش ویرایش پروفایل"
         disabled={busy}
         onChange={(value) => {
-          if (!isProfileSection(value)) return;
           setSection(value);
           setFieldErrors({});
           setSaveMessage(null);
         }}
-        options={sections.map((item) => ({ label: sectionLabel(item), value: item }))}
-        selectedValue={section}
-        testID="profile-section-tabs"
+        sections={sections}
+        selectedSection={section}
       />
 
       {section === "personal" ? (
@@ -492,6 +482,93 @@ export function ProfileScreen() {
   );
 }
 
+function ProfileSectionProgress({
+  accessibilityLabel,
+  disabled,
+  onChange,
+  sections,
+  selectedSection,
+}: {
+  readonly accessibilityLabel: string;
+  readonly disabled: boolean;
+  readonly onChange: (section: ProfileSection) => void;
+  readonly sections: readonly ProfileSection[];
+  readonly selectedSection: ProfileSection;
+}) {
+  const currentIndex = Math.max(0, sections.indexOf(selectedSection));
+
+  return (
+    <View
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="radiogroup"
+      style={styles.profileProgress}
+      testID="profile-section-tabs"
+    >
+      <Text style={styles.profileProgressCount}>
+        مرحله {formatProfileNumber(currentIndex + 1)} از {formatProfileNumber(sections.length)}
+      </Text>
+      <View style={styles.progressSteps}>
+        {sections.length > 1 ? <View pointerEvents="none" style={styles.progressLine} /> : null}
+        {sections.map((item, index) => {
+          const isActive = index <= currentIndex;
+          const isCurrent = index === currentIndex;
+          return (
+            <Pressable
+              accessible
+              accessibilityLabel={sectionLabel(item)}
+              accessibilityRole="radio"
+              accessibilityState={{ disabled, selected: isCurrent }}
+              disabled={disabled}
+              key={item}
+              onPress={() => {
+                if (!disabled && !isCurrent) onChange(item);
+              }}
+              style={[
+                styles.progressStep,
+                isActive && styles.progressStepActive,
+                isCurrent && styles.progressStepCurrent,
+              ]}
+            >
+              <View style={[styles.progressBadge, isActive && styles.progressBadgeActive, isCurrent && styles.progressBadgeCurrent]}>
+                <AppIcon
+                  color={isActive ? fiticianTokens.colors.canvas : fiticianTokens.colors.muted}
+                  name={sectionIcon(item)}
+                  size={18}
+                />
+              </View>
+              <Text style={[styles.progressStepLabel, isActive && styles.progressStepLabelActive]}>
+                {sectionLabel(item)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function ProfileFormGroup({
+  children,
+  icon,
+  title,
+}: {
+  readonly children: ReactNode;
+  readonly icon: "nutrition" | "profile" | "target" | "training";
+  readonly title: string;
+}) {
+  return (
+    <Card style={styles.formGroup} variant="default">
+      <View style={styles.formGroupHeader}>
+        <View style={styles.formGroupIcon}>
+          <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={18} />
+        </View>
+        <Text style={styles.formGroupTitle}>{title}</Text>
+      </View>
+      <View style={styles.formGroupFields}>{children}</View>
+    </Card>
+  );
+}
+
 function PersonalSection({
   errors,
   showCircumferences,
@@ -504,90 +581,107 @@ function PersonalSection({
   readonly onChange: (field: keyof ProfileFormValues, value: ProfileFormValues[keyof ProfileFormValues]) => void;
 }) {
   return (
-    <Card style={styles.formCard}>
-      <Text style={styles.sectionTitle}>اطلاعات شخصی و اندازه‌گیری‌ها</Text>
-      <TextField
-        autoComplete="name"
-        error={errors.display_name}
-        label="نام نمایشی"
-        onChangeText={(value) => onChange("display_name", value)}
-        value={values.display_name}
-      />
-      <TextField
-        error={errors.birth_date}
-        keyboardType="numbers-and-punctuation"
-        label="تاریخ تولد"
-        onChangeText={(value) => onChange("birth_date", value)}
-        placeholder="۱۳۷۰-۰۲-۲۲"
-        textDirection="ltr"
-        value={values.birth_date}
-      />
-      <ChoiceField
-        error={errors.sex}
-        label="جنسیت"
-        options={sexOptions}
-        selected={values.sex}
-        onSelect={(value) => onChange("sex", value as Sex)}
-      />
-      <View style={styles.twoColumns}>
+    <View style={styles.formGroups}>
+      <ProfileFormGroup icon="profile" title="مشخصات فردی">
         <TextField
-          error={errors.height_cm}
-          keyboardType="numeric"
-          label="قد (سانتی‌متر)"
-          onChangeText={(value) => onChange("height_cm", value)}
-          textDirection="ltr"
-          value={values.height_cm}
+          autoComplete="name"
+          error={errors.display_name}
+          label="نام نمایشی"
+          onChangeText={(value) => onChange("display_name", value)}
+          value={values.display_name}
         />
         <TextField
-          error={errors.current_weight_kg}
-          keyboardType="decimal-pad"
-          label="وزن (کیلوگرم)"
-          onChangeText={(value) => onChange("current_weight_kg", value)}
+          error={errors.birth_date}
+          keyboardType="numbers-and-punctuation"
+          label="تاریخ تولد"
+          onChangeText={(value) => onChange("birth_date", value)}
+          placeholder="۱۳۷۰-۰۲-۲۲"
           textDirection="ltr"
-          value={values.current_weight_kg}
+          value={values.birth_date}
         />
-      </View>
-      {showCircumferences ? (
-        <>
-          <Text style={styles.subheading}>اندازه‌های بدنی (اختیاری)</Text>
-          <View style={styles.twoColumns}>
+        <ChoiceField
+          error={errors.sex}
+          label="جنسیت"
+          options={sexOptions}
+          selected={values.sex}
+          onSelect={(value) => onChange("sex", value as Sex)}
+        />
+      </ProfileFormGroup>
+
+      <ProfileFormGroup icon="target" title="بدن و هدف">
+        <View style={styles.twoColumns}>
+          <View style={styles.column}>
             <TextField
-              error={errors.shoulder_circumference_cm}
-              keyboardType="decimal-pad"
-              label="سرشانه (سانتی‌متر)"
-              onChangeText={(value) => onChange("shoulder_circumference_cm", value)}
+              error={errors.height_cm}
+              keyboardType="numeric"
+              label="قد (سانتی‌متر)"
+              onChangeText={(value) => onChange("height_cm", value)}
               textDirection="ltr"
-              value={values.shoulder_circumference_cm}
-            />
-            <TextField
-              error={errors.waist_circumference_cm}
-              keyboardType="decimal-pad"
-              label="کمر (سانتی‌متر)"
-              onChangeText={(value) => onChange("waist_circumference_cm", value)}
-              textDirection="ltr"
-              value={values.waist_circumference_cm}
+              value={values.height_cm}
             />
           </View>
-          <TextField
-            error={errors.hip_circumference_cm}
-            keyboardType="decimal-pad"
-            label="باسن (سانتی‌متر)"
-            onChangeText={(value) => onChange("hip_circumference_cm", value)}
-            textDirection="ltr"
-            value={values.hip_circumference_cm}
-          />
-        </>
-      ) : (
-        <Text style={styles.mutedText}>اندازه دور بدن پس از ساخت پروفایل تمرینی در دسترس است.</Text>
-      )}
-      <ChoiceField
-        error={errors.fitness_goal}
-        label="هدف اصلی"
-        options={goalOptions}
-        selected={values.fitness_goal}
-        onSelect={(value) => onChange("fitness_goal", value as FitnessGoal)}
-      />
-    </Card>
+          <View style={styles.column}>
+            <TextField
+              error={errors.current_weight_kg}
+              keyboardType="decimal-pad"
+              label="وزن (کیلوگرم)"
+              onChangeText={(value) => onChange("current_weight_kg", value)}
+              textDirection="ltr"
+              value={values.current_weight_kg}
+            />
+          </View>
+        </View>
+        {showCircumferences ? (
+          <>
+            <View style={styles.measurementHeading}>
+              <Text style={styles.subheading}>اندازه‌های بدنی</Text>
+              <Text style={styles.optionalBadge}>اختیاری</Text>
+            </View>
+            <View style={styles.twoColumns}>
+              <View style={styles.column}>
+                <TextField
+                  error={errors.shoulder_circumference_cm}
+                  keyboardType="decimal-pad"
+                  label="دور شانه (سانتی‌متر)"
+                  onChangeText={(value) => onChange("shoulder_circumference_cm", value)}
+                  textDirection="ltr"
+                  value={values.shoulder_circumference_cm}
+                />
+              </View>
+              <View style={styles.column}>
+                <TextField
+                  error={errors.waist_circumference_cm}
+                  keyboardType="decimal-pad"
+                  label="دور کمر (سانتی‌متر)"
+                  onChangeText={(value) => onChange("waist_circumference_cm", value)}
+                  textDirection="ltr"
+                  value={values.waist_circumference_cm}
+                />
+              </View>
+            </View>
+            <View style={styles.singleColumn}>
+              <TextField
+                error={errors.hip_circumference_cm}
+                keyboardType="decimal-pad"
+                label="دور باسن (سانتی‌متر)"
+                onChangeText={(value) => onChange("hip_circumference_cm", value)}
+                textDirection="ltr"
+                value={values.hip_circumference_cm}
+              />
+            </View>
+          </>
+        ) : (
+          <Text style={styles.mutedText}>اندازه دور بدن پس از ساخت پروفایل تمرینی در دسترس است.</Text>
+        )}
+        <ChoiceField
+          error={errors.fitness_goal}
+          label="هدف اصلی"
+          options={goalOptions}
+          selected={values.fitness_goal}
+          onSelect={(value) => onChange("fitness_goal", value as FitnessGoal)}
+        />
+      </ProfileFormGroup>
+    </View>
   );
 }
 
@@ -601,8 +695,7 @@ function TrainingSection({
   readonly onChange: (field: keyof ProfileFormValues, value: ProfileFormValues[keyof ProfileFormValues]) => void;
 }) {
   return (
-    <Card style={styles.formCard}>
-      <Text style={styles.sectionTitle}>تنظیمات تمرین</Text>
+    <ProfileFormGroup icon="training" title="تنظیمات تمرین">
       <ChoiceField
         error={errors.experience_level}
         label="سطح تجربه"
@@ -611,22 +704,26 @@ function TrainingSection({
         onSelect={(value) => onChange("experience_level", value)}
       />
       <View style={styles.twoColumns}>
-        <TextField
-          error={errors.training_days_per_week}
-          keyboardType="numeric"
-          label="روز تمرین در هفته"
-          onChangeText={(value) => onChange("training_days_per_week", value)}
-          textDirection="ltr"
-          value={values.training_days_per_week}
-        />
-        <TextField
-          error={errors.training_age_months}
-          keyboardType="numeric"
-          label="سابقه تمرین (ماه)"
-          onChangeText={(value) => onChange("training_age_months", value)}
-          textDirection="ltr"
-          value={values.training_age_months}
-        />
+        <View style={styles.column}>
+          <TextField
+            error={errors.training_days_per_week}
+            keyboardType="numeric"
+            label="روز تمرین در هفته"
+            onChangeText={(value) => onChange("training_days_per_week", value)}
+            textDirection="ltr"
+            value={values.training_days_per_week}
+          />
+        </View>
+        <View style={styles.column}>
+          <TextField
+            error={errors.training_age_months}
+            keyboardType="numeric"
+            label="سابقه تمرین (ماه)"
+            onChangeText={(value) => onChange("training_age_months", value)}
+            textDirection="ltr"
+            value={values.training_age_months}
+          />
+        </View>
       </View>
       <ChoiceField
         error={errors.training_location}
@@ -720,7 +817,7 @@ function TrainingSection({
         selected={values.priority_muscle}
         onSelect={(value) => onChange("priority_muscle", value as UserSelectablePriorityMuscle)}
       />
-    </Card>
+    </ProfileFormGroup>
   );
 }
 
@@ -741,8 +838,7 @@ function NutritionSection({
   ) => void;
 }) {
   return (
-    <Card style={styles.formCard}>
-      <Text style={styles.sectionTitle}>ترجیحات تغذیه‌ای</Text>
+    <ProfileFormGroup icon="nutrition" title="ترجیحات تغذیه‌ای">
       <ChoiceField
         label="فعالیت روزانه"
         options={activityOptions}
@@ -861,7 +957,7 @@ function NutritionSection({
           value={preferences.preferred_check_in_time}
         />
       ) : null}
-    </Card>
+    </ProfileFormGroup>
   );
 }
 
@@ -879,13 +975,18 @@ function ProfileOverviewCard({
   readonly onEdit: () => void;
 }) {
   const stats = [
-    { icon: "ruler" as const, label: "قد", value: `${formatProfileNumber(shared.height_cm)} سانتی‌متر` },
-    { icon: "scale" as const, label: "وزن", value: `${formatProfileNumber(shared.current_weight_kg)} کیلوگرم` },
-    { icon: "calendar" as const, label: "سن", value: formatProfileNumber(ageFromBirthDate(shared.birth_date)) },
-    ...(profile?.training_days_per_week
-      ? [{ icon: "flame" as const, label: "فعالیت", value: `${formatProfileNumber(profile.training_days_per_week)} روز در هفته` }]
-      : []),
-    { icon: "target" as const, label: "هدف", value: goalLabel(shared.fitness_goal) },
+    { direction: "ltr" as const, icon: "ruler" as const, label: "قد", value: `${formatProfileNumber(shared.height_cm)} سانتی‌متر` },
+    { direction: "ltr" as const, icon: "scale" as const, label: "وزن", value: `${formatProfileNumber(shared.current_weight_kg)} کیلوگرم` },
+    { direction: "ltr" as const, icon: "calendar" as const, label: "سن", value: formatProfileNumber(ageFromBirthDate(shared.birth_date)) },
+    {
+      direction: "ltr" as const,
+      icon: "flame" as const,
+      label: "فعالیت",
+      value: profile?.training_days_per_week
+        ? `${formatProfileNumber(profile.training_days_per_week)} روز در هفته`
+        : "ثبت نشده",
+    },
+    { direction: "rtl" as const, icon: "target" as const, label: "هدف", value: goalLabel(shared.fitness_goal) },
   ];
 
   return (
@@ -908,8 +1009,15 @@ function ProfileOverviewCard({
         </Pressable>
       </View>
       <View style={styles.overviewStats}>
-        {stats.map((stat) => (
-          <ProfileStat icon={stat.icon} key={stat.label} label={stat.label} value={stat.value} />
+        {stats.map((stat, index) => (
+          <ProfileStat
+            direction={stat.direction}
+            icon={stat.icon}
+            key={stat.label}
+            label={stat.label}
+            separated={index % 3 !== 0}
+            value={stat.value}
+          />
         ))}
       </View>
     </Card>
@@ -919,20 +1027,24 @@ function ProfileOverviewCard({
 function ProfileStat({
   icon,
   label,
+  direction,
+  separated = false,
   value,
 }: {
   readonly icon: "calendar" | "flame" | "ruler" | "scale" | "target";
   readonly label: string;
+  readonly direction: "ltr" | "rtl";
+  readonly separated?: boolean;
   readonly value: string;
 }) {
   return (
-    <View style={styles.overviewStat}>
+    <View style={[styles.overviewStat, separated && styles.overviewStatSeparated]}>
       <View style={styles.overviewStatIcon}>
         <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={17} />
       </View>
       <View style={styles.overviewStatCopy}>
         <Text style={styles.overviewStatLabel}>{label}</Text>
-        <Text style={styles.overviewStatValue}>{value}</Text>
+        <Text style={[styles.overviewStatValue, direction === "ltr" && styles.overviewStatNumeric]}>{value}</Text>
       </View>
     </View>
   );
@@ -950,14 +1062,32 @@ function ProfileMeasurements({
   return (
     <View style={styles.measurementStack}>
       <Card style={styles.measurementCard} variant="raised">
-        <SectionHeader title="آخرین اندازه‌گیری وزن" />
-        <Text style={styles.measurementValue}>{formatProfileNumber(shared.current_weight_kg)} کیلوگرم</Text>
-        <Text style={styles.mutedText}>ثبت‌شده در {measuredAt}</Text>
+        <View style={styles.measurementRow}>
+          <View style={styles.measurementCopy}>
+            <Text accessibilityRole="header" style={styles.measurementTitle}>آخرین اندازه‌گیری وزن</Text>
+            <Text style={styles.measurementValue}>{formatProfileNumber(shared.current_weight_kg)} کیلوگرم</Text>
+          </View>
+          <Text style={styles.measurementDate}>ثبت‌شده در {measuredAt}</Text>
+        </View>
       </Card>
       <Card style={styles.measurementCard} variant="default">
-        <SectionHeader title="تحلیل بدن" />
-        <Text style={styles.mutedText}>اختیاری — برای برنامه تمرینی دقیق‌تر و شخصی‌تر، عکس‌های استاندارد بدن را اضافه کن.</Text>
-        <Button label="مشاهده روند بدن" onPress={onOpenProgress} variant="secondary" />
+        <View style={styles.measurementRow}>
+          <View style={styles.measurementCopy}>
+            <Text accessibilityRole="header" style={styles.measurementTitle}>تحلیل بدن</Text>
+            <Text numberOfLines={2} style={styles.measurementDescription}>
+              اختیاری — برای برنامه تمرینی دقیق‌تر و شخصی‌تر، عکس‌های استاندارد بدن را اضافه کن.
+            </Text>
+          </View>
+          <Pressable
+            accessible
+            accessibilityLabel="مشاهده روند بدن"
+            accessibilityRole="button"
+            onPress={onOpenProgress}
+            style={styles.measurementAction}
+          >
+            <Text style={styles.measurementActionText}>مشاهده روند بدن</Text>
+          </Pressable>
+        </View>
       </Card>
     </View>
   );
@@ -979,10 +1109,12 @@ function ChoiceField({
   readonly onSelect: (value: string) => void;
 }) {
   return (
-    <FormField error={error} label={label}>
+    <FormField error={error} label={label} style={styles.choiceField}>
       <View style={styles.choiceGrid}>
         {options.map((option) => (
           <Pressable
+            accessible
+            accessibilityLabel={option.label}
             accessibilityRole="radio"
             accessibilityState={{ selected: option.value === selected }}
             key={option.value}
@@ -1013,12 +1145,14 @@ function MultiChoiceField({
   readonly onToggle: (value: string) => void;
 }) {
   return (
-    <FormField error={error} label={label}>
+    <FormField error={error} label={label} style={styles.choiceField}>
       <View style={styles.choiceGrid}>
         {options.map((option) => {
           const isSelected = selected.includes(option.value);
           return (
             <Pressable
+              accessible
+              accessibilityLabel={option.label}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: isSelected }}
               key={option.value}
@@ -1070,17 +1204,19 @@ function modeLabel(mode: ProductMode): string {
 
 function sectionLabel(section: ProfileSection): string {
   if (section === "personal") return "شخصی";
-  if (section === "training") return "تمرین";
-  return "تغذیه";
+  if (section === "training") return "تمرینی";
+  return "تغذیه‌ای";
 }
 
-function isProfileSection(value: string): value is ProfileSection {
-  return value === "personal" || value === "training" || value === "nutrition";
+function sectionIcon(section: ProfileSection): "nutrition" | "profile" | "training" {
+  if (section === "personal") return "profile";
+  if (section === "training") return "training";
+  return "nutrition";
 }
 
 function goalLabel(goal: FitnessGoal): string {
   const labels: Record<FitnessGoal, string> = {
-    body_recomposition: "بازترکیب بدنی",
+    body_recomposition: "ریکامپ",
     build_muscle: "عضله‌سازی",
     fat_loss: "چربی‌سوزی",
     gain_weight: "افزایش وزن",
@@ -1128,15 +1264,15 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
-    marginTop: fiticianTokens.spacing[4],
+    marginTop: fiticianTokens.spacing[2],
   },
   avatar: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.aqua,
     borderRadius: fiticianTokens.radii.pill,
-    height: 56,
+    height: 52,
     justifyContent: "center",
-    width: 56,
+    width: 52,
   },
   avatarText: {
     color: fiticianTokens.colors.canvas,
@@ -1162,11 +1298,17 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
+    flexBasis: "48%",
+    flexGrow: 1,
+    flexShrink: 1,
     justifyContent: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: fiticianTokens.spacing[3],
-    paddingVertical: fiticianTokens.spacing[2],
-    width: "48%",
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: 10,
+  },
+  choiceField: {
+    gap: fiticianTokens.spacing[2],
   },
   choiceGrid: {
     flexDirection: "row-reverse",
@@ -1177,6 +1319,11 @@ const styles = StyleSheet.create({
   choiceSelected: {
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
     borderColor: fiticianTokens.colors.aqua,
+    elevation: 1,
+    shadowColor: fiticianTokens.colors.aqua,
+    shadowOffset: { height: 1, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
   },
   choiceText: {
     color: fiticianTokens.colors.muted,
@@ -1190,8 +1337,42 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
   },
-  formCard: {
-    gap: fiticianTokens.spacing[4],
+  column: {
+    flex: 1,
+    minWidth: 0,
+  },
+  formGroup: {
+    gap: fiticianTokens.spacing[3],
+    padding: 14,
+  },
+  formGroupFields: {
+    gap: fiticianTokens.spacing[3],
+  },
+  formGroupHeader: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+  },
+  formGroupIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  formGroups: {
+    gap: fiticianTokens.spacing[3],
+  },
+  formGroupTitle: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.lg,
+    lineHeight: 24,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   email: {
     color: fiticianTokens.colors.muted,
@@ -1209,7 +1390,8 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   overviewCard: {
-    gap: fiticianTokens.spacing[4],
+    gap: 0,
+    padding: fiticianTokens.spacing[3],
   },
   overviewCopy: {
     flex: 1,
@@ -1218,16 +1400,18 @@ const styles = StyleSheet.create({
   },
   overviewStat: {
     alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surfaceTranslucent,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.medium,
-    borderWidth: 1,
-    flexBasis: "42%",
+    flexBasis: "31%",
     flexDirection: "row-reverse",
     flexGrow: 1,
-    gap: fiticianTokens.spacing[2],
-    minWidth: 135,
-    padding: fiticianTokens.spacing[2],
+    flexShrink: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[1],
+    paddingVertical: 8,
+  },
+  overviewStatSeparated: {
+    borderRightColor: fiticianTokens.colors.line,
+    borderRightWidth: 1,
   },
   overviewStatCopy: {
     flex: 1,
@@ -1240,14 +1424,15 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
-    height: 34,
+    height: 30,
     justifyContent: "center",
-    width: 34,
+    width: 30,
   },
   overviewStats: {
     flexDirection: "row-reverse",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
+    paddingTop: fiticianTokens.spacing[2],
   },
   summaryEdit: {
     alignItems: "center",
@@ -1270,6 +1455,9 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  overviewStatNumeric: {
+    writingDirection: "ltr",
   },
   overviewSubtitle: {
     color: fiticianTokens.colors.muted,
@@ -1296,45 +1484,205 @@ const styles = StyleSheet.create({
   },
   summaryIdentityRow: {
     alignItems: "center",
+    borderBottomColor: fiticianTokens.colors.line,
+    borderBottomWidth: 1,
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
+    paddingBottom: fiticianTokens.spacing[3],
   },
   summaryPhoto: {
     backgroundColor: fiticianTokens.colors.surfaceRaised,
     borderRadius: fiticianTokens.radii.pill,
-    height: 56,
-    width: 56,
+    height: 52,
+    width: 52,
   },
   measurementCard: {
+    minHeight: 76,
+    padding: fiticianTokens.spacing[3],
+  },
+  measurementCopy: {
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+  },
+  measurementDate: {
+    color: fiticianTokens.colors.muted,
+    flexShrink: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    maxWidth: "38%",
+    textAlign: "left",
+    writingDirection: "rtl",
+  },
+  measurementDescription: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  measurementHeading: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+  },
+  measurementRow: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
   },
+  measurementTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  measurementAction: {
+    alignItems: "center",
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    minWidth: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[2],
+  },
+  measurementActionText: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
   measurementStack: {
-    gap: fiticianTokens.spacing[3],
+    gap: fiticianTokens.spacing[2],
   },
   measurementValue: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-    lineHeight: 32,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 28,
+    textAlign: "right",
+    writingDirection: "ltr",
+  },
+  optionalBadge: {
+    backgroundColor: fiticianTokens.colors.surfaceHighlight,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: 3,
+    writingDirection: "rtl",
+  },
+  profileProgress: {
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.card,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.soft.elevation,
+    gap: fiticianTokens.spacing[2],
+    padding: fiticianTokens.spacing[3],
+    shadowColor: fiticianTokens.shadows.soft.color,
+    shadowOffset: fiticianTokens.shadows.soft.offset,
+    shadowOpacity: fiticianTokens.shadows.soft.opacity,
+    shadowRadius: fiticianTokens.shadows.soft.radius,
+  },
+  profileProgressCount: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  progressBadge: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  progressBadgeActive: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  progressBadgeCurrent: {
+    elevation: fiticianTokens.shadows.glow.elevation,
+    shadowColor: fiticianTokens.colors.aqua,
+    shadowOffset: fiticianTokens.shadows.glow.offset,
+    shadowOpacity: fiticianTokens.shadows.glow.opacity,
+    shadowRadius: fiticianTokens.shadows.glow.radius,
+  },
+  progressLine: {
+    backgroundColor: fiticianTokens.colors.lineStrong,
+    height: 1,
+    left: 24,
+    position: "absolute",
+    right: 24,
+    top: 20,
+  },
+  progressStep: {
+    alignItems: "center",
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    justifyContent: "flex-start",
+    minHeight: 62,
+    paddingHorizontal: fiticianTokens.spacing[1],
+    paddingVertical: 3,
+    zIndex: 1,
+  },
+  progressStepActive: {
+    borderColor: fiticianTokens.colors.lineStrong,
+  },
+  progressStepCurrent: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.aqua,
+    elevation: fiticianTokens.shadows.glow.elevation,
+    shadowColor: fiticianTokens.colors.aqua,
+    shadowOffset: fiticianTokens.shadows.glow.offset,
+    shadowOpacity: fiticianTokens.shadows.glow.opacity,
+    shadowRadius: fiticianTokens.shadows.glow.radius,
+  },
+  progressStepLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  progressStepLabelActive: {
+    color: fiticianTokens.colors.aqua,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+  },
+  progressSteps: {
+    flexDirection: "row-reverse",
+    minHeight: 64,
+    position: "relative",
   },
   screen: {
-    gap: fiticianTokens.spacing[4],
+    gap: fiticianTokens.spacing[3],
     paddingBottom: fiticianTokens.spacing[6],
   },
-  sectionTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-    lineHeight: 32,
-    textAlign: "right",
-    writingDirection: "rtl",
+  singleColumn: {
+    width: "100%",
   },
   subheading: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.lg,
+    fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
@@ -1347,6 +1695,6 @@ const styles = StyleSheet.create({
   },
   twoColumns: {
     flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
+    gap: fiticianTokens.spacing[2],
   },
 });

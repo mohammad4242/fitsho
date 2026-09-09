@@ -166,15 +166,15 @@ const styles = StyleSheet.create({
   actions: {
     alignItems: "center",
     flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
+    gap: fiticianTokens.spacing[2],
   },
   avatar: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.aqua,
     borderRadius: fiticianTokens.radii.pill,
-    height: 64,
+    height: 56,
     justifyContent: "center",
-    width: 64,
+    width: 56,
   },
   avatarText: {
     color: fiticianTokens.colors.canvas,
@@ -182,7 +182,8 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.h2,
   },
   card: {
-    gap: fiticianTokens.spacing[3],
+    gap: fiticianTokens.spacing[2],
+    padding: fiticianTokens.spacing[3],
   },
   copy: {
     flex: 1,
@@ -221,8 +222,8 @@ const styles = StyleSheet.create({
   photo: {
     backgroundColor: fiticianTokens.colors.surfaceRaised,
     borderRadius: fiticianTokens.radii.pill,
-    height: 64,
-    width: 64,
+    height: 56,
+    width: 56,
   },
   title: {
     color: fiticianTokens.colors.ink,

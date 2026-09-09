@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -35,7 +35,7 @@ const shared = {
   birth_date: "1992-05-12",
   current_weight_kg: 64,
   display_name: "سارا احمدی",
-  fitness_goal: "build_muscle",
+  fitness_goal: "body_recomposition",
   height_cm: 168,
   product_mode: "both",
   profile_photo_url: null,
@@ -157,10 +157,24 @@ test("renders the Web profile summary before the native section editor", async (
   expect(await screen.findByRole("header", { name: "پروفایل ورزشی" })).toBeTruthy();
   expect(screen.getByText("سارا احمدی")).toBeTruthy();
   expect(screen.getByText("sara@example.com")).toBeTruthy();
+  expect(screen.getByText("قد")).toBeTruthy();
+  expect(screen.getByText("۱۶۸ سانتی‌متر")).toBeTruthy();
+  expect(screen.getByText("وزن")).toBeTruthy();
+  expect(screen.getAllByText("۶۴ کیلوگرم").length).toBeGreaterThanOrEqual(2);
   expect(screen.getByText("سن")).toBeTruthy();
   expect(screen.getByText("۳۴")).toBeTruthy();
   expect(screen.getByText("فعالیت")).toBeTruthy();
   expect(screen.getByText("۳ روز در هفته")).toBeTruthy();
+  expect(screen.getByText("هدف")).toBeTruthy();
+  expect(screen.getAllByText("ریکامپ").length).toBeGreaterThanOrEqual(2);
+  expect(screen.queryByText("بازترکیب بدنی")).toBeNull();
+  expect(screen.getByText("زن")).toBeTruthy();
+  expect(screen.getByText("مرد")).toBeTruthy();
+  expect(screen.queryByRole("radio", { name: "سایر" })).toBeNull();
+  expect(screen.queryByRole("radio", { name: "ترجیح می‌دهم نگویم" })).toBeNull();
+  expect(screen.getByText("مشخصات فردی")).toBeTruthy();
+  expect(screen.getByText("بدن و هدف")).toBeTruthy();
+  expect(screen.getByText("مرحله ۱ از ۳")).toBeTruthy();
   expect(screen.getByRole("button", { name: "ویرایش پروفایل" })).toBeTruthy();
   expect(screen.getByRole("header", { name: "آخرین اندازه‌گیری وزن" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "مشاهده روند بدن" })).toBeTruthy();
@@ -170,12 +184,48 @@ test("keeps profile edits sectioned and routes body progress through the member 
   renderProfile();
 
   await screen.findByRole("header", { name: "پروفایل ورزشی" });
-  fireEvent.press(screen.getByRole("radio", { name: "تمرین" }));
+  fireEvent.press(screen.getByRole("radio", { name: "تمرینی" }));
   expect(screen.getByText("تنظیمات تمرین")).toBeTruthy();
   expect(screen.queryByRole("header", { name: "آخرین اندازه‌گیری وزن" })).toBeNull();
 
   fireEvent.press(screen.getByRole("radio", { name: "شخصی" }));
+  expect(screen.getByText("مشخصات فردی")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "مشاهده روند بدن" }));
 
   expect(mockPush).toHaveBeenCalledWith("/member/body-analysis-history");
+});
+
+test("keeps progress limited to sections available for the loaded mode", async () => {
+  mockUseRouteSnapshot.mockReturnValue({
+    profile: { completionState: "training_ready", productMode: "training", status: "resolved" },
+  } as never);
+  mockCreateProfileApi.mockReturnValue({
+    getNutritionProfile: resolved(null),
+    getProfile: resolved(profile),
+    getSharedProfile: resolved(shared),
+    saveNutritionProfile: resolved(nutrition),
+    saveSharedProfile: resolved(shared),
+    updateProfile: resolved(profile),
+  } as never);
+
+  renderProfile();
+
+  await screen.findByRole("header", { name: "پروفایل ورزشی" });
+  expect(screen.getByRole("radio", { name: "شخصی" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "تمرینی" })).toBeTruthy();
+  expect(screen.queryByRole("radio", { name: "تغذیه‌ای" })).toBeNull();
+  expect(screen.getByText("مرحله ۱ از ۲")).toBeTruthy();
+});
+
+test("saves personal edits through the existing updateProfile API", async () => {
+  renderProfile();
+
+  await screen.findByRole("header", { name: "پروفایل ورزشی" });
+  fireEvent.changeText(screen.getByLabelText("نام نمایشی"), "سارا جدید");
+  fireEvent.press(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  const api = mockCreateProfileApi.mock.results[mockCreateProfileApi.mock.results.length - 1]?.value as {
+    readonly updateProfile: jest.Mock;
+  };
+  await waitFor(() => expect(api.updateProfile).toHaveBeenCalledWith({ display_name: "سارا جدید" }));
 });

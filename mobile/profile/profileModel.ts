@@ -103,9 +103,14 @@ export function validateProfileSection(
   section: "personal" | "training",
   today: Date,
 ): ProfileValidationErrors {
-  return section === "personal"
+  const errors = section === "personal"
     ? { ...validateStep(values, 1, today), ...validateStep(values, 2, today) }
     : validateStep(values, 3, today);
+
+  if (section === "personal" && values.sex !== "female" && values.sex !== "male") {
+    errors.sex = "required";
+  }
+  return errors;
 }
 
 export function profilePatchForSection(

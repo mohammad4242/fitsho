@@ -12,7 +12,8 @@ it("keeps profile presentation grouped around real account data", async () => {
   expect(source).toMatch(/ageFromBirthDate/);
   expect(source).toMatch(/ProfileMeasurements/);
   expect(source).toMatch(/body-analysis-history/);
-  expect(source).toMatch(/SegmentedControl/);
+  expect(source).toMatch(/ProfileSectionProgress/);
+  expect(source).not.toMatch(/SegmentedControl/);
   expect(source).toMatch(/shared\.fitness_goal/);
   expect(source).toMatch(/shared\.height_cm/);
   expect(source).toMatch(/shared\.current_weight_kg/);

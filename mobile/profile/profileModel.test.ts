@@ -117,6 +117,18 @@ it("shares the existing core validation rules for native sections", () => {
   });
 });
 
+it("requires a supported native sex choice for legacy persisted values", () => {
+  for (const sex of ["other", "prefer_not_to_say"] as const) {
+    const values = profileFormValuesForProfile(profile);
+    values.sex = sex;
+
+    expect(validateProfileSection(values, "personal", new Date("2026-09-07T00:00:00Z"))).toMatchObject({
+      sex: "required",
+    });
+    expect(values.sex).toBe(sex);
+  }
+});
+
 it("round-trips editable nutrition preferences without dropping backend fields", () => {
   const forms = nutritionFormsForProfile(nutrition);
   expect(forms.basics.monthly_food_budget_toman).toBe("12,345");
