@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react-native";
+import { render, screen, waitFor } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
 
 jest.mock("@tanstack/react-query", () => ({
@@ -42,16 +42,16 @@ const estimate = {
   },
 } as unknown as NutritionEstimate;
 
-test("renders target calorie and TDEE rings with the web macro strip", () => {
+test("renders target calorie and TDEE rings with the web macro strip", async () => {
   render(<NutritionSummaryCard connectivityStatus="online" estimate={estimate} />);
 
   expect(screen.getByText("کالری هدف")).toBeTruthy();
-  expect(screen.getByText("۲٬۱۰۰")).toBeTruthy();
+  await waitFor(() => expect(screen.getByText("۲٬۱۰۰")).toBeTruthy(), { timeout: 1500 });
   expect(screen.getByRole("progressbar", { name: "پیشرفت کالری هدف" }).props.accessibilityValue)
     .toEqual({ max: 100, min: 0, now: 100 });
   expect(screen.getByText("TDEE (کل مصرف روزانه)")).toBeTruthy();
-  expect(screen.getByText("پایه: ۱٬۶۰۰")).toBeTruthy();
-  expect(screen.getByText("فعالیت: ۸۰۰")).toBeTruthy();
+  await waitFor(() => expect(screen.getByText("پایه: ۱٬۶۰۰")).toBeTruthy(), { timeout: 1500 });
+  await waitFor(() => expect(screen.getByText("فعالیت: ۸۰۰")).toBeTruthy(), { timeout: 1500 });
   expect(screen.getByRole("progressbar", { name: "تفکیک مصرف انرژی روزانه" })).toBeTruthy();
   expect(screen.getByText("پروتئین")).toBeTruthy();
   expect(screen.getByText("کربوهیدرات")).toBeTruthy();

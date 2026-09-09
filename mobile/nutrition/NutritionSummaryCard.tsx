@@ -12,6 +12,7 @@ import { Button, Card, MetricRing, Notice, Skeleton } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { NutritionDualMetricRing } from "./NutritionDualMetricRing";
+import { NutritionAnimatedNumber } from "./NutritionAnimatedNumber";
 import { formatNutritionNumber } from "./nutritionModel";
 
 type NutritionSummaryCardProps =
@@ -92,9 +93,11 @@ function NutritionEstimateSummaryCard({
           <View style={summaryStyles.energyItem}>
             <View style={summaryStyles.targetCopy}>
               <Text style={summaryStyles.targetLabel}>کالری هدف</Text>
-              <Text style={summaryStyles.calorieValue}>
-                {goalCalories === null ? "تعیین نشده" : formatWebNumber(goalCalories)}
-              </Text>
+              {goalCalories === null ? (
+                <Text style={summaryStyles.calorieValue}>تعیین نشده</Text>
+              ) : (
+                <NutritionAnimatedNumber style={summaryStyles.calorieValue} value={goalCalories} />
+              )}
               <Text style={summaryStyles.unit}>
                 {hasTrackedData
                   ? `دریافت امروز ${formatWebNumber(tracked?.energy_kcal ?? 0)} کیلوکالری`
@@ -116,15 +119,23 @@ function NutritionEstimateSummaryCard({
             <View style={[summaryStyles.energyItem, summaryStyles.tdeeItem]}>
               <View style={summaryStyles.targetCopy}>
                 <Text style={summaryStyles.targetLabel}>TDEE (کل مصرف روزانه)</Text>
-                <Text style={summaryStyles.tdeeValue}>{formatWebNumber(tdee)}</Text>
+                <NutritionAnimatedNumber style={summaryStyles.tdeeValue} value={tdee} />
                 <View accessibilityLabel="تفکیک متابولیسم پایه و فعالیت" style={summaryStyles.breakdownLegend}>
                   <View style={summaryStyles.breakdownItem}>
                     <Text style={summaryStyles.bmrDot}>●</Text>
-                    <Text style={summaryStyles.breakdownText}>پایه: {bmr === null ? "—" : formatWebNumber(bmr)}</Text>
+                    {bmr === null ? (
+                      <Text style={summaryStyles.breakdownText}>پایه: —</Text>
+                    ) : (
+                      <NutritionAnimatedNumber prefix="پایه: " style={summaryStyles.breakdownText} value={bmr} />
+                    )}
                   </View>
                   <View style={summaryStyles.breakdownItem}>
                     <Text style={summaryStyles.activityDot}>●</Text>
-                    <Text style={summaryStyles.breakdownText}>فعالیت: {activity === null ? "—" : formatWebNumber(activity)}</Text>
+                    {activity === null ? (
+                      <Text style={summaryStyles.breakdownText}>فعالیت: —</Text>
+                    ) : (
+                      <NutritionAnimatedNumber prefix="فعالیت: " style={summaryStyles.breakdownText} value={activity} />
+                    )}
                   </View>
                 </View>
               </View>
