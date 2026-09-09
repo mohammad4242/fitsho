@@ -15,6 +15,7 @@ import {
   EmptyState,
   Notice,
   Skeleton,
+  SegmentedControl,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
@@ -436,34 +437,16 @@ function GenerationMethodSelector({
   return (
     <View style={styles.generationMethodSection}>
       <Text style={styles.selectorTitle}>چه کسی برنامه‌ات را بنویسد؟</Text>
-      <View accessibilityRole="radiogroup" style={styles.generationMethodControl}>
-        <Pressable
-          accessibilityRole="radio"
-          accessibilityState={{ checked: selected === "fitsho_coach", disabled: saving }}
-          disabled={saving}
-          onPress={() => onSelect("fitsho_coach")}
-          style={({ pressed }) => [
-            styles.generationMethodOption,
-            selected === "fitsho_coach" && styles.generationMethodOptionSelected,
-            pressed && styles.generationMethodOptionPressed,
-          ]}
-        >
-          <Text style={[styles.generationMethodText, selected === "fitsho_coach" && styles.generationMethodTextSelected]}>موتور داخلی</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="radio"
-          accessibilityState={{ checked: selected === "ai", disabled: saving }}
-          disabled={saving}
-          onPress={() => onSelect("ai")}
-          style={({ pressed }) => [
-            styles.generationMethodOption,
-            selected === "ai" && styles.generationMethodOptionSelected,
-            pressed && styles.generationMethodOptionPressed,
-          ]}
-        >
-          <Text style={[styles.generationMethodText, selected === "ai" && styles.generationMethodTextSelected]}>هوش مصنوعی</Text>
-        </Pressable>
-      </View>
+      <SegmentedControl
+        accessibilityLabel="روش ساخت برنامه"
+        disabled={saving}
+        onChange={(value) => onSelect(value as WorkoutGenerationMethod)}
+        options={[
+          { label: "موتور داخلی", value: "fitsho_coach" },
+          { label: "هوش مصنوعی", value: "ai" },
+        ]}
+        selectedValue={selected}
+      />
       {saving ? <Text style={styles.selectorHint}>در حال ذخیره…</Text> : null}
       {error ? <Text style={styles.selectorError}>{error}</Text> : null}
     </View>
@@ -984,7 +967,7 @@ const styles = StyleSheet.create({
   },
   durationBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(80,223,206,0.04)",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: 14,
     borderWidth: 1,
@@ -1024,7 +1007,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   focusDayCard: {
-    backgroundColor: "rgba(80,223,206,0.045)",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.large,
     borderWidth: 1,
@@ -1041,53 +1024,16 @@ const styles = StyleSheet.create({
     width: 94,
   },
   focusDayNumber: {
-    backgroundColor: "rgba(80,223,206,0.06)",
+    backgroundColor: fiticianTokens.colors.surfaceHighlight,
   },
   focusDaySummary: {
     minHeight: 112,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  generationMethodControl: {
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.medium,
-    borderWidth: 1,
-    flexDirection: "row-reverse",
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-    overflow: "hidden",
-    width: "100%",
-  },
-  generationMethodOption: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  generationMethodOptionPressed: {
-    opacity: 0.8,
-  },
-  generationMethodOptionSelected: {
-    backgroundColor: "rgba(80,223,206,0.08)",
-    borderColor: fiticianTokens.colors.lineStrong,
-    borderWidth: 1,
-  },
   generationMethodSection: {
     gap: fiticianTokens.spacing[2],
     marginTop: fiticianTokens.spacing[1],
-  },
-  generationMethodText: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.compact,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "center",
-    writingDirection: "rtl",
-  },
-  generationMethodTextSelected: {
-    color: fiticianTokens.colors.aqua,
   },
   inlineNotice: {
     borderColor: fiticianTokens.colors.line,
@@ -1115,7 +1061,7 @@ const styles = StyleSheet.create({
   },
   libraryButton: {
     alignSelf: "flex-end",
-    minHeight: 40,
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -1186,7 +1132,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   reviewIndicator: {
-    borderColor: "#ff5b62",
+    borderColor: fiticianTokens.colors.coral,
     borderRadius: 999,
     borderWidth: 2,
     flexShrink: 0,
@@ -1257,7 +1203,7 @@ const styles = StyleSheet.create({
   },
   updateButton: {
     borderRadius: fiticianTokens.radii.pill,
-    minHeight: 40,
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
@@ -1274,7 +1220,7 @@ const styles = StyleSheet.create({
     shadowRadius: fiticianTokens.shadows.card.radius,
   },
   secondaryDayNumber: {
-    backgroundColor: "rgba(80,223,206,0.06)",
+    backgroundColor: fiticianTokens.colors.surfaceHighlight,
   },
   secondaryDaySummary: {
     minHeight: 62,
@@ -1460,7 +1406,7 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.small,
     flexDirection: "row",
     gap: fiticianTokens.spacing[1],
-    minHeight: 32,
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[1],
   },

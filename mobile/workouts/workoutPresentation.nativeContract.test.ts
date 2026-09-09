@@ -22,6 +22,7 @@ it("uses the web-like workout page hierarchy without cinematic overview componen
   expect(source).toContain("CoachReviewBanner");
   expect(source).toContain("reviewBanner");
   expect(source).toContain("GenerationMethodSelector");
+  expect(source).toContain("SegmentedControl");
   expect(source).toContain("چه کسی برنامه‌ات را بنویسد؟");
   expect(source).toContain("هوش مصنوعی");
   expect(source).toContain("موتور داخلی");
@@ -94,6 +95,8 @@ it("keeps cycle, check-in, replacement, and completion behavior secondary to the
 
 it("keeps the four context cells viable at the required phone widths", async () => {
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+  const contextStrip = source.slice(source.indexOf("function PlanContextStrip"), source.indexOf("function CoachReviewBanner"));
+  expect(contextStrip.match(/\{ label:/g)).toHaveLength(4);
 
   for (const width of [360, 390, 430]) {
     const contentWidth = getResponsiveLayout(width, 844).contentWidth;
