@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { nutritionKeys } from "../data/queryKeys";
 import type { ConnectivityStatus } from "../platform/connectivity";
-import { Card, Notice, Skeleton } from "../ui/components";
+import { DisclosureCard, Notice, Skeleton } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { formatNutritionPlanMoney } from "./nutritionPlanModel";
@@ -11,6 +11,8 @@ import { type NutritionPlanApi } from "./nutritionPlanApi";
 import {
   approvedShoppingPriceVisibility,
   formatShoppingQuantity,
+  type ShoppingList,
+  type ShoppingPriceVisibility,
 } from "./nutritionShoppingList";
 
 const shoppingWarningMessages: Readonly<Record<string, string>> = {
@@ -41,35 +43,45 @@ export function NutritionShoppingList({
   const list = stateData(state);
 
   if (historical) return null;
-  if (state.status === "loading") return <Skeleton height={260} />;
-  if (state.status === "error" && list === undefined) {
-    return (
-      <Notice
-        actionLabel="تلاش دوباره"
-        message="لیست خرید برنامه دریافت نشد."
-        onAction={() => void query.refetch()}
-        variant="danger"
-      />
-    );
-  }
-  if (state.status === "offline" && list === undefined) {
-    return <Notice message="لیست خرید در حالت آفلاین در دسترس نیست." variant="offline" />;
-  }
-  if (list === undefined) return null;
-
-  const priceVisibility = approvedShoppingPriceVisibility(list, executable);
   return (
-    <Card style={styles.card}>
-      <View style={styles.heading}>
-        <Text style={styles.title}>لیست خرید</Text>
-        <Text style={styles.subtitle}>مواد لازم برای این نسخه از برنامه</Text>
-      </View>
-      {state.status === "offline" || state.status === "stale" ? (
-        <Notice message="این لیست تازه‌سازی نشده است؛ قبل از خرید اتصال را بررسی کن." variant="offline" />
+    <DisclosureCard
+      defaultExpanded={false}
+      direction="rtl"
+      style={styles.card}
+      summary="مواد لازم برای این نسخه از برنامه"
+      title="لیست خرید"
+    >
+      {state.status === "loading" ? <Skeleton height={260} /> : null}
+      {state.status === "error" && list === undefined ? (
+        <Notice
+          actionLabel="تلاش دوباره"
+          message="لیست خرید برنامه دریافت نشد."
+          onAction={() => void query.refetch()}
+          variant="danger"
+        />
       ) : null}
-      {priceVisibility === "not_approved" ? (
-        <Notice message="قیمت نهایی تا تأیید پزشک نمایش داده نمی‌شود." variant="warning" />
+      {state.status === "offline" && list === undefined ? (
+        <Notice message="لیست خرید در حالت آفلاین در دسترس نیست." variant="offline" />
       ) : null}
+      {list !== undefined ? (
+        <ShoppingListContent
+          list={list}
+          priceVisibility={approvedShoppingPriceVisibility(list, executable)}
+        />
+      ) : null}
+    </DisclosureCard>
+  );
+}
+
+function ShoppingListContent({
+  list,
+  priceVisibility,
+}: {
+  readonly list: ShoppingList;
+  readonly priceVisibility: ShoppingPriceVisibility;
+}) {
+  return (
+    <>
       {priceVisibility === "not_executable" ? (
         <Notice message="قیمت مرجع فقط برای برنامه فعال و تأییدشده نمایش داده می‌شود." variant="warning" />
       ) : null}
@@ -102,7 +114,7 @@ export function NutritionShoppingList({
           <Text style={styles.totalLabel}>جمع هزینه مرجع تأییدشده</Text>
         </View>
       ) : null}
-    </Card>
+    </>
   );
 }
 
@@ -119,7 +131,6 @@ function ShoppingWarnings({ codes }: { readonly codes: readonly string[] }) {
 
 const styles = StyleSheet.create({
   card: {
-    gap: fiticianTokens.spacing[3],
     marginTop: fiticianTokens.spacing[3],
   },
   english: {
@@ -128,10 +139,6 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "left",
     writingDirection: "ltr",
-  },
-  heading: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[1],
   },
   item: {
     alignItems: "center",
@@ -185,22 +192,6 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "left",
-    writingDirection: "rtl",
-  },
-  subtitle: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    lineHeight: 22,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h3,
-    lineHeight: 28,
-    textAlign: "right",
     writingDirection: "rtl",
   },
   totalLabel: {

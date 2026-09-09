@@ -222,7 +222,6 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
           pdfStore={pdfStore}
           plan={displayedPlan}
           safety={safety}
-          stale={offline || (selectedPlanId === null && (activeState.status === "stale" || latestState.status === "stale"))}
         />
       ) : null}
 
@@ -283,7 +282,6 @@ function NutritionPlanCard({
   pdfStore,
   plan,
   safety,
-  stale,
 }: {
   readonly actionsApi: NutritionPlanActionsApi;
   readonly api: NutritionPlanApi;
@@ -293,7 +291,6 @@ function NutritionPlanCard({
   readonly pdfStore: ExpoNutritionPlanPdfStore;
   readonly plan: WeeklyPlan;
   readonly safety: SafetyDecision | null;
-  readonly stale: boolean;
 }) {
   const queryClient = useQueryClient();
   const [currentPlan, setCurrentPlan] = useState(plan);
@@ -328,7 +325,6 @@ function NutritionPlanCard({
           </View>
           <StatusBadge status={status} />
         </View>
-        {stale ? <Notice message="این برنامه قدیمی است؛ قبل از خرید یا تصمیم جدید، اتصال را بررسی کن." variant="offline" /> : null}
         {historical ? <Notice message="این نسخه فقط برای مشاهده تاریخچه است و برنامه فعال تو نیست." variant="info" /> : null}
         {!executable && !historical ? <PlanReviewNotice status={status} /> : null}
         <View style={styles.statsGrid}>
@@ -1125,7 +1121,7 @@ function PlanReviewNotice({ status }: { readonly status: ReturnType<typeof getNu
     return <Notice message="پزشک برای ادامه اصلاح یا اطلاعات بیشتری خواسته است." variant="warning" />;
   }
   if (status === "rejected") return <Notice message="این نسخه توسط پزشک تأیید نشده و قابل اجرا نیست." variant="danger" />;
-  return <Notice message="این نسخه هنوز برای استفاده نهایی فعال نشده است." variant="info" />;
+  return null;
 }
 
 function StatusBadge({ status }: { readonly status: ReturnType<typeof getNutritionPlanStatus> }) {
