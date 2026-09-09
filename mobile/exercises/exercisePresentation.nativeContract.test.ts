@@ -30,16 +30,35 @@ it("uses the compact localized media carousel card", async () => {
   expect(source).toContain('direction={language === "en" ? "ltr" : "rtl"}');
   expect(source.indexOf('testID="exercise-detail-breadcrumb"')).toBeLessThan(source.indexOf("<ExerciseMediaPanel"));
   const mediaPanel = source.slice(source.indexOf("function ExerciseMediaPanel"), source.indexOf("function ExerciseInformation"));
+  expect(mediaPanel.indexOf("<ExerciseMediaCarousel")).toBeLessThan(mediaPanel.indexOf("<GenderMediaSelector"));
   expect(mediaPanel.indexOf("<GenderMediaSelector")).toBeLessThan(mediaPanel.indexOf('testID="exercise-media-card-title"'));
   expect(source).toContain("languageForDirection");
   expect(source).toContain("availableMediaPresentations");
   expect(source).toContain('api.get(slug ?? "", "unspecified")');
   expect(source).toContain("styles.infoCard");
-  expect(source).toContain("ذخیره برای استفاده آفلاین");
+  expect(source).not.toContain("saveOffline");
+  expect(source).not.toContain("downloadSelectedVideo");
+  expect(source).not.toContain("downloadHint");
+  expect(source).not.toContain("offlineReadyHint");
+  expect(source).not.toContain("removeDownload");
+  expect(source).not.toContain("PublicExerciseVideoCache");
+  expect(source).not.toContain("ExpoPublicExerciseVideoStore");
+  expect(source).not.toContain("validatePublicExerciseVideoPath");
+  expect(source).not.toContain("detailCopy[language].stale");
   expect(source).not.toContain("رسانه نمایش");
   expect(source).not.toContain("exerciseSecondaryTitle");
   expect(source).not.toContain("PresentationChip");
-  expect(source).toContain("PublicExerciseVideoCache");
+  const mediaTitle = source.slice(source.indexOf("mediaTitle:"), source.indexOf("mediaTitleEnglish:"));
+  expect(mediaTitle).toContain('alignSelf: "stretch"');
+  expect(mediaTitle).toContain('textAlign: "center"');
+});
+
+it("gives the gender selector the full centered media-card row", async () => {
+  const source = await readFile(new URL("./GenderMediaSelector.tsx", import.meta.url), "utf8");
+  const container = source.slice(source.indexOf("container:"), source.indexOf("ltr:"));
+
+  expect(container).toContain('justifyContent: "center"');
+  expect(container).toContain('width: "100%"');
 });
 
 it("matches the web media aspect ratio while keeping native media controls", async () => {

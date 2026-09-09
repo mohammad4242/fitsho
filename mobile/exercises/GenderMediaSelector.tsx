@@ -76,6 +76,8 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     gap: fiticianTokens.spacing[2],
+    justifyContent: "center",
+    width: "100%",
   },
   ltr: {
     flexDirection: "row",

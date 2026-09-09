@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -7,9 +7,7 @@ const mockVideoPlayer = {
   status: "idle",
 };
 const mockVideoSources: unknown[] = [];
-const mockGetCached = jest.fn<() => Promise<unknown>>();
-const mockGetOrDownload = jest.fn<() => Promise<unknown>>();
-const mockRemoveCached = jest.fn<() => Promise<void>>();
+let mockQueryIsStale = false;
 
 jest.mock("@tanstack/react-query", () => ({ useQuery: jest.fn() }));
 jest.mock("expo-router", () => ({
@@ -20,20 +18,6 @@ jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("../auth/MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
 jest.mock("../config/nativeRuntimeConfig", () => ({
   getMobileRuntimeConfig: () => ({ apiBaseUrl: "https://api.example.com" }),
-}));
-jest.mock("../api/nativeTransport", () => ({
-  createNativeTransport: () => ({ download: jest.fn() }),
-}));
-jest.mock("../video/publicExerciseVideoCache", () => ({
-  PublicExerciseVideoCache: class {
-    getCached = mockGetCached;
-    getOrDownload = mockGetOrDownload;
-    remove = mockRemoveCached;
-  },
-  validatePublicExerciseVideoPath: (path: string) => path,
-}));
-jest.mock("../video/publicExerciseVideoStore", () => ({
-  ExpoPublicExerciseVideoStore: class {},
 }));
 jest.mock("../platform/connectivity", () => ({
   connectivityMonitor: {
@@ -87,9 +71,7 @@ beforeEach(() => {
   mockLanguageForDirection.mockReturnValue("fa");
   mockVideoSources.length = 0;
   mockVideoPlayer.addListener.mockClear();
-  mockGetCached.mockReset().mockImplementation(() => new Promise(() => undefined));
-  mockGetOrDownload.mockReset();
-  mockRemoveCached.mockReset().mockResolvedValue(undefined);
+  mockQueryIsStale = false;
   mockUseQuery.mockImplementation(({ queryKey }) => {
     const lastKey = queryKey[queryKey.length - 1];
     const data = lastKey === "media-inventory"
@@ -103,7 +85,7 @@ beforeEach(() => {
       isError: false,
       isFetching: false,
       isPending: false,
-      isStale: false,
+      isStale: mockQueryIsStale,
     } as never;
   });
 });
@@ -119,15 +101,22 @@ function renderDetail() {
   );
 }
 
-test("keeps the exercise card compact and exposes the native offline action", () => {
+test("renders the compact media card without manual offline controls", () => {
   renderDetail();
 
+  expect(screen.getByTestId("exercise-media-surface")).toBeTruthy();
+  expect(screen.getByTestId("exercise-media-gender-selector")).toBeTruthy();
   expect(screen.getByTestId("exercise-media-card-title").props.children).toBe("پرس بالا سینه دمبل");
   expect(screen.queryByText("Dumbbell Incline Bench Press")).toBeNull();
   expect(screen.getByText("1/2")).toBeTruthy();
   expect(screen.getByRole("radio", { name: "ویدیوی مرد" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "ویدیوی زن" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "ذخیره برای استفاده آفلاین" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "ذخیره برای استفاده آفلاین" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Save for offline use" })).toBeNull();
+  expect(screen.queryByText("ویدئو فقط با انتخاب تو روی دستگاه ذخیره می‌شود.")).toBeNull();
+  expect(screen.queryByText("The video is stored on this device only when you choose to download it.")).toBeNull();
+  expect(screen.queryByText("این ویدئو برای مشاهده بدون اینترنت روی دستگاه ذخیره است.")).toBeNull();
+  expect(screen.queryByText("This video is saved on this device for offline playback.")).toBeNull();
   expect(screen.queryByText("رسانه نمایش")).toBeNull();
   expect(screen.queryByText("ویدیوی مرد 1")).toBeNull();
 });
@@ -142,32 +131,12 @@ test("resets the carousel to the first female video after switching gender", () 
   expect(mockVideoSources.at(-1)).toEqual({ uri: "https://api.example.com/media/female-1.mp4" });
 });
 
-test("prefers a persisted public video cache file for offline playback", async () => {
-  mockGetCached.mockResolvedValueOnce(cachedVideoFile());
-
+test("does not render the stale catalog-refresh notice on the detail screen", () => {
+  mockQueryIsStale = true;
   renderDetail();
 
-  await waitFor(() => {
-    expect(mockVideoSources.at(-1)).toEqual({ uri: "file:///cache/male-1.video" });
-  });
-  expect(screen.getByRole("button", { name: "حذف دانلود" })).toBeTruthy();
-});
-
-test("downloads and removes the selected public video through native actions", async () => {
-  mockGetCached.mockResolvedValueOnce(null);
-  mockGetOrDownload.mockResolvedValueOnce(cachedVideoFile());
-  renderDetail();
-
-  const download = await screen.findByRole("button", { name: "ذخیره برای استفاده آفلاین" });
-  fireEvent.press(download);
-
-  await waitFor(() => expect(mockGetOrDownload).toHaveBeenCalledWith("/media/male-1.mp4"));
-  expect(mockVideoSources.at(-1)).toEqual({ uri: "file:///cache/male-1.video" });
-
-  fireEvent.press(screen.getByRole("button", { name: "حذف دانلود" }));
-
-  await waitFor(() => expect(mockRemoveCached).toHaveBeenCalledWith("/media/male-1.mp4"));
-  expect(screen.getByRole("button", { name: "ذخیره برای استفاده آفلاین" })).toBeTruthy();
+  expect(screen.queryByText("در حال به‌روزرسانی فهرست…")).toBeNull();
+  expect(screen.queryByText("Showing saved details; the latest version may not be available.")).toBeNull();
 });
 
 test("uses only the English card title and labels when the native direction is LTR", () => {
@@ -182,6 +151,8 @@ test("uses only the English card title and labels when the native direction is L
   expect(screen.getByRole("button", { name: "Instructions" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Safety" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "مشخصات حرکت" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Save for offline use" })).toBeNull();
+  expect(screen.queryByText("The video is stored on this device only when you choose to download it.")).toBeNull();
 });
 
 test("does not switch media from a normal player-control tap", () => {
@@ -206,16 +177,6 @@ function asset(
     presentation,
     role: "primary",
     sort_order: sortOrder,
-  };
-}
-
-function cachedVideoFile() {
-  return {
-    byteSize: 24,
-    cacheKey: "a".repeat(64),
-    contentType: "video/mp4",
-    sourcePath: "/media/male-1.mp4",
-    uri: "file:///cache/male-1.video",
   };
 }
 
