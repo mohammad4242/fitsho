@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Button, Notice, TextField } from "../../../ui/components";
 import { AuthScaffold } from "../../../auth/AuthScaffold";
+import { onboardingRoute } from "../../../auth/authRoute";
 import { authCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
 import { authStyles } from "../../../auth/authStyles";
@@ -18,7 +19,7 @@ interface OtpFormValues {
 export default function PhoneOtpScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
-  const params = useLocalSearchParams<{ phoneNumber?: string }>();
+  const params = useLocalSearchParams<{ phoneNumber?: string; source?: string }>();
   const phoneNumber = useMemo(
     () => normalizePhoneNumber(
       Array.isArray(params.phoneNumber) ? params.phoneNumber[0] ?? "" : params.phoneNumber ?? "",
@@ -48,7 +49,7 @@ export default function PhoneOtpScreen() {
     setError(null);
     try {
       await auth.verifyPhoneOtp(phoneNumber, normalizePhoneNumber(code));
-      router.replace("/onboarding");
+      router.replace(onboardingRoute(params.source));
     } catch (submissionError) {
       setError(authErrorMessage(submissionError, "otp"));
     }

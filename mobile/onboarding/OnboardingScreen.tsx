@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ApiError } from "@fitician/core";
 import type { NutritionProfileInput, SafetyProfileInput, StructuredExerciseInput } from "@fitician/core/nutrition";
@@ -32,6 +32,9 @@ import {
 } from "./onboardingController";
 import { createOnboardingApi } from "./onboardingApi";
 import { NativeOnboardingDraftStore } from "./nativeOnboardingDraftStore";
+import { PUBLIC_ONBOARDING_SOURCE } from "../auth/authRoute";
+import { hydratePublicOnboardingState } from "./publicOnboardingHandoff";
+import { SecurePublicOnboardingDraftStore } from "./publicOnboardingDraftStore";
 import {
   emptyProfileFormValues,
   profileFormValuesForSharedProfile,
@@ -191,12 +194,19 @@ const productModeOptions: readonly {
 
 type ChoiceOption = { readonly label: string; readonly value: string };
 
+function firstParam(value: string | string[] | undefined): string {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 export function OnboardingScreen() {
   const auth = useMobileAuth();
   const router = useRouter();
+  const params = useLocalSearchParams<{ source?: string }>();
   const refreshProfileStatus = useRefreshMobileProfileStatus();
   const userId = auth.user?.id ?? null;
   const api = useMemo(() => createOnboardingApi(auth.request), [auth.request]);
+  const publicDraftStore = useMemo(() => new SecurePublicOnboardingDraftStore(), []);
+  const publicOnboardingSource = firstParam(params.source);
   const [controller, setController] = useState<NativeOnboardingController | null>(null);
   const [state, setState] = useState<OnboardingState | null>(null);
   const [decision, setDecision] = useState<NutritionSafetyResult["decision"] | null>(null);
@@ -229,10 +239,22 @@ export function OnboardingScreen() {
           api,
           new NativeOnboardingDraftStore(opened),
         );
-        const nextState = await nextController.initialize();
+        const initializedState = await nextController.initialize();
         if (!active) return;
         setController(nextController);
-        setState(nextState);
+        setState(initializedState);
+        if (publicOnboardingSource === PUBLIC_ONBOARDING_SOURCE) {
+          try {
+            const publicDraft = await publicDraftStore.load();
+            if (publicDraft.status === "valid") {
+              const hydratedState = await hydratePublicOnboardingState(nextController, publicDraft.state);
+              await publicDraftStore.clear();
+              if (active) setState(hydratedState);
+            }
+          } catch (handoffError) {
+            if (active) setError(onboardingErrorMessage(handoffError));
+          }
+        }
       } catch (initializationError) {
         if (active) setError(onboardingErrorMessage(initializationError));
       } finally {
@@ -244,7 +266,7 @@ export function OnboardingScreen() {
       active = false;
       if (opened !== null) void opened.database.closeAsync();
     };
-  }, [api, userId]);
+  }, [api, publicDraftStore, publicOnboardingSource, userId]);
 
   const run = useCallback(
     async (action: (activeController: NativeOnboardingController) => Promise<OnboardingState>) => {
@@ -414,7 +436,7 @@ export function OnboardingScreen() {
   );
 }
 
-function ModeStage({ busy, onSelect }: { readonly busy: boolean; readonly onSelect: (mode: ProductMode) => void }) {
+export function ModeStage({ busy, onSelect }: { readonly busy: boolean; readonly onSelect: (mode: ProductMode) => void }) {
   return (
     <StageFrame
       description="مسیرت را انتخاب کن؛ فیتشو فقط سؤال‌هایی را می‌پرسد که برای برنامه‌ات لازم است."
@@ -444,7 +466,7 @@ function ModeStage({ busy, onSelect }: { readonly busy: boolean; readonly onSele
   );
 }
 
-function SharedProfileStage({
+export function SharedProfileStage({
   busy,
   initialValues,
   onBack,
@@ -544,7 +566,7 @@ function SharedProfileStage({
   );
 }
 
-function TrainingProfileStage({
+export function TrainingProfileStage({
   busy,
   initialValues,
   onBack,
@@ -649,7 +671,7 @@ function TrainingProfileStage({
   );
 }
 
-function SafetyStage({
+export function SafetyStage({
   blocked,
   busy,
   initialValues,
@@ -718,7 +740,7 @@ function SafetyStage({
   );
 }
 
-function ExerciseStage({
+export function ExerciseStage({
   busy,
   initialValues,
   onBack,
@@ -776,7 +798,7 @@ function ExerciseStage({
   );
 }
 
-function NutritionBasicsStage({
+export function NutritionBasicsStage({
   busy,
   initialValues,
   onBack,
@@ -843,7 +865,7 @@ function NutritionBasicsStage({
   );
 }
 
-function NutritionPreferencesStage({
+export function NutritionPreferencesStage({
   basics,
   busy,
   initialValues,
@@ -950,7 +972,7 @@ function NutritionPreferencesStage({
   );
 }
 
-function ReviewStage({
+export function ReviewStage({
   busy,
   mode,
   onComplete,
@@ -981,7 +1003,7 @@ function ReviewStage({
   );
 }
 
-function CompletedStage({ onContinue }: { readonly onContinue: () => void }) {
+export function CompletedStage({ onContinue }: { readonly onContinue: () => void }) {
   return (
     <StageFrame
       description="پروفایل تو آماده است. از خانه می‌توانی برنامه و پیشرفتت را دنبال کنی."
@@ -1310,7 +1332,7 @@ function onboardingErrorMessage(error: unknown): string {
   return "ارتباط با سرور برقرار نشد. اتصال را بررسی کن و دوباره تلاش کن.";
 }
 
-function safetyFormValuesForState(safety: SafetyProfileInput | null): SafetyFormValues {
+export function safetyFormValuesForState(safety: SafetyProfileInput | null): SafetyFormValues {
   if (safety === null) return emptySafetyFormValues();
   return {
     conditions: safety.conditions.map((condition) => condition.code).join(","),
@@ -1327,7 +1349,7 @@ function safetyFormValuesForState(safety: SafetyProfileInput | null): SafetyForm
   };
 }
 
-function exerciseFormValuesForState(exercise: StructuredExerciseInput | null): ExerciseFormValues {
+export function exerciseFormValuesForState(exercise: StructuredExerciseInput | null): ExerciseFormValues {
   if (exercise === null || exercise.trains === false) return emptyExerciseFormValues();
   return {
     trains: true,
@@ -1338,7 +1360,7 @@ function exerciseFormValuesForState(exercise: StructuredExerciseInput | null): E
   };
 }
 
-function nutritionBasicsFormValuesForState(basics: NutritionBasicsDraft | null): NutritionBasicsFormValues {
+export function nutritionBasicsFormValuesForState(basics: NutritionBasicsDraft | null): NutritionBasicsFormValues {
   if (basics === null) return emptyNutritionBasicsFormValues();
   return {
     daily_activity_level: basics.daily_activity_level,
@@ -1354,7 +1376,7 @@ function nutritionBasicsFormValuesForState(basics: NutritionBasicsDraft | null):
   };
 }
 
-function nutritionPreferencesFormValuesForState(
+export function nutritionPreferencesFormValuesForState(
   nutrition: NutritionProfileInput | null,
 ): NutritionPreferencesFormValues {
   if (nutrition === null) return emptyNutritionPreferencesFormValues();

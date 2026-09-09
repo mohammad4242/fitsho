@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Button, Card, Notice, TextField } from "../../../ui/components";
 import { AuthScaffold } from "../../../auth/AuthScaffold";
+import { onboardingRoute, publicOnboardingParams } from "../../../auth/authRoute";
 import { authCopy, mobileAuthCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
 import { authStyles } from "../../../auth/authStyles";
@@ -27,7 +28,7 @@ export default function SignInScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
   const google = useGoogleSignIn();
-  const params = useLocalSearchParams<{ reason?: string }>();
+  const params = useLocalSearchParams<{ reason?: string; source?: string }>();
   const [mode, setMode] = useState<SignInMode>("email");
   const [error, setError] = useState<string | null>(null);
   const [googleBusy, setGoogleBusy] = useState(false);
@@ -41,7 +42,7 @@ export default function SignInScreen() {
     setError(null);
     try {
       await auth.signInWithPassword({ email: values.email.trim(), password: values.password });
-      router.replace("/onboarding");
+      router.replace(onboardingRoute(params.source));
     } catch (submissionError) {
       setError(authErrorMessage(submissionError));
     }
@@ -52,7 +53,7 @@ export default function SignInScreen() {
     try {
       const normalizedPhone = normalizePhoneNumber(phoneNumber);
       await auth.sendPhoneOtp(normalizedPhone);
-      router.push({ pathname: "/auth/phone-otp", params: { phoneNumber: normalizedPhone } });
+      router.push({ pathname: "/auth/phone-otp", params: { phoneNumber: normalizedPhone, ...publicOnboardingParams(params.source) } });
     } catch (submissionError) {
       setError(authErrorMessage(submissionError, "otp"));
     }
@@ -63,7 +64,7 @@ export default function SignInScreen() {
     setGoogleBusy(true);
     try {
       await auth.signInWithGoogle(await google.signIn());
-      router.replace("/onboarding");
+      router.replace(onboardingRoute(params.source));
     } catch (submissionError) {
       setError(authErrorMessage(submissionError, "google"));
     } finally {
@@ -138,7 +139,7 @@ export default function SignInScreen() {
                 )}
               />
               <Button label={authCopy.login.submit} loading={auth.busy} onPress={submitEmail} />
-              <Pressable accessibilityRole="button" onPress={() => router.push("/auth/forgot-password")}>
+              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/auth/forgot-password", params: publicOnboardingParams(params.source) })}>
                 <Text style={authStyles.link}>{authCopy.login.forgotPassword}</Text>
               </Pressable>
             </View>
@@ -187,7 +188,7 @@ export default function SignInScreen() {
         ) : null}
         <View style={authStyles.footer}>
           <Text style={authStyles.footerText}>{authCopy.login.noAccount}</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push("/auth/register")}>
+          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/auth/register", params: publicOnboardingParams(params.source) })}>
             <Text style={authStyles.link}>{authCopy.login.registerLink}</Text>
           </Pressable>
         </View>

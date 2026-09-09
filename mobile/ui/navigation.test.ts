@@ -32,6 +32,7 @@ it("defines the public, auth, onboarding, account, member, coach, and physician 
   const requiredRoutes = [
     "(public)/_layout.tsx",
     "(public)/index.tsx",
+    "(public)/public-onboarding.tsx",
     "(auth)/_layout.tsx",
     "(auth)/auth/sign-in.tsx",
     "(auth)/auth/register.tsx",
@@ -134,6 +135,18 @@ it("uses the native onboarding flow instead of a route placeholder", async () =>
   await expect(
     readFile(resolve(appRoot, "(onboarding)/onboarding/index.tsx"), "utf8"),
   ).resolves.toMatch(/onboarding\/OnboardingScreen/);
+});
+
+it("keeps public onboarding native and connected to the account handoff", async () => {
+  await expect(
+    readFile(resolve(appRoot, "(public)/public-onboarding.tsx"), "utf8"),
+  ).resolves.toMatch(/PublicOnboardingScreen/);
+  await expect(readFile(resolve(appRoot, "(public)/index.tsx"), "utf8"))
+    .resolves.toContain("/public-onboarding");
+  await expect(readFile(resolve(dirname(appRoot), "onboarding/PublicOnboardingScreen.tsx"), "utf8"))
+    .resolves.toContain("PUBLIC_ONBOARDING_SOURCE");
+  await expect(readFile(resolve(dirname(appRoot), "onboarding/OnboardingScreen.tsx"), "utf8"))
+    .resolves.toContain("hydratePublicOnboardingState");
 });
 
 it("uses the native profile editor inside the member profile tab", async () => {

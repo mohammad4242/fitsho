@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Button, Notice, TextField } from "../../../ui/components";
 import { AuthScaffold } from "../../../auth/AuthScaffold";
+import { onboardingRoute, publicOnboardingParams } from "../../../auth/authRoute";
 import { authCopy, mobileAuthCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
 import { authStyles } from "../../../auth/authStyles";
@@ -19,6 +20,7 @@ interface RegisterFormValues {
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ source?: string }>();
   const auth = useMobileAuth();
   const [error, setError] = useState<string | null>(null);
   const [complete, setComplete] = useState(false);
@@ -32,7 +34,7 @@ export default function RegisterScreen() {
     try {
       await auth.register({ email: values.email.trim(), password: values.password });
       setComplete(true);
-      router.replace("/onboarding");
+      router.replace(onboardingRoute(params.source));
     } catch (submissionError) {
       setError(authErrorMessage(submissionError));
     }
@@ -105,7 +107,7 @@ export default function RegisterScreen() {
         <Button label={authCopy.register.submit} loading={auth.busy} onPress={submit} />
         <View style={authStyles.footer}>
           <Text style={authStyles.footerText}>{authCopy.register.hasAccount}</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.replace("/auth/sign-in")}>
+          <Pressable accessibilityRole="button" onPress={() => router.replace({ pathname: "/auth/sign-in", params: publicOnboardingParams(params.source) })}>
             <Text style={authStyles.link}>{authCopy.register.loginLink}</Text>
           </Pressable>
         </View>

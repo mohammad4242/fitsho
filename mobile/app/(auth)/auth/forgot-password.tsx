@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { View } from "react-native";
 
 import { Button, Notice, TextField } from "../../../ui/components";
 import { AuthScaffold } from "../../../auth/AuthScaffold";
+import { publicOnboardingParams } from "../../../auth/authRoute";
 import { authCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
 import { authStyles } from "../../../auth/authStyles";
@@ -17,6 +18,7 @@ interface ForgotPasswordFormValues {
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ source?: string }>();
   const auth = useMobileAuth();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -62,7 +64,7 @@ export default function ForgotPasswordScreen() {
         <Button label={authCopy.passwordRecovery.forgotSubmit} loading={auth.busy} onPress={submit} />
         <Button
           label={authCopy.passwordRecovery.backToLogin}
-          onPress={() => router.replace("/auth/sign-in")}
+          onPress={() => router.replace({ pathname: "/auth/sign-in", params: publicOnboardingParams(params.source) })}
           variant="ghost"
         />
       </View>
