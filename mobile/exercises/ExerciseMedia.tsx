@@ -9,6 +9,7 @@ import { isExerciseMediaRenderable, resolveExerciseMediaUrl } from "./exerciseMe
 export interface ExerciseMediaProps {
   readonly accessibilityLabel: string;
   readonly autoplay?: boolean;
+  readonly compact?: boolean;
   readonly mediaType: components["schemas"]["MediaType"];
   readonly name: string;
   readonly path: string;
@@ -18,6 +19,7 @@ export interface ExerciseMediaProps {
 export function ExerciseMedia({
   accessibilityLabel,
   autoplay = false,
+  compact = false,
   mediaType,
   name,
   path,
@@ -27,7 +29,7 @@ export function ExerciseMedia({
   const source = { uri: resolveExerciseMediaUrl(path, runtime.apiBaseUrl) };
 
   return (
-    <View accessibilityLabel={accessibilityLabel} accessibilityRole="image" style={[styles.frame, style]}>
+    <View accessibilityLabel={accessibilityLabel} accessibilityRole="image" style={[styles.frame, compact && styles.compactFrame, style]}>
       {isExerciseMediaRenderable(path, mediaType) ? (
         mediaType === "video" ? (
           <Media
@@ -37,13 +39,13 @@ export function ExerciseMedia({
             kind="video"
             loop
             source={source}
-            style={styles.media}
+            style={[styles.media, compact && styles.compactMedia]}
           />
         ) : (
           <Media
             accessibilityLabel={`تصویر حرکت ${name}`}
             source={source}
-            style={styles.media}
+            style={[styles.media, compact && styles.compactMedia]}
           />
         )
       ) : (
@@ -57,6 +59,12 @@ export function ExerciseMedia({
 }
 
 const styles = StyleSheet.create({
+  compactFrame: {
+    minHeight: 0,
+  },
+  compactMedia: {
+    minHeight: 0,
+  },
   fallback: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceRaised,

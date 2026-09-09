@@ -40,6 +40,7 @@ export type NoticeVariant = "info" | "success" | "warning" | "danger" | "offline
 
 export interface NoticeProps {
   readonly actionLabel?: string;
+  readonly compact?: boolean;
   readonly message: string;
   readonly onAction?: () => void;
   readonly title?: string;
@@ -71,15 +72,16 @@ const noticeStyles: Record<NoticeVariant, ViewStyle> = {
 
 export function Notice({
   actionLabel,
+  compact = false,
   message,
   onAction,
   title,
   variant = "info",
 }: NoticeProps) {
   return (
-    <View accessibilityRole="alert" style={[styles.notice, noticeStyles[variant]]}>
-      {title ? <Text style={styles.noticeTitle}>{title}</Text> : null}
-      <Text style={styles.noticeMessage}>{message}</Text>
+    <View accessibilityRole="alert" style={[styles.notice, noticeStyles[variant], compact && styles.compactNotice]}>
+      {title ? <Text style={[styles.noticeTitle, compact && styles.compactTitle]}>{title}</Text> : null}
+      <Text style={[styles.noticeMessage, compact && styles.compactMessage]}>{message}</Text>
       {actionLabel && onAction ? (
         <Button label={actionLabel} onPress={onAction} variant="secondary" />
       ) : null}
@@ -112,6 +114,18 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     justifyContent: "center",
     padding: fiticianTokens.spacing[6],
+  },
+  compactMessage: {
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    lineHeight: 20,
+  },
+  compactNotice: {
+    gap: fiticianTokens.spacing[1],
+    padding: fiticianTokens.spacing[3],
+  },
+  compactTitle: {
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    lineHeight: 21,
   },
   notice: {
     borderRadius: fiticianTokens.radii.medium,

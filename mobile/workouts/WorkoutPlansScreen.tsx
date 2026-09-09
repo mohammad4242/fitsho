@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Linking, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { workoutKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
-import { Button, Card, EmptyState, Notice, Skeleton } from "../ui/components";
+import { AppIcon, Button, Card, EmptyState, Notice, Skeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
@@ -31,6 +31,7 @@ import {
 } from "./workoutPdfStore";
 import { WorkoutCyclePanel } from "./WorkoutCyclePanel";
 import type { WorkoutGenerationErrorKind } from "./workoutModel";
+import { ExerciseMedia } from "../exercises/ExerciseMedia";
 
 type PdfStatus = "checking" | "downloading" | "error" | "idle" | "ready";
 
@@ -330,34 +331,39 @@ function PlanView({
         </View>
       </Card>
 
-      {historical ? <Notice message="این نسخه فقط برای مشاهدهٔ تاریخچه است و قابل اجرا نیست." variant="info" /> : null}
-      {pending || plan.coach_review?.state === "pending_coach_review" ? (
-        <Notice
-          message="این برنامه تا تأیید مربی قابل اجرا نیست؛ جزئیات آن فقط برای بررسی نمایش داده می‌شود."
-          variant="warning"
-        />
-      ) : null}
-      {plan.status === "failed" ? (
-        <Notice message="این نسخه با خطا ساخته شده و قابل اجرا نیست." variant="danger" />
-      ) : null}
-      {plan.is_stale ? <Notice message="اطلاعات این برنامه قدیمی است؛ قبل از اجرا وضعیت آنلاین را بررسی کن." variant="warning" /> : null}
-      {plan.coach_review?.state === "coach_approved" ? (
-        <Notice
-          message={plan.coach_review.coach_note ?? "این برنامه توسط مربی تأیید شده است."}
-          title={`تأیید مربی${plan.coach_review.coach_display_name ? `: ${plan.coach_review.coach_display_name}` : ""}`}
-          variant="success"
-        />
-      ) : null}
-      {plan.coach_review?.state === "coach_rejected" ? (
-        <Notice
-          message={plan.coach_review.coach_note ?? "مربی برای این برنامه توضیح اصلاحات ثبت کرده است."}
-          title="نیاز به اصلاح طبق نظر مربی"
-          variant="danger"
-        />
-      ) : null}
-      {!executable && plan.status === "active" && !historical && !pending ? (
-        <Notice message="این برنامه هنوز برای اجرا آزاد نشده است." variant="warning" />
-      ) : null}
+      <View style={styles.statusStack}>
+        {historical ? <Notice compact message="این نسخه فقط برای مشاهدهٔ تاریخچه است و قابل اجرا نیست." variant="info" /> : null}
+        {pending || plan.coach_review?.state === "pending_coach_review" ? (
+          <Notice
+            compact
+            message="این برنامه تا تأیید مربی قابل اجرا نیست؛ جزئیات آن فقط برای بررسی نمایش داده می‌شود."
+            variant="warning"
+          />
+        ) : null}
+        {plan.status === "failed" ? (
+          <Notice compact message="این نسخه با خطا ساخته شده و قابل اجرا نیست." variant="danger" />
+        ) : null}
+        {plan.is_stale ? <Notice compact message="اطلاعات این برنامه قدیمی است؛ قبل از اجرا وضعیت آنلاین را بررسی کن." variant="warning" /> : null}
+        {plan.coach_review?.state === "coach_approved" ? (
+          <Notice
+            compact
+            message={plan.coach_review.coach_note ?? "این برنامه توسط مربی تأیید شده است."}
+            title={`تأیید مربی${plan.coach_review.coach_display_name ? `: ${plan.coach_review.coach_display_name}` : ""}`}
+            variant="success"
+          />
+        ) : null}
+        {plan.coach_review?.state === "coach_rejected" ? (
+          <Notice
+            compact
+            message={plan.coach_review.coach_note ?? "مربی برای این برنامه توضیح اصلاحات ثبت کرده است."}
+            title="نیاز به اصلاح طبق نظر مربی"
+            variant="danger"
+          />
+        ) : null}
+        {!executable && plan.status === "active" && !historical && !pending ? (
+          <Notice compact message="این برنامه هنوز برای اجرا آزاد نشده است." variant="warning" />
+        ) : null}
+      </View>
 
       {plan.ai_coach_program_explanation_fa ? (
         <Card style={styles.aiCard}>
@@ -367,7 +373,7 @@ function PlanView({
       ) : null}
 
       {plan.warnings !== undefined && plan.warnings.length > 0 ? (
-        <Notice message={plan.warnings.join("\n")} title="نکات ایمنی برنامه" variant="warning" />
+        <Notice compact message={plan.warnings.join("\n")} title="نکات ایمنی برنامه" variant="warning" />
       ) : null}
 
       {plan.status === "failed" || plan.days.length === 0 ? null : (
@@ -423,9 +429,33 @@ function WorkoutDayCard({
   readonly onOpenExercise: (slug: string) => void;
   readonly onToggle: () => void;
 }) {
+  const leadExercise = day.exercises[0];
   return (
     <Card onPress={onToggle} style={styles.dayCard} variant={expanded ? "raised" : "interactive"}>
       <View style={styles.dayHeader}>
+        {leadExercise ? (
+          <Pressable
+            accessibilityLabel={`باز کردن راهنمای ${leadExercise.exercise.name_fa || leadExercise.exercise.name_en}`}
+            accessibilityRole="button"
+            onPress={(event) => {
+              event.stopPropagation();
+              onOpenExercise(leadExercise.exercise.slug);
+            }}
+            style={({ pressed }) => [styles.dayMediaButton, pressed && styles.mediaPressed]}
+          >
+            <ExerciseMedia
+              accessibilityLabel={`پیش‌نمایش ${leadExercise.exercise.name_fa || leadExercise.exercise.name_en}`}
+              compact
+              mediaType={leadExercise.exercise.media_type}
+              name={leadExercise.exercise.name_fa || leadExercise.exercise.name_en}
+              path={leadExercise.exercise.media_path}
+              style={styles.dayMedia}
+            />
+            <View pointerEvents="none" style={styles.dayMediaBadge}>
+              <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
+            </View>
+          </Pressable>
+        ) : null}
         <View style={styles.dayHeadingCopy}>
           <Text style={styles.dayNumber}>روز {day.day_number}</Text>
           <Text style={styles.dayTitle}>{day.title_fa || day.title_en}</Text>
@@ -462,14 +492,37 @@ function WorkoutExerciseRow({
 }) {
   return (
     <View style={styles.exerciseRow}>
+      <Pressable
+        accessibilityLabel={`باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
+        accessibilityRole="button"
+        onPress={onOpen}
+        style={({ pressed }) => [styles.exerciseMediaButton, pressed && styles.mediaPressed]}
+      >
+        <ExerciseMedia
+          accessibilityLabel={`پیش‌نمایش ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
+          compact
+          mediaType={exercise.exercise.media_type}
+          name={exercise.exercise.name_fa || exercise.exercise.name_en}
+          path={exercise.exercise.media_path}
+          style={styles.exerciseMedia}
+        />
+        <View pointerEvents="none" style={styles.exerciseMediaBadge}>
+          <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
+        </View>
+      </Pressable>
       <View style={styles.exerciseCopy}>
-        <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>
+        <Pressable accessibilityRole="button" onPress={onOpen}>
+          <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>
+        </Pressable>
         <Text style={styles.exerciseSecondary}>{exercise.exercise.name_en}</Text>
         <View style={styles.exerciseStats}>
-          <Text style={styles.exerciseStat}>{exercise.sets} ست</Text>
-          <Text style={styles.exerciseStat}>{formatWorkoutPrescription(exercise)}</Text>
-          <Text style={styles.exerciseStat}>{exercise.rest_seconds} ثانیه استراحت</Text>
-          {exercise.rir !== null ? <Text style={styles.exerciseStat}>RIR {exercise.rir}</Text> : null}
+          <WorkoutMetric label="ست" value={String(exercise.sets)} />
+          <WorkoutMetric
+            label={exercise.prescription_mode === "duration" ? "مدت" : "تکرار"}
+            value={formatWorkoutPrescription(exercise)}
+          />
+          <WorkoutMetric label="استراحت" value={`${exercise.rest_seconds} ث`} />
+          {exercise.rir !== null ? <WorkoutMetric label="RIR" value={String(exercise.rir)} /> : null}
         </View>
         {exercise.notes_fa ? <Text style={styles.exerciseNote}>{exercise.notes_fa}</Text> : null}
         {exercise.load_guidance ? <Text style={styles.exerciseNote}>{exercise.load_guidance}</Text> : null}
@@ -480,6 +533,15 @@ function WorkoutExerciseRow({
         ) : null}
       </View>
       <Button label="راهنما" onPress={onOpen} variant="ghost" />
+    </View>
+  );
+}
+
+function WorkoutMetric({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <View style={styles.metricChip}>
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
 }
@@ -624,6 +686,30 @@ const styles = StyleSheet.create({
   dayCard: {
     gap: fiticianTokens.spacing[3],
   },
+  dayMedia: {
+    borderRadius: fiticianTokens.radii.medium,
+    height: 78,
+    minHeight: 0,
+    width: 96,
+  },
+  dayMediaBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(2,6,7,0.70)",
+    borderRadius: fiticianTokens.radii.pill,
+    bottom: 7,
+    height: 26,
+    justifyContent: "center",
+    position: "absolute",
+    right: 7,
+    width: 26,
+  },
+  dayMediaButton: {
+    borderRadius: fiticianTokens.radii.medium,
+    height: 78,
+    overflow: "hidden",
+    position: "relative",
+    width: 96,
+  },
   dayDetails: {
     gap: fiticianTokens.spacing[3],
   },
@@ -681,6 +767,30 @@ const styles = StyleSheet.create({
   exerciseCopy: {
     flex: 1,
     gap: fiticianTokens.spacing[1],
+  },
+  exerciseMedia: {
+    borderRadius: fiticianTokens.radii.medium,
+    height: 112,
+    minHeight: 0,
+    width: 104,
+  },
+  exerciseMediaBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(2,6,7,0.70)",
+    borderRadius: fiticianTokens.radii.pill,
+    bottom: 7,
+    height: 26,
+    justifyContent: "center",
+    position: "absolute",
+    right: 7,
+    width: 26,
+  },
+  exerciseMediaButton: {
+    borderRadius: fiticianTokens.radii.medium,
+    height: 112,
+    overflow: "hidden",
+    position: "relative",
+    width: 104,
   },
   exerciseNote: {
     color: fiticianTokens.colors.muted,
@@ -773,6 +883,36 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  mediaPressed: {
+    opacity: 0.78,
+    transform: [{ scale: fiticianTokens.motion.pressedScale }],
+  },
+  metricChip: {
+    alignItems: "flex-end",
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    gap: 2,
+    minWidth: 48,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+  },
+  metricLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  metricValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   intro: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -803,6 +943,9 @@ const styles = StyleSheet.create({
   },
   planSection: {
     gap: fiticianTokens.spacing[3],
+  },
+  statusStack: {
+    gap: fiticianTokens.spacing[2],
   },
   planTitle: {
     color: fiticianTokens.colors.ink,
