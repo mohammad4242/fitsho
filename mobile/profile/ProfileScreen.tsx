@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   StyleSheet,
   Switch,
@@ -27,7 +28,17 @@ import type {
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { AppIcon, Button, Card, FormField, Notice, ScreenHeader, TextField } from "../ui/components";
+import {
+  AppIcon,
+  Button,
+  Card,
+  FormField,
+  Notice,
+  PageHeading,
+  SectionHeader,
+  SegmentedControl,
+  TextField,
+} from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot, useRefreshMobileProfileStatus } from "../ui/navigation/RouteGuards";
@@ -400,23 +411,23 @@ export function ProfileScreen() {
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <ScreenHeader
-        compact
-        eyebrow="حساب کاربری"
-        subtitle="اطلاعات بدنی، تنظیمات تمرین و ترجیحات تغذیه‌ای را از همین‌جا به‌روز کن."
-        title="پروفایل من"
+      <PageHeading
+        eyebrow="تنظیمات شخصی"
+        supportingText="اطلاعاتت را به‌روز نگه دار تا مسیر تمرین با شرایط فعلی تو هماهنگ بماند."
+        title="پروفایل ورزشی"
       />
 
-      <ProfileOverviewCard mode={loaded.mode} shared={loaded.shared} />
-      <Card style={styles.identityCard} variant="raised">
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{loaded.shared.display_name.trim().slice(0, 1) || "ف"}</Text>
-        </View>
-        <View style={styles.identityCopy}>
-          <Text style={styles.identityName}>{loaded.shared.display_name}</Text>
-          <Text style={styles.mutedText}>{modeLabel(loaded.mode)}</Text>
-        </View>
-      </Card>
+      <ProfileOverviewCard
+        email={auth.user?.email ?? null}
+        mode={loaded.mode}
+        profile={loaded.profile}
+        shared={loaded.shared}
+        onEdit={() => {
+          setSection("personal");
+          setFieldErrors({});
+          setSaveMessage(null);
+        }}
+      />
       <ProfilePhotoControl
         initialUrl={loaded.shared.profile_photo_url}
         label={loaded.shared.display_name}
@@ -427,29 +438,29 @@ export function ProfileScreen() {
         }}
       />
 
+      {section === "personal" ? (
+        <ProfileMeasurements
+          shared={loaded.shared}
+          onOpenProgress={() => router.push("/member/body-analysis-history")}
+        />
+      ) : null}
+
       {error !== null ? <Notice message={error} variant="danger" /> : null}
       {saveMessage !== null ? <Notice message={saveMessage} variant="success" /> : null}
 
-      <View accessibilityRole="tablist" style={styles.sectionTabs}>
-        {sections.map((item) => (
-          <Pressable
-            accessibilityRole="tab"
-            accessibilityState={{ selected: item === section }}
-            disabled={busy}
-            key={item}
-            onPress={() => {
-              setSection(item);
-              setFieldErrors({});
-              setSaveMessage(null);
-            }}
-            style={[styles.sectionTab, item === section && styles.sectionTabActive]}
-          >
-            <Text style={[styles.sectionTabText, item === section && styles.sectionTabTextActive]}>
-              {sectionLabel(item)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <SegmentedControl
+        accessibilityLabel="بخش ویرایش پروفایل"
+        disabled={busy}
+        onChange={(value) => {
+          if (!isProfileSection(value)) return;
+          setSection(value);
+          setFieldErrors({});
+          setSaveMessage(null);
+        }}
+        options={sections.map((item) => ({ label: sectionLabel(item), value: item }))}
+        selectedValue={section}
+        testID="profile-section-tabs"
+      />
 
       {section === "personal" ? (
         <PersonalSection
@@ -855,28 +866,51 @@ function NutritionSection({
 }
 
 function ProfileOverviewCard({
+  email,
   mode,
+  profile,
   shared,
+  onEdit,
 }: {
+  readonly email: string | null;
   readonly mode: ProductMode;
+  readonly profile: Profile | null;
   readonly shared: SharedProfile;
+  readonly onEdit: () => void;
 }) {
+  const stats = [
+    { icon: "ruler" as const, label: "قد", value: `${formatProfileNumber(shared.height_cm)} سانتی‌متر` },
+    { icon: "scale" as const, label: "وزن", value: `${formatProfileNumber(shared.current_weight_kg)} کیلوگرم` },
+    { icon: "calendar" as const, label: "سن", value: formatProfileNumber(ageFromBirthDate(shared.birth_date)) },
+    ...(profile?.training_days_per_week
+      ? [{ icon: "flame" as const, label: "فعالیت", value: `${formatProfileNumber(profile.training_days_per_week)} روز در هفته` }]
+      : []),
+    { icon: "target" as const, label: "هدف", value: goalLabel(shared.fitness_goal) },
+  ];
+
   return (
-    <Card style={styles.overviewCard} variant="hero">
-      <View style={styles.overviewHeader}>
-        <View style={styles.overviewIcon}>
-          <AppIcon color={fiticianTokens.colors.aqua} name="profile" size={22} />
-        </View>
+    <Card accessibilityLabel="خلاصه پروفایل" style={styles.overviewCard} variant="raised">
+      <View style={styles.summaryIdentityRow}>
+        {shared.profile_photo_url === null || shared.profile_photo_url === undefined ? (
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{shared.display_name.trim().slice(0, 1) || "ف"}</Text>
+          </View>
+        ) : (
+          <Image accessibilityLabel={shared.display_name} source={{ uri: shared.profile_photo_url }} style={styles.summaryPhoto} />
+        )}
         <View style={styles.overviewCopy}>
-          <Text style={styles.overviewEyebrow}>FITICIAN PROFILE</Text>
-          <Text style={styles.overviewTitle}>مسیر اختصاصی تو</Text>
+          <Text style={styles.overviewTitle}>{shared.display_name}</Text>
+          {email ? <Text numberOfLines={1} style={styles.email}>{email}</Text> : null}
           <Text style={styles.overviewSubtitle}>{modeLabel(mode)}</Text>
         </View>
+        <Pressable accessibilityLabel="ویرایش پروفایل" accessibilityRole="button" onPress={onEdit} style={styles.summaryEdit}>
+          <Text style={styles.summaryEditText}>ویرایش</Text>
+        </Pressable>
       </View>
       <View style={styles.overviewStats}>
-        <ProfileStat icon="target" label="هدف اصلی" value={goalLabel(shared.fitness_goal)} />
-        <ProfileStat icon="bodyAnalysis" label="قد" value={`${formatProfileNumber(shared.height_cm)} سانتی‌متر`} />
-        <ProfileStat icon="training" label="وزن فعلی" value={`${formatProfileNumber(shared.current_weight_kg)} کیلو`} />
+        {stats.map((stat) => (
+          <ProfileStat icon={stat.icon} key={stat.label} label={stat.label} value={stat.value} />
+        ))}
       </View>
     </Card>
   );
@@ -887,15 +921,44 @@ function ProfileStat({
   label,
   value,
 }: {
-  readonly icon: "bodyAnalysis" | "target" | "training";
+  readonly icon: "calendar" | "flame" | "ruler" | "scale" | "target";
   readonly label: string;
   readonly value: string;
 }) {
   return (
     <View style={styles.overviewStat}>
-      <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={16} />
-      <Text style={styles.overviewStatLabel}>{label}</Text>
-      <Text numberOfLines={1} style={styles.overviewStatValue}>{value}</Text>
+      <View style={styles.overviewStatIcon}>
+        <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={17} />
+      </View>
+      <View style={styles.overviewStatCopy}>
+        <Text style={styles.overviewStatLabel}>{label}</Text>
+        <Text style={styles.overviewStatValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+function ProfileMeasurements({
+  shared,
+  onOpenProgress,
+}: {
+  readonly shared: SharedProfile;
+  readonly onOpenProgress: () => void;
+}) {
+  const measuredAt = formatProfileDate(shared.weight_measured_at);
+
+  return (
+    <View style={styles.measurementStack}>
+      <Card style={styles.measurementCard} variant="raised">
+        <SectionHeader title="آخرین اندازه‌گیری وزن" />
+        <Text style={styles.measurementValue}>{formatProfileNumber(shared.current_weight_kg)} کیلوگرم</Text>
+        <Text style={styles.mutedText}>ثبت‌شده در {measuredAt}</Text>
+      </Card>
+      <Card style={styles.measurementCard} variant="default">
+        <SectionHeader title="تحلیل بدن" />
+        <Text style={styles.mutedText}>اختیاری — برای برنامه تمرینی دقیق‌تر و شخصی‌تر، عکس‌های استاندارد بدن را اضافه کن.</Text>
+        <Button label="مشاهده روند بدن" onPress={onOpenProgress} variant="secondary" />
+      </Card>
     </View>
   );
 }
@@ -1011,6 +1074,10 @@ function sectionLabel(section: ProfileSection): string {
   return "تغذیه";
 }
 
+function isProfileSection(value: string): value is ProfileSection {
+  return value === "personal" || value === "training" || value === "nutrition";
+}
+
 function goalLabel(goal: FitnessGoal): string {
   const labels: Record<FitnessGoal, string> = {
     body_recomposition: "بازترکیب بدنی",
@@ -1027,6 +1094,26 @@ function goalLabel(goal: FitnessGoal): string {
 
 function formatProfileNumber(value: number): string {
   return new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 1 }).format(value);
+}
+
+function ageFromBirthDate(value: string): number {
+  const birth = new Date(`${value}T00:00:00Z`);
+  const now = new Date();
+  let age = now.getUTCFullYear() - birth.getUTCFullYear();
+  if (
+    now.getUTCMonth() < birth.getUTCMonth()
+    || (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate())
+  ) {
+    age -= 1;
+  }
+  return age;
+}
+
+function formatProfileDate(value: string): string {
+  return new Intl.DateTimeFormat("fa-IR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function profileErrorMessage(error: unknown): string {
@@ -1107,21 +1194,12 @@ const styles = StyleSheet.create({
   formCard: {
     gap: fiticianTokens.spacing[4],
   },
-  identityCard: {
-    alignItems: "center",
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
-  },
-  identityCopy: {
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-  },
-  identityName: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h3,
+  email: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "right",
-    writingDirection: "rtl",
+    writingDirection: "ltr",
   },
   mutedText: {
     color: fiticianTokens.colors.muted,
@@ -1137,39 +1215,47 @@ const styles = StyleSheet.create({
   overviewCopy: {
     flex: 1,
     gap: fiticianTokens.spacing[1],
-  },
-  overviewEyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
-    fontSize: 10,
-    letterSpacing: 1.2,
-    textAlign: "right",
-  },
-  overviewHeader: {
-    alignItems: "center",
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
-  },
-  overviewIcon: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    borderColor: fiticianTokens.colors.lineStrong,
-    borderRadius: fiticianTokens.radii.medium,
-    borderWidth: 1,
-    height: 48,
-    justifyContent: "center",
-    width: 48,
+    minWidth: 0,
   },
   overviewStat: {
-    alignItems: "flex-end",
+    alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceTranslucent,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
+    flexBasis: "42%",
+    flexDirection: "row-reverse",
+    flexGrow: 1,
+    gap: fiticianTokens.spacing[2],
+    minWidth: 135,
+    padding: fiticianTokens.spacing[2],
+  },
+  overviewStatCopy: {
     flex: 1,
     gap: 3,
     minWidth: 0,
-    padding: fiticianTokens.spacing[2],
+  },
+  overviewStatIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  overviewStats: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+  },
+  summaryEdit: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    minWidth: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[1],
   },
   overviewStatLabel: {
     color: fiticianTokens.colors.muted,
@@ -1183,13 +1269,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 11,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    maxWidth: "100%",
     textAlign: "right",
     writingDirection: "rtl",
-  },
-  overviewStats: {
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[2],
   },
   overviewSubtitle: {
     color: fiticianTokens.colors.muted,
@@ -1206,37 +1287,42 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  summaryEditText: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  summaryIdentityRow: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+  },
+  summaryPhoto: {
+    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    borderRadius: fiticianTokens.radii.pill,
+    height: 56,
+    width: 56,
+  },
+  measurementCard: {
+    gap: fiticianTokens.spacing[3],
+  },
+  measurementStack: {
+    gap: fiticianTokens.spacing[3],
+  },
+  measurementValue: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h2,
+    lineHeight: 32,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   screen: {
     gap: fiticianTokens.spacing[4],
     paddingBottom: fiticianTokens.spacing[6],
-  },
-  sectionTab: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surface,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.pill,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: fiticianTokens.spacing[2],
-  },
-  sectionTabActive: {
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    borderColor: fiticianTokens.colors.aqua,
-  },
-  sectionTabText: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    writingDirection: "rtl",
-  },
-  sectionTabTextActive: {
-    color: fiticianTokens.colors.aqua,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-  },
-  sectionTabs: {
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[2],
   },
   sectionTitle: {
     color: fiticianTokens.colors.ink,

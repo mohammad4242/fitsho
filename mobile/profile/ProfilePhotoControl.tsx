@@ -120,7 +120,7 @@ export function ProfilePhotoControl({
   }
 
   return (
-    <Card style={styles.card}>
+    <Card accessibilityLabel="عکس پروفایل" style={styles.card}>
       <View style={styles.identityRow}>
         {url === null ? (
           <View style={styles.avatar}>
@@ -130,8 +130,8 @@ export function ProfilePhotoControl({
           <Image accessibilityLabel={label} source={{ uri: url }} style={styles.photo} />
         )}
         <View style={styles.copy}>
-          <Text style={styles.title}>تصویر پروفایل</Text>
-          <Text style={styles.description}>اختیاری؛ عکس مربعی فقط برای حساب خودت ذخیره می‌شود.</Text>
+          <Text style={styles.title}>تصویر حساب</Text>
+          <Text style={styles.description}>یک تصویر مربعی انتخاب کن تا در حساب و فضای متخصص نمایش داده شود.</Text>
         </View>
       </View>
       {error !== null ? <Notice message={error} variant="danger" /> : null}
