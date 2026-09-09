@@ -66,6 +66,7 @@ describe("native exercise media", () => {
   it("accepts real GIF, image, and video media but rejects placeholders", () => {
     expect(isExerciseMediaRenderable("/media/row.gif", "gif")).toBe(true);
     expect(isExerciseMediaRenderable("/media/row.webp", "image")).toBe(true);
+    expect(isExerciseMediaRenderable("/media/row.webp", "animated_webp")).toBe(true);
     expect(isExerciseMediaRenderable("/media/row.mp4", "video")).toBe(true);
     expect(isExerciseMediaRenderable("/exercises/exercise-placeholder.svg", "placeholder")).toBe(false);
     expect(isExerciseMediaRenderable("", "gif")).toBe(false);

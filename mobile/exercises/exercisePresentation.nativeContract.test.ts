@@ -11,6 +11,15 @@ it("renders real exercise media in catalogue cards", async () => {
   expect(source).toContain("styles.cardMedia");
 });
 
+it("keeps network media loading visible and falls back safely", async () => {
+  const source = await readFile(new URL("./ExerciseMedia.tsx", import.meta.url), "utf8");
+
+  expect(source).toContain("onFirstFrameRender");
+  expect(source).toContain("onError");
+  expect(source).toContain("loadingOverlay");
+  expect(source).toContain("isExerciseMediaRenderable");
+});
+
 it("places the primary exercise media before detail metadata", async () => {
   const source = await readFile(new URL("./ExerciseDetailScreen.tsx", import.meta.url), "utf8");
 

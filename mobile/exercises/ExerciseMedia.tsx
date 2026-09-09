@@ -1,5 +1,6 @@
 import type { components } from "@fitician/core";
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
 import { AppIcon, Media } from "../ui/components";
@@ -27,10 +28,19 @@ export function ExerciseMedia({
 }: ExerciseMediaProps) {
   const runtime = getMobileRuntimeConfig();
   const source = { uri: resolveExerciseMediaUrl(path, runtime.apiBaseUrl) };
+  const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setFailed(false);
+    setLoading(true);
+  }, [mediaType, path]);
+
+  const renderable = isExerciseMediaRenderable(path, mediaType) && !failed;
 
   return (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="image" style={[styles.frame, compact && styles.compactFrame, style]}>
-      {isExerciseMediaRenderable(path, mediaType) ? (
+      {renderable ? (
         mediaType === "video" ? (
           <Media
             accessibilityLabel={`ویدئوی حرکت ${name}`}
@@ -38,12 +48,19 @@ export function ExerciseMedia({
             contentFit="cover"
             kind="video"
             loop
+            onFirstFrameRender={() => setLoading(false)}
             source={source}
             style={[styles.media, compact && styles.compactMedia]}
           />
         ) : (
           <Media
             accessibilityLabel={`تصویر حرکت ${name}`}
+            onError={() => {
+              setFailed(true);
+              setLoading(false);
+            }}
+            onLoad={() => setLoading(false)}
+            onLoadStart={() => setLoading(true)}
             source={source}
             style={[styles.media, compact && styles.compactMedia]}
           />
@@ -54,6 +71,11 @@ export function ExerciseMedia({
           <Text style={styles.fallbackText}>نمایش حرکت آماده نیست</Text>
         </View>
       )}
+      {renderable && loading ? (
+        <View pointerEvents="none" style={styles.loadingOverlay}>
+          <ActivityIndicator accessibilityLabel="در حال بارگذاری رسانه حرکت" color={fiticianTokens.colors.aqua} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -86,6 +108,16 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.large,
     minHeight: 160,
     overflow: "hidden",
+  },
+  loadingOverlay: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.mediaOverlay,
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
   },
   media: {
     flex: 1,
