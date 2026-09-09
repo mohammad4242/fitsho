@@ -1,4 +1,6 @@
 export { Button } from "./Button";
+export { DisclosureCard } from "./DisclosureCard";
+export type { DisclosureCardProps } from "./DisclosureCard";
 export type { ButtonProps, ButtonVariant } from "./Button";
 export { AppIcon } from "./AppIcon";
 export type { AppIconProps } from "./AppIcon";
