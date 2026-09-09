@@ -190,13 +190,13 @@ const conditionOptions: readonly ChoiceOption[] = [
 
 const productModeOptions: readonly {
   readonly description: string;
-  readonly icon: "bodyAnalysis" | "nutrition" | "training";
+  readonly icon: "bodyAnalysis" | "nutrition" | "target" | "training";
   readonly label: string;
   readonly mode: ProductMode;
 }[] = [
   { description: "برنامه شخصی بر اساس بدن، هدف و امکاناتت", icon: "training", label: "تمرین", mode: "training" },
   { description: "برنامه غذایی متناسب با هدف، بدن و بودجه", icon: "nutrition", label: "تغذیه", mode: "nutrition" },
-  { description: "یک مسیر هماهنگ برای تمرین و تغذیه", icon: "bodyAnalysis", label: "تمرین و تغذیه", mode: "both" },
+  { description: "یک مسیر هماهنگ برای تمرین و تغذیه", icon: "target", label: "تمرین و تغذیه", mode: "both" },
 ];
 
 type ChoiceOption = { readonly label: string; readonly value: string };
@@ -444,16 +444,33 @@ export function OnboardingScreen() {
   );
 }
 
-export function ModeStage({ busy, onSelect }: { readonly busy: boolean; readonly onSelect: (mode: ProductMode) => void }) {
+export interface ModeStageCopy {
+  readonly description?: string;
+  readonly eyebrow?: string;
+  readonly labels?: Partial<Record<ProductMode, string>>;
+  readonly showDescriptions?: boolean;
+  readonly title?: string;
+}
+
+export function ModeStage({
+  busy,
+  copy,
+  onSelect,
+}: {
+  readonly busy: boolean;
+  readonly copy?: ModeStageCopy;
+  readonly onSelect: (mode: ProductMode) => void;
+}) {
   return (
     <StageFrame
-      description="مسیرت را انتخاب کن؛ فیتشو فقط سؤال‌هایی را می‌پرسد که برای برنامه‌ات لازم است."
-      eyebrow="شروع شخصی‌سازی"
-      title="در چه زمینه‌ای به کمک نیاز داری؟"
+      description={copy?.description}
+      eyebrow={copy?.eyebrow ?? "شروع شخصی‌سازی"}
+      title={copy?.title ?? "در چه زمینه‌ای به کمک نیاز داری؟"}
     >
       <View style={styles.modeList}>
         {productModeOptions.map((option) => (
           <Pressable
+            accessibilityLabel={copy?.labels?.[option.mode] ?? option.label}
             accessibilityRole="button"
             accessibilityState={{ disabled: busy }}
             disabled={busy}
@@ -471,8 +488,8 @@ export function ModeStage({ busy, onSelect }: { readonly busy: boolean; readonly
             </View>
             <View style={styles.modeContent}>
               {option.mode === "both" ? <Text style={styles.recommended}>پیشنهاد فیتشو</Text> : null}
-              <Text style={styles.modeTitle}>{option.label}</Text>
-              <Text style={styles.modeDescription}>{option.description}</Text>
+              <Text style={styles.modeTitle}>{copy?.labels?.[option.mode] ?? option.label}</Text>
+              {copy?.showDescriptions === false ? null : <Text style={styles.modeDescription}>{option.description}</Text>}
             </View>
           </Pressable>
         ))}
@@ -1069,7 +1086,7 @@ function StageFrame({
   title,
 }: {
   readonly children: ReactNode;
-  readonly description: string;
+  readonly description?: string;
   readonly eyebrow: string;
   readonly onBack?: () => boolean;
   readonly progress?: string;
@@ -1083,7 +1100,7 @@ function StageFrame({
           {progress ? <Text style={styles.progress}>{progress}</Text> : null}
         </View>
         <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
+        {description ? <Text style={styles.description}>{description}</Text> : null}
       </View>
       {children}
       {onBack && progress === undefined ? <Button label="بازگشت" onPress={onBack} variant="ghost" /> : null}

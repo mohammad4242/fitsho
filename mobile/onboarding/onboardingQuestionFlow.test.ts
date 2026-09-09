@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getOnboardingStageProgress,
   getQuestionProgress,
   nextQuestionIndex,
   previousQuestionIndex,
@@ -17,5 +18,12 @@ describe("onboarding question flow", () => {
   it("returns stable progress for a single or multi-question stage", () => {
     expect(getQuestionProgress(0, 1)).toEqual({ current: 1, progress: 1, total: 1 });
     expect(getQuestionProgress(1, 3)).toEqual({ current: 2, progress: 2 / 3, total: 3 });
+  });
+
+  it("counts only completed persisted onboarding stages", () => {
+    expect(getOnboardingStageProgress(null, "product_mode")).toEqual({ completed: 0, progress: 0, total: 0 });
+    expect(getOnboardingStageProgress("training", "shared_profile")).toEqual({ completed: 0, progress: 0, total: 2 });
+    expect(getOnboardingStageProgress("training", "training_profile")).toEqual({ completed: 1, progress: 0.5, total: 2 });
+    expect(getOnboardingStageProgress("training", "review")).toEqual({ completed: 2, progress: 1, total: 2 });
   });
 });

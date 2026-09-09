@@ -18,4 +18,12 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(publicSource).toMatch(/SecurePublicOnboardingDraftStore/);
   expect(publicSource).toMatch(/PUBLIC_ONBOARDING_SOURCE/);
   expect(publicSource).toMatch(/StateSkeleton/);
+  expect(publicSource).toMatch(/اطلاعاتت تا زمان ساخت حساب فقط در همین تب نگه‌داری می‌شود/);
+  expect(publicSource).toMatch(/شروع با مربی فیتشو/);
+  expect(publicSource).toMatch(/برنامه تمرینی/);
+  expect(publicSource).toMatch(/برنامه تغذیه/);
+  expect(publicSource).toMatch(/حالا حسابت را بساز/);
+  expect(publicSource).toMatch(/مسیر امن انتقال اطلاعات/);
+  expect(publicSource).toMatch(/getOnboardingStageProgress/);
+  expect(publicSource).not.toMatch(/WebView/);
 });

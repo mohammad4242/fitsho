@@ -2,12 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { getOnboardingSteps, createInitialOnboardingState, transitionOnboardingState, type OnboardingEvent, type OnboardingState } from "@fitician/core/onboarding";
-import type { ProductMode } from "@fitician/core/profile";
+import { createInitialOnboardingState, transitionOnboardingState, type OnboardingEvent, type OnboardingState } from "@fitician/core/onboarding";
 
 import { PUBLIC_ONBOARDING_SOURCE } from "../auth/authRoute";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { AppIcon, Button, Card, Notice, ProgressBar, StateSkeleton } from "../ui/components";
+import { AppIcon, Button, Card, Notice, PageHeading, ProgressBar, StateSkeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -23,12 +22,34 @@ import {
   TrainingProfileStage,
   exerciseFormValuesForState,
 } from "./OnboardingScreen";
+import { getOnboardingStageProgress } from "./onboardingQuestionFlow";
 import {
   emptyProfileFormValues,
   profileFormValuesForSharedProfile,
   profileFormValuesForTrainingProfile,
 } from "./onboardingForms";
 import { SecurePublicOnboardingDraftStore } from "./publicOnboardingDraftStore";
+
+const publicOnboardingCopy = {
+  header: "اطلاعاتت تا زمان ساخت حساب فقط در همین تب نگه‌داری می‌شود.",
+  mode: {
+    eyebrow: "شروع با مربی فیتشو",
+    labels: {
+      both: "تمرین و تغذیه",
+      nutrition: "برنامه تغذیه",
+      training: "برنامه تمرینی",
+    },
+    title: "تو چه زمینه‌ای به کمک نیاز داری؟",
+  },
+  account: {
+    description: "پاسخ‌ها بعد از ورود امن به حساب فیتشو منتقل می‌شوند.",
+    edit: "بازگشت و ویرایش پاسخ‌ها",
+    eyebrow: "آخرین قدم",
+    securityBody: "پاسخ‌ها تا لحظه‌ی ساخت حساب در همین تب می‌مانند.",
+    securityTitle: "مسیر امن انتقال اطلاعات",
+    title: "حالا حسابت را بساز",
+  },
+} as const;
 
 export function PublicOnboardingScreen() {
   const router = useRouter();
@@ -109,11 +130,26 @@ export function PublicOnboardingScreen() {
           <Text style={styles.progressText}>{progress}</Text>
         </View>
       </View>
+      <View style={styles.publicHeaderNote} testID="public-onboarding-header-note">
+        <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={fiticianTokens.iconSize.sm} />
+        <Text style={styles.publicHeaderNoteText}>{publicOnboardingCopy.header}</Text>
+      </View>
       <View style={styles.progressTrack}>
         <ProgressBar label="پیشرفت مسیر شخصی‌سازی" progress={onboardingProgressValue(state)} />
       </View>
       {error ? <Notice message={error} variant="danger" /> : null}
-      {state.step === "product_mode" ? <ModeStage busy={busy} onSelect={(mode) => run({ mode, type: "select_product_mode" })} /> : null}
+      {state.step === "product_mode" ? (
+        <ModeStage
+          busy={busy}
+          copy={{
+            eyebrow: publicOnboardingCopy.mode.eyebrow,
+            labels: publicOnboardingCopy.mode.labels,
+            showDescriptions: false,
+            title: publicOnboardingCopy.mode.title,
+          }}
+          onSelect={(mode) => run({ mode, type: "select_product_mode" })}
+        />
+      ) : null}
       {state.step === "shared_profile" ? (
         <SharedProfileStage
           busy={busy}
@@ -166,67 +202,56 @@ export function PublicOnboardingScreen() {
           onSubmit={(nutrition) => run({ profile: nutrition, type: "save_nutrition_profile" })}
         />
       ) : null}
-      {state.step === "review" ? <AccountHandoffStage mode={state.mode} onBack={goBack} onRegister={() => router.push({ pathname: "/auth/register", params: { source: PUBLIC_ONBOARDING_SOURCE } })} onSignIn={() => router.push({ pathname: "/auth/sign-in", params: { source: PUBLIC_ONBOARDING_SOURCE } })} /> : null}
+      {state.step === "review" ? <AccountHandoffStage onBack={goBack} onRegister={() => router.push({ pathname: "/auth/register", params: { source: PUBLIC_ONBOARDING_SOURCE } })} onSignIn={() => router.push({ pathname: "/auth/sign-in", params: { source: PUBLIC_ONBOARDING_SOURCE } })} /> : null}
       {state.step === "complete" ? <Notice message="این مسیر قبلاً تکمیل شده است." variant="success" /> : null}
     </Screen>
   );
 }
 
 function AccountHandoffStage({
-  mode,
   onBack,
   onRegister,
   onSignIn,
 }: {
-  readonly mode: ProductMode | null;
   readonly onBack: () => boolean;
   readonly onRegister: () => void;
   readonly onSignIn: () => void;
 }) {
   return (
     <View style={styles.stage}>
-      <View style={styles.heading}>
-        <Text style={styles.eyebrow}>آخرین قدم</Text>
-        <Text accessibilityRole="header" style={styles.title}>مسیرت آماده است</Text>
-        <Text style={styles.description}>برای ذخیره امن پاسخ‌ها و ساخت برنامه شخصی، یک حساب فیتشو بساز یا وارد حساب خودت شو.</Text>
-      </View>
+      <PageHeading
+        compact={false}
+        eyebrow={publicOnboardingCopy.account.eyebrow}
+        supportingText={publicOnboardingCopy.account.description}
+        testID="public-onboarding-account-heading"
+        title={publicOnboardingCopy.account.title}
+      />
+      <Button label={publicOnboardingCopy.account.edit} onPress={onBack} variant="ghost" />
       <Card variant="hero" style={styles.accountCard}>
         <View style={styles.accountIcon}>
           <AppIcon accessibilityLabel="امنیت" color={fiticianTokens.colors.aqua} name="shield" size={fiticianTokens.iconSize.lg} />
         </View>
         <View style={styles.accountCopy}>
-          <Text style={styles.accountTitle}>اطلاعاتت همراه خودت می‌ماند</Text>
-          <Text style={styles.accountDescription}>پاسخ‌های مسیر {productModeLabel(mode)} فقط برای شخصی‌سازی تجربه تو استفاده می‌شوند.</Text>
+          <Text style={styles.accountTitle}>{publicOnboardingCopy.account.securityTitle}</Text>
+          <Text style={styles.accountDescription}>{publicOnboardingCopy.account.securityBody}</Text>
         </View>
       </Card>
       <View style={styles.accountActions}>
-        <Button label="ساخت حساب جدید" onPress={onRegister} />
-        <Button label="ورود به حساب" onPress={onSignIn} variant="secondary" />
-        <Button label="ویرایش پاسخ‌ها" onPress={onBack} variant="ghost" />
+        <Button label="ساخت حساب و ذخیره پاسخ‌ها" onPress={onRegister} />
+        <Button label="ورود و ذخیره پاسخ‌ها" onPress={onSignIn} variant="secondary" />
       </View>
     </View>
   );
 }
 
-function productModeLabel(mode: ProductMode | null): string {
-  if (mode === "training") return "تمرین";
-  if (mode === "nutrition") return "تغذیه";
-  return "تمرین و تغذیه";
-}
-
 function onboardingProgress(state: OnboardingState): string {
-  if (state.mode === null) return "شروع";
-  const steps = getOnboardingSteps(state.mode);
-  const index = Math.min(steps.indexOf(state.step) + 1, steps.length - 1);
-  return `گام ${index} از ${steps.length - 1}`;
+  const progress = getOnboardingStageProgress(state.mode, state.step);
+  if (progress.total === 0) return "شروع";
+  return `پاسخ‌های ثبت‌شده ${progress.completed} از ${progress.total}`;
 }
 
 function onboardingProgressValue(state: OnboardingState): number {
-  if (state.mode === null || state.step === "product_mode") return 0;
-  const steps = getOnboardingSteps(state.mode);
-  const index = steps.indexOf(state.step);
-  if (index <= 0) return 0;
-  return Math.min(1, index / Math.max(1, steps.length - 1));
+  return getOnboardingStageProgress(state.mode, state.step).progress;
 }
 
 function publicOnboardingErrorMessage(error: unknown): string {
@@ -293,25 +318,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
   },
-  description: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    lineHeight: 28,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  eyebrow: {
-    color: fiticianTokens.colors.coral,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  heading: {
-    gap: fiticianTokens.spacing[3],
-  },
   loadingScreen: {
     alignItems: "center",
     gap: fiticianTokens.spacing[4],
@@ -353,19 +359,26 @@ const styles = StyleSheet.create({
   progressTrack: {
     marginTop: -fiticianTokens.spacing[3],
   },
+  publicHeaderNote: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+    width: "100%",
+  },
+  publicHeaderNoteText: {
+    color: fiticianTokens.colors.muted,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   screen: {
     gap: fiticianTokens.spacing[5],
     paddingBottom: fiticianTokens.spacing[7],
   },
   stage: {
     gap: fiticianTokens.spacing[5],
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h1,
-    lineHeight: 42,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
 });
