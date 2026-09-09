@@ -20,6 +20,9 @@ required to remain within its budget. A launch cohort is accepted at ≥99.5%
 crash-free launches across at least 100 clean launches per representative device
 tier. The launch denominator, crash count, OS/API level, device model, app
 version, commit, and build profile are retained with the report.
+`buildMobilePerformanceReport` calculates p95, reports missing metrics, validates
+the cohort fields, and accepts a report only when all metrics and the launch
+cohort satisfy these rules.
 
 The automated harness covers budget evaluation, bounded samples, cold-start
 completion, route transitions, list commits, privacy image processing, video
@@ -34,8 +37,9 @@ npm --prefix mobile run validate
 
 Physical API 24, 29, 33, and 36 runs and low/mid-range device measurements are
 release-gate evidence. They require an Android development build and profiler;
-the current repository environment has no Android SDK or emulator, so those
-measurements are not claimed by the automated checks above.
+the current repository environment has Android SDK/ADB tooling but no attached
+device or configured AVD. Those measurements are not claimed by the automated
+checks above.
 
 ## Web-native parity Phase 27 verification
 
@@ -46,7 +50,9 @@ measurements are not claimed by the automated checks above.
   are not replaced with unbounded decorative rendering.
 - Catalogue media does not autoplay. The public exercise-video cache remains
   hashed, LRU-bounded to 50 entries/128 MiB, validates public video paths, and
-  records persisted cache reads against the 150 ms budget.
+  records persisted cache reads against the 150 ms budget. Exercise detail
+  playback prefers the persisted local URI and exposes native download/remove
+  actions while retaining online playback as fallback.
 - Privacy-cropped body-photo encoding and multipart uploads use the shared
   recorder. User query persistence remains restricted to the allowlisted
   workout/nutrition plan policies.

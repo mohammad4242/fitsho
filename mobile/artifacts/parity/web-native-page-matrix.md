@@ -73,10 +73,10 @@ Classification values follow the master plan: `VISUAL_HIERARCHY`, `SECTION_ORDER
 
 ## Phase 27 evidence
 
-- Performance source review: `mobile/platform/performance.ts`, root cold-start/transition instrumentation, catalogue `PerformanceMeasuredCommit`, privacy image processing, upload timing, and persisted public-video cache timing are already wired to explicit bounded budgets.
+- Performance source review: `mobile/platform/performance.ts`, root cold-start/transition instrumentation, catalogue `PerformanceMeasuredCommit`, privacy image processing, upload timing, and persisted public-video cache timing are wired to explicit bounded budgets; p95 reporting rejects missing metrics and invalid launch cohorts.
 - Native adaptation review: exercise catalogue rendering is capped at 12 API items per page and catalogue media is non-autoplay; nutrition, workout, body, and specialist flows keep API-owned data/state boundaries and do not add broad Web-style animation or visual layers.
 - Cache/query review: public exercise-video storage is hashed and LRU-bounded; encrypted query persistence is allowlisted to workout/nutrition plans; private media remains user-scoped and non-cacheable.
-- Automated performance/unit/source checks pass with the repository gates. Actual cold-start, transition, scrolling, memory/video/camera, and low/mid-range measurements remain physical-device evidence and are pending the Android matrix.
+- Automated performance/unit/source checks pass with the repository gates. Persisted exercise videos are consumed by the detail player through explicit native download/remove controls. Actual cold-start, transition, scrolling, memory/video/camera, and low/mid-range measurements remain physical-device evidence and are pending the Android matrix.
 
 ## Phase 0 gate
 

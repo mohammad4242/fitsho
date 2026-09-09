@@ -21,5 +21,6 @@ uses a member fixture and must return to the member home.
 
 The required device profiles are recorded in `mobile/device-matrix.json` for
 API 24, 29, 33, and 36, plus low- and mid-range physical tiers. The current
-repository environment has neither the Maestro CLI nor Android SDK/emulator,
-so static flow validation is available here but device execution is not claimed.
+repository environment has Android SDK/ADB tooling, but no Maestro CLI, attached
+device, or configured AVD. Static flow validation is available here; device
+execution is not claimed.
