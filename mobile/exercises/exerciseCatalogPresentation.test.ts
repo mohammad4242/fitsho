@@ -13,7 +13,7 @@ it("keeps primary discovery visible and moves secondary filters into a sheet", a
   expect(source.indexOf("placeholder={exerciseCopy.searchPlaceholder}")).toBeLessThan(source.indexOf("discoveryPanel"));
   expect(source.indexOf("discoveryPanel")).toBeLessThan(source.indexOf("<Sheet"));
   expect(source.indexOf("<DiscoveryStage")).toBeLessThan(source.indexOf("<Sheet"));
-  expect(source.indexOf("<Sheet")).toBeLessThan(source.indexOf("<ExerciseResults"));
+  expect(source.indexOf("<ExerciseResults")).toBeLessThan(source.indexOf("<Sheet"));
   expect(source).not.toContain('accessibilityLabel="باز کردن فیلترها"');
 });
 
