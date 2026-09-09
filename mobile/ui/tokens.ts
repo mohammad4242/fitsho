@@ -6,7 +6,15 @@ export type FiticianTokens = {
     readonly surface: string;
     readonly surfaceSubtle: string;
     readonly surfaceRaised: string;
+    readonly surfaceTranslucent: string;
+    readonly hero: string;
+    readonly mediaOverlay: string;
+    readonly scrim: string;
     readonly surfaceInteractive: string;
+    readonly infoSurface: string;
+    readonly warningSurface: string;
+    readonly successSurface: string;
+    readonly dangerSurface: string;
     readonly aqua: string;
     readonly blue: string;
     readonly coral: string;
@@ -35,10 +43,11 @@ export type FiticianTokens = {
       readonly displayEnglish: string;
       readonly displayPersian: string;
     };
-    readonly fontSize: Readonly<Record<"xs" | "sm" | "body" | "lg" | "h3" | "h2" | "h1", number>>;
+    readonly fontSize: Readonly<Record<"xs" | "sm" | "body" | "lg" | "h3" | "h2" | "h1" | "display" | "metric" | "compact", number>>;
     readonly lineHeight: Readonly<Record<"tight" | "body" | "loose", number>>;
     readonly fontWeight: Readonly<Record<"regular" | "medium" | "bold" | "extraBold", string>>;
   };
+  readonly iconSize: Readonly<Record<"sm" | "md" | "lg" | "xl", number>>;
   readonly shadows: {
     readonly card: NativeShadowToken;
     readonly soft: NativeShadowToken;
@@ -87,6 +96,14 @@ export const fiticianTokens = {
     surfaceInteractive: "rgba(80,223,206,0.07)",
     surfaceRaised: "#101e1c",
     surfaceSubtle: "#050b0c",
+    surfaceTranslucent: "rgba(16,30,28,0.78)",
+    hero: "#102522",
+    mediaOverlay: "rgba(2,6,7,0.72)",
+    scrim: "rgba(2,6,7,0.56)",
+    infoSurface: "rgba(80,223,206,0.08)",
+    warningSurface: "rgba(242,184,91,0.12)",
+    successSurface: "rgba(102,200,159,0.12)",
+    dangerSurface: "rgba(246,120,89,0.12)",
     teal: "#0e201e",
   },
   layout: {
@@ -150,6 +167,12 @@ export const fiticianTokens = {
     7: 48,
     8: 72,
   },
+  iconSize: {
+    sm: 18,
+    md: 22,
+    lg: 28,
+    xl: 36,
+  },
   typography: {
     fontFamily: {
       bodyEnglish: "Sora",
@@ -159,10 +182,13 @@ export const fiticianTokens = {
     },
     fontSize: {
       body: 16,
+      compact: 13,
+      display: 38,
       h1: 32,
       h2: 24,
       h3: 20,
       lg: 18,
+      metric: 28,
       sm: 14,
       xs: 12,
     },

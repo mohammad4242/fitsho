@@ -15,6 +15,9 @@ it("preserves the Fitsho dark petrol palette for native Fitician", () => {
     teal: "#0e201e",
   });
   expect(fiticianTokens.colors.line).toBe("rgba(232,244,241,0.12)");
+  expect(fiticianTokens.colors.surfaceTranslucent).toBe("rgba(16,30,28,0.78)");
+  expect(fiticianTokens.colors.mediaOverlay).toBe("rgba(2,6,7,0.72)");
+  expect(fiticianTokens.colors.warningSurface).toBe("rgba(242,184,91,0.12)");
 });
 
 it("exposes typed native spacing, radii, typography, motion, and layout tokens", () => {
@@ -37,5 +40,7 @@ it("exposes typed native spacing, radii, typography, motion, and layout tokens",
     displayPersian: "Lalezar",
   });
   expect(fiticianTokens.motion).toMatchObject({ fastMs: 160, mediumMs: 260 });
+  expect(fiticianTokens.typography.fontSize.display).toBe(38);
+  expect(fiticianTokens.iconSize).toMatchObject({ sm: 18, md: 22, lg: 28 });
   expect(fiticianTokens.layout.minimumTouchTarget).toBe(48);
 });

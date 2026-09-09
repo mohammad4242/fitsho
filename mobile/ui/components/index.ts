@@ -1,5 +1,7 @@
 export { Button } from "./Button";
 export type { ButtonProps, ButtonVariant } from "./Button";
+export { AppIcon } from "./AppIcon";
+export type { AppIconProps } from "./AppIcon";
 export { Card } from "./Card";
 export type { CardProps, CardVariant } from "./Card";
 export { Dialog, Sheet } from "./Overlay";

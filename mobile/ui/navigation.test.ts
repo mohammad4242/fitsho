@@ -111,6 +111,15 @@ it("places route guards at group boundaries and hides capability tabs", async ()
   );
 });
 
+it("uses native icons and safe-area-aware member tab navigation", async () => {
+  const route = resolve(appRoot, "(member)/member/(tabs)/_layout.tsx");
+  const source = await readFile(route, "utf8");
+  expect(source).toContain("AppIcon");
+  expect(source).toContain("tabBarIcon");
+  expect(source).toContain("useSafeAreaInsets");
+  expect(source).toContain("paddingBottom");
+});
+
 it("keeps account deletion available to any signed-in role without admin routes", async () => {
   await expect(readFile(resolve(appRoot, "(account)/account-deletion.tsx"), "utf8"))
     .resolves.toMatch(/AccountDeletionScreen/);
