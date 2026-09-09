@@ -4,7 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Button, Notice, TextField } from "../../../ui/components";
-import { AuthScaffold } from "../../../auth/AuthScaffold";
+import { AuthFormCard, AuthScaffold } from "../../../auth/AuthScaffold";
 import { onboardingRoute } from "../../../auth/authRoute";
 import { authCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
@@ -72,27 +72,29 @@ export default function PhoneOtpScreen() {
     >
       <View style={authStyles.content}>
         {error ? <Notice message={error} variant="danger" /> : null}
-        <Controller
-          control={control}
-          name="code"
-          rules={{ required: "کد ورود را وارد کنید.", validate: validateOtpCode }}
-          render={({ field, fieldState }) => (
-            <TextField
-              autoCapitalize="none"
-              autoComplete="one-time-code"
-              error={fieldState.error?.message}
-              keyboardType="number-pad"
-              label={authCopy.common.otpCode}
-              maxLength={6}
-              onBlur={field.onBlur}
-              onChangeText={field.onChange}
-              textAlign="center"
-              textDirection="ltr"
-              value={field.value}
-            />
-          )}
-        />
-        <Button label={authCopy.login.verifyOtp} loading={auth.busy} onPress={submit} />
+        <AuthFormCard>
+          <Controller
+            control={control}
+            name="code"
+            rules={{ required: "کد ورود را وارد کنید.", validate: validateOtpCode }}
+            render={({ field, fieldState }) => (
+              <TextField
+                autoCapitalize="none"
+                autoComplete="one-time-code"
+                error={fieldState.error?.message}
+                keyboardType="number-pad"
+                label={authCopy.common.otpCode}
+                maxLength={6}
+                onBlur={field.onBlur}
+                onChangeText={field.onChange}
+                textAlign="center"
+                textDirection="ltr"
+                value={field.value}
+              />
+            )}
+          />
+          <Button label={authCopy.login.verifyOtp} loading={auth.busy} onPress={submit} />
+        </AuthFormCard>
         <Pressable
           accessibilityRole="button"
           disabled={secondsLeft > 0 || auth.busy}

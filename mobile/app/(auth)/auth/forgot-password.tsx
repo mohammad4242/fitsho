@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { View } from "react-native";
 
 import { Button, Notice, TextField } from "../../../ui/components";
-import { AuthScaffold } from "../../../auth/AuthScaffold";
+import { AuthFormCard, AuthScaffold } from "../../../auth/AuthScaffold";
 import { publicOnboardingParams } from "../../../auth/authRoute";
 import { authCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
@@ -42,31 +42,33 @@ export default function ForgotPasswordScreen() {
       <View style={authStyles.content}>
         {error ? <Notice message={error} variant="danger" /> : null}
         {success ? <Notice message={authCopy.passwordRecovery.forgotSuccess} variant="success" /> : null}
-        <Controller
-          control={control}
-          name="email"
-          rules={{ required: "ایمیل را وارد کنید.", validate: validateEmail }}
-          render={({ field, fieldState }) => (
-            <TextField
-              autoCapitalize="none"
-              autoComplete="email"
-              error={fieldState.error?.message}
-              keyboardType="email-address"
-              label={authCopy.common.email}
-              onBlur={field.onBlur}
-              onChangeText={field.onChange}
-              textContentType="emailAddress"
-              textDirection="ltr"
-              value={field.value}
-            />
-          )}
-        />
-        <Button label={authCopy.passwordRecovery.forgotSubmit} loading={auth.busy} onPress={submit} />
-        <Button
-          label={authCopy.passwordRecovery.backToLogin}
-          onPress={() => router.replace({ pathname: "/auth/sign-in", params: publicOnboardingParams(params.source) })}
-          variant="ghost"
-        />
+        <AuthFormCard>
+          <Controller
+            control={control}
+            name="email"
+            rules={{ required: "ایمیل را وارد کنید.", validate: validateEmail }}
+            render={({ field, fieldState }) => (
+              <TextField
+                autoCapitalize="none"
+                autoComplete="email"
+                error={fieldState.error?.message}
+                keyboardType="email-address"
+                label={authCopy.common.email}
+                onBlur={field.onBlur}
+                onChangeText={field.onChange}
+                textContentType="emailAddress"
+                textDirection="ltr"
+                value={field.value}
+              />
+            )}
+          />
+          <Button label={authCopy.passwordRecovery.forgotSubmit} loading={auth.busy} onPress={submit} />
+          <Button
+            label={authCopy.passwordRecovery.backToLogin}
+            onPress={() => router.replace({ pathname: "/auth/sign-in", params: publicOnboardingParams(params.source) })}
+            variant="ghost"
+          />
+        </AuthFormCard>
       </View>
     </AuthScaffold>
   );

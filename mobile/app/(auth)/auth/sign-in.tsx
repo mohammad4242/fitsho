@@ -3,8 +3,8 @@ import { Controller, useForm } from "react-hook-form";
 import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { Button, Card, Notice, TextField } from "../../../ui/components";
-import { AuthScaffold } from "../../../auth/AuthScaffold";
+import { Button, Notice, TextField } from "../../../ui/components";
+import { AuthFormCard, AuthScaffold } from "../../../auth/AuthScaffold";
 import { onboardingRoute, publicOnboardingParams } from "../../../auth/authRoute";
 import { authCopy, mobileAuthCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
@@ -99,7 +99,7 @@ export default function SignInScreen() {
           />
         </View>
         {mode === "email" ? (
-          <Card>
+          <AuthFormCard>
             <View style={authStyles.content}>
               <Controller
                 control={emailForm.control}
@@ -143,9 +143,9 @@ export default function SignInScreen() {
                 <Text style={authStyles.link}>{authCopy.login.forgotPassword}</Text>
               </Pressable>
             </View>
-          </Card>
+          </AuthFormCard>
         ) : (
-          <Card>
+          <AuthFormCard>
             <View style={authStyles.content}>
               <Controller
                 control={phoneForm.control}
@@ -168,7 +168,7 @@ export default function SignInScreen() {
               />
               <Button label={authCopy.login.sendOtp} loading={auth.busy} onPress={submitPhone} />
             </View>
-          </Card>
+          </AuthFormCard>
         )}
         {google.available ? (
           <>

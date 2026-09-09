@@ -27,7 +27,7 @@ import type {
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { Button, Card, FormField, Notice, TextField } from "../ui/components";
+import { AppIcon, Button, Card, FormField, Notice, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot, useRefreshMobileProfileStatus } from "../ui/navigation/RouteGuards";
@@ -407,6 +407,7 @@ export function ProfileScreen() {
       <Text accessibilityRole="header" style={styles.title}>پروفایل من</Text>
       <Text style={styles.intro}>اطلاعات بدنی، تنظیمات تمرین و ترجیحات تغذیه‌ای را از همین‌جا به‌روز کن.</Text>
 
+      <ProfileOverviewCard mode={loaded.mode} shared={loaded.shared} />
       <Card style={styles.identityCard} variant="raised">
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{loaded.shared.display_name.trim().slice(0, 1) || "ف"}</Text>
@@ -853,6 +854,52 @@ function NutritionSection({
   );
 }
 
+function ProfileOverviewCard({
+  mode,
+  shared,
+}: {
+  readonly mode: ProductMode;
+  readonly shared: SharedProfile;
+}) {
+  return (
+    <Card style={styles.overviewCard} variant="hero">
+      <View style={styles.overviewHeader}>
+        <View style={styles.overviewIcon}>
+          <AppIcon color={fiticianTokens.colors.aqua} name="profile" size={22} />
+        </View>
+        <View style={styles.overviewCopy}>
+          <Text style={styles.overviewEyebrow}>FITICIAN PROFILE</Text>
+          <Text style={styles.overviewTitle}>مسیر اختصاصی تو</Text>
+          <Text style={styles.overviewSubtitle}>{modeLabel(mode)}</Text>
+        </View>
+      </View>
+      <View style={styles.overviewStats}>
+        <ProfileStat icon="target" label="هدف اصلی" value={goalLabel(shared.fitness_goal)} />
+        <ProfileStat icon="bodyAnalysis" label="قد" value={`${formatProfileNumber(shared.height_cm)} سانتی‌متر`} />
+        <ProfileStat icon="training" label="وزن فعلی" value={`${formatProfileNumber(shared.current_weight_kg)} کیلو`} />
+      </View>
+    </Card>
+  );
+}
+
+function ProfileStat({
+  icon,
+  label,
+  value,
+}: {
+  readonly icon: "bodyAnalysis" | "target" | "training";
+  readonly label: string;
+  readonly value: string;
+}) {
+  return (
+    <View style={styles.overviewStat}>
+      <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={16} />
+      <Text style={styles.overviewStatLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.overviewStatValue}>{value}</Text>
+    </View>
+  );
+}
+
 type ChoiceOption = { readonly label: string; readonly value: string };
 
 function ChoiceField({
@@ -964,6 +1011,24 @@ function sectionLabel(section: ProfileSection): string {
   return "تغذیه";
 }
 
+function goalLabel(goal: FitnessGoal): string {
+  const labels: Record<FitnessGoal, string> = {
+    body_recomposition: "بازترکیب بدنی",
+    build_muscle: "عضله‌سازی",
+    fat_loss: "چربی‌سوزی",
+    gain_weight: "افزایش وزن",
+    improve_fitness: "بهبود آمادگی",
+    lose_weight: "کاهش وزن",
+    maintain_weight: "حفظ وزن",
+    strength: "افزایش قدرت",
+  };
+  return labels[goal];
+}
+
+function formatProfileNumber(value: number): string {
+  return new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 1 }).format(value);
+}
+
 function profileErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.message !== "Request failed") return error.message;
   if (error instanceof Error && error.message !== "") {
@@ -974,7 +1039,7 @@ function profileErrorMessage(error: unknown): string {
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     marginTop: fiticianTokens.spacing[4],
@@ -1023,7 +1088,7 @@ const styles = StyleSheet.create({
     width: "48%",
   },
   choiceGrid: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
     justifyContent: "flex-start",
@@ -1055,7 +1120,7 @@ const styles = StyleSheet.create({
   },
   identityCard: {
     alignItems: "center",
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
   },
   identityCopy: {
@@ -1082,6 +1147,81 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 22,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  overviewCard: {
+    gap: fiticianTokens.spacing[4],
+  },
+  overviewCopy: {
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+  },
+  overviewEyebrow: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    textAlign: "right",
+  },
+  overviewHeader: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+  },
+  overviewIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+  overviewStat: {
+    alignItems: "flex-end",
+    backgroundColor: fiticianTokens.colors.surfaceTranslucent,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+    padding: fiticianTokens.spacing[2],
+  },
+  overviewStatLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  overviewStatValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 11,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    maxWidth: "100%",
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  overviewStats: {
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+  },
+  overviewSubtitle: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  overviewTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 29,
     textAlign: "right",
     writingDirection: "rtl",
   },
@@ -1114,7 +1254,7 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
   },
   sectionTabs: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[2],
   },
   sectionTitle: {
@@ -1135,7 +1275,7 @@ const styles = StyleSheet.create({
   },
   switchRow: {
     alignItems: "center",
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     justifyContent: "flex-end",
   },
@@ -1148,7 +1288,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   twoColumns: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
   },
 });
