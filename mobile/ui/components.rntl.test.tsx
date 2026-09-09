@@ -3,6 +3,7 @@ import { expect, jest, test } from "@jest/globals";
 
 import { Button } from "./components/Button";
 import { TextField } from "./components/Input";
+import { MetricRing } from "./components/MetricRing";
 
 test("renders the shared button with native accessibility and press behavior", () => {
   const onPress = jest.fn();
@@ -35,4 +36,12 @@ test("keeps screen-reader names, font scaling, and focus order in source order",
     "اول",
     "دوم",
   ]);
+});
+
+test("exposes metric progress and its visible value to assistive technology", () => {
+  render(<MetricRing label="پیشرفت کالری امروز" progress={0.375} />);
+
+  const ring = screen.getByRole("progressbar", { name: "پیشرفت کالری امروز" });
+  expect(ring.props.accessibilityValue).toEqual({ max: 100, min: 0, now: 38 });
+  expect(screen.getByText("۳۸٪")).toBeTruthy();
 });

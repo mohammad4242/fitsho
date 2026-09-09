@@ -26,6 +26,9 @@ export type FiticianTokens = {
     readonly muted: string;
     readonly line: string;
     readonly lineStrong: string;
+    readonly aquaAtmosphere: string;
+    readonly progressTrack: string;
+    readonly surfaceHighlight: string;
   };
   readonly spacing: Readonly<Record<1 | 2 | 3 | 4 | 5 | 6 | 7 | 8, number>>;
   readonly radii: {
@@ -88,6 +91,9 @@ export const fiticianTokens = {
     ink: "#e8f4f1",
     line: "rgba(232,244,241,0.12)",
     lineStrong: "rgba(80,223,206,0.28)",
+    aquaAtmosphere: "rgba(80,223,206,0.10)",
+    progressTrack: "rgba(232,244,241,0.10)",
+    surfaceHighlight: "rgba(255,255,255,0.05)",
     mist: "#e8f4f1",
     muted: "#94aba5",
     petrol: "#091817",
