@@ -36,3 +36,21 @@ Physical API 24, 29, 33, and 36 runs and low/mid-range device measurements are
 release-gate evidence. They require an Android development build and profiler;
 the current repository environment has no Android SDK or emulator, so those
 measurements are not claimed by the automated checks above.
+
+## Web-native parity Phase 27 verification
+
+- Cold start and route transitions are measured from the native root layout and
+  `InteractionManager`-settled pathname changes.
+- Exercise catalogue commits are measured around a bounded 12-item page. Long
+  nutrition and specialist collections keep their existing API-owned bounds and
+  are not replaced with unbounded decorative rendering.
+- Catalogue media does not autoplay. The public exercise-video cache remains
+  hashed, LRU-bounded to 50 entries/128 MiB, validates public video paths, and
+  records persisted cache reads against the 150 ms budget.
+- Privacy-cropped body-photo encoding and multipart uploads use the shared
+  recorder. User query persistence remains restricted to the allowlisted
+  workout/nutrition plan policies.
+- No WebView, blur layer, animation library, or list-wide gradient/shadow
+  expansion was added for visual parity. Cold-start, transition, scroll,
+  media, memory, camera, and low/mid-range device measurements still require
+  the physical Android matrix.
