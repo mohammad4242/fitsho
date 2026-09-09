@@ -15,4 +15,12 @@ it("keeps the native physician workflow role-scoped and revision-safe", () => {
   expect(source).toContain("reject");
   expect(source).toContain("connectivityStatus");
   expect(source).toContain("readOnly");
+  expect(source).toContain("PageHeading");
+  expect(source).toContain("SegmentedControl");
+  expect(source).toContain("useAndroidBackHandler");
+  expect(source).toContain("clinicalTab");
+  expect(source).toContain("requestLabs");
+  expect(source).toContain("reviewLab");
+  expect(source).toContain("supplement-orders");
+  expect(source).toContain("مکمل‌ها");
 });

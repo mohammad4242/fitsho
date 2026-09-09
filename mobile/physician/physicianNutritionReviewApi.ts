@@ -6,6 +6,12 @@ export type PhysicianNutritionPlan = components["schemas"]["WeeklyPlanResponse"]
 export type PhysicianPlanAction = "start_review" | "approve" | "request_changes" | "reject";
 export type PhysicianMedicalContextResponse = components["schemas"]["PhysicianMedicalContextResponse"];
 export type PhysicianCatalogueFood = components["schemas"]["CatalogueFoodResponse"];
+export type PhysicianLabDocument = components["schemas"]["NutritionLabDocumentResponse"];
+export type PhysicianLabRequest = components["schemas"]["NutritionLabRequestResponse"];
+export type PhysicianSupplementCatalogue = components["schemas"]["NutritionSupplementCatalogueResponse"];
+export type PhysicianSupplementOrder = components["schemas"]["NutritionSupplementOrderResponse"];
+export type PhysicianSupplementOrderInput = components["schemas"]["PhysicianSupplementOrderInput"];
+export type PhysicianSupplementOrderStatus = components["schemas"]["NutritionSupplementOrderStatus"];
 
 export type AuthenticatedPhysicianRequest = <TResponse>(
   request: TransportRequest,
@@ -28,11 +34,13 @@ export interface PhysicianNutritionReviewApi {
   ): Promise<PhysicianNutritionPlan>;
   claim(reviewId: string): Promise<components["schemas"]["NutritionReviewClaimResponse"]>;
   getAccess(): Promise<{ authorized: true }>;
-  getLabs(planId: string): Promise<components["schemas"]["NutritionLabDocumentResponse"][]>;
+  getLabs(planId: string): Promise<PhysicianLabDocument[]>;
   getMedicalContext(planId: string): Promise<PhysicianMedicalContextResponse>;
   getPlan(planId: string): Promise<PhysicianNutritionPlan>;
   listFoods(): Promise<PhysicianCatalogueFood[]>;
   list(view: PhysicianReviewQueueView): Promise<PhysicianReviewQueueItem[]>;
+  listSupplementCatalogue(): Promise<PhysicianSupplementCatalogue[]>;
+  listSupplementOrders(planId: string): Promise<PhysicianSupplementOrder[]>;
   removeMeal(
     planId: string,
     expectedPlanRevisionId: string,
@@ -45,6 +53,29 @@ export interface PhysicianNutritionReviewApi {
     foodId: string,
     replacementFoodId: string,
   ): Promise<PhysicianNutritionPlan>;
+  requestLabs(
+    planId: string,
+    expectedPlanRevisionId: string,
+    requestedTests: string[],
+    userVisibleReason: string,
+  ): Promise<components["schemas"]["NutritionLabRequestCreatedResponse"]>;
+  reviewLab(
+    documentId: string,
+    reviewStatus: string,
+    notes: string | null,
+  ): Promise<PhysicianLabDocument>;
+  createSupplementOrder(
+    planId: string,
+    input: PhysicianSupplementOrderInput,
+  ): Promise<PhysicianSupplementOrder>;
+  updateSupplementOrder(
+    orderId: string,
+    input: PhysicianSupplementOrderInput,
+  ): Promise<PhysicianSupplementOrder>;
+  transitionSupplementOrder(
+    orderId: string,
+    status: PhysicianSupplementOrderStatus,
+  ): Promise<PhysicianSupplementOrder>;
 }
 
 const nutritionPath = "/api/v1/nutrition";
@@ -93,7 +124,7 @@ export function createPhysicianNutritionReviewApi(
       method: "GET",
       path: `${nutritionPath}/physician/access`,
     }),
-    getLabs: (planId) => request<components["schemas"]["NutritionLabDocumentResponse"][]>({
+    getLabs: (planId) => request<PhysicianLabDocument[]>({
       method: "GET",
       path: `${planPath(planId)}/labs`,
     }),
@@ -113,6 +144,14 @@ export function createPhysicianNutritionReviewApi(
       method: "GET",
       path: `${nutritionPath}/physician/reviews?view=${encodeURIComponent(view)}`,
     }),
+    listSupplementCatalogue: () => request<PhysicianSupplementCatalogue[]>({
+      method: "GET",
+      path: `${nutritionPath}/supplements/catalogue`,
+    }),
+    listSupplementOrders: (planId) => request<PhysicianSupplementOrder[]>({
+      method: "GET",
+      path: `${planPath(planId)}/supplement-orders`,
+    }),
     removeMeal: (planId, expectedPlanRevisionId, mealId) => request<PhysicianNutritionPlan>({
       body: jsonBody({ expected_plan_revision_id: expectedPlanRevisionId, meal_id: mealId }),
       method: "POST",
@@ -127,6 +166,35 @@ export function createPhysicianNutritionReviewApi(
       }),
       method: "POST",
       path: `${planPath(planId)}/edits/replace-food`,
+    }),
+    requestLabs: (planId, expectedPlanRevisionId, requestedTests, userVisibleReason) => request<components["schemas"]["NutritionLabRequestCreatedResponse"]>({
+      body: jsonBody({
+        expected_plan_revision_id: expectedPlanRevisionId,
+        requested_tests: requestedTests,
+        user_visible_reason: userVisibleReason,
+      }),
+      method: "POST",
+      path: `${planPath(planId)}/request-labs`,
+    }),
+    reviewLab: (documentId, reviewStatus, notes) => request<PhysicianLabDocument>({
+      body: jsonBody({ notes, review_status: reviewStatus }),
+      method: "PUT",
+      path: `${nutritionPath}/physician/labs/${encodeURIComponent(documentId)}/review`,
+    }),
+    createSupplementOrder: (planId, input) => request<PhysicianSupplementOrder>({
+      body: jsonBody(input),
+      method: "POST",
+      path: `${planPath(planId)}/supplement-orders`,
+    }),
+    updateSupplementOrder: (orderId, input) => request<PhysicianSupplementOrder>({
+      body: jsonBody(input),
+      method: "PUT",
+      path: `${nutritionPath}/physician/supplement-orders/${encodeURIComponent(orderId)}`,
+    }),
+    transitionSupplementOrder: (orderId, status) => request<PhysicianSupplementOrder>({
+      body: jsonBody({ status }),
+      method: "POST",
+      path: `${nutritionPath}/physician/supplement-orders/${encodeURIComponent(orderId)}/transition`,
     }),
   } satisfies PhysicianNutritionReviewApi;
 }
