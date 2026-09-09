@@ -31,7 +31,6 @@ import {
 import {
   classifyWorkoutGenerationError,
   findPendingWorkoutPlanId,
-  formatWorkoutPrescription,
   getUserVisibleWorkoutWarnings,
   getWorkoutPlanSummaryStatus,
   isWorkoutPlanExecutable,
@@ -717,17 +716,19 @@ function WorkoutDayCard({
   );
 }
 
-function formatExerciseMetadata(exercise: WorkoutPlanExercise): string {
-  const prescriptionValue = exercise.prescription_mode === "duration"
-    ? exercise.duration_min_seconds ?? exercise.duration_max_seconds
-    : exercise.reps_min ?? exercise.reps_max;
+function formatExerciseNumber(value: number): string {
+  return formatPersianNumber(value, { maximumFractionDigits: 0, useGrouping: false });
+}
 
-  return [
-    exercise.sets === null || exercise.sets === undefined ? null : `${formatPersianNumber(exercise.sets, { maximumFractionDigits: 0 })} ست`,
-    prescriptionValue === null || prescriptionValue === undefined ? null : formatWorkoutPrescription(exercise),
-    exercise.rir === null || exercise.rir === undefined ? null : `RIR ${formatPersianNumber(exercise.rir, { maximumFractionDigits: 0, useGrouping: false })}`,
-    exercise.rest_seconds === null || exercise.rest_seconds === undefined ? null : `${formatPersianNumber(exercise.rest_seconds, { maximumFractionDigits: 0 })}ث استراحت`,
-  ].filter((item): item is string => item !== null).join(" · ");
+function formatExerciseRange(
+  min: number | null | undefined,
+  max: number | null | undefined,
+  suffix = "",
+): string | null {
+  const lower = min ?? max;
+  if (lower === null || lower === undefined) return null;
+  const upper = max ?? lower;
+  return `${formatExerciseNumber(lower)}–${formatExerciseNumber(upper)}${suffix}`;
 }
 
 function WorkoutExerciseRow({
@@ -739,6 +740,11 @@ function WorkoutExerciseRow({
   readonly onOpen: () => void;
   readonly onStartReplacement?: (exerciseId: string) => void;
 }) {
+  const prescriptionLabel = exercise.prescription_mode === "duration" ? "زمان" : "تکرار";
+  const prescriptionValue = exercise.prescription_mode === "duration"
+    ? formatExerciseRange(exercise.duration_min_seconds, exercise.duration_max_seconds, "ث")
+    : formatExerciseRange(exercise.reps_min, exercise.reps_max);
+
   return (
     <View style={styles.exerciseRow}>
       <Pressable
@@ -763,37 +769,58 @@ function WorkoutExerciseRow({
         </View>
       </Pressable>
       <View style={styles.exerciseCopy}>
+        <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>
+        <View style={styles.exerciseStatsRow}>
+          {exercise.sets === null || exercise.sets === undefined ? null : (
+            <View style={styles.exerciseStat}>
+              <Text style={styles.exerciseStatLabel}>ست</Text>
+              <Text style={styles.exerciseStatValue}>{formatExerciseNumber(exercise.sets)}</Text>
+            </View>
+          )}
+          {prescriptionValue === null ? null : (
+            <View style={styles.exerciseStat}>
+              <Text style={styles.exerciseStatLabel}>{prescriptionLabel}</Text>
+              <Text style={styles.exerciseStatValue}>{prescriptionValue}</Text>
+            </View>
+          )}
+          {exercise.rest_seconds === null || exercise.rest_seconds === undefined ? null : (
+            <View style={styles.exerciseStat}>
+              <Text style={styles.exerciseStatLabel}>استراحت</Text>
+              <Text style={styles.exerciseStatValue}>{formatExerciseNumber(exercise.rest_seconds)}ث</Text>
+            </View>
+          )}
+          {exercise.rir === null || exercise.rir === undefined ? null : (
+            <View style={styles.exerciseStat}>
+              <Text style={styles.exerciseStatLabel}>RIR</Text>
+              <Text style={styles.exerciseStatValue}>{formatExerciseNumber(exercise.rir)}</Text>
+            </View>
+          )}
+        </View>
+        {exercise.notes_fa ? <Text style={styles.exerciseNote}>{exercise.notes_fa}</Text> : null}
         <Pressable
-          accessibilityLabel={`باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
-          accessibilityRole="button"
+          accessibilityLabel="مشاهده جزئیات حرکت"
+          accessibilityRole="link"
+          hitSlop={fiticianTokens.spacing[1]}
           onPress={(event) => {
             event.stopPropagation();
             onOpen();
           }}
-          style={({ pressed }) => [styles.exerciseDetailButton, pressed && styles.exerciseRowPressed]}
+          style={({ pressed }) => [styles.exerciseDetailLink, pressed && styles.exerciseActionPressed]}
         >
-          <View style={styles.exerciseDetailCopy}>
-            <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>
-            <Text style={styles.exerciseSecondary}>{exercise.exercise.name_en}</Text>
-          </View>
-          <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
+          <Text style={styles.exerciseDetailLinkText}>مشاهده جزئیات حرکت</Text>
         </Pressable>
-        <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1} style={styles.exerciseStats}>
-          {formatExerciseMetadata(exercise)}
-        </Text>
-        {exercise.notes_fa ? <Text style={styles.exerciseNote}>{exercise.notes_fa}</Text> : null}
         {onStartReplacement && exercise.alternatives.length > 0 ? (
           <Pressable
-            accessibilityLabel="جایگزین"
+            accessibilityLabel="حرکت جایگزین"
             accessibilityRole="button"
             hitSlop={fiticianTokens.spacing[1]}
             onPress={(event) => {
               event.stopPropagation();
               onStartReplacement(exercise.id);
             }}
-            style={({ pressed }) => [styles.exerciseReplacement, pressed && styles.exerciseReplacementPressed]}
+            style={({ pressed }) => [styles.exerciseReplacement, pressed && styles.exerciseActionPressed]}
           >
-            <Text style={styles.exerciseReplacementText}>جایگزین</Text>
+            <Text style={styles.exerciseReplacementText}>حرکت جایگزین</Text>
             <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
           </Pressable>
         ) : null}
@@ -1343,18 +1370,28 @@ const styles = StyleSheet.create({
   exerciseCopy: {
     flex: 1,
     gap: fiticianTokens.spacing[1],
+    minWidth: 0,
   },
-  exerciseDetailButton: {
-    alignItems: "flex-start",
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[2],
+  exerciseActionPressed: {
+    opacity: 0.78,
   },
-  exerciseDetailCopy: {
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
+  exerciseDetailLink: {
+    alignSelf: "flex-start",
+    paddingVertical: 2,
+  },
+  exerciseDetailLinkText: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 18,
+    textAlign: "right",
+    textDecorationLine: "underline",
+    writingDirection: "rtl",
   },
   exerciseMedia: {
     borderRadius: fiticianTokens.radii.medium,
+    flexShrink: 0,
     height: 68,
     minHeight: 0,
     width: 76,
@@ -1372,6 +1409,7 @@ const styles = StyleSheet.create({
   },
   exerciseMediaButton: {
     borderRadius: fiticianTokens.radii.medium,
+    flexShrink: 0,
     height: 68,
     overflow: "hidden",
     position: "relative",
@@ -1391,26 +1429,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
+    minWidth: 0,
     paddingBottom: fiticianTokens.spacing[3],
     paddingTop: fiticianTokens.spacing[1],
-  },
-  exerciseRowPressed: {
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    opacity: 0.9,
   },
   exerciseReplacement: {
     alignItems: "center",
     alignSelf: "flex-start",
-    borderRadius: fiticianTokens.radii.small,
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[1],
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: fiticianTokens.spacing[2],
-    paddingVertical: fiticianTokens.spacing[1],
-  },
-  exerciseReplacementPressed: {
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    opacity: 0.86,
+    paddingVertical: 2,
   },
   exerciseReplacementText: {
     color: fiticianTokens.colors.aqua,
@@ -1421,20 +1449,35 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  exerciseSecondary: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
-    writingDirection: "ltr",
+  exerciseStat: {
+    alignItems: "baseline",
+    flexDirection: "row-reverse",
+    flexShrink: 0,
+    gap: 2,
   },
-  exerciseStats: {
+  exerciseStatLabel: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 17,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  exerciseStatValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 18,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  exerciseStatsRow: {
+    alignItems: "baseline",
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+    minWidth: 0,
   },
   exerciseTitle: {
     color: fiticianTokens.colors.ink,

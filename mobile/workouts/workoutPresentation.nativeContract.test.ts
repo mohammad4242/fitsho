@@ -63,16 +63,43 @@ it("maps only supported warnings and filters internal warning codes", () => {
   expect(visible.join("\n")).not.toContain("PLANNED_VOLUME_REDUCED_DURING_SESSION_FIT");
 });
 
-it("keeps expanded exercise details and icon-based disclosure interactions", async () => {
+it("keeps expanded exercise details as separate web-parity stats and actions", async () => {
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+  const row = source.slice(source.indexOf("function WorkoutExerciseRow"), source.indexOf("function WorkoutHistory"));
 
   expect(source).toContain("function WorkoutExerciseRow");
-  expect(source).toContain("formatWorkoutPrescription(exercise)");
-  expect(source).toContain("exercise.rest_seconds");
-  expect(source).toContain("exercise.rir");
-  expect(source).toContain("exercise.alternatives");
+  expect(row).toContain("exercise.sets");
+  expect(row).toContain("exercise.reps_min");
+  expect(row).toContain("exercise.reps_max");
+  expect(row).toContain("exercise.duration_min_seconds");
+  expect(row).toContain("exercise.duration_max_seconds");
+  expect(row).toContain("exercise.rest_seconds");
+  expect(row).toContain("exercise.rir");
+  expect(row).toContain("exercise.alternatives");
+  expect(row).toContain("ست");
+  expect(row).toContain("تکرار");
+  expect(row).toContain("زمان");
+  expect(row).toContain("استراحت");
+  expect(row).toContain("RIR");
+  expect(row).toContain("مشاهده جزئیات حرکت");
+  expect(row).toContain("حرکت جایگزین");
+  expect(row).toContain("styles.exerciseStatsRow");
+  expect(row).toContain("styles.exerciseStatLabel");
+  expect(row).toContain("styles.exerciseStatValue");
+  expect(row).toContain("styles.exerciseDetailLink");
+  expect(row).toContain("styles.exerciseDetailLinkText");
+  expect(row).toContain("onStartReplacement");
+  expect(row).toContain("onOpen();");
+  expect(row).toContain("onStartReplacement(exercise.id)");
+  expect(row).toContain("event.stopPropagation()");
+  expect(source).not.toContain("formatExerciseMetadata");
+  expect(source).not.toContain("formatWorkoutPrescription(exercise)");
+  expect(row).not.toContain('style={styles.exerciseStats}');
+  expect(source).toContain("exerciseStatsRow:");
+  expect(source).toContain("exerciseStatLabel:");
+  expect(source).toContain("exerciseStatValue:");
+  expect(source).toContain('textDecorationLine: "underline"');
   expect(source).toContain("onOpenExercise");
-  expect(source).toContain("onStartReplacement");
   expect(source).toContain('name={expanded ? "chevronUp" : "chevronDown"}');
   expect(source).toContain("accessibilityState={{ expanded }}");
   expect(source).not.toContain("statusStack");
