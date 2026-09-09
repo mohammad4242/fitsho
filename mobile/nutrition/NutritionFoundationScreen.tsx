@@ -122,7 +122,7 @@ export function NutritionFoundationScreen() {
         estimate={estimate}
       />
 
-      <NutritionDestinations onOpen={(path) => router.push(path)} />
+      <NutritionPlanShortcut onOpen={() => router.push("/member/nutrition-plan")} />
 
       <NutritionProfileSection
         onEdit={() => router.push("/member/profile")}
@@ -153,58 +153,15 @@ export function NutritionFoundationScreen() {
   );
 }
 
-type NutritionDestinationPath = "/member/food-catalogue" | "/member/meal-catalogue" | "/member/nutrition-plan";
-
-function NutritionDestinations({ onOpen }: { readonly onOpen: (path: NutritionDestinationPath) => void }) {
+function NutritionPlanShortcut({ onOpen }: { readonly onOpen: () => void }) {
   return (
-    <View style={styles.destinations}>
-      <View style={styles.sectionHeading}>
-        <Text style={styles.sectionTitle}>دسترسی سریع</Text>
-        <Text style={styles.statusText}>سه مسیر اصلی</Text>
+    <Card accessibilityLabel="برنامه غذایی" onPress={onOpen} style={styles.planShortcutCard} variant="hero">
+      <AppIcon color={fiticianTokens.colors.aqua} name="nutrition" size={fiticianTokens.iconSize.lg} />
+      <View style={styles.planShortcutCopy}>
+        <Text style={styles.planShortcutTitle}>برنامه غذایی</Text>
+        <Text style={styles.bodyText}>نسخه فعال، روزها، هزینه و تعویض‌های مجاز</Text>
       </View>
-      <View style={styles.destinationStack}>
-        <NutritionDestinationCard
-          description="نسخه فعال، روزها، هزینه و تعویض‌های مجاز"
-          icon="nutrition"
-          onPress={() => onOpen("/member/nutrition-plan")}
-          title="برنامه غذایی"
-        />
-        <NutritionDestinationCard
-          description="مواد غذایی با منبع و پیمانه‌های تأییدشده"
-          icon="foodLog"
-          onPress={() => onOpen("/member/food-catalogue")}
-          title="کاتالوگ مواد غذایی"
-        />
-        <NutritionDestinationCard
-          description="وعده‌های منتشرشده و خلاصه مواد تشکیل‌دهنده"
-          icon="calendar"
-          onPress={() => onOpen("/member/meal-catalogue")}
-          title="کاتالوگ وعده‌ها"
-        />
-      </View>
-    </View>
-  );
-}
-
-function NutritionDestinationCard({
-  description,
-  icon,
-  onPress,
-  title,
-}: {
-  readonly description: string;
-  readonly icon: "calendar" | "foodLog" | "nutrition";
-  readonly onPress: () => void;
-  readonly title: string;
-}) {
-  return (
-    <Card onPress={onPress} style={styles.destinationCard} variant="interactive">
-      <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={fiticianTokens.iconSize.lg} />
-      <View style={styles.destinationCopy}>
-        <Text style={styles.destinationTitle}>{title}</Text>
-        <Text style={styles.bodyText}>{description}</Text>
-      </View>
-      <AppIcon color={fiticianTokens.colors.muted} name="arrowLeft" size={fiticianTokens.iconSize.md} />
+      <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.md} />
     </Card>
   );
 }
@@ -761,29 +718,23 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.canvas,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
   },
-  destinationCard: {
+  planShortcutCard: {
     alignItems: "center",
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
   },
-  destinationCopy: {
+  planShortcutCopy: {
     alignItems: "flex-end",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
-  destinationStack: {
-    gap: fiticianTokens.spacing[2],
-  },
-  destinationTitle: {
+  planShortcutTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
-  },
-  destinations: {
-    gap: fiticianTokens.spacing[3],
   },
   fieldLabel: {
     color: fiticianTokens.colors.ink,

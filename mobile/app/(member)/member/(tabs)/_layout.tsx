@@ -71,13 +71,13 @@ export default function MemberTabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="more"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <AppIcon color={color} name="profile" size={focused ? fiticianTokens.iconSize.lg : fiticianTokens.iconSize.md} />
+            <AppIcon color={color} name="more" size={focused ? fiticianTokens.iconSize.lg : fiticianTokens.iconSize.md} />
           ),
-          tabBarLabel: "پروفایل",
-          title: "پروفایل",
+          tabBarLabel: "بیشتر",
+          title: "بیشتر",
         }}
       />
     </Tabs>

@@ -50,8 +50,9 @@ it("defines the public, auth, onboarding, account, member, coach, and physician 
     "(member)/member/(tabs)/index.tsx",
     "(member)/member/(tabs)/workouts.tsx",
     "(member)/member/(tabs)/nutrition.tsx",
+    "(member)/member/(tabs)/more.tsx",
     "(member)/member/nutrition-tracking.tsx",
-    "(member)/member/(tabs)/profile.tsx",
+    "(member)/member/profile.tsx",
     "(member)/member/body-analysis.tsx",
     "(member)/member/body-analysis-history.tsx",
     "(member)/member/body-analysis-result/[sessionId].tsx",
@@ -150,13 +151,28 @@ it("keeps public onboarding native and connected to the account handoff", async 
     .resolves.toContain("hydratePublicOnboardingState");
 });
 
-it("uses the native profile editor inside the member profile tab", async () => {
+it("keeps the native profile editor in the member stack and removes its tab route", async () => {
+  await expect(routeExists("(member)/member/(tabs)/profile.tsx")).resolves.toBe(false);
   await expect(
-    readFile(resolve(appRoot, "(member)/member/(tabs)/profile.tsx"), "utf8"),
+    readFile(resolve(appRoot, "(member)/member/profile.tsx"), "utf8"),
   ).resolves.toMatch(/ProfileScreen/);
   await expect(
-    readFile(resolve(appRoot, "(member)/member/(tabs)/profile.tsx"), "utf8"),
+    readFile(resolve(appRoot, "(member)/member/profile.tsx"), "utf8"),
   ).resolves.not.toMatch(/RouteEntryScreen/);
+});
+
+it("keeps More as the fourth and only optional-independent member tab", async () => {
+  const source = await readFile(
+    resolve(appRoot, "(member)/member/(tabs)/_layout.tsx"),
+    "utf8",
+  );
+  const tabNames = Array.from(source.matchAll(/<Tabs\.Screen\s+name="([^"]+)"/g), (match) => match[1]);
+  expect(tabNames).toEqual(["index", "workouts", "nutrition", "more"]);
+  expect(source).toContain('tabBarLabel: "بیشتر"');
+  expect(source).not.toContain('name="profile"');
+  await expect(
+    readFile(resolve(appRoot, "(member)/member/(tabs)/more.tsx"), "utf8"),
+  ).resolves.toMatch(/MoreScreen/);
 });
 
 it("uses the data-driven member home instead of the route-entry placeholder", async () => {

@@ -1,10 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 
-it("offers nutrition destinations before secondary forms and preserves guarded routes", async () => {
+it("keeps the nutrition plan shortcut before secondary forms and leaves catalogues to More", async () => {
   const source = await readFile(new URL("./NutritionFoundationScreen.tsx", import.meta.url), "utf8");
-  expect(source.indexOf("<NutritionDestinations")).toBeGreaterThan(0);
-  expect(source.indexOf("<NutritionDestinations")).toBeLessThan(source.indexOf("<NutritionProfileSection"));
+  expect(source.indexOf("<NutritionPlanShortcut")).toBeGreaterThan(0);
+  expect(source.indexOf("<NutritionPlanShortcut")).toBeLessThan(source.indexOf("<NutritionProfileSection"));
+  expect(source).not.toContain("<NutritionDestinations");
+  expect(source).not.toContain("سه مسیر اصلی");
+  expect(source).not.toContain('title="کاتالوگ مواد غذایی"');
+  expect(source).not.toContain('title="کاتالوگ وعده‌ها"');
   for (const route of ["nutrition-plan", "food-catalogue", "meal-catalogue"]) {
     const text = await readFile(new URL(`../app/(member)/member/${route}.tsx`, import.meta.url), "utf8");
     expect(text).toContain('requiredCapability="nutrition"');

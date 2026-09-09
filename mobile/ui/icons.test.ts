@@ -8,6 +8,7 @@ it("keeps member navigation on a stable, renderable icon set", () => {
     "training",
     "nutrition",
     "profile",
+    "more",
     "genderMale",
     "genderFemale",
   ]));
@@ -15,6 +16,7 @@ it("keeps member navigation on a stable, renderable icon set", () => {
   expect(fiticianIconName("training")).toBe("dumbbell");
   expect(fiticianIconName("nutrition")).toBe("silverware-fork-knife");
   expect(fiticianIconName("profile")).toBe("account-circle-outline");
+  expect(fiticianIconName("more")).toBe("dots-horizontal");
   expect(fiticianIconName("genderMale")).toBe("gender-male");
   expect(fiticianIconName("genderFemale")).toBe("gender-female");
 });
