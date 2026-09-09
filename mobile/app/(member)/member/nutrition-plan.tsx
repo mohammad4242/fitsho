@@ -3,7 +3,7 @@ import { useMemo } from "react";
 
 import { useMobileAuth } from "../../../auth/MobileAuthProvider";
 import { nutritionKeys } from "../../../data/queryKeys";
-import { Notice, ScreenHeader, Skeleton } from "../../../ui/components";
+import { Notice, PageHeading, Skeleton } from "../../../ui/components";
 import { Screen } from "../../../ui/layout";
 import { RouteGuard } from "../../../ui/navigation/RouteGuards";
 import { NutritionPlanSection } from "../../../nutrition/NutritionPlanSection";
@@ -20,10 +20,10 @@ export default function MemberNutritionPlanRoute() {
   return (
     <RouteGuard kind="member" requiredCapability="nutrition">
       <Screen contentWidth="reading">
-        <ScreenHeader
+        <PageHeading
           compact
           eyebrow="تغذیه"
-          subtitle="نسخه فعال، تاریخچه و تغییرهای مجاز برنامه غذایی را اینجا مدیریت کن."
+          supportingText="نسخه فعال، تاریخچه و تغییرهای مجاز برنامه غذایی را اینجا مدیریت کن."
           title="برنامه غذایی"
         />
         {safetyQuery.isPending ? <Skeleton height={180} /> : null}

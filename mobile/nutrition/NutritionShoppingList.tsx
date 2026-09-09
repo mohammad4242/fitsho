@@ -13,6 +13,12 @@ import {
   formatShoppingQuantity,
 } from "./nutritionShoppingList";
 
+const shoppingWarningMessages: Readonly<Record<string, string>> = {
+  INSUFFICIENT_PRICE_COVERAGE: "پوشش قیمت مرجع برای همه مواد غذایی کافی نیست.",
+  PHYSICIAN_REVIEW_REQUIRED: "این نسخه تا بررسی پزشک برای خرید نهایی آماده نیست.",
+  PRICE_SNAPSHOT_STALE: "قیمت‌های مرجع این نسخه ممکن است تازه نباشند.",
+};
+
 export function NutritionShoppingList({
   api,
   connectivityStatus,
@@ -67,9 +73,7 @@ export function NutritionShoppingList({
       {priceVisibility === "not_executable" ? (
         <Notice message="قیمت مرجع فقط برای برنامه فعال و تأییدشده نمایش داده می‌شود." variant="warning" />
       ) : null}
-      {list.warning_codes.length > 0 ? (
-        <Notice message={list.warning_codes.join("\n")} title="وضعیت برنامه" variant="info" />
-      ) : null}
+      <ShoppingWarnings codes={list.warning_codes} />
       {list.items.length === 0 ? (
         <Notice message="برای این نسخه ماده‌ای در لیست خرید ثبت نشده است." variant="info" />
       ) : (
@@ -105,6 +109,12 @@ export function NutritionShoppingList({
 function stateData<TData>(state: ReturnType<typeof getMobileViewState<TData>>): TData | undefined {
   if (state.status === "loading") return undefined;
   return "data" in state ? state.data : undefined;
+}
+
+function ShoppingWarnings({ codes }: { readonly codes: readonly string[] }) {
+  const messages = [...new Set(codes.map((code) => shoppingWarningMessages[code]).filter((message): message is string => message !== undefined))];
+  if (messages.length === 0) return null;
+  return <Notice message={messages.join(" ")} title="وضعیت برنامه" variant="info" />;
 }
 
 const styles = StyleSheet.create({

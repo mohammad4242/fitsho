@@ -62,6 +62,27 @@ const generationMessages: Record<ReturnType<typeof classifyNutritionGenerationOu
   success: "برنامه غذایی با اطلاعات فعلی ساخته شد.",
 };
 
+const generationReasonMessages: Readonly<Record<string, string>> = {
+  CARBOHYDRATE_MINIMUM_EXCEEDS_CALORIE_BUDGET: "حداقل کربوهیدرات موردنیاز با کالری هدف فعلی قابل جمع نیست.",
+  FLEXIBLE_BUDGET_CAP_EXCEEDED: "حتی محدوده انعطاف‌پذیر بودجه برای برنامه فعلی کافی نیست.",
+  GOAL_RESELECTION_REQUIRED: "هدف فعلی با شرایط ثبت‌شده قابل برنامه‌ریزی نیست.",
+  INSUFFICIENT_PRICE_COVERAGE: "برای تعداد کافی از مواد غذایی قیمت معتبر در دسترس نیست.",
+  NUTRITION_PROFILE_REQUIRED: "پروفایل تغذیه کامل نیست.",
+  PHYSICIAN_MANUAL_PLAN_REQUIRED: "این شرایط به تنظیم یا بررسی پزشک نیاز دارد.",
+  PROTEIN_MINIMUM_EXCEEDS_CALORIE_BUDGET: "حداقل پروتئین موردنیاز با کالری هدف فعلی قابل جمع نیست.",
+  STRUCTURED_EXERCISE_REQUIRED: "اطلاعات تمرین برای ساخت برنامه کامل نیست.",
+  STRICT_BUDGET_EXCEEDED: "هزینه برنامه از بودجه سخت‌گیرانه بیشتر است.",
+  UNSUPPORTED_OR_HARD_BLOCKED: "ساخت خودکار برنامه با شرایط فعلی مجاز نیست.",
+  USER_BUDGET_BELOW_MINIMUM_FEASIBLE: "با بودجه فعلی برنامه سازگار و شدنی پیدا نشد.",
+};
+
+const planWarningMessages: Readonly<Record<string, string>> = {
+  INSUFFICIENT_PRICE_COVERAGE: "پوشش قیمت مرجع برای همه مواد غذایی کافی نیست.",
+  PHYSICIAN_REVIEW_REQUIRED: "این نسخه تا بررسی پزشک برای تصمیم نهایی آماده نیست.",
+  PRICE_SNAPSHOT_STALE: "قیمت‌های مرجع این نسخه ممکن است تازه نباشند.",
+  SAFETY_REVIEW_REQUIRED: "این نسخه به بررسی ایمنی تغذیه نیاز دارد.",
+};
+
 export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecision | null }) {
   const auth = useMobileAuth();
   const queryClient = useQueryClient();
@@ -304,8 +325,8 @@ function NutritionPlanCard({
       <Card style={styles.planCard}>
         <View style={styles.planHeading}>
           <View style={styles.planCopy}>
-            <Text style={styles.eyebrow}>{historical ? "نسخه قبلی" : "آخرین نسخه"}</Text>
-            <Text style={styles.planTitle}>برنامه غذایی تو</Text>
+            <Text style={styles.eyebrow}>{planHeadingEyebrow(currentPlan, historical)}</Text>
+            <Text accessibilityRole="header" style={styles.planTitle}>{planTitle(currentPlan)}</Text>
           </View>
           <StatusBadge status={status} />
         </View>
@@ -318,14 +339,19 @@ function NutritionPlanCard({
           <PlanStat label="تعداد روز" value={formatNutritionNumber(currentPlan.days.length)} />
           <PlanStat label="نسخه" value={formatNutritionNumber(currentPlan.revision)} />
         </View>
+        <View style={styles.planContext}>
+          <PlanContextItem label="نقش برنامه" value={planRoleLabel(currentPlan.plan_role)} />
+          <PlanContextItem label="وضعیت پزشک" value={planApprovalLabel(currentPlan)} />
+          <PlanContextItem label="شروع برنامه" value={formatPlanDate(currentPlan.start_date)} />
+        </View>
         {currentPlan.physician_user_visible_notes ? (
           <Notice message={currentPlan.physician_user_visible_notes} title="یادداشت پزشک" variant="info" />
         ) : null}
-        {currentPlan.warning_codes.length > 0 ? (
-          <Notice message={currentPlan.warning_codes.join("\n")} title="هشدارهای برنامه" variant="warning" />
+        {currentPlan.physician_change_summary.length > 0 ? (
+          <Notice message="پزشک در این نسخه تغییراتی ثبت کرده است؛ جزئیات در وضعیت همین برنامه اعمال شده‌اند." title="خلاصه تغییرات پزشک" variant="info" />
         ) : null}
+        <PlanWarnings codes={currentPlan.warning_codes} />
         <SummaryRow label="وضعیت بودجه" value={budgetStatusLabel(currentPlan.budget_status)} />
-        <SummaryRow label="شروع برنامه" value={formatPlanDate(currentPlan.start_date)} />
       </Card>
 
       {selectedDay !== null ? (
@@ -934,21 +960,26 @@ function BundleChoice({
 
   return (
     <Card style={styles.sectionCard}>
-      <Text style={styles.cardTitle}>انتخاب نسخه برنامه</Text>
-      <Text style={styles.bodyText}>هر دو نسخه از همان داده‌های مرجع تأییدشده استفاده می‌کنند؛ یکی را به عنوان برنامه فعال انتخاب کن.</Text>
+      <Text accessibilityRole="header" style={styles.cardTitle}>مقایسه و انتخاب نسخه</Text>
+      <Text style={styles.bodyText}>{comparisonExplanation(bundle.comparison)}</Text>
+      {bundle.comparison.monthly_cost_gap_irr !== null && bundle.comparison.monthly_cost_gap_irr !== undefined ? (
+        <Text style={styles.comparisonCost}>
+          اختلاف هزینه ماهانه: {formatNutritionPlanMoney(bundle.comparison.monthly_cost_gap_irr)}
+        </Text>
+      ) : null}
       <View style={styles.choiceStack}>
         <PlanChoice
           disabled={disabled}
           label="نسخه اقتصادی"
+          plan={bundle.budget_plan}
           selected={selectedRole === "budget"}
-          subtitle={formatNutritionPlanMoney(bundle.budget_plan.weekly_cost_irr)}
           onPress={() => onSelect("budget")}
         />
         <PlanChoice
           disabled={disabled}
           label="نسخه ایده‌آل"
+          plan={bundle.ideal_plan}
           selected={selectedRole === "ideal"}
-          subtitle={formatNutritionPlanMoney(bundle.ideal_plan.weekly_cost_irr)}
           onPress={() => onSelect("ideal")}
         />
       </View>
@@ -960,26 +991,46 @@ function PlanChoice({
   disabled,
   label,
   onPress,
+  plan,
   selected,
-  subtitle,
 }: {
   readonly disabled: boolean;
   readonly label: string;
   readonly onPress: () => void;
+  readonly plan: WeeklyPlan;
   readonly selected: boolean;
-  readonly subtitle: string;
 }) {
   return (
     <Pressable
+      accessibilityLabel={selected ? `${label}، برنامه فعال شما` : label}
       accessibilityRole="radio"
       accessibilityState={{ checked: selected, disabled }}
       disabled={disabled}
       onPress={onPress}
       style={[styles.planChoice, selected && styles.planChoiceSelected]}
     >
-      <Text style={[styles.planChoiceLabel, selected && styles.planChoiceLabelSelected]}>{label}</Text>
-      <Text style={[styles.planChoiceSubtitle, selected && styles.planChoiceSubtitleSelected]}>{subtitle}</Text>
+      <View style={styles.planChoiceHeading}>
+        <Text style={[styles.planChoiceLabel, selected && styles.planChoiceLabelSelected]}>{label}</Text>
+        {selected ? <Text style={styles.planChoiceActive}>برنامه فعال شما</Text> : null}
+      </View>
+      <Text style={[styles.planChoiceSubtitle, selected && styles.planChoiceSubtitleSelected]}>
+        {formatNutritionPlanMoney(plan.weekly_cost_irr)} در هفته
+      </Text>
+      <View style={styles.planChoiceMetrics}>
+        <PlanChoiceMetric label="کالری" value={planMetricLabel(plan, "goal_calories")} />
+        <PlanChoiceMetric label="پروتئین" value={planMetricLabel(plan, "protein")} />
+        <PlanChoiceMetric label="کربوهیدرات" value={planMetricLabel(plan, "carbohydrate")} />
+      </View>
     </Pressable>
+  );
+}
+
+function PlanChoiceMetric({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <View style={styles.planChoiceMetric}>
+      <Text style={styles.planChoiceMetricValue}>{value}</Text>
+      <Text style={styles.planChoiceMetricLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -1063,7 +1114,9 @@ function DaySelector({
 function GenerationNotice({ result }: { readonly result: WeeklyPlanGeneration }) {
   const status = classifyNutritionGenerationOutcome(result.outcome);
   if (status === "success") return <Notice message={generationMessages.success} variant="success" />;
-  return <Notice message={`${generationMessages[status]}${result.reason_codes.length > 0 ? ` (${result.reason_codes.join(", ")})` : ""}`} variant="warning" />;
+  const reasons = [...new Set(result.reason_codes.map((code) => generationReasonMessages[code]).filter((message): message is string => message !== undefined))];
+  const message = reasons.length > 0 ? `${generationMessages[status]} ${reasons.join(" ")}` : generationMessages[status];
+  return <Notice message={message} variant="warning" />;
 }
 
 function PlanReviewNotice({ status }: { readonly status: ReturnType<typeof getNutritionPlanStatus> }) {
@@ -1103,6 +1156,65 @@ function PlanStat({ label, value }: { readonly label: string; readonly value: st
   );
 }
 
+function PlanContextItem({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <View style={styles.planContextItem}>
+      <Text style={styles.planContextValue}>{value}</Text>
+      <Text style={styles.planContextLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function planHeadingEyebrow(plan: WeeklyPlan, historical: boolean): string {
+  if (historical) return "نسخه قبلی";
+  if (plan.lifecycle_status === "active") return "برنامه فعال";
+  if (plan.physician_approved) return "تأییدشده برای اجرا";
+  return "پیش‌نویس در انتظار بررسی";
+}
+
+function planRoleLabel(value: string | null | undefined): string {
+  if (value === "budget") return "با بودجه شما";
+  if (value === "ideal") return "ایده‌آل";
+  return "برنامه غذایی";
+}
+
+function planTitle(plan: WeeklyPlan): string {
+  if (plan.plan_role === "budget") return "برنامه با بودجه شما";
+  if (plan.plan_role === "ideal") return "برنامه ایده‌آل";
+  return "برنامه غذایی تو";
+}
+
+function planApprovalLabel(plan: WeeklyPlan): string {
+  if (plan.physician_approved && plan.review_status === "approved") return "تأیید شده";
+  if (plan.lifecycle_status === "rejected" || plan.review_status === "rejected") return "تأیید نشده";
+  return "در انتظار بررسی";
+}
+
+function planMetricLabel(plan: WeeklyPlan, code: string): string {
+  const metric = plan.nutrients[code];
+  if (metric === undefined || !Number.isFinite(metric.planned)) return "—";
+  const unit = metric.unit === "kcal/day" ? "کیلوکالری" : metric.unit === "g/day" ? "گرم" : metric.unit;
+  return `${formatNutritionNumber(metric.planned)} ${unit}`;
+}
+
+function comparisonExplanation(
+  comparison: NonNullable<WeeklyPlanGeneration["comparison"]>,
+): string {
+  if (comparison.meaningful_quality_improvement) {
+    return "نسخه ایده‌آل بهبود معناداری در کیفیت یا پوشش مواد مغذی دارد؛ نسخه اقتصادی همچنان بر اساس بودجه شما محاسبه شده است.";
+  }
+  if (comparison.monthly_cost_gap_irr !== null && comparison.monthly_cost_gap_irr !== undefined) {
+    return "دو نسخه با همان داده‌های مرجع تأییدشده مقایسه شده‌اند؛ اختلاف هزینه و مقدارهای اصلی را پیش از فعال‌سازی ببین.";
+  }
+  return "هر دو نسخه از داده‌های مرجع تأییدشده استفاده می‌کنند؛ یکی را به عنوان برنامه فعال انتخاب کن.";
+}
+
+function PlanWarnings({ codes }: { readonly codes: readonly string[] }) {
+  const messages = [...new Set(codes.map((code) => planWarningMessages[code]).filter((message): message is string => message !== undefined))];
+  if (messages.length === 0) return null;
+  return <Notice message={messages.join(" ")} title="هشدارهای برنامه" variant="warning" />;
+}
+
 function SummaryRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <View style={styles.summaryRow}>
@@ -1122,7 +1234,7 @@ function budgetStatusLabel(value: string): string {
   if (value === "flexible_overage") return "با مازاد انعطاف‌پذیر";
   if (value === "over_budget") return "بیش از بودجه";
   if (value === "unconstrained") return "بدون محدودیت بودجه";
-  return value;
+  return "وضعیت بودجه ثبت نشده";
 }
 
 function formatPlanDate(value: string): string {
@@ -1147,7 +1259,7 @@ function mealRoleLabel(value: string): string {
   if (value === "snack") return "میان‌وعده";
   if (value === "free_meal") return "وعده آزاد";
   if (value === "post_workout") return "پس از تمرین";
-  return value;
+  return "وعده غذایی";
 }
 
 function nutritionLabel(value: string): string {
@@ -1156,7 +1268,7 @@ function nutritionLabel(value: string): string {
   if (value === "carbohydrate" || value === "carbohydrates") return "کربوهیدرات";
   if (value === "fat") return "چربی";
   if (value === "fibre" || value === "fiber") return "فیبر";
-  return value;
+  return "سایر مواد مغذی";
 }
 
 function nutritionPlanErrorMessage(error: unknown): string {
@@ -1189,6 +1301,14 @@ const styles = StyleSheet.create({
   },
   choiceStack: {
     gap: fiticianTokens.spacing[2],
+  },
+  comparisonCost: {
+    color: fiticianTokens.colors.amber,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   dayCard: {
     gap: fiticianTokens.spacing[3],
@@ -1457,6 +1577,50 @@ const styles = StyleSheet.create({
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     padding: fiticianTokens.spacing[3],
   },
+  planChoiceActive: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  planChoiceHeading: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  planChoiceMetric: {
+    alignItems: "flex-end",
+    backgroundColor: fiticianTokens.colors.surface,
+    borderRadius: fiticianTokens.radii.small,
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+    padding: fiticianTokens.spacing[2],
+  },
+  planChoiceMetricLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  planChoiceMetricValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  planChoiceMetrics: {
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[1],
+    width: "100%",
+  },
   planChoiceLabel: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -1500,6 +1664,36 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
+  },
+  planContext: {
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+  },
+  planContextItem: {
+    alignItems: "flex-end",
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+    padding: fiticianTokens.spacing[2],
+  },
+  planContextLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  planContextValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   planStack: {
     gap: fiticianTokens.spacing[3],
