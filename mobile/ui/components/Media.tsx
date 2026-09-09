@@ -24,6 +24,7 @@ export interface VideoMediaProps extends Omit<VideoViewProps, "accessibilityLabe
   readonly kind: "video";
   readonly loop?: boolean;
   readonly muted?: boolean;
+  readonly onError?: () => void;
   readonly source: VideoSource;
   readonly style?: StyleProp<ViewStyle>;
 }
@@ -53,6 +54,7 @@ function VideoMedia({
   kind: _kind,
   loop = false,
   muted = true,
+  onError,
   source,
   style,
   ...videoProps
@@ -60,6 +62,12 @@ function VideoMedia({
   const player = useVideoPlayer(source, (instance) => {
     instance.loop = loop;
     instance.muted = muted;
+    if (onError && typeof instance.addListener === "function") {
+      instance.addListener("statusChange", ({ status }) => {
+        if (status === "error") onError();
+      });
+      if (instance.status === "error") onError();
+    }
     if (autoplay) {
       instance.play();
     }

@@ -88,6 +88,9 @@ describe("native exercise media", () => {
       mediaItem("female", ""),
       mediaItem("unspecified", "/media/shared.mp4"),
     ])).toEqual(["male"]);
+    expect(availableMediaPresentations([
+      mediaItem("female", "/media/female-1.mp4"),
+    ])).toEqual(["female"]);
   });
 });
 

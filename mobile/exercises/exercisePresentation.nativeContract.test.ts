@@ -20,10 +20,18 @@ it("keeps network media loading visible and falls back safely", async () => {
   expect(source).toContain("isExerciseMediaRenderable");
 });
 
-it("places the primary exercise media before detail metadata", async () => {
+it("uses the compact localized media carousel card", async () => {
   const source = await readFile(new URL("./ExerciseDetailScreen.tsx", import.meta.url), "utf8");
 
-  expect(source.indexOf("<NativeExerciseMedia")).toBeLessThan(source.indexOf("styles.mediaHeader"));
-  expect(source).toContain("styles.media");
+  expect(source).toContain("<ExerciseMediaCarousel");
+  expect(source).toContain("<GenderMediaSelector");
+  expect(source).toContain("languageForDirection");
+  expect(source).toContain("availableMediaPresentations");
+  expect(source).toContain('api.get(slug ?? "", "unspecified")');
   expect(source).toContain("styles.infoCard");
+  expect(source).not.toContain("ذخیره برای استفاده آفلاین");
+  expect(source).not.toContain("رسانه نمایش");
+  expect(source).not.toContain("exerciseSecondaryTitle");
+  expect(source).not.toContain("PresentationChip");
+  expect(source).not.toContain("PublicExerciseVideoCache");
 });

@@ -2,13 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 
-import { createNativeTransport } from "../api/nativeTransport";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
 import { exerciseKeys } from "../data/queryKeys";
@@ -18,37 +16,29 @@ import {
   Button,
   Card,
   EmptyState,
-  Media,
   Notice,
   ScreenHeader,
   Skeleton,
 } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { Screen } from "../ui/layout";
+import { languageForDirection } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import {
   createExerciseApi,
   type ExerciseDetail,
 } from "./exerciseApi";
+import { ExerciseMediaCarousel } from "./ExerciseMediaCarousel";
+import { GenderMediaSelector } from "./GenderMediaSelector";
 import {
+  availableMediaPresentations,
   buildExerciseMediaItems,
-  resolveExerciseMediaUrl,
   type ExerciseMediaItem,
+  type GenderMediaPresentation,
 } from "./exerciseMedia";
-import {
-  exerciseCopy,
-  exerciseSecondaryTitle,
-  exerciseTitle,
-} from "./exerciseCopy";
-import {
-  PublicExerciseVideoCache,
-  validatePublicExerciseVideoPath,
-  type PublicVideoCacheFile,
-} from "../video/publicExerciseVideoCache";
-import { ExpoPublicExerciseVideoStore } from "../video/publicExerciseVideoStore";
+import { exerciseCopy, exerciseTitle } from "./exerciseCopy";
 
-type MediaPresentationChoice = "male" | "female";
-type VideoDownloadStatus = "checking" | "downloading" | "error" | "idle" | "ready";
+type MediaPresentationChoice = GenderMediaPresentation;
 
 export function ExerciseDetailScreen() {
   const auth = useMobileAuth();
@@ -57,19 +47,10 @@ export function ExerciseDetailScreen() {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const api = useMemo(() => createExerciseApi(auth.request), [auth.request]);
   const runtime = useMemo(() => getMobileRuntimeConfig(), []);
-  const videoCache = useMemo(
-    () => new PublicExerciseVideoCache({
-      storage: new ExpoPublicExerciseVideoStore(),
-      transport: createNativeTransport({ apiBaseUrl: runtime.apiBaseUrl }),
-    }),
-    [runtime.apiBaseUrl],
-  );
   const connectivityStatus = useConnectivityStatus();
+  const language = languageForDirection();
   const [presentation, setPresentation] = useState<MediaPresentationChoice | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
-  const [cachedVideo, setCachedVideo] = useState<PublicVideoCacheFile | null>(null);
-  const [videoDownloadError, setVideoDownloadError] = useState(false);
-  const [videoDownloadStatus, setVideoDownloadStatus] = useState<VideoDownloadStatus>("idle");
   const presentationQuery = presentation ?? undefined;
   const detailQuery = useQuery({
     enabled: slug !== undefined,
@@ -79,21 +60,39 @@ export function ExerciseDetailScreen() {
       presentationQuery ?? "profile",
     ],
   });
+  const mediaInventoryQuery = useQuery({
+    enabled: slug !== undefined,
+    queryFn: () => api.get(slug ?? "", "unspecified"),
+    queryKey: [...exerciseKeys.detail(slug ?? ""), "media-inventory"],
+  });
   const detailState = getMobileViewState(detailQuery, { connectivityStatus });
   const detail = viewData(detailState);
   const mediaItems = useMemo(
     () => (detail === undefined || detail === null ? [] : buildExerciseMediaItems(detail)),
     [detail],
   );
-  const selectedItem = mediaItems[mediaIndex] ?? mediaItems[0];
-  const effectivePresentation = presentation ?? resolveMediaPresentation(detail);
-  const selectedCachedVideo = selectedItem !== undefined && cachedVideo?.sourcePath === selectedItem.mediaPath
-    ? cachedVideo
-    : null;
+  const mediaInventoryItems = useMemo(() => {
+    const inventory = mediaInventoryQuery.data ?? detail;
+    return inventory === undefined || inventory === null ? [] : buildExerciseMediaItems(inventory);
+  }, [detail, mediaInventoryQuery.data]);
+  const availablePresentations = useMemo(
+    () => availableMediaPresentations(mediaInventoryItems.length > 0 ? mediaInventoryItems : mediaItems),
+    [mediaInventoryItems, mediaItems],
+  );
+  const resolvedPresentation = presentation ?? resolveMediaPresentation(detail);
+  const effectivePresentation = availablePresentations.includes(resolvedPresentation)
+    ? resolvedPresentation
+    : availablePresentations[0] ?? resolvedPresentation;
+  const mediaItemKeys = mediaItems.map((item) => item.key).join("\u001f");
+
+  useEffect(() => {
+    setPresentation(null);
+    setMediaIndex(0);
+  }, [slug]);
 
   useEffect(() => {
     setMediaIndex(0);
-  }, [detail?.slug, presentationQuery, mediaItems.length]);
+  }, [detail?.slug, mediaItemKeys, presentationQuery]);
 
   useEffect(() => {
     if (
@@ -106,70 +105,15 @@ export function ExerciseDetailScreen() {
     }
   }, [detail, presentation]);
 
-  useEffect(() => {
-    let active = true;
-    setCachedVideo(null);
-    setVideoDownloadError(false);
-    if (selectedItem === undefined || selectedItem.mediaType !== "video") {
-      setVideoDownloadStatus("idle");
-      return () => {
-        active = false;
-      };
-    }
-    setVideoDownloadStatus("checking");
-    void videoCache.getCached(selectedItem.mediaPath).then((file) => {
-      if (!active) return;
-      setCachedVideo(file);
-      setVideoDownloadStatus(file === null ? "idle" : "ready");
-    }).catch(() => {
-      if (!active) return;
-      setVideoDownloadStatus("idle");
-    });
-    return () => {
-      active = false;
-    };
-  }, [selectedItem?.mediaPath, selectedItem?.mediaType, videoCache]);
-
   useAndroidBackHandler("wizard", () => {
     router.back();
     return true;
   }, true);
 
   function choosePresentation(next: MediaPresentationChoice) {
-    if (next !== effectivePresentation) {
-      setPresentation(next);
-      setMediaIndex(0);
-    }
-  }
-
-  async function downloadSelectedVideo() {
-    if (
-      selectedItem === undefined ||
-      selectedItem.mediaType !== "video" ||
-      !isDownloadableVideoPath(selectedItem.mediaPath) ||
-      videoDownloadStatus === "checking" ||
-      videoDownloadStatus === "downloading"
-    ) {
-      return;
-    }
-    setVideoDownloadStatus("downloading");
-    setVideoDownloadError(false);
-    try {
-      const file = await videoCache.getOrDownload(selectedItem.mediaPath);
-      setCachedVideo(file);
-      setVideoDownloadStatus("ready");
-    } catch {
-      setVideoDownloadError(true);
-      setVideoDownloadStatus("error");
-    }
-  }
-
-  async function removeSelectedVideo() {
-    if (selectedItem === undefined || selectedCachedVideo === null) return;
-    await videoCache.remove(selectedItem.mediaPath);
-    setCachedVideo(null);
-    setVideoDownloadError(false);
-    setVideoDownloadStatus("idle");
+    if (next === effectivePresentation || !availablePresentations.includes(next)) return;
+    setPresentation(next);
+    setMediaIndex(0);
   }
 
   if (slug === undefined) {
@@ -213,19 +157,15 @@ export function ExerciseDetailScreen() {
             <Notice message={exerciseCopy.stale} variant="info" />
           ) : null}
           <ExerciseMediaPanel
-            cachedVideo={selectedCachedVideo}
+            availablePresentations={availablePresentations}
             detail={detail}
-            downloadError={videoDownloadError}
-            downloadStatus={videoDownloadStatus}
             effectivePresentation={effectivePresentation}
+            language={language}
             mediaIndex={mediaIndex}
             mediaItems={mediaItems}
-            onDownload={downloadSelectedVideo}
-            runtimeApiBaseUrl={runtime.apiBaseUrl}
-            selectedItem={selectedItem}
-            onRemoveDownload={removeSelectedVideo}
             onMediaIndexChange={setMediaIndex}
             onPresentationChange={choosePresentation}
+            runtimeApiBaseUrl={runtime.apiBaseUrl}
           />
           <ExerciseInformation detail={detail} />
         </>
@@ -235,149 +175,52 @@ export function ExerciseDetailScreen() {
 }
 
 function ExerciseMediaPanel({
-  cachedVideo,
+  availablePresentations,
   detail,
-  downloadError,
-  downloadStatus,
   effectivePresentation,
+  language,
   mediaIndex,
   mediaItems,
-  onDownload,
   onMediaIndexChange,
   onPresentationChange,
-  onRemoveDownload,
   runtimeApiBaseUrl,
-  selectedItem,
 }: {
-  readonly cachedVideo: PublicVideoCacheFile | null;
+  readonly availablePresentations: readonly MediaPresentationChoice[];
   readonly detail: ExerciseDetail;
-  readonly downloadError: boolean;
-  readonly downloadStatus: VideoDownloadStatus;
   readonly effectivePresentation: MediaPresentationChoice;
+  readonly language: ReturnType<typeof languageForDirection>;
   readonly mediaIndex: number;
   readonly mediaItems: ExerciseMediaItem[];
-  readonly onDownload: () => Promise<void>;
   readonly onMediaIndexChange: (index: number) => void;
   readonly onPresentationChange: (presentation: MediaPresentationChoice) => void;
-  readonly onRemoveDownload: () => Promise<void>;
   readonly runtimeApiBaseUrl: string;
-  readonly selectedItem: ExerciseMediaItem | undefined;
 }) {
-  const name = exerciseTitle(detail.name_fa, detail.name_en);
+  const name = exerciseTitle(detail.name_fa, detail.name_en, language);
   return (
-    <Card style={styles.mediaCard} variant="hero">
-      {selectedItem !== undefined && selectedItem.mediaType !== "placeholder" ? (
-        <NativeExerciseMedia
-          item={selectedItem}
-          name={name}
-          runtimeApiBaseUrl={runtimeApiBaseUrl}
-          sourceUri={cachedVideo?.uri}
-        />
-      ) : (
-        <View accessibilityRole="image" style={styles.mediaFallback}>
-          <Text style={styles.mediaFallbackText}>{exerciseCopy.mediaUnavailable}</Text>
-        </View>
-      )}
-      <View style={styles.mediaHeader}>
-        <Text style={styles.mediaTitle}>{name}</Text>
-        <Text style={styles.mediaSecondary}>{exerciseSecondaryTitle(detail.name_fa, detail.name_en)}</Text>
-      </View>
-      <View style={styles.presentationRow}>
-        <Text style={styles.filterLabel}>{exerciseCopy.selectedMedia}</Text>
-        <PresentationChip
-          label={exerciseCopy.videoFemale}
-          selected={effectivePresentation === "female"}
-          onPress={() => onPresentationChange("female")}
-        />
-        <PresentationChip
-          label={exerciseCopy.videoMale}
-          selected={effectivePresentation === "male"}
-          onPress={() => onPresentationChange("male")}
-        />
-      </View>
-      {selectedItem?.mediaType === "video" && isDownloadableVideoPath(selectedItem.mediaPath) ? (
-        <View style={styles.downloadSection}>
-          {cachedVideo === null ? (
-            <Button
-              disabled={downloadStatus === "checking"}
-              label="ذخیره برای استفاده آفلاین"
-              loading={downloadStatus === "downloading"}
-              onPress={() => void onDownload()}
-              variant="secondary"
-            />
-          ) : (
-            <Button
-              label="حذف دانلود"
-              onPress={() => void onRemoveDownload()}
-              variant="ghost"
-            />
-          )}
-          <Text style={styles.downloadHint}>
-            {cachedVideo === null
-              ? "ویدئو فقط با انتخاب تو روی دستگاه ذخیره می‌شود."
-              : "این ویدئو برای مشاهده بدون اینترنت روی دستگاه ذخیره است."}
-          </Text>
-          {downloadStatus === "error" || downloadError ? (
-            <Notice message="ذخیرهٔ ویدئو انجام نشد. اتصال و فضای دستگاه را بررسی کن." variant="danger" />
-          ) : null}
-        </View>
-      ) : null}
-      {mediaItems.length > 1 ? (
-        <View style={styles.mediaSelector}>
-          <Text style={styles.mediaCount}>
-            {exerciseCopy.selectedMediaCount(mediaIndex + 1, mediaItems.length)}
-          </Text>
-          <View style={styles.mediaChoices}>
-            {mediaItems.map((item, index) => (
-              <PresentationChip
-                key={item.key}
-                label={mediaItemLabel(item, index)}
-                selected={index === mediaIndex}
-                onPress={() => onMediaIndexChange(index)}
-              />
-            ))}
-          </View>
-        </View>
-      ) : null}
-      {selectedItem?.mediaAttribution ? (
-        <Text style={styles.attribution}>
-          {exerciseCopy.mediaAttribution}: {selectedItem.mediaAttribution}
-        </Text>
-      ) : null}
-    </Card>
-  );
-}
-
-function NativeExerciseMedia({
-  item,
-  name,
-  runtimeApiBaseUrl,
-  sourceUri,
-}: {
-  readonly item: ExerciseMediaItem;
-  readonly name: string;
-  readonly runtimeApiBaseUrl: string;
-  readonly sourceUri?: string;
-}) {
-  const source = { uri: sourceUri ?? resolveExerciseMediaUrl(item.mediaPath, runtimeApiBaseUrl) };
-  if (item.mediaType === "video") {
-    return (
-      <Media
-        accessibilityLabel={`نمایش حرکت ${name}`}
-        contentFit="contain"
-        kind="video"
-        nativeControls
-        source={source}
-        style={styles.media}
+    <Card style={[styles.mediaCard, language === "en" && styles.mediaCardEnglish]} variant="hero">
+      <ExerciseMediaCarousel
+        apiBaseUrl={runtimeApiBaseUrl}
+        items={mediaItems}
+        language={language}
+        name={name}
+        onIndexChange={onMediaIndexChange}
+        selectedIndex={mediaIndex}
       />
-    );
-  }
-  return (
-    <Media
-      accessibilityLabel={`نمایش حرکت ${name}`}
-      source={source}
-      style={styles.media}
-    />
+      <View style={[styles.mediaFooter, language === "en" && styles.mediaFooterEnglish]}>
+        <Text
+          style={[styles.mediaTitle, language === "en" && styles.mediaTitleEnglish]}
+          testID="exercise-media-card-title"
+        >
+          {name}
+        </Text>
+        <GenderMediaSelector
+          available={availablePresentations}
+          language={language}
+          onChange={onPresentationChange}
+          selected={effectivePresentation}
+        />
+      </View>
+    </Card>
   );
 }
 
@@ -450,61 +293,20 @@ function InfoRow({ label, value }: { readonly label: string; readonly value: str
   );
 }
 
-function PresentationChip({
-  label,
-  onPress,
-  selected,
-}: {
-  readonly label: string;
-  readonly onPress: () => void;
-  readonly selected: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.presentationChip, selected && styles.presentationChipSelected]}
-    >
-      <Text style={[styles.presentationChipText, selected && styles.presentationChipTextSelected]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function DetailSkeleton() {
   return (
     <View style={styles.skeletonGroup}>
-      <Skeleton height={260} />
+      <Skeleton height={232} />
       <Skeleton height={130} />
       <Skeleton height={180} />
     </View>
   );
 }
 
-function mediaItemLabel(item: ExerciseMediaItem, index: number): string {
-  const presentation = item.presentation === "female"
-    ? exerciseCopy.videoFemale
-    : item.presentation === "male"
-      ? exerciseCopy.videoMale
-      : "رسانه";
-  return `${presentation} ${index + 1}`;
-}
-
 function resolveMediaPresentation(detail: ExerciseDetail | null | undefined): MediaPresentationChoice {
   if (detail?.media_presentation === "female") return "female";
   if (detail?.media_presentation === "male") return "male";
   return detail?.media_assets?.[0]?.presentation === "female" ? "female" : "male";
-}
-
-function isDownloadableVideoPath(path: string): boolean {
-  try {
-    validatePublicExerciseVideoPath(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function viewData<TData>(state: ReturnType<typeof getMobileViewState<TData>>): TData | undefined {
@@ -519,33 +321,6 @@ function useConnectivityStatus(): ConnectivityStatus {
 }
 
 const styles = StyleSheet.create({
-  attribution: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    lineHeight: 18,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  downloadHint: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    lineHeight: 18,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  downloadSection: {
-    gap: fiticianTokens.spacing[2],
-  },
-  filterLabel: {
-    color: fiticianTokens.colors.muted,
-    flex: 1,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
   infoCard: {
     gap: fiticianTokens.spacing[3],
     marginBottom: fiticianTokens.spacing[4],
@@ -603,55 +378,21 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  media: {
-    height: 260,
-    width: "100%",
-  },
   mediaCard: {
-    gap: fiticianTokens.spacing[3],
+    overflow: "hidden",
+    padding: 0,
   },
-  mediaChoices: {
+  mediaCardEnglish: {
+    direction: "ltr",
+  },
+  mediaFooter: {
+    alignItems: "flex-end",
+    gap: fiticianTokens.spacing[2],
+    paddingHorizontal: fiticianTokens.spacing[4],
+    paddingVertical: fiticianTokens.spacing[3],
+  },
+  mediaFooterEnglish: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
-    flexWrap: "wrap",
-    gap: fiticianTokens.spacing[2],
-  },
-  mediaCount: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  mediaFallback: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.medium,
-    borderWidth: 1,
-    height: 260,
-    justifyContent: "center",
-    padding: fiticianTokens.spacing[4],
-  },
-  mediaFallbackText: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    textAlign: "center",
-    writingDirection: "rtl",
-  },
-  mediaHeader: {
-    gap: fiticianTokens.spacing[1],
-  },
-  mediaSecondary: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
-    writingDirection: "ltr",
-  },
-  mediaSelector: {
-    gap: fiticianTokens.spacing[2],
   },
   mediaTitle: {
     color: fiticianTokens.colors.ink,
@@ -661,42 +402,17 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  mediaTitleEnglish: {
+    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
+    textAlign: "left",
+    writingDirection: "ltr",
+  },
   mutedText: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     textAlign: "right",
     writingDirection: "rtl",
-  },
-  presentationChip: {
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.pill,
-    borderWidth: 1,
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: fiticianTokens.spacing[3],
-    paddingVertical: fiticianTokens.spacing[2],
-  },
-  presentationChipSelected: {
-    backgroundColor: fiticianTokens.colors.aqua,
-    borderColor: fiticianTokens.colors.aqua,
-  },
-  presentationChipText: {
-    color: fiticianTokens.colors.mist,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "center",
-    writingDirection: "rtl",
-  },
-  presentationChipTextSelected: {
-    color: fiticianTokens.colors.canvas,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-  },
-  presentationRow: {
-    alignItems: "center",
-    flexDirection: "row-reverse",
-    flexWrap: "wrap",
-    gap: fiticianTokens.spacing[2],
   },
   sectionTitle: {
     color: fiticianTokens.colors.ink,

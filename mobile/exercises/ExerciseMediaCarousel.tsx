@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   PanResponder,
   StyleSheet,
@@ -100,11 +100,7 @@ export function ExerciseMediaCarousel({
       {item !== undefined && isExerciseMediaRenderable(item.mediaPath, item.mediaType) ? (
         <NativeExerciseMedia item={item} key={item.key} language={language} name={name} apiBaseUrl={apiBaseUrl} />
       ) : (
-        <View accessibilityRole="image" style={styles.mediaFallback}>
-          <Text style={[styles.mediaFallbackText, language === "en" && styles.mediaFallbackTextEnglish]}>
-            {mediaUnavailableCopy[language]}
-          </Text>
-        </View>
+        <MediaFallback language={language} />
       )}
       {items.length > 1 ? (
         <View accessibilityLabel={`${safeIndex + 1}/${items.length}`} pointerEvents="none" style={styles.indicator}>
@@ -126,8 +122,11 @@ function NativeExerciseMedia({
   readonly language: MobileLanguage;
   readonly name: string;
 }) {
+  const [failed, setFailed] = useState(false);
   const source = { uri: resolveExerciseMediaUrl(item.mediaPath, apiBaseUrl) };
   const accessibilityLabel = language === "en" ? `Exercise demonstration: ${name}` : `نمایش حرکت ${name}`;
+  if (failed) return <MediaFallback language={language} />;
+
   if (item.mediaType === "video") {
     return (
       <Media
@@ -135,12 +134,30 @@ function NativeExerciseMedia({
         contentFit="contain"
         kind="video"
         nativeControls
+        onError={() => setFailed(true)}
         source={source}
         style={styles.media}
       />
     );
   }
-  return <Media accessibilityLabel={accessibilityLabel} source={source} style={styles.media} />;
+  return (
+    <Media
+      accessibilityLabel={accessibilityLabel}
+      onError={() => setFailed(true)}
+      source={source}
+      style={styles.media}
+    />
+  );
+}
+
+function MediaFallback({ language }: { readonly language: MobileLanguage }) {
+  return (
+    <View accessibilityRole="image" style={styles.mediaFallback}>
+      <Text style={[styles.mediaFallbackText, language === "en" && styles.mediaFallbackTextEnglish]}>
+        {mediaUnavailableCopy[language]}
+      </Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
