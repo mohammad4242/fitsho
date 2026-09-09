@@ -21,6 +21,9 @@ export function QuickActionCard({ icon, image, onPress, subtitle, title }: Quick
     >
       <Media accessibilityLabel="" source={image} style={styles.image} />
       <View pointerEvents="none" style={styles.scrim} />
+      <View pointerEvents="none" style={[styles.corner, styles.cornerStart]} />
+      <View pointerEvents="none" style={[styles.corner, styles.cornerEnd]} />
+      <View pointerEvents="none" style={styles.scanLine} />
       <View pointerEvents="none" style={styles.content}>
         <View style={styles.iconBadge}>
           <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={fiticianTokens.iconSize.md} />
@@ -48,6 +51,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.24,
     shadowRadius: 10,
     elevation: 3,
+    flex: 1,
   },
   content: {
     alignItems: "flex-start",
@@ -58,14 +62,32 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 14,
   },
+  corner: {
+    borderColor: fiticianTokens.colors.aqua,
+    height: 18,
+    opacity: 0.7,
+    position: "absolute",
+    top: fiticianTokens.spacing[3],
+    width: 18,
+  },
+  cornerEnd: {
+    borderRightWidth: 2,
+    borderTopWidth: 2,
+    right: fiticianTokens.spacing[3],
+  },
+  cornerStart: {
+    borderLeftWidth: 2,
+    borderTopWidth: 2,
+    left: fiticianTokens.spacing[3],
+  },
   copy: {
     flex: 1,
     gap: 2,
   },
   iconBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(2,6,7,0.72)",
-    borderColor: "rgba(80,223,206,0.32)",
+    backgroundColor: fiticianTokens.colors.mediaOverlay,
+    borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: 14,
     borderWidth: 1,
     height: 42,
@@ -82,24 +104,36 @@ const styles = StyleSheet.create({
     transform: [{ scale: fiticianTokens.motion.pressedScale }],
   },
   scrim: {
-    backgroundColor: "rgba(2,6,7,0.60)",
+    backgroundColor: fiticianTokens.colors.scrim,
     bottom: 0,
     left: 0,
     position: "absolute",
     right: 0,
     top: 0,
   },
+  scanLine: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    height: 1,
+    left: fiticianTokens.spacing[3],
+    opacity: 0.68,
+    position: "absolute",
+    right: fiticianTokens.spacing[3],
+    shadowColor: fiticianTokens.colors.aqua,
+    shadowOpacity: 0.7,
+    shadowRadius: 7,
+    top: "54%",
+  },
   subtitle: {
-    color: "rgba(232,244,241,0.72)",
-    fontFamily: "Vazirmatn",
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 11,
     lineHeight: 18,
     textAlign: "right",
     writingDirection: "rtl",
   },
   title: {
-    color: "#e8f4f1",
-    fontFamily: "Lalezar",
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: 19,
     lineHeight: 27,
     textAlign: "right",

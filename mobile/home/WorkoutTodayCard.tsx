@@ -1,9 +1,11 @@
 import { useRouter } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
-import { Button, Card, ProgressBar } from "../ui/components";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import type { WorkoutDay } from "../workouts/workoutApi";
+import { Button, CinematicSurface, StateSkeleton } from "../ui/components";
+import { fiticianTokens } from "../ui/tokens";
+import { getHomeHeroLayout } from "./homePresentation";
 
 export type WorkoutHomeState = "empty" | "error" | "loading" | "offline" | "ready" | "stale";
 
@@ -14,232 +16,227 @@ export interface WorkoutTodayCardProps {
 
 export function WorkoutTodayCard({ day, state }: WorkoutTodayCardProps) {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const stacked = getHomeHeroLayout(width) === "stacked";
   const firstExercise = day?.exercises[0];
   const title = day?.title_fa || day?.title_en || "تمرین امروز";
   const canStart = day !== null && state === "ready";
 
-  return (
-    <Card style={styles.card} variant="hero">
-      <View style={styles.heading}>
-        <View style={styles.headingCopy}>
-          <Text style={styles.eyebrow}>تمرین امروز</Text>
-          <Text style={styles.title}>{title}</Text>
-        </View>
-        <View style={styles.dayBadge}>
-          <Text style={styles.dayNumber}>{day ? String(day.day_number).padStart(2, "0") : "—"}</Text>
-          <Text style={styles.dayLabel}>روز</Text>
-        </View>
-      </View>
+  if (state === "loading" && day === null) return <StateSkeleton variant="hero" />;
 
-      {firstExercise ? (
-        <View style={styles.mediaWrap}>
-          <ExerciseMedia
-            accessibilityLabel={`رسانه تمرین ${firstExercise.exercise.name_fa || firstExercise.exercise.name_en}`}
-            autoplay
-            mediaType={firstExercise.exercise.media_type}
-            name={firstExercise.exercise.name_fa || firstExercise.exercise.name_en}
-            path={firstExercise.exercise.media_path}
-            style={styles.media}
-          />
+  return (
+    <CinematicSurface accent style={styles.card} variant="hero">
+      <View style={[styles.layout, stacked && styles.layoutStacked]}>
+        <View style={[styles.mediaWrap, stacked && styles.mediaStacked]}>
+          {firstExercise ? (
+            <ExerciseMedia
+              accessibilityLabel={`رسانه تمرین ${firstExercise.exercise.name_fa || firstExercise.exercise.name_en}`}
+              autoplay
+              mediaType={firstExercise.exercise.media_type}
+              name={firstExercise.exercise.name_fa || firstExercise.exercise.name_en}
+              path={firstExercise.exercise.media_path}
+              style={styles.media}
+            />
+          ) : (
+            <View style={styles.emptyMedia}>
+              <Text style={styles.emptyMediaMark}>01</Text>
+              <Text style={styles.emptyMediaText}>جلسه بعدی پس از آماده‌شدن برنامه اینجا دیده می‌شود.</Text>
+            </View>
+          )}
           <View pointerEvents="none" style={styles.mediaScrim} />
-          <View pointerEvents="none" style={styles.mediaCaption}>
-            <Text style={styles.mediaLabel}>حرکت اول</Text>
-            <Text style={styles.mediaTitle}>{firstExercise.exercise.name_fa || firstExercise.exercise.name_en}</Text>
+          {firstExercise ? (
+            <View pointerEvents="none" style={styles.mediaCaption}>
+              <Text numberOfLines={2} style={styles.mediaTitle}>
+                {firstExercise.exercise.name_fa || firstExercise.exercise.name_en}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={styles.copy}>
+          <View style={styles.topLine}>
+            <View style={styles.statusPill}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>{stateLabel(state, Boolean(day))}</Text>
+            </View>
+            <Text style={styles.eyebrow}>تمرین امروز</Text>
           </View>
+          <Text numberOfLines={3} style={styles.title}>{title}</Text>
+          <View style={styles.dayLine}>
+            <View style={styles.dayBadge}>
+              <Text style={styles.dayNumber}>{day ? String(day.day_number).padStart(2, "0") : "—"}</Text>
+            </View>
+            <View style={styles.sessionFacts}>
+              <Text style={styles.factValue}>{day ? `${day.estimated_duration_minutes} دقیقه` : "—"}</Text>
+              <Text style={styles.factLabel}>{day ? `${day.total_exercise_count} حرکت` : "برنامه در حال آماده‌سازی"}</Text>
+            </View>
+          </View>
+          {state === "offline" || state === "stale" ? (
+            <Text style={styles.stateText}>آخرین نسخه ذخیره‌شده نمایش داده می‌شود.</Text>
+          ) : null}
+          {state === "error" ? (
+            <Text style={styles.stateText}>دریافت برنامه انجام نشد؛ از بخش تمرین دوباره تلاش کن.</Text>
+          ) : null}
+          <Button
+            label={canStart ? "شروع تمرین" : "مشاهده برنامه"}
+            onPress={() => router.push("/member/workouts")}
+            style={styles.action}
+          />
         </View>
-      ) : (
-        <View style={styles.emptyMedia}>
-          <Text style={styles.emptyMediaTitle}>برنامه‌ات آماده می‌شود</Text>
-          <Text style={styles.emptyMediaText}>با تکمیل پروفایل تمرینی، جلسه امروز را ببین.</Text>
-        </View>
-      )}
-
-      <View style={styles.metaRow}>
-        <MetaItem label="مدت جلسه" value={day ? `${day.estimated_duration_minutes} دقیقه` : "—"} />
-        <MetaItem label="حرکت‌ها" value={day ? `${day.total_exercise_count} حرکت` : "—"} />
-        <MetaItem label="وضعیت" value={stateLabel(state, Boolean(day))} />
       </View>
-
-      {state === "loading" ? <ProgressBar label="در حال بارگذاری تمرین" progress={0.36} /> : null}
-      {state === "offline" && day !== null ? <Text style={styles.stateText}>آخرین برنامه ذخیره‌شده نمایش داده می‌شود.</Text> : null}
-      {state === "stale" && day !== null ? <Text style={styles.stateText}>آخرین نسخه ذخیره‌شده نمایش داده می‌شود.</Text> : null}
-      {state === "error" ? <Text style={styles.stateText}>دریافت برنامه انجام نشد؛ دوباره از بخش تمرین تلاش کن.</Text> : null}
-
-      <Button
-        disabled={state === "loading"}
-        label={canStart ? "شروع تمرین" : "مشاهده برنامه تمرینی"}
-        onPress={() => router.push("/member/workouts")}
-        variant="primary"
-      />
-    </Card>
-  );
-}
-
-function MetaItem({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <View style={styles.metaItem}>
-      <Text style={styles.metaValue}>{value}</Text>
-      <Text style={styles.metaLabel}>{label}</Text>
-    </View>
+    </CinematicSurface>
   );
 }
 
 function stateLabel(state: WorkoutHomeState, hasDay: boolean): string {
-  if (state === "loading") return "در حال خواندن";
   if (state === "offline") return "آفلاین";
-  if (state === "stale") return "قدیمی";
+  if (state === "stale") return "ذخیره‌شده";
   if (state === "error") return "خطا";
   if (!hasDay) return "بدون برنامه";
-  return "آماده";
+  return "برنامه فعال";
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#0d211e",
-    gap: 16,
-    overflow: "hidden",
-    padding: 16,
-  },
+  action: { alignSelf: "stretch", marginTop: "auto" },
+  card: { minHeight: 276 },
+  copy: { flex: 1.08, gap: fiticianTokens.spacing[3], padding: fiticianTokens.spacing[4] },
   dayBadge: {
     alignItems: "center",
-    backgroundColor: "rgba(80,223,206,0.12)",
-    borderColor: "rgba(80,223,206,0.28)",
-    borderRadius: 16,
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    minWidth: 58,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    height: 50,
+    justifyContent: "center",
+    width: 50,
   },
-  dayLabel: {
-    color: "#94aba5",
-    fontFamily: "Vazirmatn",
-    fontSize: 11,
-    writingDirection: "rtl",
-  },
+  dayLine: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[2] },
   dayNumber: {
-    color: "#50dfce",
-    fontFamily: "Sora",
-    fontSize: 24,
-    fontWeight: "800",
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
   },
   emptyMedia: {
     alignItems: "center",
-    backgroundColor: "#091817",
-    borderRadius: 18,
-    gap: 8,
+    backgroundColor: fiticianTokens.colors.petrol,
+    flex: 1,
+    gap: fiticianTokens.spacing[2],
     justifyContent: "center",
-    minHeight: 184,
-    padding: 24,
+    padding: fiticianTokens.spacing[4],
+  },
+  emptyMediaMark: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.metric,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
   },
   emptyMediaText: {
-    color: "#94aba5",
-    fontFamily: "Vazirmatn",
-    fontSize: 13,
-    lineHeight: 22,
-    textAlign: "center",
-    writingDirection: "rtl",
-  },
-  emptyMediaTitle: {
-    color: "#e8f4f1",
-    fontFamily: "Lalezar",
-    fontSize: 20,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 19,
     textAlign: "center",
     writingDirection: "rtl",
   },
   eyebrow: {
-    color: "#50dfce",
-    fontFamily: "Vazirmatn",
-    fontSize: 13,
-    fontWeight: "700",
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
   },
-  heading: {
-    alignItems: "flex-start",
-    flexDirection: "row-reverse",
-    gap: 12,
-    justifyContent: "space-between",
+  factLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
-  headingCopy: {
-    flex: 1,
-    gap: 4,
+  factValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
-  media: {
-    borderRadius: 18,
-    height: 220,
-    minHeight: 220,
-  },
+  layout: { flexDirection: "row-reverse", minHeight: 276 },
+  layoutStacked: { flexDirection: "column" },
+  media: { borderRadius: 0, flex: 1, minHeight: 276 },
   mediaCaption: {
-    bottom: 14,
-    left: 16,
+    bottom: fiticianTokens.spacing[3],
+    left: fiticianTokens.spacing[3],
     position: "absolute",
-    right: 16,
-  },
-  mediaLabel: {
-    color: "#50dfce",
-    fontFamily: "Vazirmatn",
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "right",
-    writingDirection: "rtl",
+    right: fiticianTokens.spacing[3],
   },
   mediaScrim: {
-    backgroundColor: "rgba(2,6,7,0.56)",
+    backgroundColor: fiticianTokens.colors.scrim,
     bottom: 0,
     left: 0,
     position: "absolute",
     right: 0,
-    top: 108,
+    top: "54%",
   },
+  mediaStacked: { flex: 0, height: 178, minHeight: 178 },
   mediaTitle: {
-    color: "#e8f4f1",
-    fontFamily: "Lalezar",
-    fontSize: 22,
-    lineHeight: 30,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.lg,
+    lineHeight: 25,
     textAlign: "right",
     writingDirection: "rtl",
   },
   mediaWrap: {
-    borderRadius: 18,
+    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    flex: 0.92,
+    minHeight: 276,
     overflow: "hidden",
+    position: "relative",
   },
-  metaItem: {
-    flex: 1,
-    gap: 3,
-  },
-  metaLabel: {
-    color: "#94aba5",
-    fontFamily: "Vazirmatn",
-    fontSize: 11,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  metaRow: {
-    flexDirection: "row-reverse",
-    gap: 12,
-  },
-  metaValue: {
-    color: "#e8f4f1",
-    fontFamily: "Vazirmatn",
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
+  sessionFacts: { flex: 1, gap: 2 },
   stateText: {
-    color: "#f2b85b",
-    fontFamily: "Vazirmatn",
-    fontSize: 12,
-    lineHeight: 20,
+    color: fiticianTokens.colors.amber,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    lineHeight: 17,
     textAlign: "right",
+    writingDirection: "rtl",
+  },
+  statusDot: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderRadius: fiticianTokens.radii.pill,
+    height: 5,
+    width: 5,
+  },
+  statusPill: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderRadius: fiticianTokens.radii.pill,
+    flexDirection: "row-reverse",
+    gap: 5,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: 5,
+  },
+  statusText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 9,
     writingDirection: "rtl",
   },
   title: {
-    color: "#e8f4f1",
-    fontFamily: "Lalezar",
-    fontSize: 25,
-    lineHeight: 34,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h2,
+    lineHeight: 31,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  topLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[2],
+    justifyContent: "space-between",
   },
 });

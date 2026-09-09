@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { profileKeys, workoutKeys, nutritionKeys } from "../data/queryKeys";
@@ -12,13 +12,14 @@ import { createNutritionPlanApi } from "../nutrition/nutritionPlanApi";
 import { createNutritionTrackingApi } from "../nutrition/nutritionTrackingApi";
 import { createWorkoutPlanApi } from "../workouts/workoutApi";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
-import { Notice, SectionHeader } from "../ui/components";
+import { Notice, ScreenHeader, SectionHeader } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot } from "../ui/navigation/RouteGuards";
 import { NutritionSummaryCard } from "./NutritionSummaryCard";
 import { QuickActionCard } from "./QuickActionCard";
 import { currentWorkoutDay, nutritionSummary } from "./homeModel";
+import { getQuickActionColumns } from "./homePresentation";
 import { WorkoutTodayCard, type WorkoutHomeState } from "./WorkoutTodayCard";
 
 const homeBodyImage = require("../assets/home-body.webp") as number;
@@ -26,6 +27,7 @@ const homeFoodImage = require("../assets/home-food.webp") as number;
 
 export function MemberHomeScreen() {
   const auth = useMobileAuth();
+  const { width } = useWindowDimensions();
   const router = useRouter();
   const snapshot = useMobileRouteSnapshot();
   const connectivityStatus = useConnectivityStatus();
@@ -107,23 +109,20 @@ export function MemberHomeScreen() {
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <View style={styles.topBar}>
-        <Text style={styles.brand}>FITICIAN</Text>
-        <Pressable
+      <ScreenHeader
+        action={<Pressable
           accessibilityLabel="باز کردن پروفایل"
           accessibilityRole="button"
           onPress={() => router.push("/member/profile")}
           style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
         >
           <Text style={styles.avatarText}>{avatar}</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.welcome}>
-        <Text style={styles.welcomeEyebrow}>{formatToday()}</Text>
-        <Text accessibilityRole="header" style={styles.welcomeTitle}>سلام، {displayName}</Text>
-        <Text style={styles.welcomeText}>برای امروز آماده‌ای؟</Text>
-      </View>
+        </Pressable>}
+        compact
+        eyebrow={formatToday()}
+        subtitle="برای امروز آماده‌ای؟"
+        title={`سلام، ${displayName}`}
+      />
 
       {sharedProfileQuery.isError ? (
         <Notice message="نام پروفایل خوانده نشد؛ اطلاعاتت همچنان در دسترس است." variant="info" />
@@ -147,7 +146,7 @@ export function MemberHomeScreen() {
 
       <View style={styles.section}>
         <SectionHeader eyebrow="ادامه مسیر" title="دسترسی سریع" />
-        <View style={styles.quickGrid}>
+        <View style={[styles.quickGrid, getQuickActionColumns(width) === 1 && styles.quickGridStacked]}>
           <QuickActionCard
             icon="bodyAnalysis"
             image={homeBodyImage}
@@ -217,14 +216,6 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     writingDirection: "rtl",
   },
-  brand: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    letterSpacing: 1.8,
-    writingDirection: "ltr",
-  },
   offlineText: {
     color: fiticianTokens.colors.amber,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -241,8 +232,11 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
   },
+  quickGridStacked: {
+    flexDirection: "column",
+  },
   screen: {
-    gap: fiticianTokens.spacing[5],
+    gap: fiticianTokens.spacing[4],
     paddingBottom: fiticianTokens.spacing[7],
     paddingTop: fiticianTokens.spacing[3],
   },
@@ -253,39 +247,6 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  topBar: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  welcome: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[1],
-  },
-  welcomeEyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.compact,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  welcomeText: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    lineHeight: 26,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  welcomeTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.display,
-    lineHeight: 46,
     textAlign: "right",
     writingDirection: "rtl",
   },
