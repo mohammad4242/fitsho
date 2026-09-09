@@ -12,7 +12,18 @@ import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { ExpoPrivateMediaStore } from "../media/privateMediaStore";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { Button, Card, Dialog, EmptyState, Notice, Skeleton, TextField } from "../ui/components";
+import {
+  Button,
+  Card,
+  Dialog,
+  DisclosureCard,
+  EmptyState,
+  Notice,
+  PageHeading,
+  SegmentedControl,
+  Skeleton,
+  TextField,
+} from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { UploadCancellationError, UploadManager, type UploadHandle } from "../upload/uploadManager";
@@ -42,6 +53,16 @@ type LabSelection = {
   readonly asset: NutritionLabAsset;
   readonly name: string;
 };
+
+type SupplementStatusFilter = "all" | "prescribed" | "active" | "completed" | "discontinued";
+
+const supplementStatusFilters: readonly { readonly label: string; readonly value: SupplementStatusFilter }[] = [
+  { label: "همه", value: "all" },
+  { label: "تجویزشده", value: "prescribed" },
+  { label: "فعال", value: "active" },
+  { label: "تمام‌شده", value: "completed" },
+  { label: "متوقف‌شده", value: "discontinued" },
+];
 
 export function NutritionClinicalSection() {
   const auth = useMobileAuth();
@@ -75,6 +96,10 @@ export function NutritionClinicalSection() {
   const requests = stateData(requestsState) ?? [];
   const orders = stateData(ordersState) ?? [];
   const catalogue = stateData(catalogueState) ?? [];
+  const [supplementStatusFilter, setSupplementStatusFilter] = useState<SupplementStatusFilter>("all");
+  const visibleOrders = orders.filter(
+    (order) => supplementStatusFilter === "all" || order.status === supplementStatusFilter,
+  );
   const upload = auth.upload;
   const [testDate, setTestDate] = useState("");
   const [laboratoryName, setLaboratoryName] = useState("");
@@ -277,13 +302,11 @@ export function NutritionClinicalSection() {
 
   return (
     <View style={styles.section}>
-      <View style={styles.heading}>
-        <Text style={styles.eyebrow}>FITICIAN · پرونده سلامت</Text>
-        <Text accessibilityRole="header" style={styles.title}>آزمایش‌ها و مکمل‌ها</Text>
-        <Text style={styles.bodyText}>
-          مدارک آزمایش و دستورهای ثبت‌شده را در فضای عضو و با کنترل ایمنی دنبال کن.
-        </Text>
-      </View>
+      <PageHeading
+        eyebrow="پرونده سلامت"
+        supportingText="مدارک آزمایش و دستورهای ثبت‌شده را در فضای عضو و با کنترل ایمنی دنبال کن."
+        title="آزمایش‌ها و مکمل‌ها"
+      />
 
       <LabUploadCard
         category={category}
@@ -318,9 +341,12 @@ export function NutritionClinicalSection() {
       <SupplementOrdersCard
         error={supplementError}
         onAcknowledge={(order) => void acknowledge(order)}
-        orders={orders}
+        onStatusFilterChange={setSupplementStatusFilter}
         onRetry={() => void ordersQuery.refetch()}
+        orders={visibleOrders}
         state={ordersState}
+        statusFilter={supplementStatusFilter}
+        totalOrders={orders.length}
       />
       {catalogue.length > 0 ? <VerifiedSupplementCatalogue items={catalogue} state={catalogueState} /> : null}
 
@@ -521,15 +547,21 @@ function LabDocumentsCard({
 function SupplementOrdersCard({
   error,
   onAcknowledge,
+  onStatusFilterChange,
   onRetry,
   orders,
   state,
+  statusFilter,
+  totalOrders,
 }: {
   readonly error: string | null;
   readonly onAcknowledge: (order: NutritionSupplementOrder) => void;
+  readonly onStatusFilterChange: (value: SupplementStatusFilter) => void;
   readonly onRetry: () => void;
   readonly orders: readonly NutritionSupplementOrder[];
   readonly state: ReturnType<typeof getMobileViewState<NutritionSupplementOrder[]>>;
+  readonly statusFilter: SupplementStatusFilter;
+  readonly totalOrders: number;
 }) {
   if (state.status === "loading") return <Skeleton height={300} />;
   if (state.status === "error" && orders.length === 0) {
@@ -540,11 +572,29 @@ function SupplementOrdersCard({
   }
   return (
     <Card style={styles.card}>
-      <Text style={styles.cardTitle}>مکمل‌های من</Text>
+      <View style={styles.rowBetween}>
+        <Text style={styles.count}>{formatNutritionNumber(orders.length)} مورد</Text>
+        <Text style={styles.cardTitle}>مکمل‌های من</Text>
+      </View>
+      <SegmentedControl
+        accessibilityLabel="فیلتر وضعیت مکمل"
+        onChange={(value) => {
+          if (supplementStatusFilters.some((option) => option.value === value)) {
+            onStatusFilterChange(value as SupplementStatusFilter);
+          }
+        }}
+        options={supplementStatusFilters}
+        selectedValue={statusFilter}
+        testID="supplement-status-filter"
+      />
       {state.status === "offline" || state.status === "stale" ? <Notice message="آخرین دستورهای ذخیره‌شده نمایش داده می‌شوند." variant="offline" /> : null}
       {error !== null ? <Notice message={error} variant="danger" /> : null}
       {orders.length === 0 ? (
-        <EmptyState title="دستور مکملی ثبت نشده است">دستورهای عضو فقط از مسیر بررسی و ثبت مسئول سلامت نمایش داده می‌شوند.</EmptyState>
+        <EmptyState title={totalOrders === 0 ? "دستور مکملی ثبت نشده است" : "موردی با این وضعیت نیست"}>
+          {totalOrders === 0
+            ? "دستورهای عضو فقط از مسیر بررسی و ثبت مسئول سلامت نمایش داده می‌شوند."
+            : "فیلتر دیگری را برای مشاهده دستورهای ثبت‌شده انتخاب کن."}
+        </EmptyState>
       ) : (
         <View style={styles.itemStack}>
           {orders.map((order) => {
@@ -562,6 +612,17 @@ function SupplementOrdersCard({
                 {order.instructions ? <Text style={styles.bodyText}>دستور مصرف: {order.instructions}</Text> : null}
                 {order.rationale ? <Text style={styles.mutedText}>علت ثبت: {order.rationale}</Text> : null}
                 {safety.blocked ? <Notice message={safety.message} title={safety.title} variant="danger" /> : <Notice message={safety.message} title={safety.title} variant="success" />}
+                <DisclosureCard
+                  icon="nutrition"
+                  summary="جزئیات علمی برای مرور دقیق‌تر"
+                  title="سهم تغذیه و کنترل مواجهه"
+                >
+                  <Text style={styles.mutedText}>سهم مکمل</Text>
+                  <ContributionRows values={order.supplement_nutrient_contribution} />
+                  <Text style={styles.mutedText}>
+                    کنترل مواجهه ترکیبی: {order.combined_exposure_safety.hard_blocks.length > 0 ? "نیازمند بررسی" : "بدون منع ثبت‌شده"}
+                  </Text>
+                </DisclosureCard>
                 {!safety.blocked && !order.acknowledged_at ? (
                   <Button label="دستور را دیدم" onPress={() => onAcknowledge(order)} />
                 ) : null}
@@ -572,6 +633,28 @@ function SupplementOrdersCard({
         </View>
       )}
     </Card>
+  );
+}
+
+const contributionLabels: Readonly<Record<string, string>> = {
+  carbohydrate_g: "کربوهیدرات",
+  energy_kcal: "انرژی",
+  fat_g: "چربی",
+  protein_g: "پروتئین",
+};
+
+function ContributionRows({ values }: { readonly values: Readonly<Record<string, string>> }) {
+  const rows = Object.entries(values);
+  if (rows.length === 0) return <Text style={styles.mutedText}>—</Text>;
+  return (
+    <View style={styles.contributionStack}>
+      {rows.map(([code, value]) => (
+        <View key={code} style={styles.contributionRow}>
+          <Text style={styles.summaryValue}>{value}</Text>
+          <Text style={styles.summaryLabel}>{contributionLabels[code] ?? "سایر مواد مغذی"}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -674,19 +757,23 @@ const styles = StyleSheet.create({
   catalogueStack: {
     gap: fiticianTokens.spacing[2],
   },
+  contributionRow: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    padding: fiticianTokens.spacing[3],
+  },
+  contributionStack: {
+    gap: fiticianTokens.spacing[2],
+  },
   count: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    writingDirection: "ltr",
-  },
-  eyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    letterSpacing: 1,
-    textAlign: "right",
     writingDirection: "ltr",
   },
   fileName: {
@@ -698,11 +785,6 @@ const styles = StyleSheet.create({
   },
   formStack: {
     gap: fiticianTokens.spacing[3],
-  },
-  heading: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[2],
-    marginTop: fiticianTokens.spacing[4],
   },
   headingCopy: {
     alignItems: "flex-end",
@@ -761,12 +843,19 @@ const styles = StyleSheet.create({
     textAlign: "left",
     writingDirection: "rtl",
   },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-    lineHeight: 34,
+  summaryLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  summaryValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "left",
+    writingDirection: "ltr",
   },
 });

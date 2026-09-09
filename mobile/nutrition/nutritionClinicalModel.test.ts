@@ -11,6 +11,7 @@ import {
 it("localizes lab review statuses and supplement order statuses", () => {
   expect(labReviewStatusLabel("pending_review")).toBe("در انتظار بررسی پزشک");
   expect(labReviewStatusLabel("reviewed")).toBe("بررسی‌شده");
+  expect(labReviewStatusLabel("unexpected_status")).toBe("در حال بررسی");
   expect(supplementStatusLabel("active")).toBe("فعال");
 });
 

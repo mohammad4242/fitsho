@@ -24,17 +24,17 @@ const supplementStatusLabels: Readonly<Record<components["schemas"]["NutritionSu
 };
 
 export function labReviewStatusLabel(status: string): string {
-  return labStatusLabels[status] ?? status;
+  return labStatusLabels[status] ?? "در حال بررسی";
 }
 
 export function labRequestStatusLabel(status: string): string {
-  return labRequestStatusLabels[status] ?? status;
+  return labRequestStatusLabels[status] ?? "در انتظار بررسی";
 }
 
 export function supplementStatusLabel(
   status: components["schemas"]["NutritionSupplementOrderStatus"],
 ): string {
-  return supplementStatusLabels[status];
+  return supplementStatusLabels[status] ?? "نیازمند بررسی";
 }
 
 export function supplementSafetyPresentation(
