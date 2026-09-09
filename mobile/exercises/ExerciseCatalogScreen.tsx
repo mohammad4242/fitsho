@@ -39,6 +39,7 @@ import {
   type PaginatedExercises,
 } from "./exerciseApi";
 import { exerciseCopy, exerciseSecondaryTitle, exerciseTitle, formatExerciseCount } from "./exerciseCopy";
+import { ExerciseMedia } from "./ExerciseMedia";
 
 type CatalogSelection = {
   readonly bodyRegion: BodyRegion | null;
@@ -451,6 +452,18 @@ function ExerciseCard({
       style={styles.exerciseCard}
       variant="interactive"
     >
+      <View style={styles.cardMedia}>
+        <ExerciseMedia
+          accessibilityLabel={`نمایش حرکت ${name}`}
+          compact
+          mediaType={exercise.media_type}
+          name={name}
+          path={exercise.media_path}
+          style={styles.cardMediaImage}
+        />
+        <View pointerEvents="none" style={styles.cardMediaScrim} />
+        <Text style={styles.mediaDifficulty}>{exerciseCopy.difficulties[exercise.difficulty]}</Text>
+      </View>
       <View style={styles.cardHeader}>
         <View style={styles.cardCopy}>
           <Text style={styles.exerciseName}>{name}</Text>
@@ -461,10 +474,15 @@ function ExerciseCard({
         </Text>
       </View>
       <View style={styles.metaRow}>
-        <Text style={styles.metaText}>{exerciseCopy.difficulties[exercise.difficulty]}</Text>
+        <Text style={styles.metaText}>
+          {exercise.primary_muscle === null ? "عضله بررسی نشده" : exerciseCopy.muscles[exercise.primary_muscle]}
+        </Text>
         <Text style={styles.metaText}>
           {exercise.equipment.map((value) => exerciseCopy.equipments[value]).join("، ")}
         </Text>
+        {exercise.muscle_focus !== null && exercise.muscle_focus !== undefined ? (
+          <Text style={styles.metaText}>{exerciseCopy.muscleFocuses[exercise.muscle_focus]}</Text>
+        ) : null}
       </View>
     </Card>
   );
@@ -594,6 +612,27 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
+  cardMedia: {
+    borderRadius: fiticianTokens.radii.large,
+    height: 188,
+    overflow: "hidden",
+    position: "relative",
+    width: "100%",
+  },
+  cardMediaImage: {
+    borderRadius: 0,
+    height: "100%",
+    minHeight: 0,
+    width: "100%",
+  },
+  cardMediaScrim: {
+    backgroundColor: "rgba(2,6,7,0.28)",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
   chip: {
     alignItems: "flex-end",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
@@ -699,6 +738,22 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "right",
+    writingDirection: "rtl",
+  },
+  mediaDifficulty: {
+    backgroundColor: "rgba(2,6,7,0.74)",
+    borderColor: "rgba(80,223,206,0.28)",
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    bottom: fiticianTokens.spacing[3],
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    overflow: "hidden",
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+    position: "absolute",
+    right: fiticianTokens.spacing[3],
     writingDirection: "rtl",
   },
   pageIndicator: {

@@ -255,6 +255,18 @@ function ExerciseMediaPanel({
   const name = exerciseTitle(detail.name_fa, detail.name_en);
   return (
     <Card style={styles.mediaCard}>
+      {selectedItem !== undefined && selectedItem.mediaType !== "placeholder" ? (
+        <NativeExerciseMedia
+          item={selectedItem}
+          name={name}
+          runtimeApiBaseUrl={runtimeApiBaseUrl}
+          sourceUri={cachedVideo?.uri}
+        />
+      ) : (
+        <View accessibilityRole="image" style={styles.mediaFallback}>
+          <Text style={styles.mediaFallbackText}>{exerciseCopy.mediaUnavailable}</Text>
+        </View>
+      )}
       <View style={styles.mediaHeader}>
         <Text style={styles.mediaTitle}>{name}</Text>
         <Text style={styles.mediaSecondary}>{exerciseSecondaryTitle(detail.name_fa, detail.name_en)}</Text>
@@ -272,18 +284,6 @@ function ExerciseMediaPanel({
           onPress={() => onPresentationChange("male")}
         />
       </View>
-      {selectedItem !== undefined && selectedItem.mediaType !== "placeholder" ? (
-        <NativeExerciseMedia
-          item={selectedItem}
-          name={name}
-          runtimeApiBaseUrl={runtimeApiBaseUrl}
-          sourceUri={cachedVideo?.uri}
-        />
-      ) : (
-        <View accessibilityRole="image" style={styles.mediaFallback}>
-          <Text style={styles.mediaFallbackText}>{exerciseCopy.mediaUnavailable}</Text>
-        </View>
-      )}
       {selectedItem?.mediaType === "video" && isDownloadableVideoPath(selectedItem.mediaPath) ? (
         <View style={styles.downloadSection}>
           {cachedVideo === null ? (
