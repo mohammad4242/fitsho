@@ -10,7 +10,7 @@ import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { Button, Card, Dialog, EmptyState, Notice, Skeleton, TextField } from "../ui/components";
+import { Button, Card, Dialog, EmptyState, Notice, PageHeading, Skeleton, TextField } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { UploadCancellationError, UploadManager, type UploadHandle } from "../upload/uploadManager";
@@ -34,6 +34,7 @@ import {
   createNutritionTrackingApi,
   type NutritionFoodPhotoEstimate,
 } from "./nutritionTrackingApi";
+import { createNutritionApi, type NutritionEstimate } from "./nutritionApi";
 import { formatNutritionNumber } from "./nutritionModel";
 
 type CheckInStatus = components["schemas"]["NutritionDailyCheckInStatus"];
@@ -66,6 +67,7 @@ export function NutritionTrackingSection() {
     () => createNutritionTrackingApi(auth.request, auth.download),
     [auth.download, auth.request],
   );
+  const nutritionApi = useMemo(() => createNutritionApi(auth.request), [auth.request]);
   const catalogueApi = useMemo(() => createNutritionCatalogueApi(auth.request), [auth.request]);
   const dailyQuery = useQuery({
     queryFn: () => api.getDailyTracking(entryDate),
@@ -79,12 +81,18 @@ export function NutritionTrackingSection() {
     queryFn: () => catalogueApi.getFoodCatalogue({ page: 1, pageSize: 40 }),
     queryKey: nutritionKeys.foodCatalogue({ category: "", page: 1, pageSize: 40, query: "" }),
   });
+  const estimateQuery = useQuery({
+    queryFn: nutritionApi.getCurrentEstimate,
+    queryKey: nutritionKeys.estimate(),
+  });
   const dailyState = getMobileViewState(dailyQuery, { connectivityStatus });
   const recentState = getMobileViewState(recentQuery, { connectivityStatus });
   const catalogueState = getMobileViewState(catalogueQuery, { connectivityStatus });
+  const estimateState = getMobileViewState(estimateQuery, { connectivityStatus });
   const daily = stateData(dailyState);
   const recentFoods = stateData(recentState) ?? [];
   const catalogueFoods = stateData(catalogueState)?.items ?? [];
+  const estimate = stateData(estimateState) ?? null;
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [checkInStatus, setCheckInStatus] = useState<CheckInStatus | null>(null);
@@ -419,13 +427,19 @@ export function NutritionTrackingSection() {
 
   return (
     <View style={styles.section}>
-      <View style={styles.heading}>
-        <Text style={styles.eyebrow}>FITICIAN · پیگیری عضو</Text>
-        <Text accessibilityRole="header" style={styles.title}>ثبت تغذیه امروز</Text>
-        <Text style={styles.bodyText}>مقدارهای ثبت‌شده با دقت ذخیره‌شده سرور محاسبه می‌شوند؛ اینجا فقط نمایش گرد شده است.</Text>
-      </View>
+      <PageHeading
+        eyebrow="امروز"
+        supportingText="مقدارهای ثبت‌شده با دقت ذخیره‌شده سرور محاسبه می‌شوند؛ اینجا فقط نمایش گرد شده است."
+        title="ثبت تغذیه"
+      />
       {dailyState.status === "offline" || dailyState.status === "stale" ? (
         <Notice message="آخرین ثبت ذخیره‌شده نمایش داده می‌شود؛ تغییرات جدید بعد از اتصال انجام می‌شوند." variant="offline" />
+      ) : null}
+      {estimateState.status === "offline" || estimateState.status === "stale" || estimate?.is_stale ? (
+        <Notice compact message="هدف‌های ذخیره‌شده نمایش داده می‌شوند؛ ممکن است با آخرین وضعیت پروفایل هماهنگ نباشند." variant="offline" />
+      ) : null}
+      {estimateState.status === "error" && estimate === null ? (
+        <Notice compact message="هدف برنامه دریافت نشد؛ ثبت‌های واقعی امروز همچنان در دسترس هستند." variant="warning" />
       ) : null}
       <Card style={styles.summaryCard}>
         <View style={styles.summaryHeading}>
@@ -433,8 +447,18 @@ export function NutritionTrackingSection() {
           <Text style={styles.dateText}>{entryDate}</Text>
         </View>
         <View style={styles.metricRow}>
-          <Metric label="انرژی" value={displayNutrient(daily.actual_totals.energy_kcal ?? daily.actual_totals.calories)} unit="kcal" />
-          <Metric label="پروتئین" value={displayNutrient(daily.actual_totals.protein_g)} unit="g" />
+          <Metric
+            label="انرژی"
+            target={nutritionTargetLabel(estimate, ["goal_calories", "energy"], "کیلوکالری")}
+            value={displayNutrient(daily.actual_totals.energy_kcal ?? daily.actual_totals.calories)}
+            unit="kcal"
+          />
+          <Metric
+            label="پروتئین"
+            target={nutritionTargetLabel(estimate, ["protein", "protein_g"], "گرم")}
+            value={displayNutrient(daily.actual_totals.protein_g)}
+            unit="g"
+          />
           <Metric label="ثبت‌ها" value={formatNutritionNumber(daily.entries.length)} unit="" />
         </View>
         <View style={styles.dataStatusRow}>
@@ -442,6 +466,26 @@ export function NutritionTrackingSection() {
           <Text style={styles.mutedText}>کیفیت داده</Text>
         </View>
       </Card>
+
+      <FoodPhotoCard
+        actionBusy={photoActionBusy}
+        catalogueFoods={catalogueFoods}
+        consent={photoConsent}
+        error={photoError}
+        estimate={photoEstimate}
+        foodIds={photoFoodIds}
+        amounts={photoAmounts}
+        onAmountChange={(itemId, amount) => setPhotoAmounts((current) => ({ ...current, [itemId]: amount }))}
+        onChooseFood={(itemId, foodId) => setPhotoFoodIds((current) => ({ ...current, [itemId]: foodId }))}
+        onConfirm={() => void confirmPhoto()}
+        onConsentChange={setPhotoConsent}
+        onDeleteItem={(item) => void removePhotoItem(item)}
+        onPickCamera={() => void choosePhoto("camera")}
+        onPickGallery={() => void choosePhoto("gallery")}
+        onClear={() => void clearPhotoEstimate()}
+        onCorrectItem={(item) => void correctPhotoItem(item)}
+        uploading={photoUploading}
+      />
 
       <Card style={styles.card}>
         <Text style={styles.cardTitle}>ثبت وضعیت امروز</Text>
@@ -553,26 +597,6 @@ export function NutritionTrackingSection() {
         </Card>
       ) : null}
 
-      <FoodPhotoCard
-        actionBusy={photoActionBusy}
-        catalogueFoods={catalogueFoods}
-        consent={photoConsent}
-        error={photoError}
-        estimate={photoEstimate}
-        foodIds={photoFoodIds}
-        amounts={photoAmounts}
-        onAmountChange={(itemId, amount) => setPhotoAmounts((current) => ({ ...current, [itemId]: amount }))}
-        onChooseFood={(itemId, foodId) => setPhotoFoodIds((current) => ({ ...current, [itemId]: foodId }))}
-        onConfirm={() => void confirmPhoto()}
-        onConsentChange={setPhotoConsent}
-        onDeleteItem={(item) => void removePhotoItem(item)}
-        onPickCamera={() => void choosePhoto("camera")}
-        onPickGallery={() => void choosePhoto("gallery")}
-        onClear={() => void clearPhotoEstimate()}
-        onCorrectItem={(item) => void correctPhotoItem(item)}
-        uploading={photoUploading}
-      />
-
       <Card style={styles.card}>
         <View style={styles.sectionHeading}>
           <Text style={styles.cardTitle}>ثبت‌های امروز</Text>
@@ -667,8 +691,8 @@ function FoodPhotoCard({
     <Card style={styles.card}>
       <View style={styles.sectionHeading}>
         <View style={styles.headingCopy}>
-          <Text style={styles.cardTitle}>تخمین عکس غذا</Text>
-          <Text style={styles.bodyText}>عکس فقط برای برآورد تقریبی غذا پردازش می‌شود و تا تأیید تو ثبت نهایی نیست.</Text>
+          <Text style={styles.cardTitle}>عکس وعده</Text>
+          <Text style={styles.bodyText}>تخمین از روی عکس غذا انجام می‌شود و تا تأیید تو ثبت نهایی نیست.</Text>
         </View>
       </View>
       <Pressable
@@ -804,11 +828,17 @@ function TrackingEntryCard({
   );
 }
 
-function Metric({ label, unit, value }: { readonly label: string; readonly unit: string; readonly value: string }) {
+function Metric({ label, target, unit, value }: {
+  readonly label: string;
+  readonly target?: string;
+  readonly unit: string;
+  readonly value: string;
+}) {
   return (
     <View style={styles.metric}>
       <Text style={styles.metricValue}>{value}{unit ? ` ${unit}` : ""}</Text>
       <Text style={styles.mutedText}>{label}</Text>
+      {target !== undefined ? <Text style={styles.metricTarget}>هدف برنامه: {target}</Text> : null}
     </View>
   );
 }
@@ -822,6 +852,24 @@ function displayNutrient(value: number | null | undefined): string {
   return value === null || value === undefined || !Number.isFinite(value)
     ? "—"
     : formatNutritionNumber(Math.round(value));
+}
+
+function nutritionTargetLabel(
+  estimate: NutritionEstimate | null,
+  codes: readonly string[],
+  fallbackUnit: string,
+): string | undefined {
+  if (estimate === null) return undefined;
+  const target = codes.map((code) => estimate.targets[code]).find((candidate) => candidate !== undefined);
+  if (target === undefined) return undefined;
+  const lower = target.minimum ?? target.preferred;
+  const upper = target.preferred_maximum ?? target.maximum;
+  const unit = fallbackUnit;
+  if (lower !== null && upper !== null && lower !== upper) {
+    return `${formatNutritionNumber(lower)}–${formatNutritionNumber(upper)} ${unit}`;
+  }
+  const value = target.preferred ?? target.minimum ?? target.preferred_maximum ?? target.maximum;
+  return value === null ? "—" : `${formatNutritionNumber(value)} ${unit}`;
 }
 
 function numericValue(value: string): number {
@@ -1012,11 +1060,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  heading: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[2],
-    marginTop: fiticianTokens.spacing[4],
-  },
   headingCopy: {
     alignItems: "flex-end",
     flex: 1,
@@ -1043,6 +1086,13 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "ltr",
+  },
+  metricTarget: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   mutedText: {
     color: fiticianTokens.colors.muted,
@@ -1096,14 +1146,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row-reverse",
     justifyContent: "space-between",
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-    lineHeight: 34,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   recentRow: {
     alignItems: "stretch",

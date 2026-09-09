@@ -11,11 +11,13 @@ jest.mock("../auth/MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
 jest.mock("../ui/navigation/BackBehaviorProvider", () => ({ useAndroidBackHandler: jest.fn() }));
 jest.mock("./nutritionTrackingApi", () => ({ createNutritionTrackingApi: jest.fn() }));
 jest.mock("./nutritionCatalogueApi", () => ({ createNutritionCatalogueApi: jest.fn() }));
+jest.mock("./nutritionApi", () => ({ createNutritionApi: jest.fn() }));
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { createNutritionCatalogueApi } from "./nutritionCatalogueApi";
+import { createNutritionApi } from "./nutritionApi";
 import { NutritionTrackingSection } from "./NutritionTrackingSection";
 import { createNutritionTrackingApi } from "./nutritionTrackingApi";
 
@@ -23,6 +25,7 @@ const mockUseQuery = jest.mocked(useQuery);
 const mockUseQueryClient = jest.mocked(useQueryClient);
 const mockUseMobileAuth = jest.mocked(useMobileAuth);
 const mockCreateCatalogueApi = jest.mocked(createNutritionCatalogueApi);
+const mockCreateNutritionApi = jest.mocked(createNutritionApi);
 const mockCreateTrackingApi = jest.mocked(createNutritionTrackingApi);
 
 const dailyTracking = {
@@ -49,6 +52,41 @@ const catalogueFood = {
   portions: [],
   slug: "lentils",
   source: { dataset: "USDA", reference: "fdc-1" },
+};
+
+const nutritionEstimate = {
+  confidence: "high",
+  confidence_reasons: [],
+  created_at: "2026-09-09T07:00:00.000Z",
+  formula_version: "test",
+  id: "estimate-1",
+  is_stale: false,
+  micronutrients: {},
+  policy_version: "test",
+  revision: 1,
+  status: "active",
+  targets: {
+    goal_calories: {
+      confidence: "high",
+      explanation_codes: [],
+      maximum: 2300,
+      minimum: 2100,
+      preferred: 2200,
+      preferred_maximum: 2250,
+      source_ids: [],
+      unit: "kcal/day",
+    },
+    protein: {
+      confidence: "high",
+      explanation_codes: [],
+      maximum: 170,
+      minimum: 130,
+      preferred: 150,
+      preferred_maximum: 160,
+      source_ids: [],
+      unit: "g/day",
+    },
+  },
 };
 
 const queryClient = {
@@ -88,6 +126,7 @@ beforeEach(() => {
   jest.setSystemTime(new Date("2026-09-09T08:00:00.000Z"));
   mockCreateTrackingApi.mockClear();
   mockCreateCatalogueApi.mockClear();
+  mockCreateNutritionApi.mockClear();
   queryClient.invalidateQueries.mockClear();
   queryClient.setQueryData.mockClear();
 
@@ -98,6 +137,7 @@ beforeEach(() => {
   };
   mockCreateTrackingApi.mockReturnValue(trackingApi as never);
   mockCreateCatalogueApi.mockReturnValue({ getFoodCatalogue: jest.fn() } as never);
+  mockCreateNutritionApi.mockReturnValue({ getCurrentEstimate: jest.fn() } as never);
   mockUseQueryClient.mockReturnValue(queryClient as never);
   mockUseMobileAuth.mockReturnValue({
     download: jest.fn(),
@@ -108,8 +148,17 @@ beforeEach(() => {
     const key = queryKey as readonly unknown[];
     if (key[1] === "tracking") return queryResult(dailyTracking);
     if (key[1] === "recent-foods") return queryResult([]);
+    if (key[1] === "estimate") return queryResult(nutritionEstimate);
     return queryResult({ categories: ["grain"], items: [catalogueFood], page: 1, page_size: 40, total: 1 });
   });
+});
+
+test("shows the web-aligned heading and real nutrition targets before entry tools", () => {
+  renderTracking();
+
+  expect(screen.getByRole("header", { name: "ثبت تغذیه" })).toBeTruthy();
+  expect(screen.getAllByText(/هدف برنامه/)).toHaveLength(2);
+  expect(screen.getByText("عکس وعده")).toBeTruthy();
 });
 
 afterEach(() => {
