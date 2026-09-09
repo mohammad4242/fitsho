@@ -3,8 +3,9 @@ import { expect, jest, test } from "@jest/globals";
 import { Circle } from "react-native-svg";
 
 import { NutritionSummaryCard } from "./NutritionSummaryCard";
+import { QuickActionCard } from "./QuickActionCard";
 import { WorkoutTodayCard } from "./WorkoutTodayCard";
-import { CinematicSurface } from "../ui/components";
+import { AppIcon, CinematicSurface } from "../ui/components";
 
 const mockPush = jest.fn();
 
@@ -87,4 +88,27 @@ test("does not render a decorative empty day number or stale snapshot sentence",
 
   expect(screen.queryByText("01")).toBeNull();
   expect(screen.queryByText("آخرین نسخه ذخیره‌شده نمایش داده می‌شود.")).toBeNull();
+});
+
+test("uses the same moderately larger icon in both quick action cards", () => {
+  render(
+    <>
+      <QuickActionCard
+        icon="bodyAnalysis"
+        image={1}
+        onPress={jest.fn()}
+        subtitle="پیشرفت بدنت را بهتر بشناس"
+        title="تحلیل بدن"
+      />
+      <QuickActionCard
+        icon="foodLog"
+        image={1}
+        onPress={jest.fn()}
+        subtitle="وعده امروزت را ثبت کن"
+        title="ثبت غذا"
+      />
+    </>,
+  );
+
+  expect(screen.UNSAFE_getAllByType(AppIcon).map((icon) => icon.props.size)).toEqual([26, 26]);
 });

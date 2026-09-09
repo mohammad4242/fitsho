@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { describe, expect, it } from "vitest";
 
 import { getHomeHeroLayout, getQuickActionColumns } from "./homePresentation";
@@ -16,4 +18,12 @@ describe("getQuickActionColumns", () => {
     expect(getQuickActionColumns(360)).toBe(2);
     expect(getQuickActionColumns(430)).toBe(2);
   });
+});
+
+it("places quick actions directly after nutrition without extra section headings", async () => {
+  const source = await readFile(new URL("./MemberHomeScreen.tsx", import.meta.url), "utf8");
+
+  expect(source).not.toContain('eyebrow="ادامه مسیر"');
+  expect(source).not.toContain('title="دسترسی سریع"');
+  expect(source).not.toContain("<SectionHeader");
 });

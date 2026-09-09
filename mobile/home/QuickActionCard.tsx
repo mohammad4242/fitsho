@@ -26,7 +26,7 @@ export function QuickActionCard({ icon, image, onPress, subtitle, title }: Quick
       <View pointerEvents="none" style={styles.scanLine} />
       <View pointerEvents="none" style={styles.content}>
         <View style={styles.iconBadge}>
-          <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={fiticianTokens.iconSize.md} />
+          <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={26} />
         </View>
         <View style={styles.copy}>
           <Text style={styles.title}>{title}</Text>

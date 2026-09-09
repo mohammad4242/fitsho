@@ -12,7 +12,7 @@ import { createNutritionPlanApi } from "../nutrition/nutritionPlanApi";
 import { createNutritionTrackingApi } from "../nutrition/nutritionTrackingApi";
 import { createWorkoutPlanApi } from "../workouts/workoutApi";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
-import { Notice, PageHeading, SectionHeader } from "../ui/components";
+import { Notice, PageHeading } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot } from "../ui/navigation/RouteGuards";
@@ -142,26 +142,23 @@ export function MemberHomeScreen() {
         </View>
       ) : null}
 
-      <View style={styles.section}>
-        <SectionHeader eyebrow="ادامه مسیر" title="دسترسی سریع" />
-        <View style={[styles.quickGrid, getQuickActionColumns(width) === 1 && styles.quickGridStacked]}>
+      <View style={[styles.quickGrid, getQuickActionColumns(width) === 1 && styles.quickGridStacked]}>
+        <QuickActionCard
+          icon="bodyAnalysis"
+          image={homeBodyImage}
+          onPress={() => router.push("/member/body-analysis")}
+          subtitle="پیشرفت بدنت را بهتر بشناس"
+          title="تحلیل بدن"
+        />
+        {hasNutrition ? (
           <QuickActionCard
-            icon="bodyAnalysis"
-            image={homeBodyImage}
-            onPress={() => router.push("/member/body-analysis")}
-            subtitle="پیشرفت بدنت را بهتر بشناس"
-            title="تحلیل بدن"
+            icon="foodLog"
+            image={homeFoodImage}
+            onPress={() => router.push("/member/nutrition-tracking")}
+            subtitle="وعده امروزت را ثبت کن"
+            title="ثبت غذا"
           />
-          {hasNutrition ? (
-            <QuickActionCard
-              icon="foodLog"
-              image={homeFoodImage}
-              onPress={() => router.push("/member/nutrition-tracking")}
-              subtitle="وعده امروزت را ثبت کن"
-              title="ثبت غذا"
-            />
-          ) : null}
-        </View>
+        ) : null}
       </View>
 
       {hasTraining && workoutState === "error" ? (
