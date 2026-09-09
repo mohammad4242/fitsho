@@ -7,7 +7,7 @@ import type { ProductMode } from "@fitician/core/profile";
 
 import { PUBLIC_ONBOARDING_SOURCE } from "../auth/authRoute";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { AppIcon, Button, Card, Notice } from "../ui/components";
+import { AppIcon, Button, Card, Notice, ProgressBar } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -107,6 +107,9 @@ export function PublicOnboardingScreen() {
           <View style={styles.progressDot} />
           <Text style={styles.progressText}>{progress}</Text>
         </View>
+      </View>
+      <View style={styles.progressTrack}>
+        <ProgressBar label="پیشرفت مسیر شخصی‌سازی" progress={onboardingProgressValue(state)} />
       </View>
       {error ? <Notice message={error} variant="danger" /> : null}
       {state.step === "product_mode" ? <ModeStage busy={busy} onSelect={(mode) => run({ mode, type: "select_product_mode" })} /> : null}
@@ -215,6 +218,14 @@ function onboardingProgress(state: OnboardingState): string {
   const steps = getOnboardingSteps(state.mode);
   const index = Math.min(steps.indexOf(state.step) + 1, steps.length - 1);
   return `گام ${index} از ${steps.length - 1}`;
+}
+
+function onboardingProgressValue(state: OnboardingState): number {
+  if (state.mode === null || state.step === "product_mode") return 0;
+  const steps = getOnboardingSteps(state.mode);
+  const index = steps.indexOf(state.step);
+  if (index <= 0) return 0;
+  return Math.min(1, index / Math.max(1, steps.length - 1));
 }
 
 function publicOnboardingErrorMessage(error: unknown): string {
@@ -334,6 +345,9 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     writingDirection: "rtl",
+  },
+  progressTrack: {
+    marginTop: -fiticianTokens.spacing[3],
   },
   screen: {
     gap: fiticianTokens.spacing[5],

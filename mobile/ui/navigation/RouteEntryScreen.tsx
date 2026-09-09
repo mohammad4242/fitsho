@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import { type ReactNode } from "react";
 
+import { AppIcon, Card } from "../components";
 import { Screen } from "../layout";
 import { fiticianTokens } from "../tokens";
 
@@ -14,10 +15,17 @@ export function RouteEntryScreen({ children, description, title }: RouteEntryScr
   return (
     <Screen contentContainerStyle={styles.screen} contentWidth="reading" scroll={false}>
       <View style={styles.content}>
-        <Text style={styles.brand}>FITICIAN</Text>
-        <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
-        {children}
+        <View style={styles.brandRow}>
+          <Text style={styles.brand}>FITICIAN</Text>
+          <View style={styles.brandMark}>
+            <AppIcon color={fiticianTokens.colors.aqua} name="target" size={18} />
+          </View>
+        </View>
+        <Card variant="hero" style={styles.hero}>
+          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
+          <Text style={styles.description}>{description}</Text>
+          {children}
+        </Card>
       </View>
     </Screen>
   );
@@ -33,6 +41,21 @@ const styles = StyleSheet.create({
     textAlign: "left",
     writingDirection: "ltr",
   },
+  brandMark: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  brandRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   content: {
     gap: fiticianTokens.spacing[3],
     maxWidth: fiticianTokens.layout.readingMaxWidth,
@@ -45,6 +68,10 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  hero: {
+    gap: fiticianTokens.spacing[4],
+    padding: fiticianTokens.spacing[5],
   },
   screen: {
     justifyContent: "center",

@@ -12,6 +12,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ApiError } from "@fitician/core";
 import type { NutritionProfileInput, SafetyProfileInput, StructuredExerciseInput } from "@fitician/core/nutrition";
+import { getOnboardingSteps } from "@fitician/core/onboarding";
 import type { NutritionBasicsDraft, OnboardingState } from "@fitician/core/onboarding";
 import type { ProfileFormValues, ProfileInput, ProductMode } from "@fitician/core/profile";
 import { validateStep } from "@fitician/core/profile-validation";
@@ -23,7 +24,7 @@ import {
 } from "../data/encryptedUserDatabase";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
 import { useRefreshMobileProfileStatus } from "../ui/navigation/RouteGuards";
-import { Button, Card, Notice, TextField } from "../ui/components";
+import { AppIcon, Button, Card, Notice, ProgressBar, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -184,12 +185,13 @@ const conditionOptions: readonly ChoiceOption[] = [
 
 const productModeOptions: readonly {
   readonly description: string;
+  readonly icon: "bodyAnalysis" | "nutrition" | "training";
   readonly label: string;
   readonly mode: ProductMode;
 }[] = [
-  { description: "برنامه شخصی بر اساس بدن، هدف و امکاناتت", label: "تمرین", mode: "training" },
-  { description: "برنامه غذایی متناسب با هدف، بدن و بودجه", label: "تغذیه", mode: "nutrition" },
-  { description: "یک مسیر هماهنگ برای تمرین و تغذیه", label: "تمرین و تغذیه", mode: "both" },
+  { description: "برنامه شخصی بر اساس بدن، هدف و امکاناتت", icon: "training", label: "تمرین", mode: "training" },
+  { description: "برنامه غذایی متناسب با هدف، بدن و بودجه", icon: "nutrition", label: "تغذیه", mode: "nutrition" },
+  { description: "یک مسیر هماهنگ برای تمرین و تغذیه", icon: "bodyAnalysis", label: "تمرین و تغذیه", mode: "both" },
 ];
 
 type ChoiceOption = { readonly label: string; readonly value: string };
@@ -370,6 +372,7 @@ export function OnboardingScreen() {
           </Pressable>
         ) : null}
       </View>
+      <ProgressBar label="پیشرفت مسیر شخصی‌سازی" progress={onboardingProgressValue(state)} />
       {error ? <Notice message={error} variant="danger" /> : null}
       {state.step === "product_mode" ? <ModeStage busy={busy} onSelect={selectMode} /> : null}
       {state.step === "shared_profile" ? (
@@ -454,6 +457,13 @@ export function ModeStage({ busy, onSelect }: { readonly busy: boolean; readonly
             style={({ pressed }) => [styles.modeCard, option.mode === "both" && styles.recommendedCard, pressed && styles.pressed]}
           >
             <View style={styles.modeAccent} />
+            <View style={[styles.modeIcon, option.mode === "both" && styles.modeIconRecommended]}>
+              <AppIcon
+                color={option.mode === "both" ? fiticianTokens.colors.amber : fiticianTokens.colors.aqua}
+                name={option.icon}
+                size={fiticianTokens.iconSize.lg}
+              />
+            </View>
             <View style={styles.modeContent}>
               {option.mode === "both" ? <Text style={styles.recommended}>پیشنهاد فیتشو</Text> : null}
               <Text style={styles.modeTitle}>{option.label}</Text>
@@ -499,7 +509,7 @@ export function SharedProfileStage({
       progress="۱ از ۲"
       title="اول خودت را معرفی کن"
     >
-      <Card>
+      <Card variant="glass">
         <View style={styles.formStack}>
           <ControlledTextField control={control} label="نام نمایشی" name="display_name" />
           <ControlledTextField
@@ -597,7 +607,7 @@ export function TrainingProfileStage({
       progress="۲ از ۲"
       title="برنامه تمرینت را تنظیم کن"
     >
-      <Card>
+      <Card variant="glass">
         <View style={styles.formStack}>
           <ControlledChoice control={control} label="سطح تجربه" name="experience_level" options={experienceOptions} />
           <ControlledTextField
@@ -700,7 +710,7 @@ export function SafetyStage({
           variant="warning"
         />
       ) : null}
-      <Card>
+      <Card variant="glass">
         <View style={styles.formStack}>
           <ControlledMultiChoice control={control} label="شرایط پزشکی" name="conditions" options={conditionOptions} csvValues />
           <ControlledTextField
@@ -761,7 +771,7 @@ export function ExerciseStage({
       progress="۲ از ۴"
       title="خارج از فیتشو هم تمرین می‌کنی؟"
     >
-      <Card>
+      <Card variant="glass">
         <View style={styles.formStack}>
           <ToggleField control={control} label="تمرین منظم دارم" name="trains" />
           {trains ? (
@@ -828,7 +838,7 @@ export function NutritionBasicsStage({
       progress="۳ از ۴"
       title="شرایط واقعی زندگی‌ات را بگو"
     >
-      <Card>
+      <Card variant="glass">
         <View style={styles.formStack}>
           <ControlledChoice control={control} label="فعالیت روزانه" name="daily_activity_level" options={activityOptions} />
           <ControlledTextField
@@ -918,7 +928,7 @@ export function NutritionPreferencesStage({
       progress="۴ از ۴"
       title="برنامه غذایی را برای زندگی‌ات تنظیم کن"
     >
-      <Card>
+      <Card variant="glass">
         <View style={styles.formStack}>
           <ControlledTextField
             control={control}
@@ -1349,6 +1359,14 @@ export function safetyFormValuesForState(safety: SafetyProfileInput | null): Saf
   };
 }
 
+function onboardingProgressValue(state: OnboardingState): number {
+  if (state.mode === null || state.step === "product_mode") return 0;
+  const steps = getOnboardingSteps(state.mode);
+  const index = steps.indexOf(state.step);
+  if (index <= 0) return 0;
+  return Math.min(1, index / Math.max(1, steps.length - 1));
+}
+
 export function exerciseFormValuesForState(exercise: StructuredExerciseInput | null): ExerciseFormValues {
   if (exercise === null || exercise.trains === false) return emptyExerciseFormValues();
   return {
@@ -1395,7 +1413,7 @@ export function nutritionPreferencesFormValuesForState(
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     justifyContent: "flex-start",
   },
@@ -1436,7 +1454,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
   },
   choiceGrid: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -1537,6 +1555,20 @@ const styles = StyleSheet.create({
   modeContent: {
     flex: 1,
     gap: fiticianTokens.spacing[2],
+  },
+  modeIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    height: 52,
+    justifyContent: "center",
+    width: 52,
+  },
+  modeIconRecommended: {
+    backgroundColor: fiticianTokens.colors.warningSurface,
+    borderColor: fiticianTokens.colors.amber,
   },
   modeDescription: {
     color: fiticianTokens.colors.muted,
