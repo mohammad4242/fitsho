@@ -37,16 +37,14 @@ export function NutritionWeightRateCard({
       <View style={styles.header}>
         <View style={styles.titleGroup}>
           <AppIcon color={fiticianTokens.colors.aqua} name="scale" size={fiticianTokens.iconSize.md} />
-          <View style={styles.titleCopy}>
-            <Text style={styles.title}>نرخ تغییر وزن هفتگی</Text>
-            <Text style={[styles.badge, isOverride ? styles.overrideBadge : isClamped ? styles.clampedBadge : styles.safeBadge]}>
-              {isOverride
-                ? "نرخ دلخواه من"
-                : isClamped
-                  ? "تنظیم‌شده برای ایمنی خودکار"
-                  : "تنظیم ایمن پیشنهادی"}
-            </Text>
-          </View>
+          <Text style={styles.title}>نرخ تغییر وزن هفتگی</Text>
+          <Text style={[styles.badge, isOverride ? styles.overrideBadge : isClamped ? styles.clampedBadge : styles.safeBadge]}>
+            {isOverride
+              ? "نرخ دلخواه من"
+              : isClamped
+                ? "تنظیم‌شده برای ایمنی خودکار"
+                : "تنظیم ایمن پیشنهادی"}
+          </Text>
         </View>
         <RateModeControls mode={rateMode} onRefresh={onRefresh} />
       </View>
@@ -157,12 +155,12 @@ function formatRate(value: number): string {
 
 const styles = StyleSheet.create({
   badge: {
-    alignSelf: "flex-start",
+    alignSelf: "center",
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 10,
-    marginTop: fiticianTokens.spacing[1],
+    marginTop: 0,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: 2,
     textAlign: "right",
@@ -180,13 +178,15 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    direction: "rtl",
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
     justifyContent: "space-between",
   },
   modeArea: {
-    alignItems: "flex-end",
-    flexShrink: 1,
+    alignItems: "flex-start",
+    flexShrink: 0,
     gap: fiticianTokens.spacing[1],
   },
   modeButton: {
@@ -279,21 +279,22 @@ const styles = StyleSheet.create({
   },
   title: {
     color: fiticianTokens.colors.ink,
+    flexShrink: 1,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    minWidth: 150,
     textAlign: "right",
     writingDirection: "rtl",
   },
-  titleCopy: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[1],
-  },
   titleGroup: {
-    alignItems: "flex-start",
-    flex: 1,
-    flexDirection: "row-reverse",
+    alignItems: "center",
+    direction: "rtl",
+    flexGrow: 1,
+    flexShrink: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
-    minWidth: 0,
+    minWidth: 180,
   },
 });

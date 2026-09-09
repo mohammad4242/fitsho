@@ -55,3 +55,15 @@ test("uses the direct-rate wording for an explicit override", () => {
   expect(screen.getByText("نرخ دلخواه من")).toBeTruthy();
   expect(screen.getByText("مقدار اعمال‌شده (نرخ مستقیم)")).toBeTruthy();
 });
+
+test("keeps the RTL title group intact before the opposite-side mode controls", () => {
+  render(<NutritionWeightRateCard estimate={estimateWithRate()} />);
+
+  const title = screen.getByText("نرخ تغییر وزن هفتگی");
+  const titleGroup = title.parent?.parent;
+  expect(titleGroup).not.toBeNull();
+  if (titleGroup === undefined || titleGroup === null) throw new Error("Title group was not rendered");
+
+  expect(titleGroup.props.style).toMatchObject({ flexDirection: "row", flexWrap: "wrap" });
+  expect(titleGroup.parent?.props.style).toMatchObject({ flexDirection: "row", flexWrap: "wrap" });
+});
