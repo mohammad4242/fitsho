@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import * as exerciseMedia from "./exerciseMedia";
+
 import {
   buildExerciseMediaItems,
   isExerciseMediaRenderable,
   resolveExerciseMediaUrl,
+  type ExerciseMediaItem,
 } from "./exerciseMedia";
 
 describe("native exercise media", () => {
@@ -71,6 +74,21 @@ describe("native exercise media", () => {
     expect(isExerciseMediaRenderable("/exercises/exercise-placeholder.svg", "placeholder")).toBe(false);
     expect(isExerciseMediaRenderable("", "gif")).toBe(false);
   });
+
+  it("returns only usable gender collections and ignores shared or broken media", () => {
+    const availableMediaPresentations = (exerciseMedia as unknown as {
+      availableMediaPresentations?: (items: readonly ExerciseMediaItem[]) => readonly string[];
+    }).availableMediaPresentations;
+    expect(typeof availableMediaPresentations).toBe("function");
+    if (availableMediaPresentations === undefined) return;
+
+    expect(availableMediaPresentations([
+      mediaItem("male", "/media/male-1.mp4"),
+      mediaItem("male", "/media/male-2.mp4"),
+      mediaItem("female", ""),
+      mediaItem("unspecified", "/media/shared.mp4"),
+    ])).toEqual(["male"]);
+  });
 });
 
 function mediaAsset(
@@ -87,5 +105,19 @@ function mediaAsset(
     presentation: "male" as const,
     role: "video" as const,
     sort_order: sortOrder,
+  };
+}
+
+function mediaItem(
+  presentation: "male" | "female" | "unspecified",
+  mediaPath: string,
+): ExerciseMediaItem {
+  return {
+    key: `${presentation}-${mediaPath}`,
+    mediaAttribution: null,
+    mediaPath,
+    mediaType: "video",
+    presentation,
+    sortOrder: 0,
   };
 }

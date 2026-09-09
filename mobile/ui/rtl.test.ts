@@ -10,6 +10,8 @@ const native = vi.hoisted(() => ({
 
 vi.mock("react-native", () => native);
 
+import * as rtl from "./rtl";
+
 import { configureFiticianRtl } from "./rtl";
 
 it("enables RTL and requests a restart when native RTL is not active", () => {
@@ -26,4 +28,15 @@ it("does not request another restart after RTL is active", () => {
   expect(configureFiticianRtl()).toEqual({ isRTL: true, restartRequired: false });
   expect(native.I18nManager.allowRTL).toHaveBeenCalledWith(true);
   expect(native.I18nManager.forceRTL).not.toHaveBeenCalled();
+});
+
+it("maps the existing native direction to the card language", () => {
+  const languageForDirection = (rtl as unknown as {
+    languageForDirection?: (isRTL: boolean) => string;
+  }).languageForDirection;
+  expect(typeof languageForDirection).toBe("function");
+  if (languageForDirection === undefined) return;
+
+  expect(languageForDirection(true)).toBe("fa");
+  expect(languageForDirection(false)).toBe("en");
 });

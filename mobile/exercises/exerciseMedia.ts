@@ -11,6 +11,11 @@ export type ExerciseMediaItem = {
   readonly sortOrder: number | null;
 };
 
+export type GenderMediaPresentation = Extract<
+  components["schemas"]["MediaPresentation"],
+  "male" | "female"
+>;
+
 type ExerciseMediaSource = Pick<
   ExerciseDetail,
   "media_assets" | "media_attribution" | "media_path" | "media_type"
@@ -77,4 +82,15 @@ export function isExerciseMediaRenderable(
   return path.trim() !== ""
     && mediaType !== "placeholder"
     && !path.toLowerCase().includes("placeholder");
+}
+
+export function availableMediaPresentations(
+  items: readonly ExerciseMediaItem[],
+): GenderMediaPresentation[] {
+  return (["male", "female"] as const).filter((presentation) =>
+    items.some((item) =>
+      item.presentation === presentation
+      && isExerciseMediaRenderable(item.mediaPath, item.mediaType),
+    ),
+  );
 }

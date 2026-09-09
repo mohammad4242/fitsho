@@ -10,6 +10,7 @@ export type ExerciseCategories = components["schemas"]["ExerciseCategories"];
 export type ExerciseDetail = components["schemas"]["ExerciseDetail"];
 export type ExerciseSummary = components["schemas"]["ExerciseSummary"];
 export type PaginatedExercises = components["schemas"]["PaginatedExercises"];
+export type ExerciseMediaPresentation = components["schemas"]["MediaPresentation"];
 
 export type AuthenticatedExerciseRequest = <TResponse>(
   request: TransportRequest,
@@ -17,7 +18,7 @@ export type AuthenticatedExerciseRequest = <TResponse>(
 
 export interface ExerciseApi {
   getCategories(): Promise<ExerciseCategories>;
-  get(slug: string, presentation?: "male" | "female"): Promise<ExerciseDetail | null>;
+  get(slug: string, presentation?: ExerciseMediaPresentation): Promise<ExerciseDetail | null>;
   list(filters?: ExerciseFilters): Promise<PaginatedExercises>;
 }
 

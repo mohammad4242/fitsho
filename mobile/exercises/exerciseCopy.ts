@@ -8,6 +8,8 @@ import type {
   MuscleGroup,
 } from "@fitician/core/exercises";
 
+import type { MobileLanguage } from "../ui/rtl";
+
 export const exerciseCopy = {
   bodyRegion: "ناحیه بدن",
   bodyRegions: {
@@ -153,8 +155,14 @@ export const exerciseCopy = {
   } satisfies Record<ExerciseLabel, string>,
 } as const;
 
-export function exerciseTitle(nameFa: string, nameEn: string): string {
-  return nameFa.trim() || nameEn;
+export function exerciseTitle(
+  nameFa: string,
+  nameEn: string,
+  language: MobileLanguage = "fa",
+): string {
+  const localizedName = (language === "en" ? nameEn : nameFa).trim();
+  if (localizedName) return localizedName;
+  return (language === "en" ? nameFa : nameEn).trim();
 }
 
 export function exerciseSecondaryTitle(nameFa: string, nameEn: string): string {

@@ -5,6 +5,12 @@ export interface FiticianRtlConfiguration {
   readonly restartRequired: boolean;
 }
 
+export type MobileLanguage = "fa" | "en";
+
+export function languageForDirection(isRTL = I18nManager.isRTL): MobileLanguage {
+  return isRTL ? "fa" : "en";
+}
+
 export function configureFiticianRtl(): FiticianRtlConfiguration {
   I18nManager.allowRTL(true);
   if (I18nManager.isRTL) {

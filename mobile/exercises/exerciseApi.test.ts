@@ -54,6 +54,18 @@ describe("native exercise API", () => {
     });
   });
 
+  it("can request the complete media inventory for gender availability", async () => {
+    const request = vi.fn().mockResolvedValue(detail);
+    const api = createExerciseApi(request as unknown as AuthenticatedExerciseRequest);
+
+    await expect(api.get("press/advanced", "unspecified")).resolves.toBe(detail);
+
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/api/v1/exercises/press%2Fadvanced?presentation=unspecified",
+    });
+  });
+
   it("returns null only for an unknown exercise", async () => {
     const request = vi.fn()
       .mockRejectedValueOnce(new ApiError(404, "Exercise not found"))
