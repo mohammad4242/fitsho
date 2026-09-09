@@ -26,6 +26,34 @@ export type PerformanceMeasurement = {
   readonly value: number;
 };
 
+export type PerformanceLaunchCohort = {
+  readonly apiLevel: number;
+  readonly appVersion: string;
+  readonly buildProfile: string;
+  readonly cleanLaunches: number;
+  readonly commit: string;
+  readonly crashes: number;
+  readonly deviceModel: string;
+};
+
+export type PerformanceMetricSummary = {
+  readonly budget: number;
+  readonly p95: number;
+  readonly passed: boolean;
+  readonly sampleCount: number;
+  readonly unit: PerformanceUnit;
+};
+
+export type MobilePerformanceReport = {
+  readonly accepted: boolean;
+  readonly launchCohort: PerformanceLaunchCohort & {
+    readonly crashFreeRate: number;
+    readonly passed: boolean;
+  };
+  readonly metrics: Partial<Record<PerformanceMetric, PerformanceMetricSummary>>;
+  readonly missingMetrics: readonly PerformanceMetric[];
+};
+
 export type PerformanceClock = () => number;
 
 export function monotonicNow(): number {
@@ -52,6 +80,75 @@ export function assessPerformance(
     unit: budget.unit,
     value,
   };
+}
+
+export function buildMobilePerformanceReport(
+  samples: readonly PerformanceMeasurement[],
+  launchCohort: PerformanceLaunchCohort,
+): MobilePerformanceReport {
+  const metrics: Partial<Record<PerformanceMetric, PerformanceMetricSummary>> = {};
+  const missingMetrics: PerformanceMetric[] = [];
+
+  for (const metric of Object.keys(MOBILE_PERFORMANCE_BUDGETS) as PerformanceMetric[]) {
+    const values = samples
+      .filter((sample) => sample.metric === metric)
+      .map((sample) => sample.value)
+      .sort((left, right) => left - right);
+    if (values.length === 0) {
+      missingMetrics.push(metric);
+      continue;
+    }
+    const p95 = percentile95(values);
+    const budget = MOBILE_PERFORMANCE_BUDGETS[metric];
+    metrics[metric] = {
+      budget: budget.max,
+      p95,
+      passed: values.every((value) => assessPerformance(metric, value).passed),
+      sampleCount: values.length,
+      unit: budget.unit,
+    };
+  }
+
+  const cohortValid = isValidLaunchCohort(launchCohort);
+  const crashFreeRate = cohortValid && launchCohort.cleanLaunches > 0
+    ? (launchCohort.cleanLaunches - launchCohort.crashes) / launchCohort.cleanLaunches
+    : 0;
+  const launchCohortPassed = cohortValid
+    && launchCohort.cleanLaunches >= 100
+    && crashFreeRate >= 0.995;
+  const metricSummaries = Object.values(metrics);
+
+  return {
+    accepted: missingMetrics.length === 0
+      && metricSummaries.every((summary) => summary.passed)
+      && launchCohortPassed,
+    launchCohort: {
+      ...launchCohort,
+      crashFreeRate,
+      passed: launchCohortPassed,
+    },
+    metrics,
+    missingMetrics,
+  };
+}
+
+function percentile95(sortedValues: readonly number[]): number {
+  const index = Math.max(0, Math.ceil(sortedValues.length * 0.95) - 1);
+  return sortedValues[index] ?? 0;
+}
+
+function isValidLaunchCohort(cohort: PerformanceLaunchCohort): boolean {
+  return Number.isSafeInteger(cohort.apiLevel)
+    && cohort.apiLevel > 0
+    && Number.isSafeInteger(cohort.cleanLaunches)
+    && cohort.cleanLaunches > 0
+    && Number.isSafeInteger(cohort.crashes)
+    && cohort.crashes >= 0
+    && cohort.crashes <= cohort.cleanLaunches
+    && cohort.appVersion.trim().length > 0
+    && cohort.buildProfile.trim().length > 0
+    && cohort.commit.trim().length > 0
+    && cohort.deviceModel.trim().length > 0;
 }
 
 export class MobilePerformanceRecorder {

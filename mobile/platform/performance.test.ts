@@ -4,6 +4,7 @@ import {
   MOBILE_PERFORMANCE_BUDGETS,
   MobilePerformanceRecorder,
   assessPerformance,
+  buildMobilePerformanceReport,
   recordBatteryDrain,
   recordMemoryPeak,
 } from "./performance";
@@ -90,4 +91,49 @@ it("records resource measurements with the matching unit budget", () => {
     unit: "percent_per_hour",
     value: 9,
   });
+});
+
+it("builds an accepted p95 report only from complete measured evidence", () => {
+  const samples = Object.keys(MOBILE_PERFORMANCE_BUDGETS).flatMap((metric) => [
+    assessPerformance(metric as keyof typeof MOBILE_PERFORMANCE_BUDGETS, 1),
+    assessPerformance(metric as keyof typeof MOBILE_PERFORMANCE_BUDGETS, 2),
+  ]);
+
+  const report = buildMobilePerformanceReport(samples, {
+    apiLevel: 36,
+    appVersion: "0.1.0",
+    buildProfile: "development",
+    cleanLaunches: 100,
+    commit: "abc1234",
+    crashes: 0,
+    deviceModel: "Pixel test device",
+  });
+
+  expect(report.accepted).toBe(true);
+  expect(report.missingMetrics).toEqual([]);
+  expect(report.metrics.screen_transition).toMatchObject({
+    p95: 2,
+    passed: true,
+    sampleCount: 2,
+  });
+  expect(report.launchCohort).toMatchObject({ crashFreeRate: 1, passed: true });
+});
+
+it("keeps incomplete or under-budget-evidence reports out of release acceptance", () => {
+  const report = buildMobilePerformanceReport([
+    assessPerformance("screen_transition", 301),
+  ], {
+    apiLevel: 33,
+    appVersion: "0.1.0",
+    buildProfile: "preview",
+    cleanLaunches: 100,
+    commit: "abc1234",
+    crashes: 1,
+    deviceModel: "Mid-range test device",
+  });
+
+  expect(report.accepted).toBe(false);
+  expect(report.missingMetrics).toContain("memory_peak");
+  expect(report.metrics.screen_transition).toMatchObject({ p95: 301, passed: false });
+  expect(report.launchCohort).toMatchObject({ crashFreeRate: 0.99, passed: false });
 });
