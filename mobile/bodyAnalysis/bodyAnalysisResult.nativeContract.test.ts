@@ -11,7 +11,7 @@ it("keeps result display versioned, quality-aware, and private", async () => {
   expect(source).toMatch(/photo_validation/);
   expect(source).toMatch(/coach_review/);
   expect(source).toMatch(/doctor_review/);
-  expect(source).toMatch(/schema_version === "2\.0"/);
+  expect(source).toMatch(/BodyProgressComparisonCard/);
   expect(source).not.toMatch(/نسخه قرارداد:/);
   expect(source).not.toMatch(/قرارداد داده:/);
   expect(source).not.toMatch(/نسخه پردازش:/);
@@ -19,8 +19,8 @@ it("keeps result display versioned, quality-aware, and private", async () => {
   expect(source).toMatch(/BodyAnalysisMuscleSection/);
   expect(source).toMatch(/DisclosureCard/);
   expect(source).toMatch(/PrivacyDisclaimer/);
-  expect(source).toMatch(/PrivateMediaClient/);
-  expect(source).toMatch(/ExpoPrivateMediaStore/);
+  expect(source).toMatch(/createPrivateBodyPhotoClient/);
+  expect(source).toMatch(/loadPrivateBodyPhotoUris/);
   expect(source).not.toMatch(/source=\{\{ uri: photo\.content_url/);
   expect(source).not.toMatch(/console\.|Log\./);
 });

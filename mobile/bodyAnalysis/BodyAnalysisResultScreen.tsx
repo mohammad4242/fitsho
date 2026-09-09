@@ -5,20 +5,12 @@ import { Image, StyleSheet, Text, View } from "react-native";
 import { ApiError } from "@fitician/core";
 import type {
   BodyAnalysis,
-  BodyArea,
   BodyPhoto,
   BodyPhotoSession,
   BodyProgressComparison,
-  BodyProgressMeasurementDelta,
-  BodyProgressState,
-  BodyProgressVisualTransition,
-  NormalizedBodyProgressComparisonV1,
-  NormalizedBodyProgressComparisonV2,
 } from "@fitician/core/body-photos";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
-import { PrivateMediaClient } from "../media/privateMedia";
-import { ExpoPrivateMediaStore } from "../media/privateMediaStore";
 import {
   Button,
   Card,
@@ -26,7 +18,6 @@ import {
   AppIcon,
   Notice,
   PageHeading,
-  ProgressBar,
   SectionHeader,
   Skeleton,
 } from "../ui/components";
@@ -36,6 +27,11 @@ import { createBodyPhotoApi } from "./bodyPhotoApi";
 import { BodyAnalysisMuscleSection } from "./BodyAnalysisMuscleSection";
 import { BodyAnalysisOverviewCard } from "./BodyAnalysisOverviewCard";
 import { bodyAreaLabel } from "./bodyAnalysisPresentation";
+import {
+  createPrivateBodyPhotoClient,
+  loadPrivateBodyPhotoUris,
+} from "./bodyPhotoPrivateMedia";
+import { BodyProgressComparisonCard } from "./BodyProgressComparison";
 
 const activeAnalysisStates = new Set<BodyAnalysis["status"]>([
   "queued",
@@ -54,12 +50,7 @@ export function BodyAnalysisResultScreen() {
     [auth.download, auth.request, auth.upload],
   );
   const mediaClient = useMemo(() => {
-    if (userId === null) return null;
-    return new PrivateMediaClient({
-      authClient: { download: auth.download },
-      storage: new ExpoPrivateMediaStore(),
-      userId,
-    });
+    return createPrivateBodyPhotoClient(auth.download, userId);
   }, [auth.download, userId]);
   const [session, setSession] = useState<BodyPhotoSession | null>(null);
   const [analysis, setAnalysis] = useState<BodyAnalysis | null>(null);
@@ -96,7 +87,7 @@ export function BodyAnalysisResultScreen() {
       setComparison(await api.getComparison(sessionId).catch(() => null));
       setFailed(false);
       if (mediaClient !== null) {
-        void loadPrivatePhotos(loadedSession, mediaClient)
+        void loadPrivateBodyPhotoUris(loadedSession.photos, mediaClient, `body-analysis-${loadedSession.id}`)
           .then(setPhotoUris)
           .catch(() => undefined);
       }
@@ -207,7 +198,7 @@ export function BodyAnalysisResultScreen() {
           <NormalizedResult analysis={analysis} />
         ) : null}
         {analysis !== null && hasAnalysisResult(analysis) ? <ReviewStatusCard analysis={analysis} /> : null}
-        {comparison !== null ? <ComparisonCard comparison={comparison} /> : null}
+        {comparison !== null ? <BodyProgressComparisonCard comparison={comparison} /> : null}
         {analysis !== null && hasAnalysisResult(analysis) ? (
           <PrivacyDisclaimer />
         ) : null}
@@ -296,115 +287,6 @@ function ReviewRow({
   );
 }
 
-function ComparisonCard({ comparison }: { readonly comparison: BodyProgressComparison }) {
-  const normalized = comparison.normalized_result;
-  return (
-    <View style={styles.section}>
-      <SectionHeader eyebrow="از جلسه قبلی تا امروز" title="مقایسه پیشرفت" />
-      <Card style={styles.card}>
-      {normalized.schema_version === "2.0" ? (
-        <V2Comparison comparison={normalized} />
-      ) : (
-        <LegacyComparison comparison={normalized} />
-      )}
-      </Card>
-    </View>
-  );
-}
-
-function V2Comparison({ comparison }: { readonly comparison: NormalizedBodyProgressComparisonV2 }) {
-  const measurements = comparison.measurement_deltas.filter(isAvailableMeasurement);
-  const biggestChange = selectBiggestChange(comparison.visual_transitions);
-  return (
-    <View style={styles.section}>
-      <Text style={styles.body}>
-        {formatNumber(comparison.interval_days)} روز بین {formatDate(comparison.previous_session_date)} و {formatDate(comparison.current_session_date)}
-      </Text>
-      <ChangeSummary transition={biggestChange} />
-      <SectionHeader title="اندازه‌گیری‌ها" />
-      {measurements.length === 0 ? (
-        <Text style={styles.muted}>برای این دو بررسی اندازه‌گیری دقیقی ثبت نشده.</Text>
-      ) : measurements.map((measurement) => <MeasurementComparison key={measurement.measurement} delta={measurement} />)}
-      {comparison.visual_transitions.length > 0 ? (
-        <DisclosureCard summary="مشاهده‌های تصویری استاندارد، نه اندازه‌گیری مستقیم عضله" title="جزئیات تغییرهای تصویری">
-          <View style={styles.section}>
-            {comparison.visual_transitions.map(visualChangeText)}
-          </View>
-        </DisclosureCard>
-      ) : null}
-    </View>
-  );
-}
-
-function LegacyComparison({ comparison }: { readonly comparison: NormalizedBodyProgressComparisonV1 }) {
-  const changes = comparison.areas.filter((item) => item.state !== "unchanged").slice(0, 4);
-  return <ChangeSummary transition={selectBiggestChange(comparison.areas)} empty={changes.length === 0} />;
-}
-
-function ChangeSummary({
-  empty = false,
-  transition,
-}: {
-  readonly empty?: boolean;
-  readonly transition: { body_area: BodyArea; state: BodyProgressState } | null;
-}) {
-  return (
-    <View style={styles.changeSummary}>
-      <Text style={styles.changeTitle}>بیشترین تغییر</Text>
-      {transition === null || empty ? (
-        <Text style={styles.muted}>تغییر واضحی نسبت به بررسی قبلی دیده نشد.</Text>
-      ) : (
-        <>
-          <Text style={styles.changeArea}>{bodyAreaLabel(transition.body_area)}</Text>
-          <Text style={styles.body}>
-            {transition.state === "improved" ? "نسبت به بررسی قبلی بیشترین تغییر مثبت رو داشته." : "نسبت به بررسی قبلی ضعیف‌تر دیده شده."}
-          </Text>
-        </>
-      )}
-    </View>
-  );
-}
-
-function MeasurementComparison({ delta }: { readonly delta: BodyProgressMeasurementDelta }) {
-  const previous = delta.previous ?? 0;
-  const current = delta.current ?? 0;
-  const maximum = Math.max(1, previous, current);
-  const unit = delta.unit === "kg" ? "کیلوگرم" : "سانتی‌متر";
-  return (
-    <View style={styles.measurement}>
-      <View style={styles.measurementHeading}>
-        <Text style={styles.cardTitle}>{measurementLabel(delta.measurement)}</Text>
-        <Text style={styles.muted}>{unit}</Text>
-      </View>
-      <ProgressBar color={fiticianTokens.colors.muted} label={`قبلی ${measurementLabel(delta.measurement)}`} progress={previous / maximum} />
-      <ProgressBar label={`فعلی ${measurementLabel(delta.measurement)}`} progress={current / maximum} />
-      <View style={styles.measurementValues}>
-        <Text style={styles.muted}>قبلی: {formatNumber(delta.previous)} {unit}</Text>
-        <Text style={styles.body}>فعلی: {formatNumber(delta.current)} {unit}</Text>
-      </View>
-    </View>
-  );
-}
-
-function visualChangeText(transition: BodyProgressVisualTransition) {
-  return (
-    <Text key={transition.body_area} style={styles.body}>
-      {bodyAreaLabel(transition.body_area)} · {progressStateLabel(transition.state)} · اطمینان {formatPercent(transition.change_confidence)}
-    </Text>
-  );
-}
-
-function selectBiggestChange(
-  transitions: Array<Pick<BodyProgressVisualTransition, "body_area" | "state" | "change_confidence">>,
-): { body_area: BodyArea; state: BodyProgressState } | null {
-  const meaningful = transitions.filter((transition) => (
-    transition.state === "improved" || transition.state === "declined_or_less_balanced"
-  ));
-  if (meaningful.length === 0) return null;
-  const biggest = [...meaningful].sort((left, right) => right.change_confidence - left.change_confidence)[0];
-  return biggest === undefined ? null : { body_area: biggest.body_area, state: biggest.state };
-}
-
 function PrivacyDisclaimer() {
   return (
     <Card style={styles.disclaimerCard} variant="glass">
@@ -476,31 +358,6 @@ function ResultDetailsDisclosure({ analysis }: { readonly analysis: BodyAnalysis
   );
 }
 
-async function loadPrivatePhotos(
-  session: BodyPhotoSession,
-  client: PrivateMediaClient,
-): Promise<Partial<Record<BodyPhoto["view"], string>>> {
-  const safeSessionId = session.id.replace(/[^A-Za-z0-9._-]/gu, "_");
-  const entries = await Promise.all(session.photos.map(async (photo) => {
-    try {
-      const stored = await client.download({
-        fileName: `body-analysis-${safeSessionId}-${photo.view}.jpg`,
-        path: photo.content_url,
-      });
-      return [photo.view, stored.uri] as const;
-    } catch {
-      return null;
-    }
-  }));
-  return Object.fromEntries(
-    entries.filter((entry): entry is readonly [BodyPhoto["view"], string] => entry !== null),
-  );
-}
-
-function isAvailableMeasurement(delta: BodyProgressMeasurementDelta): boolean {
-  return delta.availability === "exact" && delta.previous !== null && delta.current !== null;
-}
-
 function bodyAnalysisLoadErrorMessage(error: unknown): string {
   if (error instanceof ApiError && error.status === 404) return "این نشست تحلیل پیدا نشد.";
   if (error instanceof ApiError && error.status >= 500) return "سرویس تحلیل بدن موقتاً در دسترس نیست.";
@@ -513,10 +370,6 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 
 function formatSessionDate(value: string): string {
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" }).format(new Date(value));
 }
 
 function sessionStatusLabel(status: BodyPhotoSession["state"]): string {
@@ -588,13 +441,6 @@ function classificationLabel(value: string): string {
   return "متعادل";
 }
 
-function progressStateLabel(value: BodyProgressState): string {
-  if (value === "improved") return "بهبود یافته";
-  if (value === "declined_or_less_balanced") return "نیازمند توجه";
-  if (value === "unchanged") return "بدون تغییر قابل اتکا";
-  return "نامشخص";
-}
-
 function photoQualityReasonLabel(value: string): string {
   const labels: Record<string, string> = {
     clothing_obscures_body: "لباس فرم بدن را پوشانده است",
@@ -609,16 +455,6 @@ function photoQualityReasonLabel(value: string): string {
   return labels[value] ?? "نیازمند بررسی";
 }
 
-function measurementLabel(value: BodyProgressMeasurementDelta["measurement"]): string {
-  const labels: Record<BodyProgressMeasurementDelta["measurement"], string> = {
-    hip_circumference_cm: "دور باسن",
-    shoulder_circumference_cm: "دور شانه",
-    waist_circumference_cm: "دور کمر",
-    weight_kg: "وزن",
-  };
-  return labels[value];
-}
-
 function viewLabel(view: BodyPhoto["view"]): string {
   if (view === "front") return "روبه‌رو";
   if (view === "side") return "نیمرخ";
@@ -627,10 +463,6 @@ function viewLabel(view: BodyPhoto["view"]): string {
 
 function formatPercent(value: number | null): string {
   return value === null ? "—" : `${Math.round(value * 100)}٪`;
-}
-
-function formatNumber(value: number | null): string {
-  return value === null ? "—" : new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 2 }).format(value);
 }
 
 const styles = StyleSheet.create({

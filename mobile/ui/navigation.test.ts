@@ -210,7 +210,7 @@ it("keeps Body Progress capability-aware and More as the fifth member tab", asyn
   expect(source).toContain('tabBarLabel: "امروز"');
   expect(source).toContain('tabBarLabel: "تمرین"');
   expect(source).toContain('tabBarLabel: "تغذیه"');
-  expect(source).toContain('tabBarLabel: "Body Analysis"');
+  expect(source).toContain('tabBarLabel: "تحلیل بدن"');
   expect(source).toContain('tabBarLabel: "بیشتر"');
   expect(source).toContain('name="body-analysis"');
   expect(source).toMatch(/name="workouts"[\s\S]*?href: showTraining \? undefined : null/);

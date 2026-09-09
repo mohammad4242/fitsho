@@ -47,8 +47,8 @@ export default function MemberTabsLayout() {
         name="body-analysis"
         options={{
           href: showTraining ? undefined : null,
-          tabBarLabel: "Body Analysis",
-          title: "Body Analysis",
+          tabBarLabel: "تحلیل بدن",
+          title: "تحلیل بدن",
         }}
       />
       <Tabs.Screen
