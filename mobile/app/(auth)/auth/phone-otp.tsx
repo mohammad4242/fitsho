@@ -4,7 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Button, Notice, TextField } from "../../../ui/components";
-import { AuthFormCard, AuthScaffold } from "../../../auth/AuthScaffold";
+import { AuthFormSection, AuthScaffold } from "../../../auth/AuthScaffold";
 import { onboardingRoute } from "../../../auth/authRoute";
 import { authCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
@@ -38,7 +38,7 @@ export default function PhoneOtpScreen() {
 
   if (phoneNumber === "") {
     return (
-      <AuthScaffold title={authCopy.common.otpCode}>
+      <AuthScaffold eyebrow={authCopy.login.eyebrow} title={authCopy.login.title}>
         <Notice message="شماره موبایل برای این درخواست پیدا نشد." variant="danger" />
         <Button label={authCopy.passwordRecovery.backToLogin} onPress={() => router.replace("/auth/sign-in")} />
       </AuthScaffold>
@@ -67,12 +67,13 @@ export default function PhoneOtpScreen() {
 
   return (
     <AuthScaffold
+      eyebrow={authCopy.login.eyebrow}
       subtitle={`${authCopy.login.phoneSubtitle} ${phoneNumber}`}
-      title={authCopy.common.otpCode}
+      title={authCopy.login.title}
     >
       <View style={authStyles.content}>
         {error ? <Notice message={error} variant="danger" /> : null}
-        <AuthFormCard>
+        <AuthFormSection>
           <Controller
             control={control}
             name="code"
@@ -94,7 +95,7 @@ export default function PhoneOtpScreen() {
             )}
           />
           <Button label={authCopy.login.verifyOtp} loading={auth.busy} onPress={submit} />
-        </AuthFormCard>
+        </AuthFormSection>
         <Pressable
           accessibilityRole="button"
           disabled={secondsLeft > 0 || auth.busy}

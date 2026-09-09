@@ -4,7 +4,7 @@ import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Button, Notice, TextField } from "../../../ui/components";
-import { AuthFormCard, AuthScaffold } from "../../../auth/AuthScaffold";
+import { AuthFormSection, AuthScaffold } from "../../../auth/AuthScaffold";
 import { onboardingRoute, publicOnboardingParams } from "../../../auth/authRoute";
 import { authCopy, mobileAuthCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
@@ -41,11 +41,14 @@ export default function RegisterScreen() {
   });
 
   return (
-    <AuthScaffold subtitle={authCopy.register.subtitle} title={authCopy.register.title}>
+    <AuthScaffold
+      eyebrow={authCopy.register.eyebrow}
+      subtitle={authCopy.register.subtitle}
+      title={authCopy.register.title}
+    >
       <View style={authStyles.content}>
-        {error ? <Notice message={error} variant="danger" /> : null}
         {complete ? <Notice message={mobileAuthCopy.registrationComplete} variant="success" /> : null}
-        <AuthFormCard>
+        <AuthFormSection>
           <Controller
             control={control}
             name="email"
@@ -105,8 +108,9 @@ export default function RegisterScreen() {
               />
             )}
           />
+          {error ? <Notice message={error} variant="danger" /> : null}
           <Button label={authCopy.register.submit} loading={auth.busy} onPress={submit} />
-        </AuthFormCard>
+        </AuthFormSection>
         <View style={authStyles.footer}>
           <Text style={authStyles.footerText}>{authCopy.register.hasAccount}</Text>
           <Pressable accessibilityRole="button" onPress={() => router.replace({ pathname: "/auth/sign-in", params: publicOnboardingParams(params.source) })}>

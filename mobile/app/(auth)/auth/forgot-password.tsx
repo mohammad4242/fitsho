@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { View } from "react-native";
 
 import { Button, Notice, TextField } from "../../../ui/components";
-import { AuthFormCard, AuthScaffold } from "../../../auth/AuthScaffold";
+import { AuthFormSection, AuthScaffold } from "../../../auth/AuthScaffold";
 import { publicOnboardingParams } from "../../../auth/authRoute";
 import { authCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
@@ -36,13 +36,13 @@ export default function ForgotPasswordScreen() {
 
   return (
     <AuthScaffold
+      eyebrow={authCopy.passwordRecovery.eyebrow}
       subtitle={authCopy.passwordRecovery.forgotSubtitle}
       title={authCopy.passwordRecovery.forgotTitle}
     >
       <View style={authStyles.content}>
-        {error ? <Notice message={error} variant="danger" /> : null}
         {success ? <Notice message={authCopy.passwordRecovery.forgotSuccess} variant="success" /> : null}
-        <AuthFormCard>
+        <AuthFormSection>
           <Controller
             control={control}
             name="email"
@@ -62,13 +62,14 @@ export default function ForgotPasswordScreen() {
               />
             )}
           />
+          {error ? <Notice message={error} variant="danger" /> : null}
           <Button label={authCopy.passwordRecovery.forgotSubmit} loading={auth.busy} onPress={submit} />
           <Button
             label={authCopy.passwordRecovery.backToLogin}
             onPress={() => router.replace({ pathname: "/auth/sign-in", params: publicOnboardingParams(params.source) })}
             variant="ghost"
           />
-        </AuthFormCard>
+        </AuthFormSection>
       </View>
     </AuthScaffold>
   );

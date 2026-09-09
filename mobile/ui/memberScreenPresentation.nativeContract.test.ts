@@ -18,5 +18,7 @@ it("keeps secondary member screens on the shared Fitician hierarchy", async () =
   expect(sources[2]).not.toContain("ScreenHeader");
   expect(sources[3]).toContain("PageHeading");
   expect(sources[3]).not.toContain("ScreenHeader");
-  expect(sources[4]).toContain("CinematicSurface");
+  expect(sources[4]).toContain("PageHeading");
+  expect(sources[4]).not.toContain("CinematicSurface");
+  expect(sources[4]).not.toContain("Card");
 });

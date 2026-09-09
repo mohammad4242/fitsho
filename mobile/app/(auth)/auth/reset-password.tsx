@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { View } from "react-native";
 
 import { Button, Notice, TextField } from "../../../ui/components";
-import { AuthScaffold } from "../../../auth/AuthScaffold";
+import { AuthFormSection, AuthScaffold } from "../../../auth/AuthScaffold";
 import { authCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
 import { authStyles } from "../../../auth/authStyles";
@@ -44,67 +44,70 @@ export default function ResetPasswordScreen() {
 
   return (
     <AuthScaffold
+      eyebrow={authCopy.passwordRecovery.eyebrow}
       subtitle={authCopy.passwordRecovery.resetSubtitle}
       title={authCopy.passwordRecovery.resetTitle}
     >
       <View style={authStyles.content}>
         {!token ? <Notice message={authCopy.passwordRecovery.invalidToken} variant="danger" /> : null}
-        {error ? <Notice message={error} variant="danger" /> : null}
         {success ? <Notice message={authCopy.passwordRecovery.resetSuccess} variant="success" /> : null}
-        <Controller
-          control={control}
-          name="password"
-          rules={{ required: "رمز عبور را وارد کنید.", validate: validatePassword }}
-          render={({ field, fieldState }) => (
-            <TextField
-              autoCapitalize="none"
-              autoComplete="new-password"
-              editable={Boolean(token) && !success}
-              error={fieldState.error?.message}
-              label={authCopy.passwordRecovery.newPassword}
-              onBlur={field.onBlur}
-              onChangeText={field.onChange}
-              secureTextEntry
-              textContentType="newPassword"
-              value={field.value}
-            />
-          )}
-        />
-        <Controller
-          control={control}
-          name="confirmation"
-          rules={{
-            required: "تکرار رمز عبور را وارد کنید.",
-            validate: (value) => validateConfirmation(value, password),
-          }}
-          render={({ field, fieldState }) => (
-            <TextField
-              autoCapitalize="none"
-              autoComplete="new-password"
-              editable={Boolean(token) && !success}
-              error={fieldState.error?.message}
-              label={authCopy.passwordRecovery.confirmPassword}
-              onBlur={field.onBlur}
-              onChangeText={field.onChange}
-              secureTextEntry
-              textContentType="newPassword"
-              value={field.value}
-            />
-          )}
-        />
-        {!success ? (
-          <Button
-            disabled={!token}
-            label={authCopy.passwordRecovery.resetSubmit}
-            loading={auth.busy}
-            onPress={submit}
+        <AuthFormSection>
+          <Controller
+            control={control}
+            name="password"
+            rules={{ required: "رمز عبور را وارد کنید.", validate: validatePassword }}
+            render={({ field, fieldState }) => (
+              <TextField
+                autoCapitalize="none"
+                autoComplete="new-password"
+                editable={Boolean(token) && !success}
+                error={fieldState.error?.message}
+                label={authCopy.passwordRecovery.newPassword}
+                onBlur={field.onBlur}
+                onChangeText={field.onChange}
+                secureTextEntry
+                textContentType="newPassword"
+                value={field.value}
+              />
+            )}
           />
-        ) : null}
-        <Button
-          label={authCopy.passwordRecovery.backToLogin}
-          onPress={() => router.replace("/auth/sign-in")}
-          variant="ghost"
-        />
+          <Controller
+            control={control}
+            name="confirmation"
+            rules={{
+              required: "تکرار رمز عبور را وارد کنید.",
+              validate: (value) => validateConfirmation(value, password),
+            }}
+            render={({ field, fieldState }) => (
+              <TextField
+                autoCapitalize="none"
+                autoComplete="new-password"
+                editable={Boolean(token) && !success}
+                error={fieldState.error?.message}
+                label={authCopy.passwordRecovery.confirmPassword}
+                onBlur={field.onBlur}
+                onChangeText={field.onChange}
+                secureTextEntry
+                textContentType="newPassword"
+                value={field.value}
+              />
+            )}
+          />
+          {error ? <Notice message={error} variant="danger" /> : null}
+          {!success ? (
+            <Button
+              disabled={!token}
+              label={authCopy.passwordRecovery.resetSubmit}
+              loading={auth.busy}
+              onPress={submit}
+            />
+          ) : null}
+          <Button
+            label={authCopy.passwordRecovery.backToLogin}
+            onPress={() => router.replace("/auth/sign-in")}
+            variant="ghost"
+          />
+        </AuthFormSection>
       </View>
     </AuthScaffold>
   );

@@ -3,8 +3,8 @@ import { Controller, useForm } from "react-hook-form";
 import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { Button, Notice, TextField } from "../../../ui/components";
-import { AuthFormCard, AuthScaffold } from "../../../auth/AuthScaffold";
+import { Button, Notice, SegmentedControl, TextField } from "../../../ui/components";
+import { AuthFormSection, AuthScaffold } from "../../../auth/AuthScaffold";
 import { onboardingRoute, publicOnboardingParams } from "../../../auth/authRoute";
 import { authCopy, mobileAuthCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
@@ -73,102 +73,102 @@ export default function SignInScreen() {
   };
 
   return (
-    <AuthScaffold subtitle={authCopy.login.subtitle} title={authCopy.login.title}>
+    <AuthScaffold
+      eyebrow={authCopy.login.eyebrow}
+      subtitle={mode === "email" ? authCopy.login.subtitle : authCopy.login.phoneSubtitle}
+      title={authCopy.login.title}
+    >
       <View style={authStyles.content}>
         {sessionExpired ? <Notice message={mobileAuthCopy.sessionExpired} variant="warning" /> : null}
         {auth.startupError ? <Notice message={mobileAuthCopy.startupFailed} variant="warning" /> : null}
-        {error ? <Notice message={error} variant="danger" /> : null}
-        <View accessibilityRole="tablist" style={authStyles.modeRow}>
-          <Button
-            label={authCopy.login.emailTab}
-            onPress={() => {
-              setError(null);
-              setMode("email");
-            }}
-            style={{ flex: 1 }}
-            variant={mode === "email" ? "primary" : "secondary"}
-          />
-          <Button
-            label={authCopy.login.phoneTab}
-            onPress={() => {
-              setError(null);
-              setMode("phone");
-            }}
-            style={{ flex: 1 }}
-            variant={mode === "phone" ? "primary" : "secondary"}
-          />
-        </View>
+        <SegmentedControl
+          accessibilityLabel={authCopy.login.methodLabel}
+          onChange={(value) => {
+            if (value !== "email" && value !== "phone") return;
+            setError(null);
+            setMode(value);
+          }}
+          options={[
+            { label: authCopy.login.emailTab, value: "email" },
+            { label: authCopy.login.phoneTab, value: "phone" },
+          ]}
+          selectedValue={mode}
+        />
         {mode === "email" ? (
-          <AuthFormCard>
-            <View style={authStyles.content}>
-              <Controller
-                control={emailForm.control}
-                name="email"
-                rules={{ required: "ایمیل را وارد کنید.", validate: validateEmail }}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    error={fieldState.error?.message}
-                    keyboardType="email-address"
-                    label={authCopy.common.email}
-                    onBlur={field.onBlur}
-                    onChangeText={field.onChange}
-                    textContentType="emailAddress"
-                    textDirection="ltr"
-                    value={field.value}
-                  />
-                )}
-              />
-              <Controller
-                control={emailForm.control}
-                name="password"
-                rules={{ required: "رمز عبور را وارد کنید." }}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    autoCapitalize="none"
-                    autoComplete="current-password"
-                    error={fieldState.error?.message}
-                    label={authCopy.common.password}
-                    onBlur={field.onBlur}
-                    onChangeText={field.onChange}
-                    secureTextEntry
-                    textContentType="password"
-                    value={field.value}
-                  />
-                )}
-              />
-              <Button label={authCopy.login.submit} loading={auth.busy} onPress={submitEmail} />
-              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/auth/forgot-password", params: publicOnboardingParams(params.source) })}>
-                <Text style={authStyles.link}>{authCopy.login.forgotPassword}</Text>
+          <AuthFormSection>
+            <Controller
+              control={emailForm.control}
+              name="email"
+              rules={{ required: "ایمیل را وارد کنید.", validate: validateEmail }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  error={fieldState.error?.message}
+                  keyboardType="email-address"
+                  label={authCopy.common.email}
+                  onBlur={field.onBlur}
+                  onChangeText={field.onChange}
+                  textContentType="emailAddress"
+                  textDirection="ltr"
+                  value={field.value}
+                />
+              )}
+            />
+            <View style={authStyles.fieldHeading}>
+              <Text style={authStyles.fieldLabel}>{authCopy.common.password}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push({ pathname: "/auth/forgot-password", params: publicOnboardingParams(params.source) })}
+              >
+                <Text style={authStyles.inlineLink}>{authCopy.login.forgotPassword}</Text>
               </Pressable>
             </View>
-          </AuthFormCard>
+            <Controller
+              control={emailForm.control}
+              name="password"
+              rules={{ required: "رمز عبور را وارد کنید." }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  accessibilityLabel={authCopy.common.password}
+                  autoCapitalize="none"
+                  autoComplete="current-password"
+                  error={fieldState.error?.message}
+                  onBlur={field.onBlur}
+                  onChangeText={field.onChange}
+                  secureTextEntry
+                  textContentType="password"
+                  value={field.value}
+                />
+              )}
+            />
+            {error ? <Notice message={error} variant="danger" /> : null}
+            <Button label={authCopy.login.submit} loading={auth.busy} onPress={submitEmail} />
+          </AuthFormSection>
         ) : (
-          <AuthFormCard>
-            <View style={authStyles.content}>
-              <Controller
-                control={phoneForm.control}
-                name="phoneNumber"
-                rules={{ required: "شماره موبایل را وارد کنید.", validate: validatePhoneNumber }}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    autoComplete="tel"
-                    error={fieldState.error?.message}
-                    keyboardType="phone-pad"
-                    label={authCopy.common.phoneNumber}
-                    onBlur={field.onBlur}
-                    onChangeText={field.onChange}
-                    placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-                    textContentType="telephoneNumber"
-                    textDirection="ltr"
-                    value={field.value}
-                  />
-                )}
-              />
-              <Button label={authCopy.login.sendOtp} loading={auth.busy} onPress={submitPhone} />
-            </View>
-          </AuthFormCard>
+          <AuthFormSection>
+            <Controller
+              control={phoneForm.control}
+              name="phoneNumber"
+              rules={{ required: "شماره موبایل را وارد کنید.", validate: validatePhoneNumber }}
+              render={({ field, fieldState }) => (
+                <TextField
+                  autoComplete="tel"
+                  error={fieldState.error?.message}
+                  keyboardType="phone-pad"
+                  label={authCopy.common.phoneNumber}
+                  onBlur={field.onBlur}
+                  onChangeText={field.onChange}
+                  placeholder="۰۹۱۲۳۴۵۶۷۸۹"
+                  textContentType="telephoneNumber"
+                  textDirection="ltr"
+                  value={field.value}
+                />
+              )}
+            />
+            {error ? <Notice message={error} variant="danger" /> : null}
+            <Button label={authCopy.login.sendOtp} loading={auth.busy} onPress={submitPhone} />
+          </AuthFormSection>
         )}
         {google.available ? (
           <>

@@ -39,6 +39,7 @@ export default function VerifyEmailScreen() {
 
   return (
     <AuthScaffold
+      eyebrow={authCopy.emailVerification.eyebrow}
       subtitle={authCopy.emailVerification.subtitle}
       title={authCopy.emailVerification.title}
     >

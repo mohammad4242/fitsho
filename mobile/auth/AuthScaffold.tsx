@@ -1,42 +1,45 @@
 import { type ReactNode } from "react";
 import { Text, View } from "react-native";
 
-import { AppIcon, Card, CinematicSurface } from "../ui/components";
+import { AppIcon, PageHeading } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { authStyles } from "./authStyles";
 
 export interface AuthScaffoldProps {
   readonly children: ReactNode;
+  readonly eyebrow?: string;
   readonly subtitle?: string;
   readonly title: string;
 }
 
-export function AuthScaffold({ children, subtitle, title }: AuthScaffoldProps) {
+export function AuthScaffold({ children, eyebrow, subtitle, title }: AuthScaffoldProps) {
   return (
     <Screen contentContainerStyle={authStyles.screen} contentWidth="reading">
-      <CinematicSurface accent style={authStyles.shell} variant="quiet">
-        <View style={authStyles.content}>
-          <View style={authStyles.brandRow}>
-            <View style={authStyles.brandLockup}>
-              <View style={authStyles.brandMark}>
-                <AppIcon color={authStyles.brandIcon.color} name="shield" size={16} />
-              </View>
-              <Text style={authStyles.brand}>FITICIAN</Text>
+      <View style={authStyles.panel} testID="auth-form-panel">
+        <View style={authStyles.brandRow}>
+          <View style={authStyles.brandLockup}>
+            <View style={authStyles.brandMark}>
+              <AppIcon color={authStyles.brandIcon.color} name="shield" size={16} />
             </View>
-            <Text style={authStyles.productTag}>مربی شخصی دیجیتال</Text>
+            <Text style={authStyles.brand}>FITICIAN</Text>
           </View>
-          <View style={authStyles.accentRule}>
-            <View style={authStyles.accentRuleFill} />
-          </View>
-          <Text accessibilityRole="header" style={authStyles.title}>{title}</Text>
-          {subtitle ? <Text style={authStyles.subtitle}>{subtitle}</Text> : null}
-          {children}
+          <Text style={authStyles.productTag}>مربی شخصی دیجیتال</Text>
         </View>
-      </CinematicSurface>
+        <View style={authStyles.accentRule}>
+          <View style={authStyles.accentRuleFill} />
+        </View>
+        <PageHeading
+          eyebrow={eyebrow}
+          style={authStyles.heading}
+          supportingText={subtitle}
+          title={title}
+        />
+        {children}
+      </View>
     </Screen>
   );
 }
 
-export function AuthFormCard({ children }: { readonly children: ReactNode }) {
-  return <Card variant="glass" style={authStyles.formCard}>{children}</Card>;
+export function AuthFormSection({ children }: { readonly children: ReactNode }) {
+  return <View style={authStyles.formSection}>{children}</View>;
 }
