@@ -1,14 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 
-it("keeps the nutrition plan shortcut before secondary forms and leaves catalogues to More", async () => {
+it("keeps the daily nutrition hierarchy before secondary forms", async () => {
   const source = await readFile(new URL("./NutritionFoundationScreen.tsx", import.meta.url), "utf8");
-  expect(source.indexOf("<NutritionPlanShortcut")).toBeGreaterThan(0);
+  expect(source).toContain("<PageHeading");
+  expect(source).toContain("<NutritionDailyTools");
+  expect(source).not.toContain("<ScreenHeader");
+  expect(source.indexOf("<PageHeading")).toBeLessThan(source.indexOf("<NutritionDailyTools"));
+  expect(source.indexOf("<NutritionDailyTools")).toBeLessThan(source.indexOf("<NutritionSummaryCard"));
+  expect(source.indexOf("<NutritionSummaryCard")).toBeLessThan(source.indexOf("<NutritionPlanShortcut"));
   expect(source.indexOf("<NutritionPlanShortcut")).toBeLessThan(source.indexOf("<NutritionProfileSection"));
-  expect(source).not.toContain("<NutritionDestinations");
-  expect(source).not.toContain("سه مسیر اصلی");
-  expect(source).not.toContain('title="کاتالوگ مواد غذایی"');
-  expect(source).not.toContain('title="کاتالوگ وعده‌ها"');
   for (const route of ["nutrition-plan", "food-catalogue", "meal-catalogue"]) {
     const text = await readFile(new URL(`../app/(member)/member/${route}.tsx`, import.meta.url), "utf8");
     expect(text).toContain('requiredCapability="nutrition"');

@@ -13,7 +13,7 @@ import {
   safetyInputFromForm,
   type SafetyFormValues,
 } from "../onboarding/onboardingModel";
-import { AppIcon, Button, Card, Notice, ScreenHeader, Skeleton, TextField } from "../ui/components";
+import { AppIcon, Button, Card, Notice, PageHeading, Skeleton, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
@@ -110,11 +110,16 @@ export function NutritionFoundationScreen() {
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <ScreenHeader
+      <PageHeading
         compact
-        eyebrow="سوخت، عادت و هدف"
-        subtitle="وضعیت ایمنی، اطلاعات پایه و برآوردهای تغذیه‌ای تو از همین‌جا قابل مشاهده است."
+        eyebrow="امروز"
+        supportingText="وضعیت روزانه، هدف‌ها و مسیرهای ثبت تغذیه را از همین‌جا دنبال کن."
         title="تغذیه"
+      />
+
+      <NutritionDailyTools
+        onOpenCatalogue={() => router.push("/member/food-catalogue")}
+        onOpenTracking={() => router.push("/member/nutrition-tracking")}
       />
 
       <NutritionSummaryCard
@@ -150,6 +155,45 @@ export function NutritionFoundationScreen() {
       <NutritionAdherenceSection />
       <NutritionClinicalSection />
     </Screen>
+  );
+}
+
+function NutritionDailyTools({
+  onOpenCatalogue,
+  onOpenTracking,
+}: {
+  readonly onOpenCatalogue: () => void;
+  readonly onOpenTracking: () => void;
+}) {
+  return (
+    <View style={styles.dailyTools}>
+      <Card
+        accessibilityLabel="کاتالوگ"
+        onPress={onOpenCatalogue}
+        style={styles.dailyToolCard}
+        variant="interactive"
+      >
+        <View style={styles.dailyToolCopy}>
+          <AppIcon color={fiticianTokens.colors.amber} name="foodLog" size={fiticianTokens.iconSize.lg} />
+          <Text style={styles.dailyToolTitle}>کاتالوگ</Text>
+          <Text style={styles.dailyToolSubtitle}>مرجع مواد غذایی</Text>
+        </View>
+        <AppIcon color={fiticianTokens.colors.amber} name="arrowLeft" size={fiticianTokens.iconSize.md} />
+      </Card>
+      <Card
+        accessibilityLabel="ثبت تغذیه"
+        onPress={onOpenTracking}
+        style={styles.dailyToolCard}
+        variant="hero"
+      >
+        <View style={styles.dailyToolCopy}>
+          <AppIcon color={fiticianTokens.colors.aqua} name="nutrition" size={fiticianTokens.iconSize.lg} />
+          <Text style={styles.dailyToolTitle}>ثبت تغذیه</Text>
+          <Text style={styles.dailyToolSubtitle}>دستی یا با عکس</Text>
+        </View>
+        <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.md} />
+      </Card>
+    </View>
   );
 }
 
@@ -685,6 +729,35 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 24,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  dailyToolCard: {
+    flex: 1,
+    gap: fiticianTokens.spacing[3],
+    justifyContent: "space-between",
+    minHeight: 132,
+  },
+  dailyToolCopy: {
+    alignItems: "flex-end",
+    gap: fiticianTokens.spacing[1],
+  },
+  dailyTools: {
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+  },
+  dailyToolSubtitle: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  dailyToolTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
   },

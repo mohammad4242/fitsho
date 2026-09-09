@@ -10,7 +10,8 @@ it("keeps secondary member screens on the shared Fitician hierarchy", async () =
     readFile(new URL("../auth/AuthScaffold.tsx", import.meta.url), "utf8"),
   ]);
 
-  expect(sources[0]).toContain("ScreenHeader");
+  expect(sources[0]).toContain("PageHeading");
+  expect(sources[0]).not.toContain("ScreenHeader");
   expect(sources[1]).toContain("ScreenHeader");
   expect(sources[2]).toContain("ScreenHeader");
   expect(sources[3]).toContain("ScreenHeader");
