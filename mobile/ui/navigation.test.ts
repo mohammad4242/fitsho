@@ -285,8 +285,10 @@ it("keeps member catalogue browsing and shopping prices inside approved nutritio
   const foundation = resolve(dirname(appRoot), "nutrition/NutritionFoundationScreen.tsx");
   const plan = resolve(dirname(appRoot), "nutrition/NutritionPlanSection.tsx");
   const catalogue = resolve(dirname(appRoot), "nutrition/NutritionCatalogueSection.tsx");
+  const catalogueRoute = resolve(appRoot, "(member)/member/food-catalogue.tsx");
 
-  await expect(readFile(foundation, "utf8")).resolves.toMatch(/NutritionCatalogueSection/);
+  await expect(readFile(foundation, "utf8")).resolves.not.toMatch(/<NutritionCatalogueSection\b/);
   await expect(readFile(plan, "utf8")).resolves.toMatch(/NutritionShoppingList/);
   await expect(readFile(catalogue, "utf8")).resolves.not.toMatch(/\/admin\//);
+  await expect(readFile(catalogueRoute, "utf8")).resolves.toMatch(/NutritionCatalogueSection/);
 });
