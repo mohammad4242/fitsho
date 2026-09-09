@@ -7,7 +7,7 @@ import {
   type LayoutChangeEvent,
 } from "react-native";
 
-import { Media } from "../ui/components";
+import { AppIcon, Media } from "../ui/components";
 import type { MobileLanguage } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -103,7 +103,12 @@ export function ExerciseMediaCarousel({
         <MediaFallback language={language} />
       )}
       {items.length > 1 ? (
-        <View accessibilityLabel={`${safeIndex + 1}/${items.length}`} pointerEvents="none" style={styles.indicator}>
+        <View
+          accessible
+          accessibilityLabel={`${safeIndex + 1}/${items.length}`}
+          pointerEvents="none"
+          style={styles.indicator}
+        >
           <Text style={styles.indicatorText}>{`${safeIndex + 1}/${items.length}`}</Text>
         </View>
       ) : null}
@@ -153,6 +158,7 @@ function NativeExerciseMedia({
 function MediaFallback({ language }: { readonly language: MobileLanguage }) {
   return (
     <View accessibilityRole="image" style={styles.mediaFallback}>
+      <AppIcon color={fiticianTokens.colors.aqua} name="training" size={fiticianTokens.iconSize.xl} />
       <Text style={[styles.mediaFallbackText, language === "en" && styles.mediaFallbackTextEnglish]}>
         {mediaUnavailableCopy[language]}
       </Text>

@@ -17,7 +17,9 @@ test("renders compact accessible gender radios and only offers available media",
     />,
   );
 
-  expect(screen.getByRole("radio", { name: "ویدیوی مرد" }).props.accessibilityState).toEqual({
+  const maleRadio = screen.getByRole("radio", { name: "ویدیوی مرد" });
+  expect(maleRadio.props.accessible).toBe(true);
+  expect(maleRadio.props.accessibilityState).toEqual({
     selected: true,
   });
   expect(screen.getByRole("radio", { name: "ویدیوی زن" })).toBeTruthy();

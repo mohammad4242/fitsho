@@ -45,7 +45,9 @@ export function GenderMediaSelector({
         const isSelected = presentation === selected;
         return (
           <Pressable
+            accessible
             accessibilityLabel={labels[language][presentation]}
+            accessibilityHint={language === "en" ? "Change exercise video" : "تغییر ویدیوی حرکت"}
             accessibilityRole="radio"
             accessibilityState={{ selected: isSelected }}
             hitSlop={6}

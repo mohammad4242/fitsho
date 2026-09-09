@@ -60,6 +60,7 @@ test("mounts one current player and keeps pagination on the media surface", () =
 
   expect(screen.getByTestId("exercise-media-surface")).toBeTruthy();
   expect(screen.getByText("1/2")).toBeTruthy();
+  expect(screen.getByLabelText("1/2")).toBeTruthy();
   expect(screen.getAllByTestId("native-video")).toHaveLength(1);
   expect(screen.getByTestId("native-video").props.nativeControls).toBe(true);
 
