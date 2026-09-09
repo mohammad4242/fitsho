@@ -49,23 +49,23 @@ export interface NoticeProps {
 
 const noticeStyles: Record<NoticeVariant, ViewStyle> = {
   danger: {
-    backgroundColor: "rgba(246,120,89,0.12)",
+    backgroundColor: fiticianTokens.colors.dangerSurface,
     borderColor: fiticianTokens.colors.danger,
   },
   info: {
-    backgroundColor: "rgba(80,223,206,0.08)",
+    backgroundColor: fiticianTokens.colors.infoSurface,
     borderColor: fiticianTokens.colors.aqua,
   },
   offline: {
-    backgroundColor: "rgba(242,184,91,0.12)",
+    backgroundColor: fiticianTokens.colors.warningSurface,
     borderColor: fiticianTokens.colors.amber,
   },
   success: {
-    backgroundColor: "rgba(102,200,159,0.12)",
+    backgroundColor: fiticianTokens.colors.successSurface,
     borderColor: fiticianTokens.colors.success,
   },
   warning: {
-    backgroundColor: "rgba(242,184,91,0.12)",
+    backgroundColor: fiticianTokens.colors.warningSurface,
     borderColor: fiticianTokens.colors.amber,
   },
 };

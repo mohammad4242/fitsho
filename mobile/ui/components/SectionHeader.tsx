@@ -29,6 +29,7 @@ const styles = StyleSheet.create({
   action: {
     alignItems: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
+    minWidth: fiticianTokens.layout.minimumTouchTarget,
     justifyContent: "center",
     paddingHorizontal: fiticianTokens.spacing[2],
   },

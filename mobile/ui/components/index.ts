@@ -1,4 +1,11 @@
 export { Button } from "./Button";
+export { GroupedList } from "./GroupedList";
+export type {
+  GroupedListDirection,
+  GroupedListItem,
+  GroupedListProps,
+  GroupedListSection,
+} from "./GroupedList";
 export { DisclosureCard } from "./DisclosureCard";
 export type { DisclosureCardProps } from "./DisclosureCard";
 export type { ButtonProps, ButtonVariant } from "./Button";
@@ -20,6 +27,14 @@ export { StateSkeleton } from "./StateSkeleton";
 export type { StateSkeletonProps } from "./StateSkeleton";
 export { Card } from "./Card";
 export type { CardProps, CardVariant } from "./Card";
+export { PageHeading } from "./PageHeading";
+export type { PageHeadingDirection, PageHeadingProps } from "./PageHeading";
+export { SegmentedControl } from "./SegmentedControl";
+export type {
+  SegmentedControlDirection,
+  SegmentedControlOption,
+  SegmentedControlProps,
+} from "./SegmentedControl";
 export { Dialog, Sheet } from "./Overlay";
 export type { DialogProps, SheetProps } from "./Overlay";
 export { EmptyState, Notice, Skeleton } from "./Feedback";

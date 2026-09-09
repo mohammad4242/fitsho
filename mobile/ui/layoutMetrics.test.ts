@@ -9,6 +9,15 @@ it("uses compact gutters for phones", () => {
   });
 });
 
+it("keeps the compact phone gutter across the supported parity widths", () => {
+  for (const width of [360, 390, 430]) {
+    expect(getResponsiveLayout(width, 844)).toMatchObject({
+      horizontalPadding: 16,
+      isTablet: false,
+    });
+  }
+});
+
 it("uses tablet gutters and preserves the reading width on large screens", () => {
   expect(getResponsiveLayout(1024, 768)).toMatchObject({
     contentMaxWidth: 1312,

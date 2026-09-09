@@ -39,9 +39,11 @@ const variantStyles: Record<ButtonVariant, ViewStyle> = {
   },
   primary: {
     backgroundColor: fiticianTokens.colors.aqua,
+    borderColor: fiticianTokens.colors.aqua,
+    borderWidth: 1,
   },
   secondary: {
-    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    backgroundColor: fiticianTokens.colors.surfaceHighlight,
     borderColor: fiticianTokens.colors.lineStrong,
     borderWidth: 1,
   },
@@ -113,7 +115,7 @@ export function Button({
 const styles = StyleSheet.create({
   base: {
     alignItems: "center",
-    borderRadius: fiticianTokens.radii.medium,
+    borderRadius: fiticianTokens.radii.pill,
     flexDirection: "row",
     justifyContent: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
@@ -127,7 +129,7 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 24,
     textAlign: "center",
     writingDirection: "rtl",
