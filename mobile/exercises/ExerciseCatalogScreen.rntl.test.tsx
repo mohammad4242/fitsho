@@ -162,8 +162,8 @@ test("selecting a muscle reveals focus controls and content type", () => {
   expect(screen.getByRole("button", { name: "بالاسینه" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "وسط سینه" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "زیر سینه" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "حرکت‌ها" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "راهنماها" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "حرکت‌ها" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "راهنماها" })).toBeTruthy();
   expect(latestExerciseQueryOptions().enabled).toBe(true);
   expect(latestExerciseFilters()).toMatchObject({
     body_region: "upper_body",
@@ -305,9 +305,9 @@ test("guide content type stays in stage three and hides muscle focus choices", (
 
   fireEvent.press(screen.getByRole("button", { name: "بالاتنه" }));
   fireEvent.press(screen.getByRole("button", { name: "سینه" }));
-  fireEvent.press(screen.getByRole("button", { name: "راهنماها" }));
+  fireEvent.press(screen.getByRole("radio", { name: "راهنماها" }));
 
-  expect(screen.getByRole("button", { name: "راهنماها" }).props.accessibilityState.selected).toBe(true);
+  expect(screen.getByRole("radio", { name: "راهنماها" }).props.accessibilityState.selected).toBe(true);
   expect(screen.queryByRole("button", { name: "بالاسینه" })).toBeNull();
   expect(latestExerciseFilters()).toMatchObject({ content_type: "guide", primary_muscle: "chest" });
 });

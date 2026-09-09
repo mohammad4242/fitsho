@@ -33,6 +33,7 @@ import {
   Card,
   EmptyState,
   Notice,
+  SegmentedControl,
   ScreenHeader,
   Sheet,
   Skeleton,
@@ -775,40 +776,16 @@ function ContentTypeSwitcher({
   readonly value: ExerciseContentType;
 }) {
   return (
-    <View style={styles.contentSwitcher}>
-      <Pressable
-        accessibilityLabel={exerciseCopy.contentTypes.exercise}
-        accessibilityRole="button"
-        accessibilityState={{ selected: value === "exercise" }}
-        hitSlop={fiticianTokens.spacing[1]}
-        onPress={() => onChange("exercise")}
-        style={({ pressed }: PressableStateCallbackType) => [
-          styles.contentSwitcherOption,
-          value === "exercise" && styles.contentSwitcherOptionSelected,
-          pressed && styles.categoryOptionPressed,
-        ]}
-      >
-        <Text style={[styles.contentSwitcherLabel, value === "exercise" && styles.contentSwitcherLabelSelected]}>
-          {exerciseCopy.contentTypes.exercise}
-        </Text>
-      </Pressable>
-      <Pressable
-        accessibilityLabel={exerciseCopy.contentTypes.guide}
-        accessibilityRole="button"
-        accessibilityState={{ selected: value === "guide" }}
-        hitSlop={fiticianTokens.spacing[1]}
-        onPress={() => onChange("guide")}
-        style={({ pressed }: PressableStateCallbackType) => [
-          styles.contentSwitcherOption,
-          value === "guide" && styles.contentSwitcherOptionSelected,
-          pressed && styles.categoryOptionPressed,
-        ]}
-      >
-        <Text style={[styles.contentSwitcherLabel, value === "guide" && styles.contentSwitcherLabelSelected]}>
-          {exerciseCopy.contentTypes.guide}
-        </Text>
-      </Pressable>
-    </View>
+    <SegmentedControl
+      accessibilityLabel={exerciseCopy.contentType}
+      onChange={(nextValue) => onChange(nextValue as ExerciseContentType)}
+      options={[
+        { label: exerciseCopy.contentTypes.exercise, value: "exercise" },
+        { label: exerciseCopy.contentTypes.guide, value: "guide" },
+      ]}
+      selectedValue={value}
+      testID="catalog-content-type-switcher"
+    />
   );
 }
 
@@ -1020,8 +997,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   cardMedia: {
+    aspectRatio: 16 / 10,
     borderRadius: fiticianTokens.radii.large,
-    height: 188,
     overflow: "hidden",
     position: "relative",
     width: "100%",
@@ -1132,38 +1109,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  contentSwitcher: {
-    alignSelf: "stretch",
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.pill,
-    borderWidth: 1,
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[1],
-    padding: fiticianTokens.spacing[1],
-  },
-  contentSwitcherLabel: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "center",
-    writingDirection: "rtl",
-  },
-  contentSwitcherLabelSelected: {
-    color: fiticianTokens.colors.canvas,
-  },
-  contentSwitcherOption: {
-    alignItems: "center",
-    borderRadius: fiticianTokens.radii.pill,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 40,
-    paddingHorizontal: fiticianTokens.spacing[2],
-  },
-  contentSwitcherOptionSelected: {
-    backgroundColor: fiticianTokens.colors.aqua,
-  },
   discoveryPanel: {
     backgroundColor: fiticianTokens.colors.surfaceRaised,
     borderColor: fiticianTokens.colors.lineStrong,
@@ -1211,7 +1156,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   moreFiltersButton: {
-    minHeight: 40,
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
   },
@@ -1296,8 +1241,8 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.aqua,
   },
   mediaDifficulty: {
-    backgroundColor: "rgba(2,6,7,0.74)",
-    borderColor: "rgba(80,223,206,0.28)",
+    backgroundColor: fiticianTokens.colors.mediaOverlay,
+    borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
     bottom: fiticianTokens.spacing[3],
@@ -1308,7 +1253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[1],
     position: "absolute",
-    right: fiticianTokens.spacing[3],
+    left: fiticianTokens.spacing[3],
     writingDirection: "rtl",
   },
   pageIndicator: {
