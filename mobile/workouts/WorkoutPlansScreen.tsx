@@ -21,6 +21,7 @@ import { Screen } from "../ui/layout";
 import { formatPersianNumber } from "../ui/locale";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
+import { languageForDirection, type MobileLanguage } from "../ui/rtl";
 import {
   createWorkoutPlanApi,
   type WorkoutDay,
@@ -694,6 +695,7 @@ function WorkoutDayCard({
               exercise={exercise}
               key={exercise.id}
               onOpen={() => onOpenExercise(exercise.exercise.slug)}
+              onOpenAlternative={onOpenExercise}
               onStartReplacement={onStartReplacement}
             />
           ))}
@@ -705,6 +707,7 @@ function WorkoutDayCard({
                   exercise={exercise}
                   key={exercise.id}
                   onOpen={() => onOpenExercise(exercise.exercise.slug)}
+                  onOpenAlternative={onOpenExercise}
                   onStartReplacement={onStartReplacement}
                 />
               ))}
@@ -734,12 +737,19 @@ function formatExerciseRange(
 function WorkoutExerciseRow({
   exercise,
   onOpen,
+  onOpenAlternative,
   onStartReplacement,
 }: {
   readonly exercise: WorkoutPlanExercise;
   readonly onOpen: () => void;
+  readonly onOpenAlternative: (slug: string) => void;
   readonly onStartReplacement?: (exerciseId: string) => void;
 }) {
+  const language = languageForDirection();
+  const actionCopy = language === "en"
+    ? { alternatives: "View alternatives", detail: "View exercise details" }
+    : { alternatives: "حرکت جایگزین", detail: "مشاهده جزئیات حرکت" };
+  const [alternativesExpanded, setAlternativesExpanded] = useState(false);
   const prescriptionLabel = exercise.prescription_mode === "duration" ? "زمان" : "تکرار";
   const prescriptionValue = exercise.prescription_mode === "duration"
     ? formatExerciseRange(exercise.duration_min_seconds, exercise.duration_max_seconds, "ث")
@@ -798,33 +808,108 @@ function WorkoutExerciseRow({
         </View>
         {exercise.notes_fa ? <Text style={styles.exerciseNote}>{exercise.notes_fa}</Text> : null}
         <Pressable
-          accessibilityLabel="مشاهده جزئیات حرکت"
+          accessibilityLabel={actionCopy.detail}
           accessibilityRole="link"
           hitSlop={fiticianTokens.spacing[1]}
           onPress={(event) => {
             event.stopPropagation();
             onOpen();
           }}
-          style={({ pressed }) => [styles.exerciseDetailLink, pressed && styles.exerciseActionPressed]}
+          style={({ pressed }) => [styles.exerciseAction, pressed && styles.exerciseActionPressed]}
         >
-          <Text style={styles.exerciseDetailLinkText}>مشاهده جزئیات حرکت</Text>
+          <Text style={[styles.exerciseActionText, language === "en" && styles.exerciseActionTextEnglish]}>
+            {actionCopy.detail}
+          </Text>
         </Pressable>
-        {onStartReplacement && exercise.alternatives.length > 0 ? (
-          <Pressable
-            accessibilityLabel="حرکت جایگزین"
-            accessibilityRole="button"
-            hitSlop={fiticianTokens.spacing[1]}
-            onPress={(event) => {
-              event.stopPropagation();
-              onStartReplacement(exercise.id);
-            }}
-            style={({ pressed }) => [styles.exerciseReplacement, pressed && styles.exerciseActionPressed]}
-          >
-            <Text style={styles.exerciseReplacementText}>حرکت جایگزین</Text>
-            <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
-          </Pressable>
+        {exercise.alternatives.length > 0 ? (
+          <>
+            <Pressable
+              accessibilityLabel={actionCopy.alternatives}
+              accessibilityRole="button"
+              accessibilityState={onStartReplacement ? undefined : { expanded: alternativesExpanded }}
+              hitSlop={fiticianTokens.spacing[1]}
+              onPress={(event) => {
+                event?.stopPropagation();
+                if (onStartReplacement) {
+                  onStartReplacement(exercise.id);
+                  return;
+                }
+                setAlternativesExpanded((expanded) => !expanded);
+              }}
+              style={({ pressed }) => [styles.exerciseAction, pressed && styles.exerciseActionPressed]}
+            >
+              <Text style={[styles.exerciseActionText, language === "en" && styles.exerciseActionTextEnglish]}>
+                {actionCopy.alternatives}
+              </Text>
+              <AppIcon
+                color={fiticianTokens.colors.aqua}
+                name={onStartReplacement ? "arrowLeft" : alternativesExpanded ? "chevronUp" : "chevronDown"}
+                size={fiticianTokens.iconSize.sm}
+              />
+            </Pressable>
+            {!onStartReplacement && alternativesExpanded ? (
+              <ReadOnlyAlternativeList
+                alternatives={exercise.alternatives}
+                language={language}
+                onOpenAlternative={onOpenAlternative}
+              />
+            ) : null}
+          </>
         ) : null}
       </View>
+    </View>
+  );
+}
+
+function ReadOnlyAlternativeList({
+  alternatives,
+  language,
+  onOpenAlternative,
+}: {
+  readonly alternatives: WorkoutPlanExercise["alternatives"];
+  readonly language: MobileLanguage;
+  readonly onOpenAlternative: (slug: string) => void;
+}) {
+  return (
+    <View style={styles.readOnlyAlternatives} testID="workout-read-only-alternatives">
+      {alternatives.map((alternative) => {
+        const name = language === "en"
+          ? alternative.exercise.name_en || alternative.exercise.name_fa
+          : alternative.exercise.name_fa || alternative.exercise.name_en;
+        const reason = language === "en" ? alternative.reason_en : alternative.reason_fa;
+        return (
+          <View key={alternative.exercise.id} style={styles.readOnlyAlternative}>
+            <Pressable
+              accessibilityLabel={name}
+              accessibilityRole="link"
+              onPress={(event) => {
+                event?.stopPropagation();
+                onOpenAlternative(alternative.exercise.slug);
+              }}
+              style={styles.readOnlyAlternativeLink}
+            >
+              <Text
+                style={[
+                  styles.readOnlyAlternativeName,
+                  language === "en" && styles.readOnlyAlternativeNameEnglish,
+                ]}
+              >
+                {name}
+              </Text>
+            </Pressable>
+            {reason ? (
+              <Text
+                style={[
+                  styles.readOnlyAlternativeReason,
+                  language === "en" && styles.readOnlyAlternativeReasonEnglish,
+                ]}
+              >
+                {reason}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -1375,11 +1460,14 @@ const styles = StyleSheet.create({
   exerciseActionPressed: {
     opacity: 0.78,
   },
-  exerciseDetailLink: {
+  exerciseAction: {
+    alignItems: "center",
     alignSelf: "flex-start",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[1],
     paddingVertical: 2,
   },
-  exerciseDetailLinkText: {
+  exerciseActionText: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
@@ -1388,6 +1476,11 @@ const styles = StyleSheet.create({
     textAlign: "right",
     textDecorationLine: "underline",
     writingDirection: "rtl",
+  },
+  exerciseActionTextEnglish: {
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    textAlign: "left",
+    writingDirection: "ltr",
   },
   exerciseMedia: {
     borderRadius: fiticianTokens.radii.medium,
@@ -1433,21 +1526,47 @@ const styles = StyleSheet.create({
     paddingBottom: fiticianTokens.spacing[3],
     paddingTop: fiticianTokens.spacing[1],
   },
-  exerciseReplacement: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    flexDirection: "row-reverse",
+  readOnlyAlternatives: {
+    borderRightColor: fiticianTokens.colors.aqua,
+    borderRightWidth: 2,
     gap: fiticianTokens.spacing[1],
+    marginTop: fiticianTokens.spacing[1],
+    paddingRight: fiticianTokens.spacing[2],
+  },
+  readOnlyAlternative: {
+    gap: fiticianTokens.spacing[1],
+  },
+  readOnlyAlternativeLink: {
+    alignSelf: "flex-start",
     paddingVertical: 2,
   },
-  exerciseReplacementText: {
+  readOnlyAlternativeName: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 18,
     textAlign: "right",
+    textDecorationLine: "underline",
     writingDirection: "rtl",
+  },
+  readOnlyAlternativeNameEnglish: {
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    textAlign: "left",
+    writingDirection: "ltr",
+  },
+  readOnlyAlternativeReason: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  readOnlyAlternativeReasonEnglish: {
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    textAlign: "left",
+    writingDirection: "ltr",
   },
   exerciseStat: {
     alignItems: "baseline",

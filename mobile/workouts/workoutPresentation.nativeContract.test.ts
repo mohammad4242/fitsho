@@ -86,8 +86,8 @@ it("keeps expanded exercise details as separate web-parity stats and actions", a
   expect(row).toContain("styles.exerciseStatsRow");
   expect(row).toContain("styles.exerciseStatLabel");
   expect(row).toContain("styles.exerciseStatValue");
-  expect(row).toContain("styles.exerciseDetailLink");
-  expect(row).toContain("styles.exerciseDetailLinkText");
+  expect(row).toContain("styles.exerciseAction");
+  expect(row).toContain("styles.exerciseActionText");
   expect(row).toContain("onStartReplacement");
   expect(row).toContain("onOpen();");
   expect(row).toContain("onStartReplacement(exercise.id)");
@@ -152,4 +152,31 @@ it("keeps each exercise as one roomy detail action", async () => {
   expect(row).toContain("onOpen();");
   expect(row).toContain("onStartReplacement(exercise.id)");
   expect(row).not.toContain('label="راهنما"');
+});
+
+it("shows alternatives independently of executability and keeps the web action order", async () => {
+  const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+  const row = source.slice(source.indexOf("function WorkoutExerciseRow"), source.indexOf("function WorkoutHistory"));
+
+  expect(row).toContain("exercise.alternatives.length > 0");
+  expect(row).not.toContain("onStartReplacement && exercise.alternatives.length > 0");
+  expect(row).toContain("styles.exerciseAction");
+  expect(row).toContain("styles.exerciseActionText");
+  expect(row.indexOf("actionCopy.detail")).toBeLessThan(row.indexOf("actionCopy.alternatives"));
+  expect(source).toContain('detail: "View exercise details"');
+  expect(source).toContain('alternatives: "View alternatives"');
+  expect(source).toContain("ReadOnlyAlternativeList");
+  expect(source).toContain("alternative.reason_en");
+  expect(source).toContain("alternative.reason_fa");
+});
+
+it("keeps executable replacement on the existing cycle flow and blocks non-executable submission", async () => {
+  const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+
+  expect(source).toContain("onStartReplacement(exercise.id)");
+  expect(source).toContain("replacementRequest={replacementRequest}");
+  expect(source).toContain("onStartReplacement={executable && !pending ? onStartReplacement : undefined}");
+  expect(source).toContain("onStartReplacement ?");
+  expect(source).toContain("setAlternativesExpanded");
+  expect(source).toContain("onOpenAlternative");
 });
