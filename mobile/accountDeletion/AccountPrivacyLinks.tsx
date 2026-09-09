@@ -16,11 +16,11 @@ export function AccountPrivacyLinks() {
   return (
     <View style={styles.links}>
       <Button
-        label="مدیریت حساب و حذف حساب"
+        label="حذف حساب"
         onPress={() => router.push("/account-deletion")}
         variant="secondary"
       />
-      <Button label="حریم خصوصی در وب" onPress={openPrivacyPolicy} variant="ghost" />
+      <Button label="سیاست حریم خصوصی در وب" onPress={openPrivacyPolicy} variant="ghost" />
     </View>
   );
 }

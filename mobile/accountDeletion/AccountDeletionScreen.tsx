@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { Button, Card, Notice, TextField } from "../ui/components";
+import { Button, Card, Notice, PageHeading, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -14,7 +14,6 @@ import {
 } from "./accountDeletionApi";
 import {
   accountDeletionError,
-  accountDeletionStatusLabel,
   formatDeletionDate,
   isExactDeletionConfirmation,
 } from "./accountDeletionModel";
@@ -131,16 +130,17 @@ export function AccountDeletionScreen() {
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <Text style={styles.brand}>FITICIAN</Text>
-          <Text accessibilityRole="header" style={styles.title}>حذف حساب</Text>
-          <Text style={styles.intro}>
-            کنترل حساب و داده‌های شخصی‌ات دست خودت است. این درخواست برگشت‌پذیر و دارای مهلت لغو است.
-          </Text>
-        </View>
+      <View style={styles.brandRow}>
+        <Text style={styles.brand}>FITICIAN</Text>
         <Button label="بازگشت" onPress={() => router.back()} variant="ghost" />
       </View>
+      <PageHeading
+        compact={false}
+        eyebrow="حساب / Account"
+        supportingText="درخواست حذف حساب را از همین صفحه ثبت کن. این مسیر برای اعضای فیتشو، خارج از اپلیکیشن هم در دسترس است."
+        testID="account-deletion-heading"
+        title="حذف حساب فیتشو"
+      />
 
       {error !== null ? <Notice actionLabel="تلاش دوباره" message={error} onAction={() => void loadStatus()} variant="danger" /> : null}
       {message !== null ? <Notice message={message} variant="success" /> : null}
@@ -153,9 +153,8 @@ export function AccountDeletionScreen() {
 
       {status?.status === "pending" ? (
         <Card style={styles.pendingCard} variant="raised">
-          <Text style={styles.sectionTitle}>{accountDeletionStatusLabel(status.status)}</Text>
-          <Text style={styles.body}>مهلت لغو: {formatDeletionDate(status.grace_period_ends_at)}</Text>
-          <Text style={styles.body}>در این مدت می‌توانی درخواست را لغو کنی.</Text>
+          <Text style={styles.sectionTitle}>حساب برای حذف زمان‌بندی شد</Text>
+          <Text style={styles.body}>تا پیش از این زمان می‌توانی درخواست را لغو کنی: {formatDeletionDate(status.grace_period_ends_at)}</Text>
           <Button
             disabled={busy}
             label="لغو درخواست حذف"
@@ -166,14 +165,14 @@ export function AccountDeletionScreen() {
         </Card>
       ) : status?.status === "completed" ? (
         <Card style={styles.pendingCard} variant="raised">
-          <Text style={styles.sectionTitle}>{accountDeletionStatusLabel(status.status)}</Text>
-          <Text style={styles.body}>برای ادامه، دوباره وارد حساب دیگری شو.</Text>
+          <Text style={styles.sectionTitle}>این حساب قبلاً حذف شده است.</Text>
         </Card>
       ) : (
         <Card style={styles.formCard}>
           {status?.status === "cancelled" ? (
-            <Notice message="درخواست قبلی لغو شده است." variant="info" />
+            <Notice message="درخواست حذف لغو شد. اگر هنوز می‌خواهی حسابت حذف شود، می‌توانی درخواست تازه‌ای ثبت کنی." variant="info" />
           ) : null}
+          <Text style={styles.body}>حذف پس از پایان مهلت بازگشت که بعد از ثبت نمایش داده می‌شود، اجرا خواهد شد.</Text>
           <TextField
             autoCapitalize="characters"
             autoCorrect={false}
@@ -186,7 +185,7 @@ export function AccountDeletionScreen() {
           <TextField
             autoCapitalize="none"
             autoCorrect={false}
-            label="رمز عبور (اختیاری)"
+            label="رمز عبور، اگر حساب رمزدار است"
             onChangeText={setPassword}
             secureTextEntry
             textDirection="ltr"
@@ -235,21 +234,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   formCard: { gap: fiticianTokens.spacing[4] },
-  header: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[3],
-    justifyContent: "space-between",
-  },
-  headerCopy: { flex: 1, gap: fiticianTokens.spacing[3] },
-  intro: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    lineHeight: 27,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
   linksCard: { gap: fiticianTokens.spacing[3] },
   muted: {
     color: fiticianTokens.colors.muted,
@@ -259,19 +243,17 @@ const styles = StyleSheet.create({
   },
   pendingCard: { gap: fiticianTokens.spacing[3] },
   policyCard: { gap: fiticianTokens.spacing[3] },
+  brandRow: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    width: "100%",
+  },
   screen: { gap: fiticianTokens.spacing[4] },
   sectionTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h1,
-    lineHeight: 40,
     textAlign: "right",
     writingDirection: "rtl",
   },
