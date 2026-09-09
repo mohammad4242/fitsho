@@ -24,6 +24,7 @@ export type ButtonProps = Omit<
   readonly disabled?: boolean;
   readonly label?: string;
   readonly loading?: boolean;
+  readonly loadingAccessibilityLabel?: string;
   readonly style?: PressableProps["style"];
   readonly variant?: ButtonVariant;
 };
@@ -77,6 +78,7 @@ export function Button({
   disabled = false,
   label,
   loading = false,
+  loadingAccessibilityLabel = "در حال بارگذاری",
   style,
   variant = "primary",
   ...pressableProps
@@ -104,7 +106,7 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator accessibilityLabel="Loading" color={indicatorColor} size="small" />
+        <ActivityIndicator accessibilityLabel={loadingAccessibilityLabel} color={indicatorColor} size="small" />
       ) : (
         <Text allowFontScaling style={[styles.label, variantTextStyles[variant]]}>{text}</Text>
       )}

@@ -292,7 +292,7 @@ test("clear filters returns to guided discovery instead of all exercises", () =>
   fireEvent.press(screen.getByRole("button", { name: "سینه" }));
   fireEvent.press(screen.getByRole("button", { name: "فیلترهای بیشتر" }));
   fireEvent.press(screen.getByRole("button", { name: "پاک کردن فیلترها" }));
-  fireEvent.press(screen.getAllByRole("button", { name: "Close" })[1]);
+  fireEvent.press(screen.getAllByRole("button", { name: "بستن" })[1]);
 
   expect(screen.getByText("برای شروع، بالاتنه، پایین‌تنه یا میان‌تنه را انتخاب کن.")).toBeTruthy();
   expect(screen.queryByText("نتایج حرکات")).toBeNull();

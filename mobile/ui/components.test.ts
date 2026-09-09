@@ -69,7 +69,7 @@ it("renders token-based button variants and exposes busy state", () => {
   expect(result.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
   expect(result.props.disabled).toBe(true);
   expect(result.props.accessibilityLabel).toBe("Save");
-  expect(element(result.props.children).type).toBe("ActivityIndicator");
+  expect(element(result.props.children).props.accessibilityLabel).toBe("در حال بارگذاری");
 
   const style = (result.props.style as (state: { pressed: boolean }) => unknown)({ pressed: false });
   expect(style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: "#50dfce" })]));

@@ -6,6 +6,7 @@ import { Button } from "./components/Button";
 import { TextField } from "./components/Input";
 import { MetricRing } from "./components/MetricRing";
 import { Dialog, Sheet } from "./components/Overlay";
+import { Notice } from "./components/Feedback";
 
 test("renders the shared button with native accessibility and press behavior", () => {
   const onPress = jest.fn();
@@ -20,6 +21,14 @@ test("renders the shared button with native accessibility and press behavior", (
 
   fireEvent.press(button);
   expect(onPress).toHaveBeenCalledTimes(1);
+});
+
+test("announces the Persian loading state while preserving the button state", () => {
+  render(<Button label="ذخیره" loading onPress={jest.fn()} />);
+
+  const button = screen.getByRole("button", { name: "ذخیره" });
+  expect(button.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+  expect(screen.getByLabelText("در حال بارگذاری")).toBeTruthy();
 });
 
 test("keeps screen-reader names, font scaling, and focus order in source order", () => {
@@ -57,4 +66,19 @@ test("keeps Persian overlays direction-aware", () => {
   );
 
   expect(view).toBeTruthy();
+});
+
+test("announces errors and exposes native modal boundaries", () => {
+  const view = render(
+    <>
+      <Notice message="اتصال برقرار نیست" title="خطا" variant="danger" />
+      <Sheet onClose={jest.fn()} title="جزئیات" visible><Text>متن</Text></Sheet>
+      <Dialog message="ادامه می‌دهی؟" onClose={jest.fn()} title="تأیید" visible />
+    </>,
+  );
+
+  const alert = view.UNSAFE_getByProps({ accessibilityRole: "alert" });
+  expect(alert.props.accessibilityLiveRegion).toBe("assertive");
+  expect(view.getByLabelText("جزئیات").props.accessibilityViewIsModal).toBe(true);
+  expect(view.getByLabelText("تأیید").props.accessibilityViewIsModal).toBe(true);
 });

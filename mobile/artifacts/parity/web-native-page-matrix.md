@@ -64,6 +64,13 @@ Classification values follow the master plan: `VISUAL_HIERARCHY`, `SECTION_ORDER
 - English smoke: English-only fields and labels retain LTR text direction where the existing native surface supports them; broader English copy migration remains outside this Persian-first parity pass.
 - Width evidence: source and automated checks cover 360/390/430 layout targets; physical RTL/LTR and text-scale verification remains pending because no Android device or emulator is available.
 
+## Phase 26 evidence
+
+- Shared interaction contract: `Button` and `SegmentedControl` expose native roles and disabled/busy/selected state, with a 48 dp minimum target; `TextField` keeps font scaling, labels, validation hints, and keyboard-safe sizing.
+- State announcements: `Skeleton` is an accessible progressbar with Persian loading copy; `Notice` exposes an alert and uses an assertive live region for errors and a polite live region for other status changes.
+- Native boundaries: `Screen` owns safe-area and keyboard dismissal/avoidance; `Sheet` and `Dialog` use native `Modal` boundaries, `onRequestClose`, header semantics, and 48 dp actions; `AndroidBackCoordinator` prioritizes overlay → wizard → upload before route pop or app exit.
+- Source/test evidence covers the shared contract and native composition. TalkBack traversal, 200% text scale, gesture navigation, three-button navigation, and physical safe-area behavior still require an Android device/emulator pass.
+
 ## Phase 0 gate
 
 Every core page now has a row with web source, native route/implementation, preserved actions and

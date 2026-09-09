@@ -29,7 +29,7 @@ export interface SheetProps extends OverlayBaseProps {
 
 export function Sheet({
   children,
-  closeLabel = "Close",
+  closeLabel = "بستن",
   onClose,
   style,
   title,
@@ -38,6 +38,7 @@ export function Sheet({
   return (
     <Modal
       accessibilityViewIsModal
+      accessibilityLabel={title ?? "پنجره"}
       animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent
@@ -53,7 +54,7 @@ export function Sheet({
         />
         <SafeAreaView edges={["bottom"]} style={[styles.sheet, style]}>
           <View style={styles.header}>
-            {title ? <Text style={styles.title}>{title}</Text> : <View />}
+            {title ? <Text accessibilityRole="header" style={styles.title}>{title}</Text> : <View />}
             <Pressable
               accessibilityLabel={closeLabel}
               accessibilityRole="button"
@@ -83,9 +84,9 @@ export interface DialogProps extends OverlayBaseProps {
 }
 
 export function Dialog({
-  cancelLabel = "Cancel",
-  closeLabel = "Close",
-  confirmLabel = "Confirm",
+  cancelLabel = "انصراف",
+  closeLabel = "بستن",
+  confirmLabel = "تأیید",
   destructive = false,
   message,
   onCancel,
@@ -100,7 +101,7 @@ export function Dialog({
   return (
     <Modal
       accessibilityViewIsModal
-      accessibilityLabel={closeLabel}
+      accessibilityLabel={title ?? closeLabel}
       animationType="fade"
       onRequestClose={onClose}
       statusBarTranslucent
@@ -109,7 +110,7 @@ export function Dialog({
     >
       <SafeAreaView edges={["top", "bottom"]} style={styles.dialogOverlay}>
         <View style={styles.dialog}>
-          {title ? <Text style={styles.title}>{title}</Text> : null}
+          {title ? <Text accessibilityRole="header" style={styles.title}>{title}</Text> : null}
           <Text style={styles.message}>{message}</Text>
           {children}
           <View style={styles.actions}>

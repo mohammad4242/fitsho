@@ -20,7 +20,7 @@ export interface SkeletonProps {
 }
 
 export function Skeleton({
-  accessibilityLabel = "Loading",
+  accessibilityLabel = "در حال بارگذاری",
   height = fiticianTokens.spacing[4],
   radius = fiticianTokens.radii.small,
   style,
@@ -79,7 +79,11 @@ export function Notice({
   variant = "info",
 }: NoticeProps) {
   return (
-    <View accessibilityRole="alert" style={[styles.notice, noticeStyles[variant], compact && styles.compactNotice]}>
+    <View
+      accessibilityLiveRegion={variant === "danger" ? "assertive" : "polite"}
+      accessibilityRole="alert"
+      style={[styles.notice, noticeStyles[variant], compact && styles.compactNotice]}
+    >
       {title ? <Text style={[styles.noticeTitle, compact && styles.compactTitle]}>{title}</Text> : null}
       <Text style={[styles.noticeMessage, compact && styles.compactMessage]}>{message}</Text>
       {actionLabel && onAction ? (
