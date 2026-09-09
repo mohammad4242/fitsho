@@ -25,7 +25,7 @@ current web token/primitives CSS and the current `mobile/ui` components.
 | `.fitsho-status` | `Notice` | Info/success/warning/danger/offline variants exist | Keep state concise and user-facing |
 | `.fitsho-input` / auth input rules | `FormField` / `TextField` | Labels, errors, direction, font scaling, keyboard props exist | Keep keyboard-safe native forms |
 | HTML `details/summary` | `DisclosureCard` | Pressable expansion with accessibility state exists | Match collapsed/expanded hierarchy, not HTML mechanics |
-| `.fitsho-grouped-list` | No shared native primitive | Gap: More currently uses individual `Card`s | Phase 1 `GroupedList` candidate |
+| `.fitsho-grouped-list` | `GroupedList` | Full-width RTL pressable rows, grouped headers, subtitles, trailing actions, 48 dp targets | Reuse for More and future grouped settings surfaces |
 | Web modal/dialog | `Sheet` / `Dialog` in `Overlay.tsx` | Native modal boundary, safe bottom edge, Android close callback | Preserve native sheet/dialog behavior |
 | Web image/video components | `Media`, `ExerciseMedia`, carousel/video cache | Native lifecycle/cache/fallback exists | Stable aspect ratios; pause on navigation/background |
 | Web SVG `AppIcon` | Native `AppIcon` | Shared icon system exists | Use icons instead of text glyphs/emoji for directional controls |
