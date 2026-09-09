@@ -5,6 +5,7 @@ import type { BodyAnalysisExperienceV4 } from "@fitician/core/body-photos";
 import {
   bodyBmiLabel,
   bodyMetricProgress,
+  buildBodyProgressLandingSummary,
   buildBodyIndicatorSummary,
 } from "./bodyAnalysisPresentation";
 
@@ -50,4 +51,16 @@ it("provides display-only metric scales and BMI labels", () => {
   expect(bodyMetricProgress(null, 15, 35)).toBe(0);
   expect(bodyBmiLabel(22)).toBe("محدوده نرمال");
   expect(bodyBmiLabel(null)).toBe("ثبت نشده");
+});
+
+it("keeps incomplete uploads separate and preserves the web newest-first analysis order", () => {
+  const incomplete = { session: { submitted_at: null } } as never;
+  const latest = { session: { submitted_at: "2026-09-09T10:00:00Z" } } as never;
+  const previous = { session: { submitted_at: "2026-09-01T10:00:00Z" } } as never;
+
+  const summary = buildBodyProgressLandingSummary([incomplete, latest, previous]);
+
+  expect(summary.incomplete).toEqual([incomplete]);
+  expect(summary.submitted).toEqual([latest, previous]);
+  expect(summary.latestAnalysis).toBe(latest);
 });

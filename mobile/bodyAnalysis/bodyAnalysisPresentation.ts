@@ -1,6 +1,7 @@
 import type {
   BodyAnalysisExperienceIndicator,
   BodyAnalysisExperienceV4,
+  BodyProgressTimelineItem,
 } from "@fitician/core/body-photos";
 
 import type { FiticianIconName } from "../ui/icons";
@@ -15,6 +16,24 @@ export type BodyIndicatorPresentation = {
   readonly title: string;
   readonly tone: BodyIndicatorTone;
 };
+
+export type BodyProgressLandingSummary = {
+  readonly incomplete: readonly BodyProgressTimelineItem[];
+  readonly latestAnalysis: BodyProgressTimelineItem | null;
+  readonly submitted: readonly BodyProgressTimelineItem[];
+};
+
+export function buildBodyProgressLandingSummary(
+  items: readonly BodyProgressTimelineItem[],
+): BodyProgressLandingSummary {
+  const incomplete = items.filter((item) => item.session.submitted_at === null);
+  const submitted = items.filter((item) => item.session.submitted_at !== null);
+  return {
+    incomplete,
+    latestAnalysis: submitted[0] ?? null,
+    submitted,
+  };
+}
 
 export function buildBodyIndicatorSummary(
   experience: BodyAnalysisExperienceV4,
