@@ -159,7 +159,7 @@ export function MemberHomeScreen() {
             <QuickActionCard
               icon="foodLog"
               image={homeFoodImage}
-              onPress={() => router.push("/member/nutrition")}
+              onPress={() => router.push("/member/nutrition-tracking")}
               subtitle="وعده امروزت را ثبت کن"
               title="ثبت غذا"
             />

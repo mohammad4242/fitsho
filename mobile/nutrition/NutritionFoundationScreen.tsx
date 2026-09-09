@@ -39,6 +39,7 @@ import { NutritionCatalogueSection } from "./NutritionCatalogueSection";
 import { NutritionTrackingSection } from "./NutritionTrackingSection";
 import { NutritionAdherenceSection } from "./NutritionAdherenceSection";
 import { NutritionClinicalSection } from "./NutritionClinicalSection";
+import { NutritionSummaryCard } from "./NutritionSummaryCard";
 
 type ChoiceOption = { readonly label: string; readonly value: string };
 
@@ -105,6 +106,7 @@ export function NutritionFoundationScreen() {
   const exerciseState = getMobileViewState(exerciseQuery, { connectivityStatus });
   const profile = viewData(profileState);
   const safety = viewData(safetyState);
+  const estimate = viewData(estimateState);
 
   return (
     <Screen contentWidth="reading">
@@ -115,6 +117,11 @@ export function NutritionFoundationScreen() {
           وضعیت ایمنی، اطلاعات پایه و برآوردهای تغذیه‌ای تو از همین‌جا قابل مشاهده است.
         </Text>
       </View>
+
+      <NutritionSummaryCard
+        connectivityStatus={connectivityStatus}
+        estimate={estimate}
+      />
 
       <NutritionProfileSection
         onEdit={() => router.push("/member/profile")}

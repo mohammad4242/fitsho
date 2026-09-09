@@ -50,6 +50,7 @@ it("defines the public, auth, onboarding, account, member, coach, and physician 
     "(member)/member/(tabs)/index.tsx",
     "(member)/member/(tabs)/workouts.tsx",
     "(member)/member/(tabs)/nutrition.tsx",
+    "(member)/member/nutrition-tracking.tsx",
     "(member)/member/(tabs)/profile.tsx",
     "(member)/member/body-analysis.tsx",
     "(member)/member/body-analysis-history.tsx",
@@ -190,6 +191,12 @@ it("uses the native nutrition foundation inside the completed member nutrition b
   const route = resolve(appRoot, "(member)/member/(tabs)/nutrition.tsx");
   await expect(readFile(route, "utf8")).resolves.toMatch(/NutritionFoundationScreen/);
   await expect(readFile(route, "utf8")).resolves.not.toMatch(/RouteEntryScreen/);
+  await expect(readFile(route, "utf8")).resolves.toMatch(/requiredCapability="nutrition"/);
+});
+
+it("keeps food tracking as a focused native nutrition route", async () => {
+  const route = resolve(appRoot, "(member)/member/nutrition-tracking.tsx");
+  await expect(readFile(route, "utf8")).resolves.toMatch(/NutritionTrackingSection/);
   await expect(readFile(route, "utf8")).resolves.toMatch(/requiredCapability="nutrition"/);
 });
 
