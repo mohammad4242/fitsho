@@ -12,7 +12,7 @@ import { createNutritionPlanApi } from "../nutrition/nutritionPlanApi";
 import { createNutritionTrackingApi } from "../nutrition/nutritionTrackingApi";
 import { createWorkoutPlanApi } from "../workouts/workoutApi";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
-import { Notice, ScreenHeader, SectionHeader } from "../ui/components";
+import { Notice, PageHeading, SectionHeader } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot } from "../ui/navigation/RouteGuards";
@@ -109,7 +109,7 @@ export function MemberHomeScreen() {
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <ScreenHeader
+      <PageHeading
         action={<Pressable
           accessibilityLabel="باز کردن پروفایل"
           accessibilityRole="button"
@@ -118,9 +118,7 @@ export function MemberHomeScreen() {
         >
           <Text style={styles.avatarText}>{avatar}</Text>
         </Pressable>}
-        compact
-        eyebrow={formatToday()}
-        subtitle="برای امروز آماده‌ای؟"
+        supportingText="برای امروز آماده‌ای؟"
         title={`سلام، ${displayName}`}
       />
 
@@ -190,10 +188,6 @@ function viewData<TData>(state: MobileViewState<TData>): TData | undefined {
   return "data" in state ? state.data : undefined;
 }
 
-function formatToday(): string {
-  return new Intl.DateTimeFormat("fa-IR", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
-}
-
 function useConnectivityStatus(): ConnectivityStatus {
   const [status, setStatus] = useState<ConnectivityStatus>(connectivityMonitor.getSnapshot().status);
   useEffect(() => connectivityMonitor.subscribe((snapshot) => setStatus(snapshot.status)), []);
@@ -205,9 +199,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.aqua,
     borderRadius: fiticianTokens.radii.pill,
-    height: 44,
+    height: fiticianTokens.layout.minimumTouchTarget,
     justifyContent: "center",
-    width: 44,
+    width: fiticianTokens.layout.minimumTouchTarget,
   },
   avatarText: {
     color: fiticianTokens.colors.canvas,

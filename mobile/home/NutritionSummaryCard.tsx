@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AppIcon, Button, CinematicSurface, MetricRing, MetricStrip, StateSkeleton } from "../ui/components";
+import { AppIcon, Button, MetricRing, MetricStrip, StateSkeleton } from "../ui/components";
 import { fiticianTokens } from "../ui/tokens";
 import type { HomeNutritionSummary } from "./homeModel";
 
@@ -23,52 +23,50 @@ export function NutritionSummaryCard({ error = false, loading, summary }: Nutrit
       accessibilityLabel="نمایش جزئیات تغذیه"
       accessibilityRole="button"
       onPress={() => router.push("/member/nutrition")}
-      style={({ pressed }) => pressed && styles.pressed}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
-      <CinematicSurface accent style={styles.card}>
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <View style={styles.headingCopy}>
-              <Text style={styles.eyebrow}>سوخت امروز</Text>
-              <Text style={styles.title}>تغذیه روزانه</Text>
-            </View>
-            <View style={styles.iconBadge}>
-              <AppIcon color={fiticianTokens.colors.aqua} name="nutrition" size={fiticianTokens.iconSize.md} />
-            </View>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <View style={styles.headingCopy}>
+            <Text style={styles.eyebrow}>سوخت امروز</Text>
+            <Text style={styles.title}>تغذیه روزانه</Text>
           </View>
-
-          {hasTarget ? (
-            <>
-              <View style={styles.calorieRow}>
-                <View style={styles.calorieCopy}>
-                  <Text style={styles.calorieValue}>{formatNumber(consumed ?? summary.targetCalories ?? 0)}</Text>
-                  <Text style={styles.calorieLabel}>
-                    {consumed === null
-                      ? "هدف کالری روزانه"
-                      : `از ${formatNumber(summary.targetCalories ?? 0)} کیلوکالری`}
-                  </Text>
-                  <Text style={[styles.statusText, statusTone(summary.status)]}>{statusLabel(summary.status)}</Text>
-                </View>
-                <MetricRing label="پیشرفت کالری امروز" progress={summary.progress} />
-              </View>
-              <MetricStrip
-                items={[
-                  { accent: fiticianTokens.colors.aqua, label: "پروتئین", value: formatMetric(summary.protein) },
-                  { accent: fiticianTokens.colors.blue, label: "کربوهیدرات", value: formatMetric(summary.carbohydrate) },
-                  { accent: fiticianTokens.colors.amber, label: "چربی", value: formatMetric(summary.fat) },
-                ]}
-              />
-              {error ? <Text style={styles.errorText}>بخشی از اطلاعات تغذیه به‌روز نشد.</Text> : null}
-            </>
-          ) : (
-            <View style={styles.emptyBlock}>
-              <Text style={styles.emptyTitle}>هدف غذایی هنوز آماده نیست</Text>
-              <Text style={styles.emptyText}>پروفایل تغذیه‌ات را کامل کن تا هدف روزانه را ببینی.</Text>
-              <Button label="رفتن به تغذیه" onPress={() => router.push("/member/nutrition")} variant="secondary" />
-            </View>
-          )}
+          <View style={styles.iconBadge}>
+            <AppIcon color={fiticianTokens.colors.aqua} name="nutrition" size={fiticianTokens.iconSize.md} />
+          </View>
         </View>
-      </CinematicSurface>
+
+        {hasTarget ? (
+          <>
+            <View style={styles.calorieRow}>
+              <View style={styles.calorieCopy}>
+                <Text style={styles.calorieValue}>{formatNumber(consumed ?? summary.targetCalories ?? 0)}</Text>
+                <Text style={styles.calorieLabel}>
+                  {consumed === null
+                    ? "هدف کالری روزانه"
+                    : `از ${formatNumber(summary.targetCalories ?? 0)} کیلوکالری`}
+                </Text>
+                <Text style={[styles.statusText, statusTone(summary.status)]}>{statusLabel(summary.status)}</Text>
+              </View>
+              <MetricRing label="پیشرفت کالری امروز" progress={summary.progress} />
+            </View>
+            <MetricStrip
+              items={[
+                { accent: fiticianTokens.colors.aqua, label: "پروتئین", value: formatMetric(summary.protein) },
+                { accent: fiticianTokens.colors.blue, label: "کربوهیدرات", value: formatMetric(summary.carbohydrate) },
+                { accent: fiticianTokens.colors.amber, label: "چربی", value: formatMetric(summary.fat) },
+              ]}
+            />
+            {error ? <Text style={styles.errorText}>بخشی از اطلاعات تغذیه به‌روز نشد.</Text> : null}
+          </>
+        ) : (
+          <View style={styles.emptyBlock}>
+            <Text style={styles.emptyTitle}>هدف غذایی هنوز آماده نیست</Text>
+            <Text style={styles.emptyText}>پروفایل تغذیه‌ات را کامل کن تا هدف روزانه را ببینی.</Text>
+            <Button label="رفتن به تغذیه" onPress={() => router.push("/member/nutrition")} variant="secondary" />
+          </View>
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -112,7 +110,18 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     textAlign: "right",
   },
-  card: { minHeight: 236 },
+  card: {
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.extraLarge,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.card.elevation,
+    minHeight: 236,
+    shadowColor: fiticianTokens.shadows.card.color,
+    shadowOffset: fiticianTokens.shadows.card.offset,
+    shadowOpacity: fiticianTokens.shadows.card.opacity,
+    shadowRadius: fiticianTokens.shadows.card.radius,
+  },
   content: { gap: fiticianTokens.spacing[4], padding: fiticianTokens.spacing[4] },
   emptyBlock: { gap: fiticianTokens.spacing[2] },
   emptyText: {
