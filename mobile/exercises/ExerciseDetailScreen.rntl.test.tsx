@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -7,6 +7,9 @@ const mockVideoPlayer = {
   status: "idle",
 };
 const mockVideoSources: unknown[] = [];
+const mockGetCached = jest.fn<() => Promise<unknown>>();
+const mockGetOrDownload = jest.fn<() => Promise<unknown>>();
+const mockRemoveCached = jest.fn<() => Promise<void>>();
 
 jest.mock("@tanstack/react-query", () => ({ useQuery: jest.fn() }));
 jest.mock("expo-router", () => ({
@@ -17,6 +20,20 @@ jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("../auth/MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
 jest.mock("../config/nativeRuntimeConfig", () => ({
   getMobileRuntimeConfig: () => ({ apiBaseUrl: "https://api.example.com" }),
+}));
+jest.mock("../api/nativeTransport", () => ({
+  createNativeTransport: () => ({ download: jest.fn() }),
+}));
+jest.mock("../video/publicExerciseVideoCache", () => ({
+  PublicExerciseVideoCache: class {
+    getCached = mockGetCached;
+    getOrDownload = mockGetOrDownload;
+    remove = mockRemoveCached;
+  },
+  validatePublicExerciseVideoPath: (path: string) => path,
+}));
+jest.mock("../video/publicExerciseVideoStore", () => ({
+  ExpoPublicExerciseVideoStore: class {},
 }));
 jest.mock("../platform/connectivity", () => ({
   connectivityMonitor: {
@@ -70,6 +87,9 @@ beforeEach(() => {
   mockLanguageForDirection.mockReturnValue("fa");
   mockVideoSources.length = 0;
   mockVideoPlayer.addListener.mockClear();
+  mockGetCached.mockReset().mockImplementation(() => new Promise(() => undefined));
+  mockGetOrDownload.mockReset();
+  mockRemoveCached.mockReset().mockResolvedValue(undefined);
   mockUseQuery.mockImplementation(({ queryKey }) => {
     const lastKey = queryKey[queryKey.length - 1];
     const data = lastKey === "media-inventory"
@@ -99,7 +119,7 @@ function renderDetail() {
   );
 }
 
-test("keeps the exercise card compact, localized, and free of offline or text media controls", () => {
+test("keeps the exercise card compact and exposes the native offline action", () => {
   renderDetail();
 
   expect(screen.getByTestId("exercise-media-card-title").props.children).toBe("پرس بالا سینه دمبل");
@@ -107,7 +127,7 @@ test("keeps the exercise card compact, localized, and free of offline or text me
   expect(screen.getByText("1/2")).toBeTruthy();
   expect(screen.getByRole("radio", { name: "ویدیوی مرد" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "ویدیوی زن" })).toBeTruthy();
-  expect(screen.queryByText("ذخیره برای استفاده آفلاین")).toBeNull();
+  expect(screen.getByRole("button", { name: "ذخیره برای استفاده آفلاین" })).toBeTruthy();
   expect(screen.queryByText("رسانه نمایش")).toBeNull();
   expect(screen.queryByText("ویدیوی مرد 1")).toBeNull();
 });
@@ -120,6 +140,23 @@ test("resets the carousel to the first female video after switching gender", () 
 
   expect(screen.getByText("1/2")).toBeTruthy();
   expect(mockVideoSources.at(-1)).toEqual({ uri: "https://api.example.com/media/female-1.mp4" });
+});
+
+test("prefers a persisted public video cache file for offline playback", async () => {
+  mockGetCached.mockResolvedValueOnce({
+    byteSize: 24,
+    cacheKey: "a".repeat(64),
+    contentType: "video/mp4",
+    sourcePath: "/media/male-1.mp4",
+    uri: "file:///cache/male-1.video",
+  });
+
+  renderDetail();
+
+  await waitFor(() => {
+    expect(mockVideoSources.at(-1)).toEqual({ uri: "file:///cache/male-1.video" });
+  });
+  expect(screen.getByRole("button", { name: "حذف دانلود" })).toBeTruthy();
 });
 
 test("uses only the English card title and labels when the native direction is LTR", () => {

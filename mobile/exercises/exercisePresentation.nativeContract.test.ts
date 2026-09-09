@@ -35,11 +35,11 @@ it("uses the compact localized media carousel card", async () => {
   expect(source).toContain("availableMediaPresentations");
   expect(source).toContain('api.get(slug ?? "", "unspecified")');
   expect(source).toContain("styles.infoCard");
-  expect(source).not.toContain("ذخیره برای استفاده آفلاین");
+  expect(source).toContain("ذخیره برای استفاده آفلاین");
   expect(source).not.toContain("رسانه نمایش");
   expect(source).not.toContain("exerciseSecondaryTitle");
   expect(source).not.toContain("PresentationChip");
-  expect(source).not.toContain("PublicExerciseVideoCache");
+  expect(source).toContain("PublicExerciseVideoCache");
 });
 
 it("matches the web media aspect ratio while keeping native media controls", async () => {

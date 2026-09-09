@@ -28,6 +28,7 @@ export interface ExerciseMediaCarouselProps {
   readonly name: string;
   readonly onIndexChange: (index: number) => void;
   readonly selectedIndex: number;
+  readonly sourceUri?: string;
 }
 
 const mediaUnavailableCopy: Record<MobileLanguage, string> = {
@@ -42,6 +43,7 @@ export function ExerciseMediaCarousel({
   name,
   onIndexChange,
   selectedIndex,
+  sourceUri,
 }: ExerciseMediaCarouselProps) {
   const safeIndex = clampMediaIndex(selectedIndex, items.length);
   const item = items[safeIndex];
@@ -98,7 +100,7 @@ export function ExerciseMediaCarousel({
       testID="exercise-media-surface"
     >
       {item !== undefined && isExerciseMediaRenderable(item.mediaPath, item.mediaType) ? (
-        <NativeExerciseMedia item={item} key={item.key} language={language} name={name} apiBaseUrl={apiBaseUrl} />
+        <NativeExerciseMedia item={item} key={`${item.key}:${sourceUri ?? "remote"}`} language={language} name={name} apiBaseUrl={apiBaseUrl} sourceUri={sourceUri} />
       ) : (
         <MediaFallback language={language} />
       )}
@@ -121,14 +123,16 @@ function NativeExerciseMedia({
   item,
   language,
   name,
+  sourceUri,
 }: {
   readonly apiBaseUrl: string;
   readonly item: ExerciseMediaItem;
   readonly language: MobileLanguage;
   readonly name: string;
+  readonly sourceUri?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  const source = { uri: resolveExerciseMediaUrl(item.mediaPath, apiBaseUrl) };
+  const source = { uri: sourceUri ?? resolveExerciseMediaUrl(item.mediaPath, apiBaseUrl) };
   const accessibilityLabel = language === "en" ? `Exercise demonstration: ${name}` : `نمایش حرکت ${name}`;
   if (failed) return <MediaFallback language={language} />;
 

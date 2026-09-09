@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 
+import { createNativeTransport } from "../api/nativeTransport";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
 import { exerciseKeys } from "../data/queryKeys";
@@ -25,6 +26,12 @@ import { Screen } from "../ui/layout";
 import { languageForDirection, type MobileLanguage } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import {
+  PublicExerciseVideoCache,
+  validatePublicExerciseVideoPath,
+  type PublicVideoCacheFile,
+} from "../video/publicExerciseVideoCache";
+import { ExpoPublicExerciseVideoStore } from "../video/publicExerciseVideoStore";
+import {
   createExerciseApi,
   type ExerciseDetail,
 } from "./exerciseApi";
@@ -39,12 +46,15 @@ import {
 import { exerciseCopy, exerciseTitle } from "./exerciseCopy";
 
 type MediaPresentationChoice = GenderMediaPresentation;
+type VideoDownloadStatus = "checking" | "downloading" | "error" | "idle" | "ready";
 
 const detailCopy = {
   en: {
     back: "Back",
     bodyRegion: "Body region",
     details: "Exercise details",
+    downloadError: "The video could not be saved. Check the connection and device storage.",
+    downloadHint: "The video is stored on this device only when you choose to download it.",
     difficulty: "Difficulty",
     equipment: "Equipment",
     error: "Could not load exercise details.",
@@ -52,9 +62,12 @@ const detailCopy = {
     instructions: "Instructions",
     library: "Exercise library",
     noInformation: "No information recorded.",
+    offlineReadyHint: "This video is saved on this device for offline playback.",
+    removeDownload: "Remove download",
     retry: "Try again",
     secondaryMuscles: "Secondary muscles",
     safety: "Safety",
+    saveOffline: "Save for offline use",
     stale: "Showing saved details; the latest version may not be available.",
     targetMuscle: "Target muscle",
     guide: "Exercise guide",
@@ -65,6 +78,8 @@ const detailCopy = {
     back: "بازگشت",
     bodyRegion: "ناحیه بدن",
     details: "مشخصات حرکت",
+    downloadError: "ذخیرهٔ ویدئو انجام نشد. اتصال و فضای دستگاه را بررسی کن.",
+    downloadHint: "ویدئو فقط با انتخاب تو روی دستگاه ذخیره می‌شود.",
     difficulty: exerciseCopy.difficulty,
     equipment: exerciseCopy.equipment,
     error: exerciseCopy.error,
@@ -72,9 +87,12 @@ const detailCopy = {
     instructions: exerciseCopy.instructions,
     library: exerciseCopy.library,
     noInformation: "اطلاعاتی ثبت نشده است.",
+    offlineReadyHint: "این ویدئو برای مشاهده بدون اینترنت روی دستگاه ذخیره است.",
+    removeDownload: "حذف دانلود",
     retry: exerciseCopy.retry,
     secondaryMuscles: exerciseCopy.secondaryMuscles,
     safety: exerciseCopy.safety,
+    saveOffline: "ذخیره برای استفاده آفلاین",
     stale: exerciseCopy.stale,
     targetMuscle: "عضله هدف",
     guide: "راهنمای حرکت",
@@ -173,10 +191,20 @@ export function ExerciseDetailScreen() {
   const slug = Array.isArray(params.slug) ? params.slug[0] : params.slug;
   const api = useMemo(() => createExerciseApi(auth.request), [auth.request]);
   const runtime = useMemo(() => getMobileRuntimeConfig(), []);
+  const videoCache = useMemo(
+    () => new PublicExerciseVideoCache({
+      storage: new ExpoPublicExerciseVideoStore(),
+      transport: createNativeTransport({ apiBaseUrl: runtime.apiBaseUrl }),
+    }),
+    [runtime.apiBaseUrl],
+  );
   const connectivityStatus = useConnectivityStatus();
   const language = languageForDirection();
   const [presentation, setPresentation] = useState<MediaPresentationChoice | null>(null);
   const [mediaIndex, setMediaIndex] = useState(0);
+  const [cachedVideo, setCachedVideo] = useState<PublicVideoCacheFile | null>(null);
+  const [videoDownloadError, setVideoDownloadError] = useState(false);
+  const [videoDownloadStatus, setVideoDownloadStatus] = useState<VideoDownloadStatus>("idle");
   const presentationQuery = presentation ?? undefined;
   const detailQuery = useQuery({
     enabled: slug !== undefined,
@@ -209,6 +237,10 @@ export function ExerciseDetailScreen() {
   const effectivePresentation = availablePresentations.includes(resolvedPresentation)
     ? resolvedPresentation
     : availablePresentations[0] ?? resolvedPresentation;
+  const selectedItem = mediaItems[mediaIndex] ?? mediaItems[0];
+  const selectedCachedVideo = selectedItem !== undefined && cachedVideo?.sourcePath === selectedItem.mediaPath
+    ? cachedVideo
+    : null;
   const mediaItemKeys = mediaItems.map((item) => item.key).join("\u001f");
 
   useEffect(() => {
@@ -231,6 +263,30 @@ export function ExerciseDetailScreen() {
     }
   }, [detail, presentation]);
 
+  useEffect(() => {
+    let active = true;
+    setCachedVideo(null);
+    setVideoDownloadError(false);
+    if (selectedItem === undefined || selectedItem.mediaType !== "video") {
+      setVideoDownloadStatus("idle");
+      return () => {
+        active = false;
+      };
+    }
+    setVideoDownloadStatus("checking");
+    void videoCache.getCached(selectedItem.mediaPath).then((file) => {
+      if (!active) return;
+      setCachedVideo(file);
+      setVideoDownloadStatus(file === null ? "idle" : "ready");
+    }).catch(() => {
+      if (!active) return;
+      setVideoDownloadStatus("idle");
+    });
+    return () => {
+      active = false;
+    };
+  }, [selectedItem?.mediaPath, selectedItem?.mediaType, videoCache]);
+
   useAndroidBackHandler("wizard", () => {
     router.back();
     return true;
@@ -240,6 +296,35 @@ export function ExerciseDetailScreen() {
     if (next === effectivePresentation || !availablePresentations.includes(next)) return;
     setPresentation(next);
     setMediaIndex(0);
+  }
+
+  async function downloadSelectedVideo() {
+    if (
+      selectedItem === undefined ||
+      selectedItem.mediaType !== "video" ||
+      !isDownloadableVideoPath(selectedItem.mediaPath) ||
+      videoDownloadStatus === "checking" ||
+      videoDownloadStatus === "downloading"
+    ) return;
+
+    setVideoDownloadStatus("downloading");
+    setVideoDownloadError(false);
+    try {
+      const file = await videoCache.getOrDownload(selectedItem.mediaPath);
+      setCachedVideo(file);
+      setVideoDownloadStatus("ready");
+    } catch {
+      setVideoDownloadError(true);
+      setVideoDownloadStatus("error");
+    }
+  }
+
+  async function removeSelectedVideo() {
+    if (selectedItem === undefined || selectedCachedVideo === null) return;
+    await videoCache.remove(selectedItem.mediaPath);
+    setCachedVideo(null);
+    setVideoDownloadError(false);
+    setVideoDownloadStatus("idle");
   }
 
   if (slug === undefined) {
@@ -302,14 +387,20 @@ export function ExerciseDetailScreen() {
           ) : null}
           <ExerciseMediaPanel
             availablePresentations={availablePresentations}
+            cachedVideo={selectedCachedVideo}
             detail={detail}
+            downloadError={videoDownloadError}
+            downloadStatus={videoDownloadStatus}
             effectivePresentation={effectivePresentation}
             language={language}
             mediaIndex={mediaIndex}
             mediaItems={mediaItems}
+            onDownload={downloadSelectedVideo}
             onMediaIndexChange={setMediaIndex}
             onPresentationChange={choosePresentation}
+            onRemoveDownload={removeSelectedVideo}
             runtimeApiBaseUrl={runtime.apiBaseUrl}
+            selectedItem={selectedItem}
           />
           <ExerciseInformation detail={detail} language={language} />
         </>
@@ -320,24 +411,36 @@ export function ExerciseDetailScreen() {
 
 function ExerciseMediaPanel({
   availablePresentations,
+  cachedVideo,
   detail,
+  downloadError,
+  downloadStatus,
   effectivePresentation,
   language,
   mediaIndex,
   mediaItems,
+  onDownload,
   onMediaIndexChange,
   onPresentationChange,
+  onRemoveDownload,
   runtimeApiBaseUrl,
+  selectedItem,
 }: {
   readonly availablePresentations: readonly MediaPresentationChoice[];
+  readonly cachedVideo: PublicVideoCacheFile | null;
   readonly detail: ExerciseDetail;
+  readonly downloadError: boolean;
+  readonly downloadStatus: VideoDownloadStatus;
   readonly effectivePresentation: MediaPresentationChoice;
   readonly language: ReturnType<typeof languageForDirection>;
   readonly mediaIndex: number;
   readonly mediaItems: ExerciseMediaItem[];
+  readonly onDownload: () => Promise<void>;
   readonly onMediaIndexChange: (index: number) => void;
   readonly onPresentationChange: (presentation: MediaPresentationChoice) => void;
+  readonly onRemoveDownload: () => Promise<void>;
   readonly runtimeApiBaseUrl: string;
+  readonly selectedItem: ExerciseMediaItem | undefined;
 }) {
   const name = exerciseTitle(detail.name_fa, detail.name_en, language);
   return (
@@ -349,6 +452,7 @@ function ExerciseMediaPanel({
         name={name}
         onIndexChange={onMediaIndexChange}
         selectedIndex={mediaIndex}
+        sourceUri={cachedVideo?.uri}
       />
       <View style={[styles.mediaFooter, language === "en" && styles.mediaFooterEnglish]}>
         <GenderMediaSelector
@@ -364,6 +468,31 @@ function ExerciseMediaPanel({
           {name}
         </Text>
       </View>
+      {selectedItem?.mediaType === "video" && isDownloadableVideoPath(selectedItem.mediaPath) ? (
+        <View style={styles.downloadSection}>
+          {cachedVideo === null ? (
+            <Button
+              disabled={downloadStatus === "checking"}
+              label={detailCopy[language].saveOffline}
+              loading={downloadStatus === "downloading"}
+              onPress={() => void onDownload()}
+              variant="secondary"
+            />
+          ) : (
+            <Button
+              label={detailCopy[language].removeDownload}
+              onPress={() => void onRemoveDownload()}
+              variant="ghost"
+            />
+          )}
+          <Text style={[styles.downloadHint, language === "en" && styles.downloadHintEnglish]}>
+            {cachedVideo === null ? detailCopy[language].downloadHint : detailCopy[language].offlineReadyHint}
+          </Text>
+          {downloadStatus === "error" || downloadError ? (
+            <Notice message={detailCopy[language].downloadError} variant="danger" />
+          ) : null}
+        </View>
+      ) : null}
     </Card>
   );
 }
@@ -491,6 +620,15 @@ function resolveMediaPresentation(detail: ExerciseDetail | null | undefined): Me
   return detail?.media_assets?.[0]?.presentation === "female" ? "female" : "male";
 }
 
+function isDownloadableVideoPath(path: string): boolean {
+  try {
+    validatePublicExerciseVideoPath(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function viewData<TData>(state: ReturnType<typeof getMobileViewState<TData>>): TData | undefined {
   if (state.status === "loading") return undefined;
   return "data" in state ? state.data : undefined;
@@ -503,6 +641,22 @@ function useConnectivityStatus(): ConnectivityStatus {
 }
 
 const styles = StyleSheet.create({
+  downloadHint: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  downloadHintEnglish: {
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    textAlign: "left",
+    writingDirection: "ltr",
+  },
+  downloadSection: {
+    gap: fiticianTokens.spacing[2],
+  },
   backButton: {
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[3],
