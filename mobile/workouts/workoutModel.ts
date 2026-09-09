@@ -61,6 +61,17 @@ export function workoutPlanAverageDuration(plan: WorkoutPlan): number | null {
   return Math.round(total / plan.days.length);
 }
 
+const userVisibleWorkoutWarnings: Readonly<Record<string, string>> = {
+  SESSION_DURATION_EXTENDED_TO_PRESERVE_CORE:
+    "برای حفظ اثربخشی برنامه، لطفاً زمان تمرین خود را کمی افزایش دهید.",
+};
+
+export function getUserVisibleWorkoutWarnings(warnings: readonly string[] | undefined): string[] {
+  return (warnings ?? [])
+    .map((warning) => userVisibleWorkoutWarnings[warning])
+    .filter((warning): warning is string => warning !== undefined);
+}
+
 export function formatWorkoutPrescription(
   exercise: WorkoutPlanExercise,
   language: "fa" | "en" = "fa",

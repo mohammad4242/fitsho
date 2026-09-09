@@ -1,20 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { WorkoutGenerationMethod } from "@fitician/core/profile";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
-import { workoutKeys } from "../data/queryKeys";
+import { profileKeys, workoutKeys } from "../data/queryKeys";
+import { createProfileApi } from "../profile/profileApi";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import {
   AppIcon,
   Button,
   Card,
-  CinematicSurface,
   EmptyState,
-  MetricStrip,
   Notice,
-  ScreenHeader,
   Skeleton,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
@@ -31,6 +30,7 @@ import {
   classifyWorkoutGenerationError,
   findPendingWorkoutPlanId,
   formatWorkoutPrescription,
+  getUserVisibleWorkoutWarnings,
   getWorkoutPlanSummaryStatus,
   isWorkoutPlanExecutable,
   workoutPlanAverageDuration,
@@ -39,7 +39,7 @@ import {
   ExpoWorkoutPlanPdfStore,
   type StoredWorkoutPlanPdf,
 } from "./workoutPdfStore";
-import { WorkoutCyclePanel } from "./WorkoutCyclePanel";
+import { WorkoutCyclePanel, type WorkoutReplacementRequest } from "./WorkoutCyclePanel";
 import type { WorkoutGenerationErrorKind } from "./workoutModel";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 
@@ -54,7 +54,6 @@ const generationErrorMessages: Record<WorkoutGenerationErrorKind, string> = {
 
 export function WorkoutPlansScreen() {
   const auth = useMobileAuth();
-  const router = useRouter();
   const params = useLocalSearchParams<{ cycleId?: string | string[]; planId?: string | string[] }>();
   const queryClient = useQueryClient();
   const connectivityStatus = useConnectivityStatus();
@@ -62,11 +61,15 @@ export function WorkoutPlansScreen() {
     () => createWorkoutPlanApi(auth.request, auth.download),
     [auth.download, auth.request],
   );
+  const profileApi = useMemo(() => createProfileApi(auth.request), [auth.request]);
   const pdfStore = useMemo(() => new ExpoWorkoutPlanPdfStore(), []);
   const planTargetId = firstParam(params.planId);
   const cycleTargetId = firstParam(params.cycleId);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(planTargetId ?? null);
   const [generationError, setGenerationError] = useState<WorkoutGenerationErrorKind | null>(null);
+  const [replacementRequest, setReplacementRequest] = useState<WorkoutReplacementRequest | null>(null);
+  const [generationMethod, setGenerationMethod] = useState<WorkoutGenerationMethod>("fitsho_coach");
+  const [generationMethodError, setGenerationMethodError] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedPlanId(planTargetId ?? null);
@@ -79,6 +82,10 @@ export function WorkoutPlansScreen() {
   const historyQuery = useQuery({
     queryFn: api.getHistory,
     queryKey: workoutKeys.plans(),
+  });
+  const profileQuery = useQuery({
+    queryFn: profileApi.getProfile,
+    queryKey: profileKeys.current(),
   });
   const history = historyQuery.data ?? [];
   const pendingPlanId = findPendingWorkoutPlanId(history);
@@ -106,7 +113,15 @@ export function WorkoutPlansScreen() {
   const pendingPlan = pendingPlanId === null ? undefined : viewData(pendingState);
   const selectedPlan = selectedPlanId === null ? undefined : viewData(selectedState);
   const displayedPlan = selectedPlanId === null ? activePlan : selectedPlan;
+  const contextPlan = displayedPlan ?? pendingPlan;
   const isViewingHistorical = selectedPlanId !== null && selectedPlanId !== activePlan?.id;
+  const profileGenerationMethod = profileQuery.data?.workout_generation_method;
+  const generationMethodMutation = useMutation({
+    mutationFn: (method: WorkoutGenerationMethod) => profileApi.updateProfile({ workout_generation_method: method }),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(profileKeys.current(), profile);
+    },
+  });
   const generation = useMutation({
     mutationFn: () => api.generate(),
     onError: (error: unknown) => setGenerationError(classifyWorkoutGenerationError(error)),
@@ -119,6 +134,12 @@ export function WorkoutPlansScreen() {
       await Promise.all([activeQuery.refetch(), historyQuery.refetch()]);
     },
   });
+
+  useEffect(() => {
+    if (!generationMethodMutation.isPending) {
+      setGenerationMethod(profileGenerationMethod ?? "fitsho_coach");
+    }
+  }, [generationMethodMutation.isPending, profileGenerationMethod]);
 
   const loading = activeState.status === "loading"
     || (activePlan === undefined && historyState.status === "loading");
@@ -137,6 +158,7 @@ export function WorkoutPlansScreen() {
   }
 
   function selectHistoryVersion(version: WorkoutPlanVersionSummary) {
+    setReplacementRequest(null);
     if (version.id === activePlan?.id) {
       setSelectedPlanId(null);
       return;
@@ -144,26 +166,53 @@ export function WorkoutPlansScreen() {
     setSelectedPlanId(version.id);
   }
 
+  function startReplacement(exerciseId: string) {
+    setReplacementRequest((current) => ({
+      exerciseId,
+      requestId: (current?.requestId ?? 0) + 1,
+    }));
+  }
+
+  function changeGenerationMethod(method: WorkoutGenerationMethod) {
+    if (generationMethodMutation.isPending || method === generationMethod) return;
+    const previousMethod = generationMethod;
+    setGenerationMethod(method);
+    setGenerationMethodError(null);
+    generationMethodMutation.mutate(method, {
+      onError: () => {
+        setGenerationMethod(previousMethod);
+        setGenerationMethodError("ذخیره روش ساخت برنامه انجام نشد؛ دوباره تلاش کن.");
+      },
+      onSuccess: (profile) => {
+        setGenerationMethod(profile.workout_generation_method ?? method);
+      },
+    });
+  }
+
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <ScreenHeader
-        action={<Button
-          label="کتابخانه حرکات"
-          onPress={() => router.push("/member/exercises")}
-          style={styles.headerAction}
-          variant="ghost"
-        />}
-        compact
-        eyebrow="برنامه شخصی تو"
-        subtitle="جلسه‌ها، توضیح مربی و نسخه قابل اجرای برنامه"
-        title="برنامه تمرینی"
-      />
+      <View style={styles.pageHeader}>
+        <View style={styles.pageHeaderCopy}>
+          <Text accessibilityRole="header" style={styles.pageTitle}>برنامه تمرینی من</Text>
+        </View>
+        <View accessibilityLabel={`${contextPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4} هفته`} style={styles.durationBadge}>
+          <Text style={styles.durationValue}>{contextPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4}</Text>
+          <Text style={styles.durationLabel}>هفته</Text>
+        </View>
+      </View>
+
+      {contextPlan ? (
+        <>
+          <PlanContextStrip historical={isViewingHistorical} plan={contextPlan} />
+          <CoachReviewBanner historical={isViewingHistorical} plan={contextPlan} />
+        </>
+      ) : null}
 
       {connectivityStatus === "offline" && displayedPlan !== undefined ? (
-        <Notice message="اتصال اینترنت برقرار نیست؛ آخرین برنامهٔ ذخیره‌شده نمایش داده می‌شود." variant="offline" />
+        <PlanInlineNotice message="اتصال اینترنت برقرار نیست؛ آخرین برنامهٔ ذخیره‌شده نمایش داده می‌شود." variant="offline" />
       ) : null}
       {activeState.status === "stale" && activePlan !== undefined ? (
-        <Notice message="این برنامه از حافظهٔ آفلاین خوانده شده و ممکن است تازه‌ترین نسخه نباشد." variant="info" />
+        <PlanInlineNotice message="این برنامه از حافظهٔ آفلاین خوانده شده و ممکن است تازه‌ترین نسخه نباشد." variant="info" />
       ) : null}
       {loading ? <PlanSkeleton /> : null}
       {activeLoadError ? (
@@ -176,13 +225,24 @@ export function WorkoutPlansScreen() {
       ) : null}
       {activeOffline ? <Notice message="برای دریافت برنامه تمرینی به اینترنت وصل شو." variant="offline" /> : null}
       {activeState.status === "error" && activePlan !== undefined ? (
-        <Notice message="به‌روزرسانی برنامه انجام نشد؛ نسخهٔ ذخیره‌شده نمایش داده می‌شود." variant="warning" />
+        <PlanInlineNotice message="به‌روزرسانی برنامه انجام نشد؛ نسخهٔ ذخیره‌شده نمایش داده می‌شود." variant="warning" />
       ) : null}
+
+      <GenerationMethodSelector
+        error={generationMethodError}
+        saving={generationMethodMutation.isPending}
+        selected={generationMethod}
+        onSelect={changeGenerationMethod}
+      />
 
       {!loading && !activeLoadError && !activeOffline && displayedPlan !== undefined && displayedPlan !== null ? (
         <PlanView
           api={api}
+          canGenerate={pendingPlanId === null && selectedPlanId === null}
+          generationPending={generation.isPending}
           historical={isViewingHistorical}
+          onStartReplacement={startReplacement}
+          onGenerate={selectedPlanId === null ? startGeneration : undefined}
           pdfStore={pdfStore}
           plan={displayedPlan}
           pending={displayedPlan.status === "pending_review"}
@@ -191,17 +251,24 @@ export function WorkoutPlansScreen() {
 
       {!loading && !activeLoadError && !activeOffline && displayedPlan !== null && displayedPlan !== undefined
         && isWorkoutPlanExecutable(displayedPlan, isViewingHistorical) ? (
-        <WorkoutCyclePanel expectedCycleId={cycleTargetId} plan={displayedPlan} />
+        <WorkoutCyclePanel
+          expectedCycleId={cycleTargetId}
+          plan={displayedPlan}
+          replacementRequest={replacementRequest}
+        />
       ) : null}
 
       {!loading && !activeLoadError && !activeOffline && pendingPlan !== undefined && pendingPlan.id !== displayedPlan?.id ? (
-        <PlanView
-          api={api}
-          historical={false}
-          pdfStore={pdfStore}
-          plan={pendingPlan}
-          pending
-        />
+        <View style={styles.pendingPlanSection}>
+          {contextPlan?.id !== pendingPlan.id ? <CoachReviewBanner historical={false} plan={pendingPlan} /> : null}
+          <PlanView
+            api={api}
+            historical={false}
+            pdfStore={pdfStore}
+            plan={pendingPlan}
+            pending
+          />
+        </View>
       ) : null}
 
       {pendingPlanId !== null && pendingPlan === undefined && !pendingLoading ? (
@@ -232,18 +299,6 @@ export function WorkoutPlansScreen() {
         />
       ) : null}
 
-      {activePlan !== null && activePlan !== undefined && selectedPlanId === null ? (
-        <View style={styles.generateSection}>
-          <Button
-            disabled={generation.isPending || pendingPlanId !== null}
-            label={pendingPlanId === null ? "ساخت نسخهٔ جدید" : "در انتظار تأیید مربی"}
-            loading={generation.isPending}
-            onPress={startGeneration}
-            variant="secondary"
-          />
-        </View>
-      ) : null}
-
       {selectedPlanId !== null && selectedState.status === "loading" ? <Skeleton height={300} /> : null}
       {selectedPlanId !== null && selectedState.status === "error" && selectedPlan === undefined ? (
         <Notice
@@ -266,15 +321,172 @@ export function WorkoutPlansScreen() {
   );
 }
 
+function PlanContextStrip({
+  historical,
+  plan,
+}: {
+  readonly historical: boolean;
+  readonly plan: WorkoutPlan;
+}) {
+  const status = getWorkoutPlanSummaryStatus(plan, historical);
+  const statusLabel = status === "active" ? "فعال" : status === "pending" ? "در انتظار مربی" : "غیرفعال";
+  const statusStyle = status === "active"
+    ? styles.contextValueActive
+    : status === "pending" ? styles.contextValuePending : styles.contextValueInactive;
+  const averageDuration = workoutPlanAverageDuration(plan);
+  const cells = [
+    { label: "برنامه فعلی", value: statusLabel, valueStyle: statusStyle },
+    { label: "دوره", value: `دوره ${plan.plan_duration_weeks} هفته‌ای`, valueStyle: undefined },
+    { label: "روزهای تمرین", value: `${plan.days.length} روز تمرین`, valueStyle: undefined },
+    { label: "زمان جلسه", value: averageDuration === null ? "—" : `${averageDuration} دقیقه برای هر جلسه`, valueStyle: undefined },
+  ];
+
+  return (
+    <View accessibilityLabel="خلاصه برنامه" style={styles.contextStrip}>
+      {cells.map((cell, index) => (
+        <View key={cell.label} style={[styles.contextCell, index > 0 && styles.contextCellDivided]}>
+          <Text numberOfLines={2} style={styles.contextLabel}>{cell.label}</Text>
+          <Text numberOfLines={2} style={[styles.contextValue, cell.valueStyle]}>{cell.value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function CoachReviewBanner({
+  historical,
+  plan,
+}: {
+  readonly historical: boolean;
+  readonly plan: WorkoutPlan;
+}) {
+  const review = plan.coach_review;
+  if (historical) {
+    return (
+      <View accessibilityRole="text" style={[styles.reviewBanner, styles.reviewBannerHistory]}>
+        <View style={styles.reviewIndicator} />
+        <Text style={styles.reviewText}>در حال مشاهده نسخه قبلی</Text>
+      </View>
+    );
+  }
+  if (review?.state === "pending_coach_review" || plan.status === "pending_review") {
+    return (
+      <View accessibilityRole="text" style={styles.reviewBanner}>
+        <View style={styles.reviewIndicator} />
+        <Text style={styles.reviewText}>در انتظار تایید مربی</Text>
+      </View>
+    );
+  }
+  if (review?.state === "coach_approved") {
+    const coach = review.coach_display_name ?? "مربی فیتشو";
+    return (
+      <View accessibilityRole="text" style={[styles.reviewBanner, styles.reviewBannerApproved]}>
+        <Text style={[styles.reviewIndicator, styles.reviewIndicatorApproved]}>✓</Text>
+        <View style={styles.reviewCopy}>
+          <Text style={styles.reviewText}>تأییدشده توسط {coach}</Text>
+          {plan.coach_review?.coach_note ? <Text style={styles.reviewNote}>{plan.coach_review.coach_note}</Text> : null}
+        </View>
+      </View>
+    );
+  }
+  if (review?.state === "coach_rejected") {
+    return (
+      <View accessibilityRole="text" style={[styles.reviewBanner, styles.reviewBannerRejected]}>
+        <Text style={[styles.reviewIndicator, styles.reviewIndicatorRejected]}>!</Text>
+        <View style={styles.reviewCopy}>
+          <Text style={styles.reviewText}>نیاز به اصلاح طبق نظر مربی</Text>
+          {plan.coach_review?.coach_note ? <Text style={styles.reviewNote}>{plan.coach_review.coach_note}</Text> : null}
+        </View>
+      </View>
+    );
+  }
+  return null;
+}
+
+type PlanInlineNoticeVariant = "danger" | "info" | "offline" | "warning";
+
+function PlanInlineNotice({
+  message,
+  variant,
+}: {
+  readonly message: string;
+  readonly variant: PlanInlineNoticeVariant;
+}) {
+  const accentStyle = variant === "danger"
+    ? styles.inlineNoticeDanger
+    : variant === "offline" || variant === "warning" ? styles.inlineNoticeWarning : styles.inlineNoticeInfo;
+  return (
+    <View style={[styles.inlineNotice, accentStyle]}>
+      <Text style={styles.inlineNoticeText}>{message}</Text>
+    </View>
+  );
+}
+
+function GenerationMethodSelector({
+  error,
+  saving,
+  selected,
+  onSelect,
+}: {
+  readonly error: string | null;
+  readonly saving: boolean;
+  readonly selected: WorkoutGenerationMethod;
+  readonly onSelect: (method: WorkoutGenerationMethod) => void;
+}) {
+  return (
+    <View style={styles.generationMethodSection}>
+      <Text style={styles.selectorTitle}>چه کسی برنامه‌ات را بنویسد؟</Text>
+      <View accessibilityRole="radiogroup" style={styles.generationMethodControl}>
+        <Pressable
+          accessibilityRole="radio"
+          accessibilityState={{ checked: selected === "fitsho_coach", disabled: saving }}
+          disabled={saving}
+          onPress={() => onSelect("fitsho_coach")}
+          style={({ pressed }) => [
+            styles.generationMethodOption,
+            selected === "fitsho_coach" && styles.generationMethodOptionSelected,
+            pressed && styles.generationMethodOptionPressed,
+          ]}
+        >
+          <Text style={[styles.generationMethodText, selected === "fitsho_coach" && styles.generationMethodTextSelected]}>موتور داخلی</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="radio"
+          accessibilityState={{ checked: selected === "ai", disabled: saving }}
+          disabled={saving}
+          onPress={() => onSelect("ai")}
+          style={({ pressed }) => [
+            styles.generationMethodOption,
+            selected === "ai" && styles.generationMethodOptionSelected,
+            pressed && styles.generationMethodOptionPressed,
+          ]}
+        >
+          <Text style={[styles.generationMethodText, selected === "ai" && styles.generationMethodTextSelected]}>هوش مصنوعی</Text>
+        </Pressable>
+      </View>
+      {saving ? <Text style={styles.selectorHint}>در حال ذخیره…</Text> : null}
+      {error ? <Text style={styles.selectorError}>{error}</Text> : null}
+    </View>
+  );
+}
+
 function PlanView({
   api,
+  canGenerate,
+  generationPending,
   historical,
+  onStartReplacement,
+  onGenerate,
   pdfStore,
   plan,
   pending,
 }: {
   readonly api: ReturnType<typeof createWorkoutPlanApi>;
+  readonly canGenerate?: boolean;
+  readonly generationPending?: boolean;
   readonly historical: boolean;
+  readonly onStartReplacement?: (exerciseId: string) => void;
+  readonly onGenerate?: () => void;
   readonly pdfStore: ExpoWorkoutPlanPdfStore;
   readonly plan: WorkoutPlan;
   readonly pending: boolean;
@@ -284,8 +496,7 @@ function PlanView({
   const [pdfStatus, setPdfStatus] = useState<PdfStatus>("checking");
   const [storedPdf, setStoredPdf] = useState<StoredWorkoutPlanPdf | null>(null);
   const executable = isWorkoutPlanExecutable(plan, historical);
-  const averageDuration = workoutPlanAverageDuration(plan);
-  const summaryStatus = getWorkoutPlanSummaryStatus(plan, historical);
+  const visibleWarnings = getUserVisibleWorkoutWarnings(plan.warnings);
 
   useEffect(() => {
     let active = true;
@@ -326,58 +537,47 @@ function PlanView({
 
   return (
     <View style={styles.planSection}>
-      <CinematicSurface accent style={styles.overviewCard} variant="hero">
-        <View style={styles.overviewContent}>
-          <View style={styles.planHeading}>
-            <View style={styles.planHeadingCopy}>
-              <Text style={styles.sectionEyebrow}>{historical ? "نسخهٔ قبلی" : "برنامهٔ فعلی"}</Text>
-              <Text style={styles.planTitle}>{plan.status === "failed" ? "ساخت برنامه ناموفق بود" : "برنامهٔ تمرینی هفتگی"}</Text>
-            </View>
-            <StatusPill status={summaryStatus} />
-          </View>
-          <MetricStrip
-            items={[
-              { label: "مدت برنامه", value: `${plan.plan_duration_weeks} هفته` },
-              { label: "روزهای تمرین", value: `${plan.days.length} روز` },
-              ...(averageDuration === null ? [] : [{ label: "میانگین جلسه", value: `${averageDuration} دقیقه` }]),
-            ]}
-          />
-        </View>
-      </CinematicSurface>
+      {plan.status === "failed" ? <PlanInlineNotice message="این نسخه با خطا ساخته شده و قابل اجرا نیست." variant="danger" /> : null}
+      {plan.is_stale ? <PlanInlineNotice message="اطلاعات این برنامه قدیمی است؛ قبل از اجرا وضعیت آنلاین را بررسی کن." variant="warning" /> : null}
+      {!executable && plan.status === "active" && !historical && !pending && plan.coach_review?.state !== "pending_coach_review" ? (
+        <PlanInlineNotice message="این برنامه هنوز برای اجرا آزاد نشده است." variant="warning" />
+      ) : null}
 
-      <View style={styles.statusStack}>
-        {historical ? <Notice compact message="این نسخه فقط برای مشاهدهٔ تاریخچه است و قابل اجرا نیست." variant="info" /> : null}
-        {pending || plan.coach_review?.state === "pending_coach_review" ? (
-          <Notice
-            compact
-            message="این برنامه تا تأیید مربی قابل اجرا نیست؛ جزئیات آن فقط برای بررسی نمایش داده می‌شود."
-            variant="warning"
-          />
-        ) : null}
-        {plan.status === "failed" ? (
-          <Notice compact message="این نسخه با خطا ساخته شده و قابل اجرا نیست." variant="danger" />
-        ) : null}
-        {plan.is_stale ? <Notice compact message="اطلاعات این برنامه قدیمی است؛ قبل از اجرا وضعیت آنلاین را بررسی کن." variant="warning" /> : null}
-        {plan.coach_review?.state === "coach_approved" ? (
-          <Notice
-            compact
-            message={plan.coach_review.coach_note ?? "این برنامه توسط مربی تأیید شده است."}
-            title={`تأیید مربی${plan.coach_review.coach_display_name ? `: ${plan.coach_review.coach_display_name}` : ""}`}
-            variant="success"
-          />
-        ) : null}
-        {plan.coach_review?.state === "coach_rejected" ? (
-          <Notice
-            compact
-            message={plan.coach_review.coach_note ?? "مربی برای این برنامه توضیح اصلاحات ثبت کرده است."}
-            title="نیاز به اصلاح طبق نظر مربی"
-            variant="danger"
-          />
-        ) : null}
-        {!executable && plan.status === "active" && !historical && !pending ? (
-          <Notice compact message="این برنامه هنوز برای اجرا آزاد نشده است." variant="warning" />
-        ) : null}
-      </View>
+      {plan.status === "failed" || plan.days.length === 0 ? null : (
+        <View style={styles.scheduleSection}>
+          <View style={styles.scheduleHeading}>
+            <View style={styles.scheduleHeadingCopy}>
+              <Text style={styles.sectionEyebrow}>برنامه هفتگی</Text>
+              <Text style={styles.scheduleTitle}>روزهای تمرین تو</Text>
+            </View>
+            {onGenerate ? (
+              <Button
+                disabled={!canGenerate || generationPending}
+                label="به‌روزرسانی برنامه"
+                loading={generationPending}
+                onPress={onGenerate}
+                style={styles.updateButton}
+                variant="primary"
+              />
+            ) : null}
+          </View>
+          <View style={styles.daysSection}>
+            {plan.days.map((day, dayIndex) => (
+              <WorkoutDayCard
+                day={day}
+                dayIndex={dayIndex}
+                expanded={expandedDay === day.day_number}
+                focus={dayIndex === 0}
+                key={day.day_number}
+                onOpenExercise={(slug) => router.push({ pathname: "/member/exercises/[slug]", params: { slug } })}
+                onStartReplacement={executable && !pending ? onStartReplacement : undefined}
+                showNext={dayIndex === 0 && executable && !historical}
+                onToggle={() => setExpandedDay((current) => current === day.day_number ? null : day.day_number)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
 
       {plan.ai_coach_program_explanation_fa ? (
         <Card style={styles.aiCard}>
@@ -386,24 +586,12 @@ function PlanView({
         </Card>
       ) : null}
 
-      {plan.warnings !== undefined && plan.warnings.length > 0 ? (
-        <Notice compact message={plan.warnings.join("\n")} title="نکات ایمنی برنامه" variant="warning" />
+      {visibleWarnings.map((warning) => (
+        <PlanInlineNotice key={warning} message={warning} variant="warning" />
+      ))}
+      {plan.body_analysis_provenance?.provisional === true ? (
+        <PlanInlineNotice message="این برنامه از یافته‌های موقت تحلیل بدن استفاده کرده که هنوز به تأیید هر دو متخصص نرسیده است." variant="warning" />
       ) : null}
-
-      {plan.status === "failed" || plan.days.length === 0 ? null : (
-        <View style={styles.daysSection}>
-          <Text style={styles.sectionTitle}>روزهای برنامه</Text>
-          {plan.days.map((day) => (
-            <WorkoutDayCard
-              day={day}
-              expanded={expandedDay === day.day_number}
-              key={day.day_number}
-              onOpenExercise={(slug) => router.push({ pathname: "/member/exercises/[slug]", params: { slug } })}
-              onToggle={() => setExpandedDay((current) => current === day.day_number ? null : day.day_number)}
-            />
-          ))}
-        </View>
-      )}
 
       <Card style={styles.pdfCard}>
         <Text style={styles.sectionTitle}>نسخهٔ PDF</Text>
@@ -428,26 +616,54 @@ function PlanView({
           <Notice message="دریافت یا باز کردن PDF انجام نشد؛ دوباره تلاش کن." variant="danger" />
         ) : null}
       </Card>
+      <Button
+        label="کتابخانه حرکات"
+        onPress={() => router.push("/member/exercises")}
+        style={styles.libraryButton}
+        variant="ghost"
+      />
     </View>
   );
 }
 
 function WorkoutDayCard({
   day,
+  dayIndex,
   expanded,
+  focus,
   onOpenExercise,
+  onStartReplacement,
+  showNext,
   onToggle,
 }: {
   readonly day: WorkoutDay;
+  readonly dayIndex: number;
   readonly expanded: boolean;
+  readonly focus: boolean;
   readonly onOpenExercise: (slug: string) => void;
+  readonly onStartReplacement?: (exerciseId: string) => void;
+  readonly showNext: boolean;
   readonly onToggle: () => void;
 }) {
-  const leadExercise = day.exercises[0];
+  const mainExercises = day.exercises.filter((item) => item.section !== "core");
+  const coreExercises = day.exercises.filter((item) => item.section === "core");
+  const leadExercise = mainExercises[0] ?? day.exercises[0];
+  const leadName = leadExercise?.exercise.name_fa || leadExercise?.exercise.name_en || "";
   return (
-    <Card onPress={onToggle} style={[styles.dayCard, expanded && styles.dayCardExpanded]} variant={expanded ? "raised" : "interactive"}>
-      <View style={styles.dayHeader}>
-        {leadExercise ? (
+    <Pressable
+      accessibilityLabel={`روز ${day.day_number}: ${day.title_fa || day.title_en}`}
+      accessibilityRole="button"
+      accessibilityState={{ expanded }}
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.dayCard,
+        focus ? styles.focusDayCard : styles.secondaryDayCard,
+        expanded && styles.dayCardExpanded,
+        pressed && styles.dayCardPressed,
+      ]}
+    >
+      <View style={[styles.daySummary, focus ? styles.focusDaySummary : styles.secondaryDaySummary]}>
+        {focus && dayIndex === 0 && leadExercise ? (
           <Pressable
             accessibilityLabel={`باز کردن راهنمای ${leadExercise.exercise.name_fa || leadExercise.exercise.name_en}`}
             accessibilityRole="button"
@@ -455,7 +671,7 @@ function WorkoutDayCard({
               event.stopPropagation();
               onOpenExercise(leadExercise.exercise.slug);
             }}
-            style={({ pressed }) => [styles.dayMediaButton, expanded && styles.dayMediaButtonExpanded, pressed && styles.mediaPressed]}
+            style={({ pressed }) => [styles.dayMediaButton, pressed && styles.mediaPressed]}
           >
             <ExerciseMedia
               accessibilityLabel={`پیش‌نمایش ${leadExercise.exercise.name_fa || leadExercise.exercise.name_en}`}
@@ -463,17 +679,24 @@ function WorkoutDayCard({
               mediaType={leadExercise.exercise.media_type}
               name={leadExercise.exercise.name_fa || leadExercise.exercise.name_en}
               path={leadExercise.exercise.media_path}
-              style={[styles.dayMedia, expanded && styles.dayMediaExpanded]}
+              style={styles.focusDayMedia}
             />
             <View pointerEvents="none" style={styles.dayMediaBadge}>
               <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
             </View>
           </Pressable>
         ) : null}
+        <View style={[styles.dayNumberBox, focus ? styles.focusDayNumber : styles.secondaryDayNumber]}>
+          <Text style={styles.dayNumber}>{String(day.day_number).padStart(2, "0")}</Text>
+        </View>
         <View style={styles.dayHeadingCopy}>
-          <Text style={styles.dayNumber}>روز {day.day_number}</Text>
-          <Text style={styles.dayTitle}>{day.title_fa || day.title_en}</Text>
-          <Text style={styles.dayMeta}>{day.estimated_duration_minutes} دقیقه · {day.total_exercise_count} حرکت</Text>
+          {showNext ? <Text style={styles.nextSessionLabel}>جلسه بعد</Text> : null}
+          <Text numberOfLines={focus ? 2 : 1} style={[styles.dayTitle, !focus && styles.secondaryDayTitle]}>
+            روز {day.day_number}: {day.title_fa || day.title_en}
+          </Text>
+          <Text numberOfLines={1} style={styles.dayMeta}>
+            {focus && leadExercise ? `${leadName} · ` : ""}{day.estimated_duration_minutes} دقیقه
+          </Text>
         </View>
         <AppIcon
           accessibilityLabel={expanded ? "بستن جزئیات روز" : "باز کردن جزئیات روز"}
@@ -487,34 +710,66 @@ function WorkoutDayCard({
           {day.ai_coach_explanation_fa ? (
             <Notice message={day.ai_coach_explanation_fa} title="توضیح این جلسه" variant="info" />
           ) : null}
-          {day.exercises.map((exercise) => (
+          {mainExercises.map((exercise) => (
             <WorkoutExerciseRow
               exercise={exercise}
               key={exercise.id}
               onOpen={() => onOpenExercise(exercise.exercise.slug)}
+              onStartReplacement={onStartReplacement}
             />
           ))}
+          {coreExercises.length > 0 ? (
+            <View style={styles.exerciseSection}>
+              <Text style={styles.exerciseSectionTitle}>بخش مرکزی بدن</Text>
+              {coreExercises.map((exercise) => (
+                <WorkoutExerciseRow
+                  exercise={exercise}
+                  key={exercise.id}
+                  onOpen={() => onOpenExercise(exercise.exercise.slug)}
+                  onStartReplacement={onStartReplacement}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
       ) : null}
-    </Card>
+    </Pressable>
   );
+}
+
+function formatExerciseMetadata(exercise: WorkoutPlanExercise): string {
+  const prescriptionValue = exercise.prescription_mode === "duration"
+    ? exercise.duration_min_seconds ?? exercise.duration_max_seconds
+    : exercise.reps_min ?? exercise.reps_max;
+
+  return [
+    exercise.sets === null || exercise.sets === undefined ? null : `${exercise.sets} ست`,
+    prescriptionValue === null || prescriptionValue === undefined ? null : formatWorkoutPrescription(exercise),
+    exercise.rir === null || exercise.rir === undefined ? null : `RIR ${exercise.rir}`,
+    exercise.rest_seconds === null || exercise.rest_seconds === undefined ? null : `${exercise.rest_seconds}ث استراحت`,
+  ].filter((item): item is string => item !== null).join(" · ");
 }
 
 function WorkoutExerciseRow({
   exercise,
   onOpen,
+  onStartReplacement,
 }: {
   readonly exercise: WorkoutPlanExercise;
   readonly onOpen: () => void;
+  readonly onStartReplacement?: (exerciseId: string) => void;
 }) {
   return (
-    <Pressable
-      accessibilityLabel={`باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
-      accessibilityRole="button"
-      onPress={onOpen}
-      style={({ pressed }) => [styles.exerciseRow, pressed && styles.exerciseRowPressed]}
-    >
-      <View style={styles.exerciseMediaButton}>
+    <View style={styles.exerciseRow}>
+      <Pressable
+        accessibilityLabel={`باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
+        accessibilityRole="button"
+        onPress={(event) => {
+          event.stopPropagation();
+          onOpen();
+        }}
+        style={({ pressed }) => [styles.exerciseMediaButton, pressed && styles.mediaPressed]}
+      >
         <ExerciseMedia
           accessibilityLabel={`پیش‌نمایش ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
           compact
@@ -526,37 +781,43 @@ function WorkoutExerciseRow({
         <View pointerEvents="none" style={styles.exerciseMediaBadge}>
           <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
         </View>
-      </View>
+      </Pressable>
       <View style={styles.exerciseCopy}>
-        <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>
-        <Text style={styles.exerciseSecondary}>{exercise.exercise.name_en}</Text>
-        <View style={styles.exerciseStats}>
-          <WorkoutMetric label="ست" value={String(exercise.sets)} />
-          <WorkoutMetric
-            label={exercise.prescription_mode === "duration" ? "مدت" : "تکرار"}
-            value={formatWorkoutPrescription(exercise)}
-          />
-          <WorkoutMetric label="استراحت" value={`${exercise.rest_seconds} ث`} />
-          {exercise.rir !== null ? <WorkoutMetric label="RIR" value={String(exercise.rir)} /> : null}
-        </View>
+        <Pressable
+          accessibilityLabel={`باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
+          accessibilityRole="button"
+          onPress={(event) => {
+            event.stopPropagation();
+            onOpen();
+          }}
+          style={({ pressed }) => [styles.exerciseDetailButton, pressed && styles.exerciseRowPressed]}
+        >
+          <View style={styles.exerciseDetailCopy}>
+            <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>
+            <Text style={styles.exerciseSecondary}>{exercise.exercise.name_en}</Text>
+          </View>
+          <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
+        </Pressable>
+        <Text adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1} style={styles.exerciseStats}>
+          {formatExerciseMetadata(exercise)}
+        </Text>
         {exercise.notes_fa ? <Text style={styles.exerciseNote}>{exercise.notes_fa}</Text> : null}
-        {exercise.load_guidance ? <Text style={styles.exerciseNote}>{exercise.load_guidance}</Text> : null}
-        {exercise.alternatives.length > 0 ? (
-          <Text style={styles.exerciseAlternative}>
-            {exercise.alternatives.length} جایگزین امن در دسترس است.
-          </Text>
+        {onStartReplacement && exercise.alternatives.length > 0 ? (
+          <Pressable
+            accessibilityLabel="جایگزین"
+            accessibilityRole="button"
+            hitSlop={fiticianTokens.spacing[1]}
+            onPress={(event) => {
+              event.stopPropagation();
+              onStartReplacement(exercise.id);
+            }}
+            style={({ pressed }) => [styles.exerciseReplacement, pressed && styles.exerciseReplacementPressed]}
+          >
+            <Text style={styles.exerciseReplacementText}>جایگزین</Text>
+            <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
+          </Pressable>
         ) : null}
       </View>
-      <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
-    </Pressable>
-  );
-}
-
-function WorkoutMetric({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <View style={styles.metricChip}>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricLabel}>{label}</Text>
     </View>
   );
 }
@@ -610,11 +871,6 @@ function WorkoutHistory({
   );
 }
 
-function StatusPill({ status }: { readonly status: ReturnType<typeof getWorkoutPlanSummaryStatus> }) {
-  const label = status === "active" ? "فعال" : status === "pending" ? "در انتظار تأیید" : "آرشیو";
-  return <Text style={[styles.statusPill, status === "active" ? styles.statusActive : styles.statusPending]}>{label}</Text>;
-}
-
 function PlanSkeleton() {
   return (
     <View style={styles.skeletonGroup}>
@@ -659,6 +915,400 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.aqua,
     gap: fiticianTokens.spacing[2],
   },
+  contextCell: {
+    alignItems: "center",
+    flex: 1,
+    gap: 2,
+    justifyContent: "center",
+    minWidth: 0,
+    paddingHorizontal: 4,
+    paddingVertical: 10,
+  },
+  contextCellDivided: {
+    borderRightColor: fiticianTokens.colors.line,
+    borderRightWidth: 1,
+  },
+  contextLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  contextStrip: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    flexDirection: "row-reverse",
+    minWidth: 0,
+    overflow: "hidden",
+    width: "100%",
+  },
+  contextValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 11,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 15,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  contextValueActive: {
+    color: fiticianTokens.colors.aqua,
+  },
+  contextValueInactive: {
+    color: fiticianTokens.colors.muted,
+  },
+  contextValuePending: {
+    color: fiticianTokens.colors.amber,
+  },
+  dayCardPressed: {
+    opacity: 0.9,
+  },
+  dayNumberBox: {
+    alignItems: "center",
+    aspectRatio: 1,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: 11,
+    borderWidth: 1,
+    justifyContent: "center",
+    width: 40,
+  },
+  daySummary: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: 10,
+    minWidth: 0,
+  },
+  durationBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(80,223,206,0.04)",
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: 14,
+    borderWidth: 1,
+    justifyContent: "center",
+    minWidth: 60,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  durationLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  durationValue: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: 22,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 24,
+    textAlign: "center",
+  },
+  exerciseSection: {
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+    gap: fiticianTokens.spacing[2],
+    paddingTop: fiticianTokens.spacing[2],
+  },
+  exerciseSectionTitle: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  focusDayCard: {
+    backgroundColor: "rgba(80,223,206,0.045)",
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.focus.elevation,
+    shadowColor: fiticianTokens.shadows.focus.color,
+    shadowOffset: fiticianTokens.shadows.focus.offset,
+    shadowOpacity: fiticianTokens.shadows.focus.opacity,
+    shadowRadius: fiticianTokens.shadows.focus.radius,
+  },
+  focusDayMedia: {
+    borderRadius: 11,
+    height: 86,
+    minHeight: 0,
+    width: 94,
+  },
+  focusDayNumber: {
+    backgroundColor: "rgba(80,223,206,0.06)",
+  },
+  focusDaySummary: {
+    minHeight: 112,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  generationMethodControl: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    flexDirection: "row-reverse",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    overflow: "hidden",
+    width: "100%",
+  },
+  generationMethodOption: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  generationMethodOptionPressed: {
+    opacity: 0.8,
+  },
+  generationMethodOptionSelected: {
+    backgroundColor: "rgba(80,223,206,0.08)",
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderWidth: 1,
+  },
+  generationMethodSection: {
+    gap: fiticianTokens.spacing[2],
+    marginTop: fiticianTokens.spacing[1],
+  },
+  generationMethodText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  generationMethodTextSelected: {
+    color: fiticianTokens.colors.aqua,
+  },
+  inlineNotice: {
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  inlineNoticeDanger: {
+    borderRightColor: fiticianTokens.colors.coral,
+  },
+  inlineNoticeInfo: {
+    borderRightColor: fiticianTokens.colors.aqua,
+  },
+  inlineNoticeText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 19,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  inlineNoticeWarning: {
+    borderRightColor: fiticianTokens.colors.amber,
+  },
+  libraryButton: {
+    alignSelf: "flex-end",
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  nextSessionLabel: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 14,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  pageHeader: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+    justifyContent: "space-between",
+    marginBottom: fiticianTokens.spacing[1],
+    minWidth: 0,
+  },
+  pageHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  pageTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h2,
+    lineHeight: 32,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  pendingPlanSection: {
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+    gap: fiticianTokens.spacing[3],
+    marginTop: fiticianTokens.spacing[2],
+    paddingTop: fiticianTokens.spacing[2],
+  },
+  planSection: {
+    gap: fiticianTokens.spacing[3],
+  },
+  reviewBanner: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row-reverse",
+    gap: 10,
+    minHeight: 52,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: "100%",
+  },
+  reviewBannerApproved: {
+    borderRightColor: fiticianTokens.colors.aqua,
+  },
+  reviewBannerHistory: {
+    borderRightColor: fiticianTokens.colors.coral,
+  },
+  reviewBannerRejected: {
+    borderRightColor: fiticianTokens.colors.coral,
+  },
+  reviewCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  reviewIndicator: {
+    borderColor: "#ff5b62",
+    borderRadius: 999,
+    borderWidth: 2,
+    flexShrink: 0,
+    height: 22,
+    width: 22,
+  },
+  reviewIndicatorApproved: {
+    alignItems: "center",
+    borderColor: fiticianTokens.colors.success,
+    color: fiticianTokens.colors.success,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: 15,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  reviewIndicatorRejected: {
+    alignItems: "center",
+    borderColor: fiticianTokens.colors.coral,
+    color: fiticianTokens.colors.coral,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: 15,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  reviewNote: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  reviewText: {
+    color: fiticianTokens.colors.ink,
+    flexShrink: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 20,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  scheduleHeading: {
+    alignItems: "flex-end",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+    justifyContent: "space-between",
+    marginBottom: fiticianTokens.spacing[2],
+    minWidth: 0,
+  },
+  scheduleHeadingCopy: {
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  scheduleSection: {
+    marginTop: fiticianTokens.spacing[1],
+  },
+  scheduleTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 28,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  updateButton: {
+    borderRadius: fiticianTokens.radii.pill,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  secondaryDayCard: {
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.card.elevation,
+    minHeight: 62,
+    shadowColor: fiticianTokens.shadows.card.color,
+    shadowOffset: fiticianTokens.shadows.card.offset,
+    shadowOpacity: fiticianTokens.shadows.card.opacity,
+    shadowRadius: fiticianTokens.shadows.card.radius,
+  },
+  secondaryDayNumber: {
+    backgroundColor: "rgba(80,223,206,0.06)",
+  },
+  secondaryDaySummary: {
+    minHeight: 62,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  secondaryDayTitle: {
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    lineHeight: 20,
+  },
+  selectorError: {
+    color: fiticianTokens.colors.coral,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  selectorHint: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  selectorTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   aiLabel: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -676,20 +1326,11 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   dayCard: {
-    gap: fiticianTokens.spacing[3],
+    minWidth: 0,
+    overflow: "hidden",
   },
   dayCardExpanded: {
     borderColor: fiticianTokens.colors.lineStrong,
-  },
-  dayMedia: {
-    borderRadius: fiticianTokens.radii.medium,
-    height: 78,
-    minHeight: 0,
-    width: 96,
-  },
-  dayMediaExpanded: {
-    height: 94,
-    width: 122,
   },
   dayMediaBadge: {
     alignItems: "center",
@@ -704,35 +1345,31 @@ const styles = StyleSheet.create({
   },
   dayMediaButton: {
     borderRadius: fiticianTokens.radii.medium,
-    height: 78,
+    height: 86,
     overflow: "hidden",
     position: "relative",
-    width: 96,
-  },
-  dayMediaButtonExpanded: {
-    height: 94,
-    width: 122,
+    width: 94,
   },
   dayDetails: {
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
     gap: fiticianTokens.spacing[3],
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   daysSection: {
-    gap: fiticianTokens.spacing[3],
-  },
-  dayHeader: {
-    alignItems: "center",
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
-    justifyContent: "space-between",
+    gap: 9,
   },
   dayHeadingCopy: {
     flex: 1,
-    gap: fiticianTokens.spacing[1],
+    gap: 2,
+    minWidth: 0,
   },
   dayMeta: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
     textAlign: "right",
     writingDirection: "rtl",
   },
@@ -746,8 +1383,8 @@ const styles = StyleSheet.create({
   dayTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h3,
-    lineHeight: 28,
+    fontSize: 17,
+    lineHeight: 24,
     textAlign: "right",
     writingDirection: "rtl",
   },
@@ -759,23 +1396,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
     writingDirection: "rtl",
   },
-  exerciseAlternative: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    lineHeight: 19,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
   exerciseCopy: {
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+  },
+  exerciseDetailButton: {
+    alignItems: "flex-start",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+  },
+  exerciseDetailCopy: {
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
   exerciseMedia: {
     borderRadius: fiticianTokens.radii.medium,
-    height: 112,
+    height: 68,
     minHeight: 0,
-    width: 104,
+    width: 76,
   },
   exerciseMediaBadge: {
     alignItems: "center",
@@ -790,10 +1428,10 @@ const styles = StyleSheet.create({
   },
   exerciseMediaButton: {
     borderRadius: fiticianTokens.radii.medium,
-    height: 112,
+    height: 68,
     overflow: "hidden",
     position: "relative",
-    width: 104,
+    width: 76,
   },
   exerciseNote: {
     color: fiticianTokens.colors.muted,
@@ -816,6 +1454,29 @@ const styles = StyleSheet.create({
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
     opacity: 0.9,
   },
+  exerciseReplacement: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderRadius: fiticianTokens.radii.small,
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[1],
+    minHeight: 32,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+  },
+  exerciseReplacementPressed: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    opacity: 0.86,
+  },
+  exerciseReplacementText: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 18,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   exerciseSecondary: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
@@ -823,18 +1484,13 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "ltr",
   },
-  exerciseStat: {
-    color: fiticianTokens.colors.mist,
+  exerciseStats: {
+    color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    lineHeight: 18,
     textAlign: "right",
     writingDirection: "rtl",
-  },
-  exerciseStats: {
-    alignItems: "flex-start",
-    flexDirection: "row-reverse",
-    flexWrap: "wrap",
-    gap: fiticianTokens.spacing[2],
   },
   exerciseTitle: {
     color: fiticianTokens.colors.ink,
@@ -843,13 +1499,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     textAlign: "right",
     writingDirection: "rtl",
-  },
-  generateSection: {
-    marginTop: fiticianTokens.spacing[3],
-  },
-  headerAction: {
-    minHeight: 42,
-    paddingHorizontal: fiticianTokens.spacing[3],
   },
   historyCard: {
     gap: fiticianTokens.spacing[2],
@@ -894,39 +1543,6 @@ const styles = StyleSheet.create({
     opacity: 0.78,
     transform: [{ scale: fiticianTokens.motion.pressedScale }],
   },
-  metricChip: {
-    alignItems: "flex-end",
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.small,
-    borderWidth: 1,
-    gap: 2,
-    minWidth: 48,
-    paddingHorizontal: fiticianTokens.spacing[2],
-    paddingVertical: fiticianTokens.spacing[1],
-  },
-  metricLabel: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: 10,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  metricValue: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  overviewCard: {
-    minHeight: 150,
-  },
-  overviewContent: {
-    gap: fiticianTokens.spacing[4],
-    padding: fiticianTokens.spacing[4],
-  },
   pdfActions: {
     gap: fiticianTokens.spacing[2],
   },
@@ -934,37 +1550,10 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     marginTop: fiticianTokens.spacing[4],
   },
-  planHeading: {
-    alignItems: "flex-start",
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
-    justifyContent: "space-between",
-  },
-  planHeadingCopy: {
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-  },
-  planSection: {
-    gap: fiticianTokens.spacing[3],
-  },
   screen: {
     gap: fiticianTokens.spacing[3],
     paddingBottom: fiticianTokens.spacing[7],
     paddingTop: fiticianTokens.spacing[3],
-  },
-  statusStack: {
-    borderRightColor: fiticianTokens.colors.lineStrong,
-    borderRightWidth: 2,
-    gap: fiticianTokens.spacing[2],
-    paddingRight: fiticianTokens.spacing[2],
-  },
-  planTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-    lineHeight: 32,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   sectionEyebrow: {
     color: fiticianTokens.colors.aqua,
@@ -983,23 +1572,5 @@ const styles = StyleSheet.create({
   },
   skeletonGroup: {
     gap: fiticianTokens.spacing[3],
-  },
-  statusActive: {
-    backgroundColor: "rgba(102,200,159,0.16)",
-    color: fiticianTokens.colors.success,
-  },
-  statusPending: {
-    backgroundColor: "rgba(242,184,91,0.16)",
-    color: fiticianTokens.colors.amber,
-  },
-  statusPill: {
-    borderRadius: fiticianTokens.radii.pill,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    overflow: "hidden",
-    paddingHorizontal: fiticianTokens.spacing[2],
-    paddingVertical: fiticianTokens.spacing[1],
-    textAlign: "center",
-    writingDirection: "rtl",
   },
 });

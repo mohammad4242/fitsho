@@ -8,8 +8,6 @@ import { connectivityMonitor, type ConnectivityStatus } from "../platform/connec
 import {
   Button,
   Card,
-  CinematicSurface,
-  MetricStrip,
   Notice,
   Skeleton,
   TextField,
@@ -84,12 +82,19 @@ const replacementScopes: readonly Choice<"this_time" | "persistent">[] = [
   { label: "از این به بعد", value: "persistent" },
 ];
 
+export type WorkoutReplacementRequest = {
+  readonly exerciseId: string;
+  readonly requestId: number;
+};
+
 export function WorkoutCyclePanel({
   expectedCycleId,
   plan,
+  replacementRequest,
 }: {
   readonly expectedCycleId?: string;
   readonly plan: WorkoutPlan;
+  readonly replacementRequest?: WorkoutReplacementRequest | null;
 }) {
   const auth = useMobileAuth();
   const connectivityStatus = useConnectivityStatus();
@@ -145,6 +150,8 @@ export function WorkoutCyclePanel({
           <ReplacementPanel
             api={api}
             connectivityStatus={connectivityStatus}
+            initialExerciseId={replacementRequest?.exerciseId}
+            initialRequestId={replacementRequest?.requestId}
             plan={plan}
           />
         </>
@@ -161,24 +168,31 @@ export function WorkoutCyclePanel({
 function CycleSummary({ cycle }: { readonly cycle: WorkoutCycleCurrent }) {
   const week = workoutCycleWeekDisplay(cycle);
   return (
-    <CinematicSurface accent variant="quiet">
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryHeading}>
-          <View style={styles.summaryCopy}>
-            <Text style={styles.sectionEyebrow}>چرخهٔ تمرین</Text>
-            <Text style={styles.sectionTitle}>چرخهٔ فعلی</Text>
-          </View>
-          <Text style={styles.cycleStatus}>{cycle.status === "active" ? "فعال" : "تکمیل‌شده"}</Text>
+    <View style={styles.summaryCard}>
+      <View style={styles.summaryHeading}>
+        <View style={styles.summaryCopy}>
+          <Text style={styles.sectionEyebrow}>چرخهٔ تمرین</Text>
+          <Text style={styles.sectionTitle}>چرخهٔ فعلی</Text>
         </View>
-        <MetricStrip
-          items={[
-            { accent: fiticianTokens.colors.aqua, label: "هفته فعلی", value: String(week.currentWeek) },
-            { label: "کل چرخه", value: `${week.durationWeeks} هفته` },
-            { label: "شروع", value: formatDate(cycle.started_at) },
-          ]}
-        />
+        <Text style={styles.cycleStatus}>{cycle.status === "active" ? "فعال" : "تکمیل‌شده"}</Text>
       </View>
-    </CinematicSurface>
+      <View style={styles.summaryMetrics}>
+        <View style={styles.summaryMetric}>
+          <Text style={styles.summaryMetricLabel}>هفته فعلی</Text>
+          <Text style={styles.summaryMetricValueAqua}>{week.currentWeek}</Text>
+        </View>
+        <View style={styles.summaryMetricDivider} />
+        <View style={styles.summaryMetric}>
+          <Text style={styles.summaryMetricLabel}>کل چرخه</Text>
+          <Text style={styles.summaryMetricValue}>{week.durationWeeks} هفته</Text>
+        </View>
+        <View style={styles.summaryMetricDivider} />
+        <View style={styles.summaryMetric}>
+          <Text style={styles.summaryMetricLabel}>شروع</Text>
+          <Text numberOfLines={1} style={styles.summaryMetricValue}>{formatDate(cycle.started_at)}</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -339,13 +353,20 @@ function WeeklyCheckInPanel({
 function ReplacementPanel({
   api,
   connectivityStatus,
+  initialExerciseId,
+  initialRequestId,
   plan,
 }: {
   readonly api: WorkoutCycleApi;
   readonly connectivityStatus: ConnectivityStatus;
+  readonly initialExerciseId?: string;
+  readonly initialRequestId?: number;
   readonly plan: WorkoutPlan;
 }) {
-  const options = plan.days.flatMap((day) => day.exercises).filter((exercise) => exercise.alternatives.length > 0);
+  const options = useMemo(
+    () => plan.days.flatMap((day) => day.exercises).filter((exercise) => exercise.alternatives.length > 0),
+    [plan],
+  );
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [reason, setReason] = useState<ReplacementReason | null>(null);
   const [alternativeId, setAlternativeId] = useState<string | null>(null);
@@ -365,6 +386,15 @@ function ReplacementPanel({
   const selectedExercise = options.find((exercise) => exercise.id === selectedExerciseId);
   const selectedAlternative = selectedExercise?.alternatives.find(({ exercise }) => exercise.id === alternativeId);
   const offline = connectivityStatus === "offline";
+
+  useEffect(() => {
+    if (initialExerciseId === undefined || !options.some((exercise) => exercise.id === initialExerciseId)) return;
+    setSelectedExerciseId(initialExerciseId);
+    setReason(null);
+    setAlternativeId(null);
+    setSuccess(null);
+    setError(null);
+  }, [initialExerciseId, initialRequestId, options]);
 
   if (options.length === 0) return null;
 
@@ -400,7 +430,7 @@ function ReplacementPanel({
   return (
     <Card style={styles.formCard}>
       <Text style={styles.sectionTitle}>جایگزینی حرکت</Text>
-      <Text style={styles.bodyText}>اگر حرکت مناسبت نیست، فقط از جایگزین‌های امن و تأییدشدهٔ همین برنامه انتخاب کن.</Text>
+      <Text style={styles.bodyText}>اگر حرکت مناسبت نیست، فقط از گزینه‌های تأییدشدهٔ همین برنامه انتخاب کن.</Text>
       <ChoiceGroup
         label="حرکتی که می‌خواهی عوض کنی"
         options={options.map((exercise) => ({
@@ -420,9 +450,9 @@ function ReplacementPanel({
           />
           {reason !== null ? (
             <ChoiceGroup
-              label="جایگزین امن"
-              options={selectedExercise.alternatives.map(({ exercise, reason_fa }) => ({
-                label: `${exercise.name_fa || exercise.name_en} · ${reason_fa}`,
+              label="جایگزین"
+              options={selectedExercise.alternatives.map(({ exercise }) => ({
+                label: exercise.name_fa || exercise.name_en,
                 value: exercise.id,
               }))}
               selected={alternativeId ?? ""}
@@ -759,8 +789,17 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   summaryCard: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.soft.elevation,
     gap: fiticianTokens.spacing[3],
-    padding: fiticianTokens.spacing[4],
+    padding: fiticianTokens.spacing[3],
+    shadowColor: fiticianTokens.shadows.soft.color,
+    shadowOffset: fiticianTokens.shadows.soft.offset,
+    shadowOpacity: fiticianTokens.shadows.soft.opacity,
+    shadowRadius: fiticianTokens.shadows.soft.radius,
   },
   summaryCopy: {
     flex: 1,
@@ -771,6 +810,49 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
+  },
+  summaryMetric: {
+    alignItems: "center",
+    flex: 1,
+    gap: 2,
+    justifyContent: "center",
+    minWidth: 0,
+  },
+  summaryMetricDivider: {
+    backgroundColor: fiticianTokens.colors.line,
+    height: "70%",
+    width: 1,
+  },
+  summaryMetricLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  summaryMetricValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 11,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 16,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  summaryMetricValueAqua: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: 18,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  summaryMetrics: {
+    alignItems: "stretch",
+    flexDirection: "row-reverse",
+    minHeight: 42,
+    width: "100%",
   },
   weekBadge: {
     color: fiticianTokens.colors.aqua,
