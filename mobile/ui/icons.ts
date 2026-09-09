@@ -18,6 +18,8 @@ export const fiticianIconNames = [
   "chevronUp",
   "refresh",
   "close",
+  "genderMale",
+  "genderFemale",
 ] as const;
 
 export type FiticianIconName = (typeof fiticianIconNames)[number];
@@ -40,6 +42,8 @@ const iconMap: Record<FiticianIconName, MaterialIconName> = {
   chevronUp: "chevron-up",
   refresh: "refresh",
   close: "close",
+  genderMale: "gender-male",
+  genderFemale: "gender-female",
 };
 
 export function fiticianIconName(name: FiticianIconName): MaterialIconName {
