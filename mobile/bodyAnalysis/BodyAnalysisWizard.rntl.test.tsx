@@ -73,13 +73,17 @@ beforeEach(() => {
 test("requires current measurements before starting a secure body-analysis session", async () => {
   renderWizard();
 
-  const continueButton = await screen.findByLabelText("ادامه به ثبت عکس‌ها");
+  expect(await screen.findByRole("header", { name: "اندازه‌های فعلی‌ات را تأیید کن" })).toBeTruthy();
+  expect(screen.getByText("اندازه‌های پایه")).toBeTruthy();
+  expect(screen.getByText("تناسبات بدن")).toBeTruthy();
+
+  const continueButton = await screen.findByLabelText("ذخیره و ادامه");
   expect(continueButton.props.accessibilityState.disabled).toBe(true);
 
   fireEvent(screen.getByLabelText("اندازه‌ها مربوط به امروز هستند"), "valueChange", true);
-  expect(screen.getByLabelText("ادامه به ثبت عکس‌ها").props.accessibilityState.disabled).toBe(false);
+  expect(screen.getByLabelText("ذخیره و ادامه").props.accessibilityState.disabled).toBe(false);
 
-  fireEvent.press(screen.getByLabelText("ادامه به ثبت عکس‌ها"));
+  fireEvent.press(screen.getByLabelText("ذخیره و ادامه"));
 
   await waitFor(() => expect(createSession).toHaveBeenCalledWith("initial_plan"));
 });

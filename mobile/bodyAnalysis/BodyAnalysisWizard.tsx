@@ -17,6 +17,7 @@ import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { BodyAnalysisRequirements } from "./BodyAnalysisRequirements";
 import {
+  BODY_PHOTO_VIEWS,
   createBodyPhotoFlowDraft,
   reconcileBodyPhotoFlowDraft,
   type BodyPhotoFlowDraft,
@@ -372,6 +373,10 @@ export function BodyAnalysisWizard({
     <Screen>
       <BodyPhotoCapture
         key={`${activeView}-${Object.keys(capturedAssets).length}`}
+        completedViews={BODY_PHOTO_VIEWS.filter((view) => (
+          capturedAssets[view] !== undefined
+          || session.photos.some((photo) => photo.view === view)
+        ))}
         initialCaptureMode={draft.capture_mode}
         initialGhostScale={draft.ghost_scale}
         initialSideProfile={draft.side_profile}

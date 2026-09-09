@@ -7,7 +7,7 @@ import type {
 } from "@fitician/core/profile";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
-import { Button, Card, Notice, ScreenHeader, Skeleton, TextField } from "../ui/components";
+import { Button, Card, Notice, PageHeading, Skeleton, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createProfileApi } from "../profile/profileApi";
@@ -123,20 +123,28 @@ export function BodyAnalysisRequirements({
   return (
     <Screen contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <ScreenHeader
+        <PageHeading
           compact
-          eyebrow="مرحله اول · اندازه‌گیری"
-          subtitle="برای تفسیر بهتر عکس‌ها، این اندازه‌ها باید مربوط به همین روز باشند."
-          title="اندازه‌ها را تأیید کن"
+          eyebrow="پیش از جلسه عکس"
+          supportingText="اندازه‌هایی را وارد کن که با وضعیت بدنت امروز مطابقت دارند. این مقادیر همراه همین جلسه عکس ذخیره می‌شوند."
+          title="اندازه‌های فعلی‌ات را تأیید کن"
         />
 
+        <MeasurementStatus confirmed={confirmed} />
+
         <Card style={styles.panel}>
-          <Text style={styles.sectionTitle}>اندازه‌های اصلی</Text>
+          <View style={styles.panelHeading}>
+            <Text style={styles.stepBadge}>۰۱</Text>
+            <View style={styles.panelHeadingCopy}>
+              <Text style={styles.sectionTitle}>اندازه‌های پایه</Text>
+              <Text style={styles.body}>قد و وزن، نقطهٔ شروع این اسکن هستند.</Text>
+            </View>
+          </View>
           <TextField
             accessibilityLabel="قد به سانتی‌متر"
             error={measurementErrorMessage(errors.height_cm)}
             keyboardType="number-pad"
-            label="قد"
+            label="قد (سانتی‌متر)"
             onChangeText={(value) => changeMeasurement("height_cm", value)}
             required
             value={values.height_cm}
@@ -145,7 +153,7 @@ export function BodyAnalysisRequirements({
             accessibilityLabel="وزن فعلی به کیلوگرم"
             error={measurementErrorMessage(errors.current_weight_kg)}
             keyboardType="decimal-pad"
-            label="وزن فعلی"
+            label="وزن فعلی (کیلوگرم)"
             onChangeText={(value) => changeMeasurement("current_weight_kg", value)}
             required
             value={values.current_weight_kg}
@@ -153,13 +161,18 @@ export function BodyAnalysisRequirements({
         </Card>
 
         <Card style={styles.panel}>
-          <Text style={styles.sectionTitle}>نسبت‌های بدنی</Text>
-          <Text style={styles.body}>هر سه اندازه برای این تحلیل لازم‌اند.</Text>
+          <View style={styles.panelHeading}>
+            <Text style={styles.stepBadge}>۰۲</Text>
+            <View style={styles.panelHeadingCopy}>
+              <Text style={styles.sectionTitle}>تناسبات بدن</Text>
+              <Text style={styles.body}>متر را بدون کشیدن، در پهن‌ترین بخش هر ناحیه قرار بده.</Text>
+            </View>
+          </View>
           <TextField
             accessibilityLabel="دور شانه به سانتی‌متر"
             error={measurementErrorMessage(errors.shoulder_circumference_cm)}
             keyboardType="decimal-pad"
-            label="دور شانه"
+            label="دور شانه (سانتی‌متر)"
             onChangeText={(value) => changeMeasurement("shoulder_circumference_cm", value)}
             required
             value={values.shoulder_circumference_cm}
@@ -168,7 +181,7 @@ export function BodyAnalysisRequirements({
             accessibilityLabel="دور کمر به سانتی‌متر"
             error={measurementErrorMessage(errors.waist_circumference_cm)}
             keyboardType="decimal-pad"
-            label="دور کمر"
+            label="دور کمر (سانتی‌متر)"
             onChangeText={(value) => changeMeasurement("waist_circumference_cm", value)}
             required
             value={values.waist_circumference_cm}
@@ -177,12 +190,17 @@ export function BodyAnalysisRequirements({
             accessibilityLabel="دور باسن به سانتی‌متر"
             error={measurementErrorMessage(errors.hip_circumference_cm)}
             keyboardType="decimal-pad"
-            label="دور باسن"
+            label="دور باسن (سانتی‌متر)"
             onChangeText={(value) => changeMeasurement("hip_circumference_cm", value)}
             required
             value={values.hip_circumference_cm}
           />
         </Card>
+
+        <Notice
+          message="متر را بدون کشیدن بیش از حد دور بدن قرار بده. تحلیل تا وقتی تأیید نکنی این مقادیر فعلی هستند شروع نمی‌شود."
+          variant="warning"
+        />
 
         <Card style={styles.confirmation} variant={confirmed ? "interactive" : "default"}>
           <Switch
@@ -192,7 +210,7 @@ export function BodyAnalysisRequirements({
             trackColor={{ false: fiticianTokens.colors.lineStrong, true: fiticianTokens.colors.teal }}
             value={confirmed}
           />
-          <Text style={styles.confirmationText}>اندازه‌ها مربوط به امروز هستند.</Text>
+          <Text style={styles.confirmationText}>تأیید می‌کنم این اندازه‌ها برای همین جلسه عکس فعلی هستند.</Text>
         </Card>
 
         {saveError ? <Notice message="ذخیره اندازه‌ها انجام نشد. دوباره تلاش کن." variant="danger" /> : null}
@@ -200,13 +218,34 @@ export function BodyAnalysisRequirements({
           <Button disabled={busy} label="بازگشت" onPress={onCancel} variant="secondary" />
           <Button
             disabled={!canContinue}
-            label={busy ? "در حال ذخیره…" : "ادامه به ثبت عکس‌ها"}
+            label={busy ? "در حال ذخیره…" : "ذخیره و ادامه"}
             loading={busy}
             onPress={() => void confirmMeasurements()}
           />
         </View>
       </View>
     </Screen>
+  );
+}
+
+function MeasurementStatus({ confirmed }: { readonly confirmed: boolean }) {
+  return (
+    <Card
+      accessibilityLiveRegion="polite"
+      style={[styles.statusCard, confirmed && styles.statusCardConfirmed]}
+    >
+      <View style={[styles.statusMark, confirmed && styles.statusMarkConfirmed]}>
+        <Text style={[styles.statusMarkText, confirmed && styles.statusMarkTextConfirmed]}>
+          {confirmed ? "✓" : "۰۱"}
+        </Text>
+      </View>
+      <View style={styles.statusCopy}>
+        <Text style={styles.statusTitle}>{confirmed ? "آمادهٔ ادامه" : "در انتظار تأیید"}</Text>
+        <Text style={styles.statusHint}>
+          {confirmed ? "این مقادیر همراه همین اسکن ذخیره می‌شوند." : "مقادیر امروزت را بررسی کن."}
+        </Text>
+      </View>
+    </Card>
   );
 }
 
@@ -265,6 +304,15 @@ const styles = StyleSheet.create({
   panel: {
     gap: fiticianTokens.spacing[3],
   },
+  panelHeading: {
+    alignItems: "flex-start",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+  },
+  panelHeadingCopy: {
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+  },
   sectionTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -276,6 +324,76 @@ const styles = StyleSheet.create({
   screen: {
     paddingBottom: fiticianTokens.spacing[7],
     paddingTop: fiticianTokens.spacing[3],
+  },
+  statusCard: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+    padding: fiticianTokens.spacing[3],
+  },
+  statusCardConfirmed: {
+    backgroundColor: fiticianTokens.colors.successSurface,
+    borderColor: fiticianTokens.colors.success,
+  },
+  statusCopy: {
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+  },
+  statusHint: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  statusMark: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  statusMarkConfirmed: {
+    backgroundColor: fiticianTokens.colors.successSurface,
+    borderColor: fiticianTokens.colors.success,
+  },
+  statusMarkText: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  statusMarkTextConfirmed: {
+    color: fiticianTokens.colors.success,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.lg,
+  },
+  statusTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  stepBadge: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    minHeight: 32,
+    minWidth: 32,
+    padding: fiticianTokens.spacing[2],
+    textAlign: "center",
   },
   title: {
     color: fiticianTokens.colors.ink,

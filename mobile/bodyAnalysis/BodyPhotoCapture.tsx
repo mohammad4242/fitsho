@@ -22,7 +22,7 @@ import type { BodyPhotoSide, BodyPhotoView } from "@fitician/core/body-photos";
 import type { Sex } from "@fitician/core/profile";
 
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { Button, Notice, ScreenHeader } from "../ui/components";
+import { AppIcon, Button, Notice, PageHeading, SegmentedControl } from "../ui/components";
 import { fiticianTokens } from "../ui/tokens";
 import {
   GHOST_SCALE_MAX,
@@ -44,6 +44,7 @@ import {
 import { encodeBodyPhotoWithPrivacyCrop } from "./bodyPhotoEncoder";
 
 export interface BodyPhotoCaptureProps {
+  readonly completedViews?: readonly BodyPhotoView[];
   readonly initialCaptureMode?: "camera" | "library";
   readonly initialGhostScale?: number;
   readonly initialSideProfile?: BodyPhotoSide;
@@ -66,6 +67,7 @@ type LiveWarning =
   | "wrong_view";
 
 export function BodyPhotoCapture({
+  completedViews = [],
   initialCaptureMode = "camera",
   initialGhostScale = 1,
   initialSideProfile = "right",
@@ -332,33 +334,54 @@ export function BodyPhotoCapture({
 
   return (
     <View style={styles.container}>
-      <ScreenHeader
+      <PageHeading
         compact
         eyebrow={`ثبت تصویر · ${viewLabel(view)}`}
-        subtitle="شبح فقط راهنمای حالت و موقعیت است؛ ظاهر بدن معیار رد شدن نیست."
-        title="در جای درست بایست"
+        supportingText="راهنمای Ghost فقط برای حالت و موقعیت است؛ ظاهر بدن معیار رد شدن نیست."
+        title="عکس‌های استاندارد بدن را اضافه کن"
       />
 
-      <View style={styles.sourceTabs}>
-        <Button
-          label="دوربین"
-          onPress={() => {
-            setCaptureMode("camera");
-            setConfirmError(null);
-          }}
-          style={styles.sourceButton}
-          variant={captureMode === "camera" ? "primary" : "secondary"}
-        />
-        <Button
-          label="انتخاب عکس"
-          onPress={() => {
-            setCaptureMode("library");
-            setConfirmError(null);
-          }}
-          style={styles.sourceButton}
-          variant={captureMode === "library" ? "primary" : "secondary"}
-        />
+      <PhotoClothingGuide />
+      <CaptureStepIndicator completedViews={completedViews} currentView={view} />
+      <SegmentedControl
+        accessibilityLabel="روش ثبت عکس"
+        onChange={(value) => {
+          if (value !== "camera" && value !== "library") return;
+          setCaptureMode(value);
+          setConfirmError(null);
+        }}
+        options={[{ label: "دوربین", value: "camera" }, { label: "انتخاب عکس", value: "library" }]}
+        selectedValue={captureMode}
+      />
+
+      <View style={styles.captureIntro}>
+        <Text style={styles.captureBadge}>SCAN VIEW: {view.toUpperCase()}</Text>
+        <Text style={styles.captureTitle}>عکس {viewLabel(view)}</Text>
+        <Text style={styles.body}>{captureInstruction(view)}</Text>
+        <Text style={styles.captureHint}>
+          هنگام عکس‌گرفتن، دوربین را هم‌ارتفاع میان‌تنه بگذار، کل بدن را داخل کادر نگه دار و از نور یکنواخت استفاده کن.
+        </Text>
       </View>
+
+      {view === "side" ? (
+        <View style={styles.sideToggle}>
+          <Text style={styles.controlLabel}>جهت نیمرخ</Text>
+          <View style={styles.inlineButtons}>
+            <Button
+              disabled={captured !== null || busy}
+              label="راست"
+              onPress={() => updateSideProfile("right")}
+              variant={sideProfile === "right" ? "primary" : "secondary"}
+            />
+            <Button
+              disabled={captured !== null || busy}
+              label="چپ"
+              onPress={() => updateSideProfile("left")}
+              variant={sideProfile === "left" ? "primary" : "secondary"}
+            />
+          </View>
+        </View>
+      ) : null}
 
       <View accessibilityLabel="مرحله ثبت عکس" style={styles.stage}>
         {captured === null ? (
@@ -384,26 +407,6 @@ export function BodyPhotoCapture({
           </View>
         ) : null}
       </View>
-
-      {view === "side" ? (
-        <View style={styles.sideToggle}>
-          <Text style={styles.controlLabel}>جهت نیمرخ</Text>
-          <View style={styles.inlineButtons}>
-            <Button
-              disabled={captured !== null || busy}
-              label="راست"
-              onPress={() => updateSideProfile("right")}
-              variant={sideProfile === "right" ? "primary" : "secondary"}
-            />
-            <Button
-              disabled={captured !== null || busy}
-              label="چپ"
-              onPress={() => updateSideProfile("left")}
-              variant={sideProfile === "left" ? "primary" : "secondary"}
-            />
-          </View>
-        </View>
-      ) : null}
 
       {captured === null ? (
         <>
@@ -468,6 +471,69 @@ export function BodyPhotoCapture({
       <Button disabled={busy} label="بستن این مرحله" onPress={closeCapture} variant="ghost" />
     </View>
   );
+}
+
+function PhotoClothingGuide() {
+  return (
+    <View accessibilityLabel="لباس و پوشش مناسب" style={styles.clothingGuide}>
+      <View style={styles.clothingHeader}>
+        <View style={styles.clothingIcon}>
+          <AppIcon color={fiticianTokens.colors.amber} name="shield" size={18} />
+        </View>
+        <Text style={styles.clothingTitle}>لباس و پوشش مناسب</Text>
+      </View>
+      <Text style={styles.captureHint}>
+        لباس ورزشی فیت و کم‌حجم بپوش؛ از لباس گشاد، لایه‌لایه و اکسسوری‌هایی که فرم بدن را می‌پوشانند دوری کن.
+      </Text>
+      <Text style={styles.captureHint}>
+        پوشش لازم است؛ لباس بیشتر اجباری نیست. شانه‌ها تا پاها باید واضح داخل کادر بمانند.
+      </Text>
+    </View>
+  );
+}
+
+function CaptureStepIndicator({
+  completedViews,
+  currentView,
+}: {
+  readonly completedViews: readonly BodyPhotoView[];
+  readonly currentView: BodyPhotoView;
+}) {
+  return (
+    <View accessible accessibilityLabel="مراحل ثبت عکس" style={styles.stepList}>
+      {(["front", "side", "back"] as const).map((step, index) => {
+        const completed = completedViews.includes(step);
+        const current = currentView === step;
+        const stateLabel = completed ? "، انجام‌شده" : current ? "، مرحله فعلی" : "";
+        return (
+          <View
+            accessible
+            accessibilityLabel={`نمای ${viewLabel(step)}${stateLabel}`}
+            accessibilityRole="text"
+            accessibilityState={{ selected: current }}
+            key={step}
+            style={[styles.stepItem, current && styles.stepItemActive, completed && styles.stepItemCompleted]}
+          >
+            <Text style={styles.stepIndex}>0{index + 1}</Text>
+            <Text style={[styles.stepLabel, current && styles.stepLabelActive, completed && styles.stepLabelCompleted]}>
+              {viewLabel(step)}
+            </Text>
+            {completed ? <Text style={styles.stepCheck}>✓</Text> : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function captureInstruction(view: BodyPhotoView): string {
+  if (view === "front") {
+    return "صاف بایست، جای پاها را ثابت نگه دار و بازوها را کمی از تنه فاصله بده. عضلات را منقبض نکن.";
+  }
+  if (view === "side") {
+    return "هر بار از یک سمت ثابت عکس بگیر. صاف بایست و بازوها را طوری قرار بده که تنه دیده شود.";
+  }
+  return "صاف بایست و بازوها را کمی جدا نگه دار تا پشت، باسن، پاها و ساق‌ها دیده شوند.";
 }
 
 function liveWarningsFromValidation(validation: GhostPoseValidationResult): LiveWarning[] {
@@ -556,6 +622,33 @@ const styles = StyleSheet.create({
     textAlign: "center",
     writingDirection: "rtl",
   },
+  captureBadge: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    letterSpacing: 1,
+    textAlign: "right",
+  },
+  captureHint: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  captureIntro: {
+    gap: fiticianTokens.spacing[1],
+  },
+  captureTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 30,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   capturedImage: {
     height: "100%",
     width: "100%",
@@ -567,6 +660,38 @@ const styles = StyleSheet.create({
   },
   container: {
     gap: fiticianTokens.spacing[3],
+  },
+  clothingGuide: {
+    backgroundColor: fiticianTokens.colors.warningSurface,
+    borderColor: "rgba(242,184,91,0.26)",
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[2],
+    padding: fiticianTokens.spacing[3],
+  },
+  clothingHeader: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+  },
+  clothingIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(242,184,91,0.12)",
+    borderColor: "rgba(242,184,91,0.38)",
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  clothingTitle: {
+    color: fiticianTokens.colors.amber,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   controlLabel: {
     color: fiticianTokens.colors.ink,
@@ -629,13 +754,6 @@ const styles = StyleSheet.create({
   sideToggle: {
     gap: fiticianTokens.spacing[2],
   },
-  sourceButton: {
-    flex: 1,
-  },
-  sourceTabs: {
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[2],
-  },
   stage: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.lineStrong,
@@ -644,6 +762,57 @@ const styles = StyleSheet.create({
     height: 520,
     overflow: "hidden",
     position: "relative",
+  },
+  stepCheck: {
+    color: fiticianTokens.colors.success,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  stepIndex: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
+    fontSize: 11,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  stepItem: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    justifyContent: "center",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[1],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  stepItemActive: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  stepItemCompleted: {
+    backgroundColor: fiticianTokens.colors.successSurface,
+    borderColor: fiticianTokens.colors.success,
+  },
+  stepLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  stepLabelActive: {
+    color: fiticianTokens.colors.aqua,
+  },
+  stepLabelCompleted: {
+    color: fiticianTokens.colors.success,
+  },
+  stepList: {
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
   },
   title: {
     color: fiticianTokens.colors.ink,
