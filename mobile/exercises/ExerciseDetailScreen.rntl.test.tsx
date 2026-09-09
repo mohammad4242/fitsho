@@ -143,13 +143,7 @@ test("resets the carousel to the first female video after switching gender", () 
 });
 
 test("prefers a persisted public video cache file for offline playback", async () => {
-  mockGetCached.mockResolvedValueOnce({
-    byteSize: 24,
-    cacheKey: "a".repeat(64),
-    contentType: "video/mp4",
-    sourcePath: "/media/male-1.mp4",
-    uri: "file:///cache/male-1.video",
-  });
+  mockGetCached.mockResolvedValueOnce(cachedVideoFile());
 
   renderDetail();
 
@@ -157,6 +151,23 @@ test("prefers a persisted public video cache file for offline playback", async (
     expect(mockVideoSources.at(-1)).toEqual({ uri: "file:///cache/male-1.video" });
   });
   expect(screen.getByRole("button", { name: "حذف دانلود" })).toBeTruthy();
+});
+
+test("downloads and removes the selected public video through native actions", async () => {
+  mockGetCached.mockResolvedValueOnce(null);
+  mockGetOrDownload.mockResolvedValueOnce(cachedVideoFile());
+  renderDetail();
+
+  const download = await screen.findByRole("button", { name: "ذخیره برای استفاده آفلاین" });
+  fireEvent.press(download);
+
+  await waitFor(() => expect(mockGetOrDownload).toHaveBeenCalledWith("/media/male-1.mp4"));
+  expect(mockVideoSources.at(-1)).toEqual({ uri: "file:///cache/male-1.video" });
+
+  fireEvent.press(screen.getByRole("button", { name: "حذف دانلود" }));
+
+  await waitFor(() => expect(mockRemoveCached).toHaveBeenCalledWith("/media/male-1.mp4"));
+  expect(screen.getByRole("button", { name: "ذخیره برای استفاده آفلاین" })).toBeTruthy();
 });
 
 test("uses only the English card title and labels when the native direction is LTR", () => {
@@ -195,6 +206,16 @@ function asset(
     presentation,
     role: "primary",
     sort_order: sortOrder,
+  };
+}
+
+function cachedVideoFile() {
+  return {
+    byteSize: 24,
+    cacheKey: "a".repeat(64),
+    contentType: "video/mp4",
+    sourcePath: "/media/male-1.mp4",
+    uri: "file:///cache/male-1.video",
   };
 }
 
