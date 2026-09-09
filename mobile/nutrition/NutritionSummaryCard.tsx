@@ -245,16 +245,23 @@ function firstNumericTarget(
 }
 
 function formatTargetValue(target: NutritionEstimate["targets"][string] | undefined): string {
-  const value = firstNumericTarget(target, "preferred", "minimum", "preferred_maximum", "maximum");
-  if (value === null) return "تعیین نشده";
-  const unit = target?.unit === "kcal/day"
-    ? "کیلوکالری"
-    : target?.unit === "g/day"
-      ? "گرم"
-      : target?.unit === "mg/day"
-        ? "میلی‌گرم"
-        : target?.unit ?? "";
-  return `${formatWebNumber(value)} ${unit}`.trim();
+  const preferred = firstNumericTarget(target, "preferred");
+  if (preferred !== null) return formatLocalizedValue(preferred, target?.unit);
+  if (target?.minimum !== null && target?.minimum !== undefined && target.maximum !== null && target.maximum !== undefined) {
+    return `${formatWebNumber(target.minimum)}–${formatWebNumber(target.maximum)} ${localizedUnit(target.unit)}`.trim();
+  }
+  return "تعیین نشده";
+}
+
+function formatLocalizedValue(value: number, unit: string | undefined): string {
+  return `${formatWebNumber(value)} ${localizedUnit(unit)}`.trim();
+}
+
+function localizedUnit(unit: string | undefined): string {
+  if (unit === "kcal/day") return "کیلوکالری";
+  if (unit === "g/day") return "گرم";
+  if (unit === "mg/day") return "میلی‌گرم";
+  return unit ?? "";
 }
 
 function formatWebNumber(value: number): string {

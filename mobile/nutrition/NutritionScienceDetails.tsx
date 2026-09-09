@@ -53,7 +53,7 @@ export function NutritionScienceDetails({ estimate }: { readonly estimate: Nutri
             {Object.entries(estimate.micronutrients).map(([code, item]) => (
               <View key={code} style={styles.micronutrientCard}>
                 <Text style={styles.micronutrientTitle}>{micronutrientLabels[code] ?? code.replaceAll("_", " ")}</Text>
-                <Text style={styles.micronutrientValue}>{formatValue(item.target_value, item.unit)}</Text>
+                <Text style={styles.micronutrientValue}>{formatMicronutrientValue(item.target_value, item.unit)}</Text>
                 <Text style={styles.micronutrientNote}>{item.reference_kind} · اطمینان: {item.confidence}</Text>
               </View>
             ))}
@@ -114,6 +114,10 @@ function formatValue(value: number | null | undefined, unit: string | undefined)
         ? "میلی‌گرم"
         : unit ?? "";
   return `${formatNumber(value)} ${localizedUnit}`.trim();
+}
+
+function formatMicronutrientValue(value: number, unit: string): string {
+  return `${formatNumber(value)} ${unit}`.trim();
 }
 
 function formatNumber(value: number): string {

@@ -81,6 +81,7 @@ const exerciseSourceLabels: Readonly<Record<string, string>> = {
 export function NutritionFoundationScreen() {
   const auth = useMobileAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const connectivityStatus = useConnectivityStatus();
   const api = useMemo(() => createNutritionApi(auth.request), [auth.request]);
   const planApi = useMemo(
@@ -103,6 +104,10 @@ export function NutritionFoundationScreen() {
     queryFn: planApi.getLatestBundle,
     queryKey: nutritionKeys.latestBundle(),
   });
+  const estimateGeneration = useMutation({
+    mutationFn: api.generateEstimate,
+    onSuccess: (result) => queryClient.setQueryData(nutritionKeys.estimate(), result),
+  });
   const safetyState = getMobileViewState(safetyQuery, { connectivityStatus });
   const estimateState = getMobileViewState(estimateQuery, { connectivityStatus });
   const latestPlanState = getMobileViewState(latestPlanQuery, { connectivityStatus });
@@ -113,6 +118,7 @@ export function NutritionFoundationScreen() {
   const latestBundle = viewData(latestBundleState) ?? null;
   const planDataReady = !latestPlanQuery.isPending && !latestBundleQuery.isPending;
   const plan = planDataReady ? resolveNutritionMainPlan(latestPlan, latestBundle) : null;
+  const estimateAvailable = estimate !== undefined && estimate !== null;
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
@@ -127,20 +133,30 @@ export function NutritionFoundationScreen() {
         onOpenCatalogue={() => router.push("/member/food-catalogue")}
       />
 
+      <NutritionEstimateState
+        canCalculate={canGenerateNutritionEstimate(safety ?? null) && connectivityStatus !== "offline"}
+        calculating={estimateGeneration.isPending}
+        error={estimateGeneration.error ? nutritionErrorMessage(estimateGeneration.error) : null}
+        hasEstimate={estimateAvailable}
+        onCalculate={() => estimateGeneration.mutate()}
+        onRetry={() => void estimateQuery.refetch()}
+        state={estimateState}
+      />
+
       <NutritionSummaryCard
         connectivityStatus={connectivityStatus}
         estimate={estimate}
         onRefresh={() => void estimateQuery.refetch()}
       />
 
-      {estimate !== undefined && estimate !== null ? (
+      {estimateAvailable ? (
         <NutritionWeightRateCard estimate={estimate} onRefresh={() => void estimateQuery.refetch()} />
       ) : null}
-      {estimate !== undefined && estimate !== null && planDataReady ? <NutritionTodayMeals plan={plan} /> : null}
-      {estimate !== undefined && estimate !== null ? <NutritionScienceDetails estimate={estimate} /> : null}
-      {estimate !== undefined && estimate !== null && planDataReady ? <NutritionDoctorSupervision plan={plan} /> : null}
+      {estimateAvailable && planDataReady ? <NutritionTodayMeals plan={plan} /> : null}
+      {estimateAvailable ? <NutritionScienceDetails estimate={estimate} /> : null}
+      {estimateAvailable && planDataReady ? <NutritionDoctorSupervision plan={plan} /> : null}
 
-      <NutritionPlanSection safety={safety ?? null} />
+      {estimateAvailable ? <NutritionPlanSection safety={safety ?? null} /> : null}
     </Screen>
   );
 }
@@ -204,6 +220,48 @@ function NutritionDailyTools({
         <AppIcon color={fiticianTokens.colors.amber} name="arrowLeft" size={fiticianTokens.iconSize.md} />
       </Card>
     </View>
+  );
+}
+
+function NutritionEstimateState({
+  calculating,
+  canCalculate,
+  error,
+  hasEstimate,
+  onCalculate,
+  onRetry,
+  state,
+}: {
+  readonly calculating: boolean;
+  readonly canCalculate: boolean;
+  readonly error: string | null;
+  readonly hasEstimate: boolean;
+  readonly onCalculate: () => void;
+  readonly onRetry: () => void;
+  readonly state: MobileViewState<NutritionEstimate | null>;
+}) {
+  if (hasEstimate || state.status === "loading") return null;
+  if (state.status === "offline") {
+    return <Notice message="برای دریافت برآورد تغذیه به اینترنت وصل شو." variant="offline" />;
+  }
+  if (state.status === "error") {
+    return <Notice actionLabel="تلاش دوباره" message="برآورد تغذیه دریافت نشد." onAction={onRetry} variant="danger" />;
+  }
+  if (state.status !== "empty") return null;
+
+  return (
+    <Card style={styles.estimateStateCard}>
+      <Text style={styles.sectionTitle}>هنوز برآوردی ثبت نشده</Text>
+      <Text style={styles.bodyText}>اطلاعات پروفایل فعلی را به یک برآورد شفاف تبدیل کن.</Text>
+      <Button
+        disabled={!canCalculate}
+        label="محاسبه هدف‌ها"
+        loading={calculating}
+        onPress={onCalculate}
+      />
+      {!canCalculate ? <Notice message="ابتدا ارزیابی ایمنی تغذیه را کامل کن." variant="warning" /> : null}
+      {error !== null ? <Notice message={error} variant="danger" /> : null}
+    </Card>
   );
 }
 
@@ -731,13 +789,17 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   dailyToolCard: {
+    alignItems: "center",
     flex: 1,
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
-    minHeight: 132,
+    minHeight: 58,
+    padding: fiticianTokens.spacing[3],
   },
   dailyToolCopy: {
     alignItems: "flex-end",
+    flex: 1,
     gap: fiticianTokens.spacing[1],
   },
   dailyTools: {
@@ -758,6 +820,10 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  estimateStateCard: {
+    gap: fiticianTokens.spacing[3],
+    marginBottom: fiticianTokens.spacing[1],
   },
   choice: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,

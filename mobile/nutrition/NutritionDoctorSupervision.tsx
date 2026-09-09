@@ -47,7 +47,7 @@ export function NutritionDoctorSupervision({ plan }: { readonly plan: WeeklyPlan
           variant="supplements"
         />
         <DoctorItem
-          icon="target"
+          icon="check"
           label="تأیید برنامه غذایی"
           pending={isPending}
           subtitle={approvalCopy}
@@ -80,7 +80,7 @@ function DoctorItem({
   tag,
   variant,
 }: {
-  readonly icon: "document" | "lab" | "supplement" | "target";
+  readonly icon: "check" | "document" | "lab" | "supplement";
   readonly label: string;
   readonly onPress?: () => void;
   readonly pending?: boolean;
@@ -122,7 +122,6 @@ function DoctorItem({
 }
 
 const styles = StyleSheet.create({
-  approved: {},
   card: {
     backgroundColor: "rgba(9, 54, 51, 0.45)",
     borderColor: fiticianTokens.colors.line,
@@ -139,7 +138,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 44,
   },
-  guidance: {},
   item: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,

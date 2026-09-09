@@ -59,6 +59,7 @@ test("keeps scientific details collapsed and exposes exact safety targets when o
   expect(screen.getByText("چربی ترانس")).toBeTruthy();
   expect(screen.getByText("سدیم")).toBeTruthy();
   expect(screen.getByText("مرجع ریزمغذی‌ها")).toBeTruthy();
+  expect(screen.getByText("۱٬۰۰۰ mg/day")).toBeTruthy();
   expect(screen.getByText("این یک برآورد علمی است، نه تشخیص یا نسخه پزشکی. نتیجه واقعی با پایش وزن، انرژی و عملکرد اصلاح می‌شود.")).toBeTruthy();
   expect(screen.getByText("nutrition-science-v1")).toBeTruthy();
 });

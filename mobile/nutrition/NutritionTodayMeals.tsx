@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { Button, Card } from "../ui/components";
+import { Card } from "../ui/components";
 import { fiticianTokens } from "../ui/tokens";
 import type { WeeklyPlan, WeeklyPlanMeal } from "./nutritionPlanApi";
 
@@ -14,19 +14,26 @@ export function NutritionTodayMeals({ plan }: { readonly plan: WeeklyPlan | null
     <Card accessibilityLabel="وعده‌های امروز" style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>وعده‌های امروز</Text>
-        <Button label="ثبت وعده" onPress={() => router.push("/member/nutrition-tracking")} variant="ghost" />
+        <Pressable
+          accessibilityLabel="ثبت وعده"
+          accessibilityRole="button"
+          onPress={() => router.push("/member/nutrition-tracking")}
+          style={({ pressed }) => [styles.trackAction, pressed && styles.pressed]}
+        >
+          <Text style={styles.trackActionText}>ثبت وعده</Text>
+        </Pressable>
       </View>
       <View style={styles.rows}>
-        {day.meals.map((meal) => <MealRow key={meal.id} meal={meal} />)}
+        {day.meals.map((meal, index) => <MealRow key={meal.id} meal={meal} showDivider={index > 0} />)}
       </View>
     </Card>
   );
 }
 
-function MealRow({ meal }: { readonly meal: WeeklyPlanMeal }) {
+function MealRow({ meal, showDivider }: { readonly meal: WeeklyPlanMeal; readonly showDivider: boolean }) {
   const calories = meal.nutrient_totals.energy_kcal;
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, showDivider && styles.dividedRow]}>
       <Text style={styles.mealName}>{mealLabel(meal.slot_role, meal.slot_index)}</Text>
       <Text style={styles.calories}>
         {calories === undefined ? "—" : `${formatNumber(calories)} کیلوکالری`}
@@ -65,6 +72,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     padding: 0,
   },
+  dividedRow: {
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+  },
   header: {
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
@@ -91,8 +102,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
   },
+  pressed: {
+    opacity: 0.76,
+  },
   rows: {
     gap: 0,
+  },
+  trackAction: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    minWidth: fiticianTokens.layout.minimumTouchTarget,
+  },
+  trackActionText: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   title: {
     color: fiticianTokens.colors.ink,

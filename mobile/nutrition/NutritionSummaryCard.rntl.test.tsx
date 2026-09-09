@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
+import { useQuery } from "@tanstack/react-query";
 
 jest.mock("@tanstack/react-query", () => ({
   useQuery: jest.fn(() => ({
@@ -19,6 +20,8 @@ jest.mock("./nutritionTrackingApi", () => ({ createNutritionTrackingApi: jest.fn
 
 import { NutritionSummaryCard } from "./NutritionSummaryCard";
 import type { NutritionEstimate } from "./nutritionApi";
+
+const mockUseQuery = jest.mocked(useQuery);
 
 const estimate = {
   confidence: "high",
@@ -56,4 +59,44 @@ test("renders target calorie and TDEE rings with the web macro strip", async () 
   expect(screen.getByText("پروتئین")).toBeTruthy();
   expect(screen.getByText("کربوهیدرات")).toBeTruthy();
   expect(screen.getByText("چربی")).toBeTruthy();
+});
+
+test("uses the web minimum-to-maximum fallback when a macro has no preferred target", () => {
+  const rangeEstimate = {
+    ...estimate,
+    targets: {
+      ...estimate.targets,
+      protein: { ...estimate.targets.protein, preferred: null },
+    },
+  } as unknown as NutritionEstimate;
+
+  render(<NutritionSummaryCard connectivityStatus="online" estimate={rangeEstimate} />);
+
+  expect(screen.getByText("۱۰۰–۱۴۰ گرم")).toBeTruthy();
+});
+
+test("shows consumed-today context when tracking data is available", async () => {
+  mockUseQuery.mockReturnValueOnce({
+    data: {
+      actual_totals: { energy_kcal: 1050, protein_g: 61 },
+      data_status: "sufficient",
+      entries: [],
+    },
+    error: null,
+    isError: false,
+    isFetching: false,
+    isPending: false,
+    isStale: false,
+  } as never);
+
+  render(<NutritionSummaryCard connectivityStatus="online" estimate={estimate} />);
+
+  expect(screen.getByText("دریافت امروز ۱٬۰۵۰ کیلوکالری")).toBeTruthy();
+  expect(screen.getByText("۶۱ گرم")).toBeTruthy();
+  await waitFor(() => {
+    expect(screen.getByText("۲٬۱۰۰")).toBeTruthy();
+    expect(screen.getByText("۲٬۴۰۰")).toBeTruthy();
+    expect(screen.getByText("پایه: ۱٬۶۰۰")).toBeTruthy();
+    expect(screen.getByText("فعالیت: ۸۰۰")).toBeTruthy();
+  }, { timeout: 1500 });
 });

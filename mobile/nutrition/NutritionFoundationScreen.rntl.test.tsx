@@ -70,6 +70,7 @@ test("keeps only web-equivalent daily navigation actions above the nutrition sum
 
   expect(screen.getByRole("button", { name: "ثبت تغذیه" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "کاتالوگ" })).toBeTruthy();
+  expect(screen.getByText("هنوز برآوردی ثبت نشده")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "برنامه غذایی" })).toBeNull();
 
   fireEvent.press(screen.getByRole("button", { name: "ثبت تغذیه" }));

@@ -21,9 +21,9 @@ export function NutritionWeightRateCard({
   readonly onRefresh?: () => void;
 }) {
   const snapshot = estimate.input_snapshot;
-  const requested = snapshot === undefined ? null : numericSnapshotValue(snapshot[rateFields[0]]);
-  const recommended = snapshot === undefined ? null : numericSnapshotValue(snapshot[rateFields[1]]);
-  const applied = snapshot === undefined ? null : numericSnapshotValue(snapshot[rateFields[2]]);
+  const requested = snapshot === undefined || snapshot === null ? null : numericSnapshotValue(snapshot[rateFields[0]]);
+  const recommended = snapshot === undefined || snapshot === null ? null : numericSnapshotValue(snapshot[rateFields[1]]);
+  const applied = snapshot === undefined || snapshot === null ? null : numericSnapshotValue(snapshot[rateFields[2]]);
   if (requested === null && recommended === null && applied === null) return null;
 
   const rateMode = snapshot?.weight_rate_mode === "user_override" ? "user_override" : "safe";
@@ -116,7 +116,7 @@ function RateModeControls({
           onPress={() => void switchMode("user_override")}
           style={[styles.modeButton, mode === "user_override" && styles.modeButtonOverride]}
         >
-          <AppIcon color={mode === "user_override" ? fiticianTokens.colors.canvas : fiticianTokens.colors.amber} name="flame" size={fiticianTokens.iconSize.sm} />
+          <AppIcon color={mode === "user_override" ? fiticianTokens.colors.canvas : fiticianTokens.colors.amber} name="flash" size={fiticianTokens.iconSize.sm} />
           <Text style={[styles.modeText, mode === "user_override" && styles.modeTextActive]}>اعمال نرخ دلخواه من</Text>
         </Pressable>
       </View>
@@ -231,19 +231,22 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.amber,
   },
   rateGrid: {
-    flexDirection: "row-reverse",
-    flexWrap: "wrap",
+    flexDirection: "column",
     gap: fiticianTokens.spacing[2],
   },
   rateItem: {
+    alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    flex: 1,
+    flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[1],
-    minWidth: 105,
-    padding: fiticianTokens.spacing[3],
+    justifyContent: "space-between",
+    minHeight: 44,
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
   },
   rateItemClamped: {
     backgroundColor: "rgba(239, 68, 68, 0.08)",
@@ -257,6 +260,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    flexShrink: 1,
     textAlign: "right",
     writingDirection: "rtl",
   },
