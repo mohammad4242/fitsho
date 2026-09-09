@@ -57,6 +57,21 @@ export function formatCatalogueDisplayNumber(value: number | string, maximumFrac
   return new Intl.NumberFormat("fa-IR", { maximumFractionDigits }).format(numeric);
 }
 
+export function foodCatalogueCategoryLabel(category: string): string {
+  const labels: Readonly<Record<string, string>> = {
+    dairy: "لبنیات",
+    fats: "چربی‌ها",
+    fruit: "میوه",
+    grains: "غلات",
+    legumes: "حبوبات",
+    nuts_seeds: "مغزها و دانه‌ها",
+    poultry: "مرغ و ماکیان",
+    starchy_vegetables: "سبزیجات نشاسته‌ای",
+    vegetables: "سبزیجات",
+  };
+  return labels[category] ?? category.replaceAll("_", " ");
+}
+
 export function preparedMealCatalogueLabel(
   calculationMode: "simple" | "prepared_recipe",
 ): { readonly message: string; readonly title: string } | null {

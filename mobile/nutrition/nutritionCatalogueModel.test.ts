@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 
 import type { FoodCatalogueItem } from "./nutritionCatalogueApi";
 import {
+  foodCatalogueCategoryLabel,
   foodCatalogueMacroRows,
   foodCataloguePortionRows,
   formatCatalogueDisplayNumber,
@@ -85,4 +86,9 @@ it("keeps prepared recipe catalogue rows summary-only", () => {
   });
   expect(preparedMealCatalogueLabel("simple")).toBeNull();
   expect(mealCatalogueCategoryLabel("post_workout")).toBe("پس از تمرین");
+});
+
+it("localizes food categories used by the web catalogue cards", () => {
+  expect(foodCatalogueCategoryLabel("nuts_seeds")).toBe("مغزها و دانه‌ها");
+  expect(foodCatalogueCategoryLabel("unknown_group")).toBe("unknown group");
 });

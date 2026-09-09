@@ -8,10 +8,11 @@ import { fiticianTokens } from "../ui/tokens";
 export interface NutritionThumbnailProps {
   readonly imageUrl: string | null | undefined;
   readonly name: string;
+  readonly shape?: "circle" | "rounded";
   readonly style?: StyleProp<ViewStyle>;
 }
 
-export function NutritionThumbnail({ imageUrl, name, style }: NutritionThumbnailProps) {
+export function NutritionThumbnail({ imageUrl, name, shape = "rounded", style }: NutritionThumbnailProps) {
   const runtime = getMobileRuntimeConfig();
   const normalizedImageUrl = imageUrl?.trim() || null;
   const [failed, setFailed] = useState(normalizedImageUrl === null);
@@ -28,7 +29,7 @@ export function NutritionThumbnail({ imageUrl, name, style }: NutritionThumbnail
 
   if (resolvedImageUrl === null || failed) {
     return (
-      <View accessibilityLabel={`تصویر ${name} موجود نیست`} accessibilityRole="image" style={[styles.frame, style]}>
+      <View accessibilityLabel={`تصویر ${name} موجود نیست`} accessibilityRole="image" style={[styles.frame, shape === "circle" && styles.circle, style]}>
         <AppIcon color={fiticianTokens.colors.aqua} name="nutrition" size={fiticianTokens.iconSize.lg} />
         <Text style={styles.fallbackText}>تصویر موجود نیست</Text>
       </View>
@@ -36,7 +37,7 @@ export function NutritionThumbnail({ imageUrl, name, style }: NutritionThumbnail
   }
 
   return (
-    <View style={[styles.frame, style]}>
+    <View style={[styles.frame, shape === "circle" && styles.circle, style]}>
       <Media
         accessibilityLabel={`تصویر ${name}`}
         onError={() => {
@@ -79,6 +80,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
     width: 88,
+  },
+  circle: {
+    borderRadius: 999,
   },
   loadingOverlay: {
     alignItems: "center",

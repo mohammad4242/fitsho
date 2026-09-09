@@ -19,8 +19,14 @@ it("keeps the daily nutrition hierarchy before secondary forms", async () => {
 it("passes contract images to native thumbnails for catalogues, meals, and replacements", async () => {
   const catalogue = await readFile(new URL("./NutritionCatalogueSection.tsx", import.meta.url), "utf8");
   const plan = await readFile(new URL("./NutritionPlanSection.tsx", import.meta.url), "utf8");
+  const foodRoute = await readFile(new URL("../app/(member)/member/food-catalogue.tsx", import.meta.url), "utf8");
+  const mealRoute = await readFile(new URL("../app/(member)/member/meal-catalogue.tsx", import.meta.url), "utf8");
   expect(catalogue).toContain("imageUrl={food.image_url}");
   expect(catalogue).toContain("imageUrl={meal.image_url}");
+  expect(catalogue).toContain("<PageHeading");
+  expect(catalogue).toContain('title={mode === "foods" ? "کاتالوگ مواد غذایی" : "کاتالوگ وعده‌ها"}');
+  expect(foodRoute).toContain('initialMode="foods"');
+  expect(mealRoute).toContain('initialMode="meals"');
   expect(plan).toContain("imageUrl={meal.image_url}");
   expect(plan).toContain("imageUrl={option.image_url}");
   expect(plan).toContain("<DisclosureCard");

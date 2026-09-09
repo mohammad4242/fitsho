@@ -1,11 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
-import { Button, Card, EmptyState, Notice, Sheet, Skeleton, TextField } from "../ui/components";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Notice,
+  PageHeading,
+  SegmentedControl,
+  Sheet,
+  Skeleton,
+  TextField,
+} from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -16,21 +26,22 @@ import {
 } from "./nutritionCatalogueApi";
 import {
   foodCatalogueMacroRows,
+  foodCatalogueCategoryLabel,
   foodCataloguePortionRows,
   mealCatalogueCategoryLabel,
   preparedMealCatalogueLabel,
   selectDefaultFoodPortion,
 } from "./nutritionCatalogueModel";
 import { NutritionThumbnail } from "./NutritionThumbnail";
-import { useEffect } from "react";
 
 type CatalogueMode = "foods" | "meals";
 
-export function NutritionCatalogueSection({ initialMode = "foods" }: { readonly initialMode?: CatalogueMode } = {}) {
+export function NutritionCatalogueSection({ initialMode }: { readonly initialMode?: CatalogueMode } = {}) {
   const auth = useMobileAuth();
   const connectivityStatus = useConnectivityStatus();
   const api = useMemo(() => createNutritionCatalogueApi(auth.request), [auth.request]);
-  const [mode, setMode] = useState<CatalogueMode>(initialMode);
+  const dedicatedMode = initialMode !== undefined;
+  const [mode, setMode] = useState<CatalogueMode>(initialMode ?? "foods");
   const [query, setQuery] = useState("");
   const [foodCategory, setFoodCategory] = useState<string | null>(null);
   const [mealCategory, setMealCategory] = useState<MealCatalogueCategory | null>(null);
@@ -70,17 +81,23 @@ export function NutritionCatalogueSection({ initialMode = "foods" }: { readonly 
 
   return (
     <View style={styles.section}>
-      <View style={styles.heading}>
-        <Text style={styles.eyebrow}>FITICIAN · داده‌های تأییدشده</Text>
-        <Text style={styles.title}>کاتالوگ تغذیه</Text>
-        <Text style={styles.intro}>
-          مواد غذایی و وعده‌های منتشرشده را ببین. قیمت نهایی فقط از برنامه تأییدشده و لیست خرید خوانده می‌شود.
-        </Text>
-      </View>
-      <View accessibilityRole="tablist" style={styles.modeRow}>
-        <ModeButton label="مواد غذایی" mode="foods" onPress={setMode} selected={mode} />
-        <ModeButton label="وعده‌ها" mode="meals" onPress={setMode} selected={mode} />
-      </View>
+      <PageHeading
+        eyebrow={dedicatedMode ? "تغذیه · کاتالوگ" : "تغذیه"}
+        supportingText={mode === "foods"
+          ? "مواد غذایی تأییدشده را جست‌وجو کن و جزئیات هر مورد را ببین."
+          : "وعده‌های منتشرشده و مواد تشکیل‌دهنده قابل نمایش را مرور کن."}
+        title={mode === "foods" ? "کاتالوگ مواد غذایی" : "کاتالوگ وعده‌ها"}
+      />
+      {!dedicatedMode ? (
+        <SegmentedControl
+          accessibilityLabel="نوع کاتالوگ"
+          onChange={(value) => {
+            if (value === "foods" || value === "meals") setMode(value);
+          }}
+          options={[{ label: "مواد غذایی", value: "foods" }, { label: "وعده‌ها", value: "meals" }]}
+          selectedValue={mode}
+        />
+      ) : null}
       {mode === "foods" ? (
         <FoodCatalogueView
           category={foodCategory}
@@ -226,13 +243,13 @@ function FoodCatalogueCard({ food, onPress }: { readonly food: FoodCatalogueItem
   return (
     <Card onPress={onPress} style={styles.catalogueCard} variant="interactive">
       <View style={styles.catalogueIdentity}>
-        <NutritionThumbnail imageUrl={food.image_url} name={food.name_fa} style={styles.catalogueThumbnail} />
+        <NutritionThumbnail imageUrl={food.image_url} name={food.name_fa} shape="circle" style={styles.catalogueThumbnail} />
         <View style={styles.cardHeading}>
           <View style={styles.cardCopy}>
             <Text style={styles.cardTitle}>{food.name_fa}</Text>
             <Text style={styles.cardEnglish}>{food.name_en}</Text>
           </View>
-          <Text style={styles.category}>{food.category}</Text>
+          <Text style={styles.category}>{foodCatalogueCategoryLabel(food.category)}</Text>
         </View>
       </View>
       <View style={styles.macroRow}>
@@ -373,30 +390,6 @@ function Chip({ label, onPress, selected }: { readonly label: string; readonly o
   );
 }
 
-function ModeButton({
-  label,
-  mode,
-  onPress,
-  selected,
-}: {
-  readonly label: string;
-  readonly mode: CatalogueMode;
-  readonly onPress: (mode: CatalogueMode) => void;
-  readonly selected: CatalogueMode;
-}) {
-  const isSelected = mode === selected;
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityState={{ selected: isSelected }}
-      onPress={() => onPress(mode)}
-      style={[styles.modeButton, isSelected && styles.modeButtonSelected]}
-    >
-      <Text style={[styles.modeText, isSelected && styles.modeTextSelected]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function SummaryRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <View style={styles.summaryRow}>
@@ -519,18 +512,6 @@ const styles = StyleSheet.create({
   detailStack: {
     gap: fiticianTokens.spacing[2],
   },
-  eyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    letterSpacing: 1,
-    textAlign: "right",
-    writingDirection: "ltr",
-  },
-  heading: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[2],
-  },
   ingredientRow: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
@@ -541,14 +522,6 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     padding: fiticianTokens.spacing[3],
-  },
-  intro: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    lineHeight: 24,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   macroItem: {
     flex: 1,
@@ -574,35 +547,6 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
-  },
-  modeButton: {
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.medium,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: fiticianTokens.spacing[3],
-    paddingVertical: fiticianTokens.spacing[2],
-  },
-  modeButtonSelected: {
-    backgroundColor: fiticianTokens.colors.aqua,
-    borderColor: fiticianTokens.colors.aqua,
-  },
-  modeRow: {
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[2],
-  },
-  modeText: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "center",
-    writingDirection: "rtl",
-  },
-  modeTextSelected: {
-    color: fiticianTokens.colors.canvas,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
   },
   pageMeta: {
     color: fiticianTokens.colors.muted,
@@ -668,14 +612,6 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     textAlign: "left",
-    writingDirection: "rtl",
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-    lineHeight: 32,
-    textAlign: "right",
     writingDirection: "rtl",
   },
 });

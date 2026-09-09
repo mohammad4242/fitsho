@@ -53,6 +53,8 @@ it("defines the public, auth, onboarding, account, member, coach, and physician 
     "(member)/member/(tabs)/body-analysis.tsx",
     "(member)/member/(tabs)/more.tsx",
     "(member)/member/nutrition-tracking.tsx",
+    "(member)/member/food-catalogue.tsx",
+    "(member)/member/meal-catalogue.tsx",
     "(member)/member/profile.tsx",
     "(member)/member/body-analysis.tsx",
     "(member)/member/body-analysis-history.tsx",
