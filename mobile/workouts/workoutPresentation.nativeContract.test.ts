@@ -107,6 +107,16 @@ it("keeps the four context cells viable at the required phone widths", async () 
   expect(source).toContain('width: "100%"');
 });
 
+it("keeps session duration compact and removes only stale informational notices", async () => {
+  const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+
+  expect(source).toContain('`${formatPersianNumber(averageDuration, { maximumFractionDigits: 0 })} دقیقه`');
+  expect(source).not.toContain("برای هر جلسه");
+  expect(source).not.toContain("این برنامه از حافظهٔ آفلاین خوانده شده و ممکن است تازه‌ترین نسخه نباشد.");
+  expect(source).not.toContain("اطلاعات این برنامه قدیمی است؛ قبل از اجرا وضعیت آنلاین را بررسی کن.");
+  expect(source).toContain("اتصال اینترنت برقرار نیست؛ آخرین برنامهٔ ذخیره‌شده نمایش داده می‌شود.");
+});
+
 it("keeps each exercise as one roomy detail action", async () => {
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
   const row = source.slice(source.indexOf("function WorkoutExerciseRow"), source.indexOf("function WorkoutHistory"));

@@ -213,9 +213,6 @@ export function WorkoutPlansScreen() {
       {connectivityStatus === "offline" && displayedPlan !== undefined ? (
         <PlanInlineNotice message="اتصال اینترنت برقرار نیست؛ آخرین برنامهٔ ذخیره‌شده نمایش داده می‌شود." variant="offline" />
       ) : null}
-      {activeState.status === "stale" && activePlan !== undefined ? (
-        <PlanInlineNotice message="این برنامه از حافظهٔ آفلاین خوانده شده و ممکن است تازه‌ترین نسخه نباشد." variant="info" />
-      ) : null}
       {loading ? <PlanSkeleton /> : null}
       {activeLoadError ? (
         <Notice
@@ -340,7 +337,7 @@ function PlanContextStrip({
     { label: "برنامه فعلی", value: statusLabel, valueStyle: statusStyle },
     { label: "دوره", value: `دوره ${formatPersianNumber(plan.plan_duration_weeks, { maximumFractionDigits: 0 })} هفته‌ای`, valueStyle: undefined },
     { label: "روزهای تمرین", value: `${formatPersianNumber(plan.days.length, { maximumFractionDigits: 0 })} روز تمرین`, valueStyle: undefined },
-    { label: "زمان جلسه", value: averageDuration === null ? "—" : `${formatPersianNumber(averageDuration, { maximumFractionDigits: 0 })} دقیقه برای هر جلسه`, valueStyle: undefined },
+    { label: "زمان جلسه", value: averageDuration === null ? "—" : `${formatPersianNumber(averageDuration, { maximumFractionDigits: 0 })} دقیقه`, valueStyle: undefined },
   ];
 
   return (
@@ -522,7 +519,6 @@ function PlanView({
   return (
     <View style={styles.planSection}>
       {plan.status === "failed" ? <PlanInlineNotice message="این نسخه با خطا ساخته شده و قابل اجرا نیست." variant="danger" /> : null}
-      {plan.is_stale ? <PlanInlineNotice message="اطلاعات این برنامه قدیمی است؛ قبل از اجرا وضعیت آنلاین را بررسی کن." variant="warning" /> : null}
       {!executable && plan.status === "active" && !historical && !pending && plan.coach_review?.state !== "pending_coach_review" ? (
         <PlanInlineNotice message="این برنامه هنوز برای اجرا آزاد نشده است." variant="warning" />
       ) : null}
