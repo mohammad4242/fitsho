@@ -73,7 +73,7 @@ function NutritionEstimateSummaryCard({
   const goalCalories = firstNumericTarget(target("goal_calories"), "preferred");
   const tdee = firstNumericTarget(target("tdee"), "preferred", "minimum");
   const bmr = firstNumericTarget(target("bmr"), "preferred", "minimum");
-  const activity = tdee === null || bmr === null ? null : Math.max(0, tdee - bmr);
+  const additionalCalories = tdee === null || bmr === null ? null : Math.max(0, tdee - bmr);
   const tracked = daily?.actual_totals;
   const hasTrackedData = tracked !== undefined && (
     daily?.data_status === "sufficient"
@@ -120,29 +120,29 @@ function NutritionEstimateSummaryCard({
               <View style={summaryStyles.targetCopy}>
                 <Text style={summaryStyles.targetLabel}>TDEE (کل مصرف روزانه)</Text>
                 <NutritionAnimatedNumber style={summaryStyles.tdeeValue} value={tdee} />
-                <View accessibilityLabel="تفکیک متابولیسم پایه و فعالیت" style={summaryStyles.breakdownLegend}>
+                <View accessibilityLabel="تفکیک BMR و کالری اضافه در TDEE" style={summaryStyles.breakdownLegend}>
                   <View style={summaryStyles.breakdownItem}>
                     <Text style={summaryStyles.bmrDot}>●</Text>
                     {bmr === null ? (
-                      <Text style={summaryStyles.breakdownText}>پایه: —</Text>
+                      <Text style={summaryStyles.breakdownText}>BMR: —</Text>
                     ) : (
-                      <NutritionAnimatedNumber prefix="پایه: " style={summaryStyles.breakdownText} value={bmr} />
+                      <NutritionAnimatedNumber prefix="BMR: " style={summaryStyles.breakdownText} value={bmr} />
                     )}
                   </View>
                   <View style={summaryStyles.breakdownItem}>
-                    <Text style={summaryStyles.activityDot}>●</Text>
-                    {activity === null ? (
-                      <Text style={summaryStyles.breakdownText}>فعالیت: —</Text>
+                    <Text style={summaryStyles.additionalDot}>●</Text>
+                    {additionalCalories === null ? (
+                      <Text style={summaryStyles.breakdownText}>کالری اضافه: —</Text>
                     ) : (
-                      <NutritionAnimatedNumber prefix="فعالیت: " style={summaryStyles.breakdownText} value={activity} />
+                      <NutritionAnimatedNumber prefix="کالری اضافه: " style={summaryStyles.breakdownText} value={additionalCalories} />
                     )}
                   </View>
                 </View>
               </View>
               <NutritionDualMetricRing
-                label="تفکیک مصرف انرژی روزانه"
+                label="تفکیک BMR و کالری اضافه در TDEE"
                 primaryValue={bmr ?? 0}
-                secondaryValue={activity ?? 0}
+                additionalValue={additionalCalories ?? 0}
                 total={tdee}
               />
             </View>
@@ -279,7 +279,7 @@ function todayIsoDate(): string {
 }
 
 const summaryStyles = StyleSheet.create({
-  activityDot: {
+  additionalDot: {
     color: fiticianTokens.colors.aqua,
   },
   bmrDot: {

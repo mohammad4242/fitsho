@@ -8,55 +8,55 @@ import { fiticianTokens } from "../ui/tokens";
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 type NutritionDualMetricRingProps = {
-  readonly activityColor?: string;
+  readonly additionalColor?: string;
   readonly animationDuration?: number;
   readonly animateOnFocus?: boolean;
   readonly bmrColor?: string;
   readonly label: string;
   readonly primaryValue: number;
-  readonly secondaryValue: number;
+  readonly additionalValue: number;
   readonly size?: number;
   readonly strokeWidth?: number;
   readonly total: number;
 };
 
 type NutritionDualMetricRingContentProps = {
-  readonly activityColor: string;
+  readonly additionalColor: string;
   readonly animateProgress: number | Animated.Value;
   readonly bmrColor: string;
   readonly combinedProgress: number;
   readonly label: string;
   readonly primaryProgress: number;
-  readonly secondaryProgress: number;
+  readonly additionalProgress: number;
   readonly size: number;
   readonly strokeWidth: number;
 };
 
 export function NutritionDualMetricRing({
-  activityColor = fiticianTokens.colors.aqua,
+  additionalColor = fiticianTokens.colors.aqua,
   animationDuration = 900,
   animateOnFocus = true,
   bmrColor = fiticianTokens.colors.blue,
   label,
   primaryValue,
-  secondaryValue,
+  additionalValue,
   size = 94,
   strokeWidth = 7,
   total,
 }: NutritionDualMetricRingProps) {
   const safeTotal = total > 0 ? total : 1;
   const primaryProgress = clamp(primaryValue / safeTotal);
-  const secondaryProgress = clamp(secondaryValue / safeTotal);
-  const combinedProgress = clamp((primaryValue + secondaryValue) / safeTotal);
+  const additionalProgress = clamp(Math.min(1 - primaryProgress, additionalValue / safeTotal));
+  const combinedProgress = clamp(primaryProgress + additionalProgress);
 
   const contentProps: NutritionDualMetricRingContentProps = {
-    activityColor,
+    additionalColor,
     animateProgress: 1,
     bmrColor,
     combinedProgress,
     label,
     primaryProgress,
-    secondaryProgress,
+    additionalProgress,
     size,
     strokeWidth,
   };
@@ -94,20 +94,21 @@ function FocusedNutritionDualMetricRing({
 }
 
 function NutritionDualMetricRingContent({
-  activityColor,
+  additionalColor,
   animateProgress,
   bmrColor,
   combinedProgress,
   label,
   primaryProgress,
-  secondaryProgress,
+  additionalProgress,
   size,
   strokeWidth,
 }: NutritionDualMetricRingContentProps) {
   const radius = (size - strokeWidth * 2 - 4) / 2;
   const circumference = 2 * Math.PI * radius;
   const primaryOffset = getOffset(animateProgress, primaryProgress, circumference);
-  const secondaryOffset = getOffset(animateProgress, secondaryProgress, circumference);
+  const additionalOffset = getOffset(animateProgress, additionalProgress, circumference);
+  const additionalRotation = getAdditionalStartRotation(animateProgress, primaryProgress);
   const percent = Math.round(combinedProgress * 100);
   const center = size / 2;
 
@@ -128,14 +129,6 @@ function NutritionDualMetricRingContent({
           stroke={fiticianTokens.colors.progressTrack}
           strokeWidth={strokeWidth}
         />
-        <Circle
-          cx={center}
-          cy={center}
-          fill="transparent"
-          r={radius - strokeWidth - 2}
-          stroke={fiticianTokens.colors.progressTrack}
-          strokeWidth={strokeWidth}
-        />
         <AnimatedCircle
           cx={center}
           cy={center}
@@ -146,7 +139,7 @@ function NutritionDualMetricRingContent({
           stroke={bmrColor}
           strokeDasharray={`${circumference} ${circumference}`}
           strokeDashoffset={primaryOffset}
-          strokeLinecap="round"
+          strokeLinecap="butt"
           strokeWidth={strokeWidth}
         />
         <AnimatedCircle
@@ -154,12 +147,12 @@ function NutritionDualMetricRingContent({
           cy={center}
           fill="transparent"
           origin={`${center}, ${center}`}
-          r={radius - strokeWidth - 2}
-          rotation="-90"
-          stroke={activityColor}
+          r={radius}
+          rotation={additionalRotation}
+          stroke={additionalColor}
           strokeDasharray={`${circumference} ${circumference}`}
-          strokeDashoffset={secondaryOffset}
-          strokeLinecap="round"
+          strokeDashoffset={additionalOffset}
+          strokeLinecap="butt"
           strokeWidth={strokeWidth}
         />
       </Svg>
@@ -176,6 +169,15 @@ function getOffset(progress: number | Animated.Value, share: number, circumferen
   return progress.interpolate({
     inputRange: [0, 1],
     outputRange: [circumference, circumference * (1 - share)],
+  });
+}
+
+function getAdditionalStartRotation(progress: number | Animated.Value, primaryShare: number) {
+  const finalRotation = -90 + primaryShare * 360;
+  if (typeof progress === "number") return finalRotation;
+  return progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-90, finalRotation],
   });
 }
 

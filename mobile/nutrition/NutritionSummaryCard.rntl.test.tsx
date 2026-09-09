@@ -53,9 +53,9 @@ test("renders target calorie and TDEE rings with the web macro strip", async () 
   expect(screen.getByRole("progressbar", { name: "پیشرفت کالری هدف" }).props.accessibilityValue)
     .toEqual({ max: 100, min: 0, now: 100 });
   expect(screen.getByText("TDEE (کل مصرف روزانه)")).toBeTruthy();
-  await waitFor(() => expect(screen.getByText("پایه: ۱٬۶۰۰")).toBeTruthy(), { timeout: 1500 });
-  await waitFor(() => expect(screen.getByText("فعالیت: ۸۰۰")).toBeTruthy(), { timeout: 1500 });
-  expect(screen.getByRole("progressbar", { name: "تفکیک مصرف انرژی روزانه" })).toBeTruthy();
+  await waitFor(() => expect(screen.getByText("BMR: ۱٬۶۰۰")).toBeTruthy(), { timeout: 1500 });
+  await waitFor(() => expect(screen.getByText("کالری اضافه: ۸۰۰")).toBeTruthy(), { timeout: 1500 });
+  expect(screen.getByRole("progressbar", { name: "تفکیک BMR و کالری اضافه در TDEE" })).toBeTruthy();
   expect(screen.getByText("پروتئین")).toBeTruthy();
   expect(screen.getByText("کربوهیدرات")).toBeTruthy();
   expect(screen.getByText("چربی")).toBeTruthy();
@@ -96,7 +96,7 @@ test("shows consumed-today context when tracking data is available", async () =>
   await waitFor(() => {
     expect(screen.getByText("۲٬۱۰۰")).toBeTruthy();
     expect(screen.getByText("۲٬۴۰۰")).toBeTruthy();
-    expect(screen.getByText("پایه: ۱٬۶۰۰")).toBeTruthy();
-    expect(screen.getByText("فعالیت: ۸۰۰")).toBeTruthy();
+    expect(screen.getByText("BMR: ۱٬۶۰۰")).toBeTruthy();
+    expect(screen.getByText("کالری اضافه: ۸۰۰")).toBeTruthy();
   }, { timeout: 1500 });
 });
