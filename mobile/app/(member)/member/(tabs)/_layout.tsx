@@ -71,6 +71,17 @@ export default function MemberTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="body-analysis"
+        options={{
+          href: showTraining ? undefined : null,
+          tabBarIcon: ({ color, focused }) => (
+            <AppIcon color={color} name="bodyAnalysis" size={focused ? fiticianTokens.iconSize.lg : fiticianTokens.iconSize.md} />
+          ),
+          tabBarLabel: "روند بدن",
+          title: "روند بدن",
+        }}
+      />
+      <Tabs.Screen
         name="more"
         options={{
           tabBarIcon: ({ color, focused }) => (

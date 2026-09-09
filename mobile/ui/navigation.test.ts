@@ -50,6 +50,7 @@ it("defines the public, auth, onboarding, account, member, coach, and physician 
     "(member)/member/(tabs)/index.tsx",
     "(member)/member/(tabs)/workouts.tsx",
     "(member)/member/(tabs)/nutrition.tsx",
+    "(member)/member/(tabs)/body-analysis.tsx",
     "(member)/member/(tabs)/more.tsx",
     "(member)/member/nutrition-tracking.tsx",
     "(member)/member/profile.tsx",
@@ -161,18 +162,34 @@ it("keeps the native profile editor in the member stack and removes its tab rout
   ).resolves.not.toMatch(/RouteEntryScreen/);
 });
 
-it("keeps More as the fourth and only optional-independent member tab", async () => {
+it("keeps Body Progress capability-aware and More as the fifth member tab", async () => {
   const source = await readFile(
     resolve(appRoot, "(member)/member/(tabs)/_layout.tsx"),
     "utf8",
   );
   const tabNames = Array.from(source.matchAll(/<Tabs\.Screen\s+name="([^"]+)"/g), (match) => match[1]);
-  expect(tabNames).toEqual(["index", "workouts", "nutrition", "more"]);
+  expect(tabNames).toEqual(["index", "workouts", "nutrition", "body-analysis", "more"]);
   expect(source).toContain('tabBarLabel: "بیشتر"');
+  expect(source).toContain('name="body-analysis"');
+  expect(source).toContain('tabBarLabel: "روند بدن"');
+  expect(source).toMatch(/name="body-analysis"[\s\S]*?href: showTraining \? undefined : null/);
   expect(source).not.toContain('name="profile"');
   await expect(
     readFile(resolve(appRoot, "(member)/member/(tabs)/more.tsx"), "utf8"),
   ).resolves.toMatch(/MoreScreen/);
+});
+
+it("opens Body Progress from the tab without replacing the capture wizard", async () => {
+  const tabRoute = resolve(appRoot, "(member)/member/(tabs)/body-analysis.tsx");
+  const tabSource = await readFile(tabRoute, "utf8");
+  expect(tabSource).toContain("BodyAnalysisHistoryScreen");
+  expect(tabSource).toContain('requiredCapability="training"');
+  expect(tabSource).not.toContain("BodyAnalysisWizard");
+
+  const captureRoute = resolve(appRoot, "(member)/member/body-analysis.tsx");
+  const captureSource = await readFile(captureRoute, "utf8");
+  expect(captureSource).toContain("BodyAnalysisWizard");
+  expect(captureSource).not.toContain("BodyAnalysisHistoryScreen");
 });
 
 it("uses the data-driven member home instead of the route-entry placeholder", async () => {

@@ -28,7 +28,11 @@ const statusLabels: Record<BodyPhotoSessionState, string> = {
   validating: "در حال بررسی کیفیت",
 };
 
-export function BodyAnalysisHistoryScreen() {
+export interface BodyAnalysisHistoryScreenProps {
+  readonly tabRoot?: boolean;
+}
+
+export function BodyAnalysisHistoryScreen({ tabRoot = false }: BodyAnalysisHistoryScreenProps = {}) {
   const auth = useMobileAuth();
   const router = useRouter();
   const api = useMemo(
@@ -85,7 +89,7 @@ export function BodyAnalysisHistoryScreen() {
           <Text style={styles.title}>تاریخچه تحلیل بدن در دسترس نیست</Text>
           <Notice message="دریافت نشست‌های تحلیل انجام نشد." variant="danger" />
           <Button label="تلاش دوباره" onPress={() => void loadTimeline()} />
-          <Button label="بازگشت" onPress={() => router.replace("/member")} variant="ghost" />
+          {!tabRoot ? <Button label="بازگشت" onPress={() => router.replace("/member")} variant="ghost" /> : null}
         </View>
       </Screen>
     );
@@ -101,9 +105,11 @@ export function BodyAnalysisHistoryScreen() {
           subtitle="نشست‌ها، وضعیت بررسی تخصصی و نسخه نتیجه را از همین‌جا دنبال کن."
           title="تاریخچه و روند پیشرفت"
         />
-        <View style={styles.actions}>
-          <Button label="بازگشت" onPress={() => router.replace("/member")} variant="ghost" />
-        </View>
+        {!tabRoot ? (
+          <View style={styles.actions}>
+            <Button label="بازگشت" onPress={() => router.replace("/member")} variant="ghost" />
+          </View>
+        ) : null}
         {timeline.items.length === 0 ? (
           <EmptyState actionLabel="شروع تحلیل" onAction={() => router.push("/member/body-analysis")} title="هنوز تحلیلی ثبت نشده است">
             اولین نشست تحلیل بدن را با عکس‌های سه‌نما شروع کن.
