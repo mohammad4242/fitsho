@@ -54,4 +54,5 @@ it("labels the review states for the specialist queue", () => {
   expect(physicianReviewStatusLabel("changes_requested")).toBe("نیازمند اصلاح");
   expect(physicianReviewStatusLabel("approved")).toBe("تأییدشده");
   expect(physicianReviewStatusLabel("rejected")).toBe("ردشده");
+  expect(physicianReviewStatusLabel("unknown_internal_status")).toBe("نیازمند بررسی");
 });

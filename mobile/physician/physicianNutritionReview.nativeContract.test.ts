@@ -24,3 +24,11 @@ it("keeps the native physician workflow role-scoped and revision-safe", () => {
   expect(source).toContain("supplement-orders");
   expect(source).toContain("مکمل‌ها");
 });
+
+it("keeps physician-facing technical codes behind Persian presentation labels", () => {
+  expect(source).not.toContain("safety_reason_codes.join");
+  expect(source).not.toContain("medical_condition_policy_version}");
+  expect(source).not.toContain("formula_version}");
+  expect(source).not.toContain("status.replaceAll");
+  expect(source).not.toContain("return error instanceof Error && error.message");
+});

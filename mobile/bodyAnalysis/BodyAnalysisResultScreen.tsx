@@ -250,7 +250,7 @@ function NormalizedResult({ analysis }: { readonly analysis: BodyAnalysis }) {
       <Card style={styles.card}>
         <Text style={styles.cardTitle}>خلاصه تحلیل</Text>
         <Text style={styles.body}>اعتماد کلی: {formatPercent(result.overall_confidence)}</Text>
-        <Text style={styles.body}>نسخه قرارداد: {result.schema_version}</Text>
+        <Text style={styles.muted}>نتیجهٔ استاندارد و اعتبارسنجی‌شدهٔ این تحلیل نمایش داده می‌شود.</Text>
       </Card>
       {result.findings.slice(0, 13).map((finding) => (
         <Card key={finding.body_area} style={styles.card}>
@@ -461,8 +461,8 @@ function ResultDetailsDisclosure({ analysis }: { readonly analysis: BodyAnalysis
       title="جزئیات فنی نتیجه"
     >
       <View style={styles.section}>
-        <Text style={styles.body}>نسخه پردازش: {analysis.result_version ?? "—"}</Text>
-        <Text style={styles.body}>قرارداد داده: {analysis.schema_version}</Text>
+        {analysis.result_version !== null ? <Text style={styles.body}>پردازش نتیجه برای این تحلیل ثبت شده است.</Text> : null}
+        <Text style={styles.body}>ساختار دادهٔ نتیجه با موفقیت اعتبارسنجی شده است.</Text>
         <Text style={styles.body}>منبع نتیجه: {resultSourceLabel(analysis.result_source)}</Text>
         <Text style={styles.body}>اطمینان کلی: {formatPercent(analysis.overall_confidence)}</Text>
         {validation ? (

@@ -5,7 +5,7 @@ import { File } from "expo-file-system";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, Text, View } from "react-native";
 
-import { ApiError, type MultipartUploadRequest } from "@fitician/core";
+import type { MultipartUploadRequest } from "@fitician/core";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
@@ -24,7 +24,7 @@ import {
   Skeleton,
   TextField,
 } from "../ui/components";
-import { getMobileViewState } from "../ui/requestState";
+import { getMobileViewState, mobileRequestErrorMessage } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { UploadCancellationError, UploadManager, type UploadHandle } from "../upload/uploadManager";
 import {
@@ -704,14 +704,13 @@ function formatBytes(bytes: number): string {
 }
 
 function clinicalErrorMessage(error: unknown, fallback = "عملیات پرونده سلامت انجام نشد؛ دوباره تلاش کن."): string {
-  if (error instanceof ApiError && error.message !== "Request failed") return error.message;
   if (error instanceof Error && /offline|connection|network/i.test(error.message)) {
     return "اتصال اینترنت در دسترس نیست؛ بعداً دوباره تلاش کن.";
   }
   if (error instanceof Error && /format|size|pixel|orientation|PDF|document/i.test(error.message)) {
-    return error.message;
+    return "فرمت یا اندازه پرونده آزمایش مجاز نیست.";
   }
-  return fallback;
+  return mobileRequestErrorMessage(error, fallback);
 }
 
 function useConnectivityStatus(): ConnectivityStatus {

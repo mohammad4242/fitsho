@@ -4,14 +4,14 @@ import { File } from "expo-file-system";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { ApiError, type components, type MultipartUploadRequest } from "@fitician/core";
+import type { components, MultipartUploadRequest } from "@fitician/core";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
 import { Button, Card, Dialog, EmptyState, Notice, PageHeading, Skeleton, TextField } from "../ui/components";
-import { getMobileViewState } from "../ui/requestState";
+import { getMobileViewState, mobileRequestErrorMessage } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { UploadCancellationError, UploadManager, type UploadHandle } from "../upload/uploadManager";
 import {
@@ -888,19 +888,17 @@ function todayIsoDate(): string {
 }
 
 function nutritionTrackingError(error: unknown): string {
-  if (error instanceof ApiError && error.message !== "Request failed") return error.message;
-  return "ثبت تغذیه انجام نشد؛ اتصال و وضعیت برنامه را بررسی کن.";
+  return mobileRequestErrorMessage(error, "ثبت تغذیه انجام نشد؛ اتصال و وضعیت برنامه را بررسی کن.");
 }
 
 function photoErrorMessage(error: unknown): string {
-  if (error instanceof ApiError && error.message !== "Request failed") return error.message;
   if (error instanceof Error && /permission|denied/i.test(error.message)) {
     return "دسترسی دوربین داده نشد یا عکس انتخاب نشد.";
   }
   if (error instanceof Error && /format|size|pixel|orientation|consent/i.test(error.message)) {
-    return error.message;
+    return "فرمت، اندازه یا رضایت عکس برای این عملیات قابل قبول نیست.";
   }
-  return "تخمین عکس انجام نشد؛ ثبت دستی همچنان در دسترس است.";
+  return mobileRequestErrorMessage(error, "تخمین عکس انجام نشد؛ ثبت دستی همچنان در دسترس است.");
 }
 
 function useConnectivityStatus(): ConnectivityStatus {

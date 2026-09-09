@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-import { ApiError } from "@fitician/core";
 import type { NutritionProfile } from "@fitician/core/nutrition";
 import type {
   FitnessGoal,
@@ -40,6 +39,7 @@ import {
   TextField,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
+import { mobileRequestErrorMessage } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot, useRefreshMobileProfileStatus } from "../ui/navigation/RouteGuards";
 import { createProfileApi } from "./profileApi";
@@ -1117,11 +1117,10 @@ function formatProfileDate(value: string): string {
 }
 
 function profileErrorMessage(error: unknown): string {
-  if (error instanceof ApiError && error.message !== "Request failed") return error.message;
   if (error instanceof Error && error.message !== "") {
     if (error.message.includes("profile")) return "اطلاعات پروفایل در دسترس نیست.";
   }
-  return "ذخیره یا دریافت پروفایل انجام نشد. اتصال را بررسی کن و دوباره تلاش کن.";
+  return mobileRequestErrorMessage(error, "ذخیره یا دریافت پروفایل انجام نشد. اتصال را بررسی کن و دوباره تلاش کن.");
 }
 
 const styles = StyleSheet.create({

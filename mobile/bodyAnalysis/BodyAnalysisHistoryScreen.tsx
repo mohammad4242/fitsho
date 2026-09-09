@@ -318,7 +318,7 @@ function HistoryCard({
       </View>
       <Text style={styles.body}>تعداد نماهای ثبت‌شده: {formatCount(item.photos.length)} از ۳</Text>
       {item.analysis?.result_version !== null && item.analysis?.result_version !== undefined ? (
-        <Text style={styles.body}>نسخه نتیجه: {item.analysis.result_version}</Text>
+        <Text style={styles.body}>پردازش نتیجه برای این تحلیل ثبت شده است.</Text>
       ) : null}
       <View style={styles.reviewRow}>
         <Text style={styles.reviewText}>مربی: {reviewLabel(item.review_state.coach.decision)}</Text>

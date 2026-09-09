@@ -8,6 +8,7 @@ import { irrToToman, type components } from "@fitician/core";
 import { AccountPrivacyLinks } from "../accountDeletion/AccountPrivacyLinks";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { physicianKeys } from "../data/queryKeys";
+import { labReviewStatusLabel, supplementStatusLabel } from "../nutrition/nutritionClinicalModel";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
 import {
@@ -24,7 +25,7 @@ import {
   TextField,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
-import { getMobileViewState, type MobileViewState } from "../ui/requestState";
+import { getMobileViewState, mobileRequestErrorMessage, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
   createPhysicianNutritionReviewApi,
@@ -881,7 +882,7 @@ function PlanEvidence({ plan }: { readonly plan: PhysicianNutritionPlan }) {
       <Text style={styles.body}>منشأ قیمت: {Object.keys(plan.price_snapshot).length > 0 ? "snapshot ثبت‌شده" : "ثبت نشده"}</Text>
       <Text style={styles.body}>منشأ دادهٔ غذایی: {Object.keys(plan.food_data_manifest).length > 0 ? "manifest معتبر" : "نیازمند بررسی"}</Text>
       <Text style={styles.body}>هشدارهای نسخه: {plan.warning_codes.length > 0 ? `${formatNumber(plan.warning_codes.length)} مورد` : "ندارد"}</Text>
-      <Text style={styles.muted}>نسخهٔ فرمول {plan.formula_version} · سیاست علمی {plan.scientific_policy_version}</Text>
+      <Text style={styles.muted}>نسخه‌های فرمول و سیاست علمی در پرونده ثبت شده‌اند.</Text>
     </View>
   );
 }
@@ -942,16 +943,16 @@ function MedicalContextCard({ state }: { readonly state: MobileViewState<Physici
   }
   const context = state.data;
   if (context === undefined) return null;
-  const flags = Object.entries(context.flags).filter(([, value]) => value);
+  const flags = Object.values(context.flags).some(Boolean);
   return (
     <Card style={styles.contextCard}>
       <Text style={styles.sectionTitle}>زمینهٔ پزشکی</Text>
-      <Text style={styles.muted}>نتیجهٔ ایمنی: {context.safety_outcome}</Text>
-      <Text style={styles.muted}>نسخهٔ سیاست: {context.medical_condition_policy_version}</Text>
+      <Text style={styles.muted}>نتیجهٔ ایمنی: {safetyOutcomeLabel(context.safety_outcome)}</Text>
+      <Text style={styles.muted}>قواعد پزشکی و ایمنی پرونده ثبت شده‌اند.</Text>
       {context.conditions.length > 0 ? (
         <View style={styles.contextGroup}>
           <Text style={styles.contextLabel}>شرایط ثبت‌شده</Text>
-          {context.conditions.map((condition) => <Text key={condition.code} style={styles.body}>{condition.code}{condition.details ? ` · ${condition.details}` : ""}</Text>)}
+          {context.conditions.map((condition) => <Text key={condition.code} style={styles.body}>{medicalConditionLabel(condition.code)}{condition.details ? ` · ${condition.details}` : ""}</Text>)}
         </View>
       ) : null}
       {context.medications.length > 0 ? (
@@ -960,10 +961,10 @@ function MedicalContextCard({ state }: { readonly state: MobileViewState<Physici
           {context.medications.map((medication) => <Text key={`${medication.name}-${medication.dosage ?? ""}`} style={styles.body}>{medication.name}{medication.dosage ? ` · ${medication.dosage}` : ""}{medication.notes ? ` · ${medication.notes}` : ""}</Text>)}
         </View>
       ) : null}
-      {flags.length > 0 ? <Text style={styles.body}>پرچم‌های ایمنی: {flags.map(([key]) => key).join("، ")}</Text> : null}
+      {flags ? <Text style={styles.body}>ملاحظات ایمنی تکمیلی برای این پرونده ثبت شده است.</Text> : null}
       {context.physician_dietary_restrictions ? <Text style={styles.body}>محدودیت غذایی پزشک: {context.physician_dietary_restrictions}</Text> : null}
       {context.other_relevant_condition ? <Text style={styles.body}>شرایط مرتبط دیگر: {context.other_relevant_condition}</Text> : null}
-      {context.safety_reason_codes.length > 0 ? <Text style={styles.warningText}>کدهای ایمنی: {context.safety_reason_codes.join("، ")}</Text> : null}
+      {context.safety_reason_codes.length > 0 ? <Text style={styles.warningText}>ملاحظات ایمنی نیازمند توجه پزشک است.</Text> : null}
     </Card>
   );
 }
@@ -1405,20 +1406,27 @@ function nutrientStatusLabel(status: string): string {
   return "نیازمند بررسی";
 }
 
-function labReviewStatusLabel(status: string): string {
-  if (status === "reviewed") return "بررسی‌شده";
-  if (status === "needs_attention") return "نیازمند توجه";
-  if (status === "pending") return "در انتظار بررسی";
-  return "وضعیت بررسی نامشخص";
+function safetyOutcomeLabel(status: string): string {
+  if (status === "standard_automatic") return "بررسی خودکار استاندارد";
+  if (status === "automatic_draft_requires_physician_review") return "پیش‌نویس نیازمند بررسی پزشک";
+  if (status === "physician_manual_plan_required") return "نیازمند نسخه‌نویسی پزشک";
+  if (status === "unsupported_or_hard_blocked") return "متوقف‌شده برای بررسی ایمنی";
+  return "نیازمند بررسی";
 }
 
-function supplementStatusLabel(status: PhysicianSupplementOrderStatus): string {
-  if (status === "draft") return "پیش‌نویس";
-  if (status === "prescribed") return "تجویزشده";
-  if (status === "active") return "فعال";
-  if (status === "completed") return "تکمیل‌شده";
-  if (status === "discontinued") return "قطع‌شده";
-  return "لغوشده";
+function medicalConditionLabel(code: string): string {
+  const labels: Readonly<Record<string, string>> = {
+    controlled_hypertension: "فشار خون کنترل‌شده",
+    dialysis: "دیالیز",
+    insulin_treated_diabetes: "دیابت با انسولین",
+    kidney_disease: "بیماری کلیوی",
+    lipid_disorder: "اختلال چربی خون",
+    liver_disease: "بیماری کبدی",
+    other: "شرایط پزشکی دیگر",
+    stable_gastrointestinal: "شرایط گوارشی پایدار",
+    type_2_diabetes_non_insulin: "دیابت نوع دو بدون انسولین",
+  };
+  return labels[code] ?? "شرایط پزشکی ثبت‌شده";
 }
 
 function formatNumber(value: number): string {
@@ -1432,7 +1440,7 @@ function physicianErrorMessage(error: unknown): string {
   if (code === "STALE_PLAN_REVISION") return "نسخهٔ پرونده تغییر کرده است؛ نسخهٔ تازه را بررسی کن.";
   if (code === "REVIEW_ASSIGNED_TO_ANOTHER_PHYSICIAN") return "این پرونده در اختیار پزشک دیگری است.";
   if (code === "REVIEW_NOT_IN_PROGRESS") return "این پرونده دیگر در وضعیت بررسی نیست.";
-  return error instanceof Error && error.message ? error.message : "عملیات پزشک انجام نشد؛ اتصال و وضعیت پرونده را بررسی کن.";
+  return mobileRequestErrorMessage(error, "عملیات پزشک انجام نشد؛ اتصال و وضعیت پرونده را بررسی کن.");
 }
 
 function useConnectivityStatus(): ConnectivityStatus {

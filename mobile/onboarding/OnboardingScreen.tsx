@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { ApiError } from "@fitician/core";
 import type { NutritionProfileInput, SafetyProfileInput, StructuredExerciseInput } from "@fitician/core/nutrition";
 import { getOnboardingSteps } from "@fitician/core/onboarding";
 import type { NutritionBasicsDraft, OnboardingState } from "@fitician/core/onboarding";
@@ -26,6 +25,7 @@ import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
 import { useRefreshMobileProfileStatus } from "../ui/navigation/RouteGuards";
 import { AppIcon, Button, Card, Notice, ProgressBar, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
+import { mobileRequestErrorMessage } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
   NativeOnboardingController,
@@ -1482,12 +1482,11 @@ function isOnboardingFormValidationError(error: unknown): error is OnboardingFor
 }
 
 function onboardingErrorMessage(error: unknown): string {
-  if (error instanceof ApiError && error.message !== "Request failed") return error.message;
   if (error instanceof Error && error.message !== "") {
     if (error.message.includes("Structured exercise")) return "اطلاعات فعالیت را کامل کن.";
     if (error.message.includes("incomplete")) return "پاسخ‌ها را کامل کن و دوباره تلاش کن.";
   }
-  return "ارتباط با سرور برقرار نشد. اتصال را بررسی کن و دوباره تلاش کن.";
+  return mobileRequestErrorMessage(error, "ارتباط با سرور برقرار نشد. اتصال را بررسی کن و دوباره تلاش کن.");
 }
 
 export function safetyFormValuesForState(safety: SafetyProfileInput | null): SafetyFormValues {

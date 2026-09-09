@@ -29,7 +29,7 @@ export function physicianReviewStatusLabel(status: string): string {
     pending: "در انتظار بررسی",
     rejected: "ردشده",
   };
-  return labels[status] ?? status.replaceAll("_", " ");
+  return labels[status] ?? "نیازمند بررسی";
 }
 
 export function samePhysicianPlanRevision(

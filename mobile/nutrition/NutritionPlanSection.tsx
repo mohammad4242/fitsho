@@ -2,13 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { ApiError } from "@fitician/core";
-
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { Button, Card, Dialog, DisclosureCard, EmptyState, Notice, Sheet, Skeleton } from "../ui/components";
-import { getMobileViewState, type MobileViewState } from "../ui/requestState";
+import { getMobileViewState, mobileRequestErrorMessage, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { canGenerateNutritionEstimate, formatNutritionNumber } from "./nutritionModel";
 import {
@@ -1272,8 +1270,7 @@ function nutritionLabel(value: string): string {
 }
 
 function nutritionPlanErrorMessage(error: unknown): string {
-  if (error instanceof ApiError && error.message !== "Request failed") return error.message;
-  return "عملیات برنامه غذایی انجام نشد؛ اتصال را بررسی کن و دوباره تلاش کن.";
+  return mobileRequestErrorMessage(error, "عملیات برنامه غذایی انجام نشد؛ اتصال را بررسی کن و دوباره تلاش کن.");
 }
 
 function useConnectivityStatus(): ConnectivityStatus {

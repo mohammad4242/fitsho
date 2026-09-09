@@ -80,6 +80,17 @@ export function classifyMobileStateError(error: unknown): MobileStateError {
   };
 }
 
+export function mobileRequestErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    if (error.status === 401 || error.status === 403) return "برای این عملیات دسترسی لازم وجود ندارد.";
+    if (error.status === 408 || error.status === 425 || error.status === 429) {
+      return "سرویس موقتاً شلوغ است؛ کمی بعد دوباره تلاش کن.";
+    }
+    if (error.status >= 500) return "سرویس موقتاً در دسترس نیست؛ دوباره تلاش کن.";
+  }
+  return fallback;
+}
+
 export function getMobileViewState<TData>(
   result: MobileQueryResult<TData>,
   options: MobileViewStateOptions<TData> = {},

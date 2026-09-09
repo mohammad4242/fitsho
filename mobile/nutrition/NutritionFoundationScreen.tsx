@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
-import { ApiError, irrToToman } from "@fitician/core";
+import { irrToToman } from "@fitician/core";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
@@ -15,7 +15,7 @@ import {
 } from "../onboarding/onboardingModel";
 import { AppIcon, Button, Card, Notice, PageHeading, Skeleton, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
-import { getMobileViewState, type MobileViewState } from "../ui/requestState";
+import { getMobileViewState, mobileRequestErrorMessage, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
   canGenerateNutritionEstimate,
@@ -710,8 +710,7 @@ function reviewStatusLabel(value: PhysicianReviewRequirement["status"]): string 
 }
 
 function nutritionErrorMessage(error: unknown): string {
-  if (error instanceof ApiError && error.message !== "Request failed") return error.message;
-  return "عملیات تغذیه انجام نشد؛ اتصال را بررسی کن و دوباره تلاش کن.";
+  return mobileRequestErrorMessage(error, "عملیات تغذیه انجام نشد؛ اتصال را بررسی کن و دوباره تلاش کن.");
 }
 
 function useConnectivityStatus(): ConnectivityStatus {

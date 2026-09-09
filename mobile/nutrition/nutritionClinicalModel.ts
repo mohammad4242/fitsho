@@ -2,6 +2,7 @@ import type { components } from "@fitician/core";
 
 const labStatusLabels: Readonly<Record<string, string>> = {
   cancelled: "لغوشده",
+  needs_attention: "نیازمند توجه",
   pending_review: "در انتظار بررسی پزشک",
   reviewed: "بررسی‌شده",
   uploaded: "بارگذاری‌شده",

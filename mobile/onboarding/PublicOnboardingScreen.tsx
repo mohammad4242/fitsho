@@ -8,6 +8,7 @@ import { PUBLIC_ONBOARDING_SOURCE } from "../auth/authRoute";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
 import { AppIcon, Button, Card, Notice, PageHeading, ProgressBar, StateSkeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
+import { mobileRequestErrorMessage } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
   ExerciseStage,
@@ -257,11 +258,8 @@ function onboardingProgressValue(state: OnboardingState): number {
 function publicOnboardingErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message !== "") {
     if (error.message.includes("incomplete")) return "پاسخ‌ها را کامل کن و دوباره تلاش کن.";
-    return error.message.includes("Request failed")
-      ? "ذخیره پاسخ‌ها انجام نشد. اتصال را بررسی کن."
-      : error.message;
   }
-  return "ذخیره پاسخ‌ها انجام نشد. دوباره تلاش کن.";
+  return mobileRequestErrorMessage(error, "ذخیره پاسخ‌ها انجام نشد. دوباره تلاش کن.");
 }
 
 const styles = StyleSheet.create({

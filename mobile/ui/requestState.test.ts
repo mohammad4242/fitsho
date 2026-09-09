@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 
 import { ApiError } from "@fitician/core";
 
-import { getMobileViewState, type MobileQueryResult } from "./requestState";
+import { getMobileViewState, mobileRequestErrorMessage, type MobileQueryResult } from "./requestState";
 
 function result<TData>(overrides: Partial<MobileQueryResult<TData>> = {}): MobileQueryResult<TData> {
   return {
@@ -66,4 +66,15 @@ it("maps transport failures to offline state without leaking raw errors", () => 
   );
 
   expect(state).toEqual({ status: "offline" });
+});
+
+it("presents API failures without exposing server or provider messages", () => {
+  const fallback = "عملیات انجام نشد.";
+  expect(mobileRequestErrorMessage(new ApiError(422, "internal provider detail"), fallback)).toBe(fallback);
+  expect(mobileRequestErrorMessage(new ApiError(403, "secret permission detail"), fallback)).toBe(
+    "برای این عملیات دسترسی لازم وجود ندارد.",
+  );
+  expect(mobileRequestErrorMessage(new ApiError(503, "upstream failure"), fallback)).toBe(
+    "سرویس موقتاً در دسترس نیست؛ دوباره تلاش کن.",
+  );
 });
