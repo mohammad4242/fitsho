@@ -606,7 +606,7 @@ function SupplementOrdersCard({
                   <Text style={styles.itemTitle}>{order.name}</Text>
                 </View>
                 <Text style={styles.bodyText}>
-                  {order.dose_amount ?? "—"} {order.dose_unit ?? ""} · {order.frequency ?? "دفعات ثبت نشده"}
+                  {order.dose_amount === null ? "—" : formatNutritionNumber(order.dose_amount)} {order.dose_unit ?? ""} · {order.frequency ?? "دفعات ثبت نشده"}
                 </Text>
                 {order.duration_days !== null ? <Text style={styles.mutedText}>مدت: {formatNutritionNumber(order.duration_days)} روز</Text> : null}
                 {order.instructions ? <Text style={styles.bodyText}>دستور مصرف: {order.instructions}</Text> : null}

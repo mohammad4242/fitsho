@@ -31,12 +31,19 @@ export function formatPrescriptionTarget(
   exercise: WorkoutPlanExercise,
   language: "fa" | "en",
 ): string {
+  const formatNumber = (value: number): string => language === "fa"
+    ? value.toLocaleString("fa-IR", { useGrouping: false })
+    : String(value);
   if (exercise.prescription_mode === "duration") {
     const min = exercise.duration_min_seconds ?? 0;
     const max = exercise.duration_max_seconds ?? min;
-    return language === "fa" ? `${min}–${max} ثانیه` : `${min}–${max} seconds`;
+    return language === "fa"
+      ? `${formatNumber(min)}–${formatNumber(max)} ثانیه`
+      : `${formatNumber(min)}–${formatNumber(max)} seconds`;
   }
   const min = exercise.reps_min ?? 0;
   const max = exercise.reps_max ?? min;
-  return language === "fa" ? `${min}–${max} تکرار` : `${min}–${max} reps`;
+  return language === "fa"
+    ? `${formatNumber(min)}–${formatNumber(max)} تکرار`
+    : `${formatNumber(min)}–${formatNumber(max)} reps`;
 }

@@ -4,6 +4,7 @@ import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import type { WorkoutDay } from "../workouts/workoutApi";
 import { Button, CinematicSurface, StateSkeleton } from "../ui/components";
+import { formatPersianNumber } from "../ui/locale";
 import { fiticianTokens } from "../ui/tokens";
 import { getHomeHeroLayout } from "./homePresentation";
 
@@ -64,11 +65,11 @@ export function WorkoutTodayCard({ day, state }: WorkoutTodayCardProps) {
           <Text numberOfLines={3} style={styles.title}>{title}</Text>
           <View style={styles.dayLine}>
             <View style={styles.dayBadge}>
-              <Text style={styles.dayNumber}>{day ? String(day.day_number).padStart(2, "0") : "—"}</Text>
+              <Text style={styles.dayNumber}>{day ? formatPersianNumber(day.day_number, { maximumFractionDigits: 0, useGrouping: false }).padStart(2, "۰") : "—"}</Text>
             </View>
             <View style={styles.sessionFacts}>
-              <Text style={styles.factValue}>{day ? `${day.estimated_duration_minutes} دقیقه` : "—"}</Text>
-              <Text style={styles.factLabel}>{day ? `${day.total_exercise_count} حرکت` : "برنامه در حال آماده‌سازی"}</Text>
+              <Text style={styles.factValue}>{day ? `${formatPersianNumber(day.estimated_duration_minutes, { maximumFractionDigits: 0 })} دقیقه` : "—"}</Text>
+              <Text style={styles.factLabel}>{day ? `${formatPersianNumber(day.total_exercise_count, { maximumFractionDigits: 0 })} حرکت` : "برنامه در حال آماده‌سازی"}</Text>
             </View>
           </View>
           {state === "offline" || state === "stale" ? (
@@ -116,6 +117,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.h3,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    writingDirection: "ltr",
   },
   emptyMedia: {
     alignItems: "center",

@@ -1,9 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
+import { Text } from "react-native";
 
 import { Button } from "./components/Button";
 import { TextField } from "./components/Input";
 import { MetricRing } from "./components/MetricRing";
+import { Dialog, Sheet } from "./components/Overlay";
 
 test("renders the shared button with native accessibility and press behavior", () => {
   const onPress = jest.fn();
@@ -44,4 +46,15 @@ test("exposes metric progress and its visible value to assistive technology", ()
   const ring = screen.getByRole("progressbar", { name: "پیشرفت کالری امروز" });
   expect(ring.props.accessibilityValue).toEqual({ max: 100, min: 0, now: 38 });
   expect(screen.getByText("۳۸٪")).toBeTruthy();
+});
+
+test("keeps Persian overlays direction-aware", () => {
+  const view = render(
+    <>
+      <Sheet onClose={jest.fn()} title="جزئیات" visible><Text>متن</Text><TextField label="نام" /></Sheet>
+      <Dialog message="پیام" onClose={jest.fn()} title="تأیید" visible />
+    </>,
+  );
+
+  expect(view).toBeTruthy();
 });

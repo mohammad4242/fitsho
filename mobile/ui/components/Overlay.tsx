@@ -130,6 +130,7 @@ export function Dialog({
 
 const styles = StyleSheet.create({
   actions: {
+    direction: "rtl",
     flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "flex-end",
@@ -165,11 +166,13 @@ const styles = StyleSheet.create({
     shadowOffset: fiticianTokens.shadows.focus.offset,
     shadowOpacity: fiticianTokens.shadows.focus.opacity,
     shadowRadius: fiticianTokens.shadows.focus.radius,
+    direction: "rtl",
     width: "100%",
   },
   dialogOverlay: {
     alignItems: "center",
     backgroundColor: "rgba(2,6,7,0.78)",
+    direction: "rtl",
     flex: 1,
     justifyContent: "center",
     padding: fiticianTokens.spacing[4],
@@ -188,9 +191,12 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 26,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   overlay: {
     backgroundColor: "rgba(2,6,7,0.72)",
+    direction: "rtl",
     flex: 1,
     justifyContent: "flex-end",
   },
@@ -204,6 +210,7 @@ const styles = StyleSheet.create({
     shadowOffset: fiticianTokens.shadows.focus.offset,
     shadowOpacity: fiticianTokens.shadows.focus.opacity,
     shadowRadius: fiticianTokens.shadows.focus.radius,
+    direction: "rtl",
   },
   title: {
     color: fiticianTokens.colors.ink,

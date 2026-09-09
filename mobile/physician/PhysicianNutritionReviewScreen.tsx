@@ -25,6 +25,7 @@ import {
   TextField,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
+import { formatPersianNumber } from "../ui/locale";
 import { getMobileViewState, mobileRequestErrorMessage, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -760,7 +761,7 @@ function PhysicianReviewDetail({
           </View>
           <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>پروندهٔ تغذیه</Text>
-            <Text style={styles.detailTitle}>نسخه در حال بررسی {plan.revision}</Text>
+            <Text style={styles.detailTitle}>نسخه در حال بررسی {formatPersianNumber(plan.revision, { maximumFractionDigits: 0 })}</Text>
           </View>
         </View>
         <Text style={[styles.status, readOnly && styles.approvedStatus]}>
@@ -804,7 +805,7 @@ function PhysicianReviewDetail({
           ) : null}
           {plan.days.map((day) => (
             <Card key={day.plan_date} style={styles.dayCard}>
-              <Text style={styles.dayTitle}>روز {day.day_index + 1} · {day.plan_date}</Text>
+              <Text style={styles.dayTitle}>روز {formatPersianNumber(day.day_index + 1, { maximumFractionDigits: 0 })} · {formatPhysicianPlanDate(day.plan_date)}</Text>
               {day.meals.map((meal) => (
                 <MealEditor
                   busy={busy}
@@ -1430,7 +1431,13 @@ function medicalConditionLabel(code: string): string {
 }
 
 function formatNumber(value: number): string {
-  return new Intl.NumberFormat("fa-IR").format(value);
+  return formatPersianNumber(value);
+}
+
+function formatPhysicianPlanDate(value: string): string {
+  return new Intl.DateTimeFormat("fa-IR", { day: "numeric", month: "short" }).format(
+    new Date(`${value}T12:00:00`),
+  );
 }
 
 function physicianErrorMessage(error: unknown): string {

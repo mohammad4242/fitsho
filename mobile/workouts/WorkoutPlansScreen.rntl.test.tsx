@@ -111,7 +111,7 @@ test("renders the web-parity workout hierarchy and shared generation control", (
   renderWorkoutPlans();
 
   expect(screen.getByRole("header", { name: "برنامه تمرینی من" })).toBeTruthy();
-  expect(screen.getByLabelText("4 هفته")).toBeTruthy();
+  expect(screen.getByLabelText("۴ هفته")).toBeTruthy();
   expect(screen.getByTestId("segmented-control")).toBeTruthy();
   expect(screen.getByRole("radio", { name: "موتور داخلی" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "هوش مصنوعی" })).toBeTruthy();

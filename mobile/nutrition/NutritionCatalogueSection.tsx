@@ -17,6 +17,7 @@ import {
   TextField,
 } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
+import { formatPersianNumber } from "../ui/locale";
 import { fiticianTokens } from "../ui/tokens";
 import {
   createNutritionCatalogueApi,
@@ -281,7 +282,7 @@ function MealCatalogueCard({ meal, onPress }: { readonly meal: MealCatalogueItem
           <Text style={styles.category}>{mealCatalogueCategoryLabel(meal.category)}</Text>
         </View>
       </View>
-      <Text style={styles.portionHint}>{meal.items.length} ماده تأییدشده در این وعده</Text>
+      <Text style={styles.portionHint}>{formatPersianNumber(meal.items.length, { maximumFractionDigits: 0 })} ماده تأییدشده در این وعده</Text>
       {prepared ? <Notice message={prepared.message} title={prepared.title} variant="info" /> : null}
     </Card>
   );
@@ -313,7 +314,7 @@ function FoodDetailsSheet({ food, onClose }: { readonly food: FoodCatalogueItem 
               />
             ))}
           </View>
-          <Text style={styles.sourceText}>منبع: {food.source.name} · نسخه داده: {food.source.data_version}</Text>
+          <Text style={styles.sourceText}>منبع: {food.source.name} · دادهٔ مرجع ثبت‌شده</Text>
           <Notice message="قیمت این ماده در کاتالوگ عضو نمایش داده نمی‌شود؛ هزینه فقط از برنامه تأییدشده می‌آید." variant="info" />
           <Button label="بستن" onPress={onClose} variant="ghost" />
         </View>

@@ -56,6 +56,14 @@ Classification values follow the master plan: `VISUAL_HIERARCHY`, `SECTION_ORDER
 | Pending approval/read-only | Workout coach and nutrition physician flows in web | Native workout, plan, coach, physician, and result screens model read-only states | Preserve guards and explicit status |
 | Historical | Workout version history and body timeline on web | Workout history, body history, nutrition history, private local media | Preserve route/data ownership |
 
+## Phase 25 evidence
+
+- Web reference: `frontend/src/index.css` uses Vazirmatn for Persian body/forms, Lalezar for short Persian display headings, Sora for English/numeric display, and explicit LTR treatment for email/password fields.
+- Native parity: `mobile/ui/fontManifest.ts` and `mobile/ui/tokens.ts` keep the same family roles; `mobile/ui/locale.ts` and the shared prescription formatter keep Persian numerals and mixed Persian/English units readable.
+- RTL adaptation: the phone shell owns RTL direction, rebuilt screens use explicit Persian text direction, and modal/sheet surfaces now inherit RTL instead of using an isolated LTR default.
+- English smoke: English-only fields and labels retain LTR text direction where the existing native surface supports them; broader English copy migration remains outside this Persian-first parity pass.
+- Width evidence: source and automated checks cover 360/390/430 layout targets; physical RTL/LTR and text-scale verification remains pending because no Android device or emulator is available.
+
 ## Phase 0 gate
 
 Every core page now has a row with web source, native route/implementation, preserved actions and

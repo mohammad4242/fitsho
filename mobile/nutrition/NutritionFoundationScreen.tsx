@@ -3,8 +3,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
-import { irrToToman } from "@fitician/core";
-
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
@@ -15,6 +13,7 @@ import {
 } from "../onboarding/onboardingModel";
 import { AppIcon, Button, Card, Notice, PageHeading, Skeleton, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
+import { formatPersianNumber } from "../ui/locale";
 import { getMobileViewState, mobileRequestErrorMessage, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -246,8 +245,11 @@ function NutritionProfileSection({
       {state.status === "offline" ? <Notice message="آخرین نسخه ذخیره‌شده نمایش داده می‌شود." variant="offline" /> : null}
       <SummaryRow label="الگوی غذایی" value={dietaryLabels[profile.dietary_pattern] ?? profile.dietary_pattern} />
       <SummaryRow label="فعالیت روزانه" value={activityLabels[profile.daily_activity_level] ?? profile.daily_activity_level} />
-      <SummaryRow label="وعده و میان‌وعده" value={`${profile.effective_main_meal_slots ?? profile.meals_per_day ?? 0} وعده · ${profile.effective_snack_slots ?? profile.snacks_per_day ?? 0} میان‌وعده`} />
-      <SummaryRow label="بودجه هفتگی" value={`${irrToToman(profile.weekly_budget_irr)} تومان`} />
+      <SummaryRow
+        label="وعده و میان‌وعده"
+        value={`${formatPersianNumber(profile.effective_main_meal_slots ?? profile.meals_per_day ?? 0, { maximumFractionDigits: 0 })} وعده · ${formatPersianNumber(profile.effective_snack_slots ?? profile.snacks_per_day ?? 0, { maximumFractionDigits: 0 })} میان‌وعده`}
+      />
+      <SummaryRow label="بودجه هفتگی" value={`${formatPersianNumber(Math.floor(profile.weekly_budget_irr / 10), { maximumFractionDigits: 0 })} تومان`} />
       {profile.physician_review_required ? (
         <Notice message="ادامه بعضی عملیات تغذیه به بررسی پزشک نیاز دارد." variant="warning" />
       ) : null}
@@ -477,7 +479,7 @@ function StructuredExerciseSection({ state }: { readonly state: MobileViewState<
       <Text style={styles.bodyText}>منبع: {exerciseSourceLabels[exercise.source] ?? exercise.source}</Text>
       <Text style={styles.bodyText}>
         {exercise.trains
-          ? `${exercise.days_per_week ?? 0} روز در هفته · ${exercise.minutes_per_session ?? 0} دقیقه · ${exerciseTypeLabel(exercise.exercise_type)}`
+          ? `${formatPersianNumber(exercise.days_per_week ?? 0, { maximumFractionDigits: 0 })} روز در هفته · ${formatPersianNumber(exercise.minutes_per_session ?? 0, { maximumFractionDigits: 0 })} دقیقه · ${exerciseTypeLabel(exercise.exercise_type)}`
           : "در حال حاضر فعالیت ساختاریافته‌ای ثبت نشده است."}
       </Text>
     </Card>

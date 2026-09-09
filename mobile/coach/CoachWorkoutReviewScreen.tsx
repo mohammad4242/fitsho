@@ -407,7 +407,7 @@ function CoachReviewDetail({
       </Card>
 
       {readOnly ? <Notice message="این پرونده در حالت فقط‌خواندنی نمایش داده می‌شود." variant="info" /> : null}
-      <Text style={styles.sectionTitle}>پیش‌نویس مربی · نسخه {detail.draft_revision}</Text>
+      <Text style={styles.sectionTitle}>پیش‌نویس مربی · نسخه {faNumber(detail.draft_revision)}</Text>
       {draft.days.length === 0 ? <Notice message="پیش‌نویس برنامه در دسترس نیست." variant="warning" /> : null}
       {draft.days.map((day, dayIndex) => (
         <Card key={day.day_number} style={styles.dayCard}>

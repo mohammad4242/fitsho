@@ -18,6 +18,7 @@ import {
   SegmentedControl,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
+import { formatPersianNumber } from "../ui/locale";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -196,8 +197,8 @@ export function WorkoutPlansScreen() {
         <View style={styles.pageHeaderCopy}>
           <Text accessibilityRole="header" style={styles.pageTitle}>برنامه تمرینی من</Text>
         </View>
-        <View accessibilityLabel={`${contextPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4} هفته`} style={styles.durationBadge}>
-          <Text style={styles.durationValue}>{contextPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4}</Text>
+        <View accessibilityLabel={`${formatPersianNumber(contextPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4, { maximumFractionDigits: 0 })} هفته`} style={styles.durationBadge}>
+          <Text style={styles.durationValue}>{formatPersianNumber(contextPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4, { maximumFractionDigits: 0 })}</Text>
           <Text style={styles.durationLabel}>هفته</Text>
         </View>
       </View>
@@ -337,9 +338,9 @@ function PlanContextStrip({
   const averageDuration = workoutPlanAverageDuration(plan);
   const cells = [
     { label: "برنامه فعلی", value: statusLabel, valueStyle: statusStyle },
-    { label: "دوره", value: `دوره ${plan.plan_duration_weeks} هفته‌ای`, valueStyle: undefined },
-    { label: "روزهای تمرین", value: `${plan.days.length} روز تمرین`, valueStyle: undefined },
-    { label: "زمان جلسه", value: averageDuration === null ? "—" : `${averageDuration} دقیقه برای هر جلسه`, valueStyle: undefined },
+    { label: "دوره", value: `دوره ${formatPersianNumber(plan.plan_duration_weeks, { maximumFractionDigits: 0 })} هفته‌ای`, valueStyle: undefined },
+    { label: "روزهای تمرین", value: `${formatPersianNumber(plan.days.length, { maximumFractionDigits: 0 })} روز تمرین`, valueStyle: undefined },
+    { label: "زمان جلسه", value: averageDuration === null ? "—" : `${formatPersianNumber(averageDuration, { maximumFractionDigits: 0 })} دقیقه برای هر جلسه`, valueStyle: undefined },
   ];
 
   return (
@@ -634,7 +635,7 @@ function WorkoutDayCard({
   const leadName = leadExercise?.exercise.name_fa || leadExercise?.exercise.name_en || "";
   return (
     <Pressable
-      accessibilityLabel={`روز ${day.day_number}: ${day.title_fa || day.title_en}`}
+      accessibilityLabel={`روز ${formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: ${day.title_fa || day.title_en}`}
       accessibilityRole="button"
       accessibilityState={{ expanded }}
       onPress={onToggle}
@@ -670,15 +671,15 @@ function WorkoutDayCard({
           </Pressable>
         ) : null}
         <View style={[styles.dayNumberBox, focus ? styles.focusDayNumber : styles.secondaryDayNumber]}>
-          <Text style={styles.dayNumber}>{String(day.day_number).padStart(2, "0")}</Text>
+          <Text style={styles.dayNumber}>{formatPersianNumber(day.day_number, { maximumFractionDigits: 0, useGrouping: false }).padStart(2, "۰")}</Text>
         </View>
         <View style={styles.dayHeadingCopy}>
           {showNext ? <Text style={styles.nextSessionLabel}>جلسه بعد</Text> : null}
           <Text numberOfLines={focus ? 2 : 1} style={[styles.dayTitle, !focus && styles.secondaryDayTitle]}>
-            روز {day.day_number}: {day.title_fa || day.title_en}
+            روز {formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: {day.title_fa || day.title_en}
           </Text>
           <Text numberOfLines={1} style={styles.dayMeta}>
-            {focus && leadExercise ? `${leadName} · ` : ""}{day.estimated_duration_minutes} دقیقه
+            {focus && leadExercise ? `${leadName} · ` : ""}{formatPersianNumber(day.estimated_duration_minutes, { maximumFractionDigits: 0 })} دقیقه
           </Text>
         </View>
         <AppIcon
@@ -726,10 +727,10 @@ function formatExerciseMetadata(exercise: WorkoutPlanExercise): string {
     : exercise.reps_min ?? exercise.reps_max;
 
   return [
-    exercise.sets === null || exercise.sets === undefined ? null : `${exercise.sets} ست`,
+    exercise.sets === null || exercise.sets === undefined ? null : `${formatPersianNumber(exercise.sets, { maximumFractionDigits: 0 })} ست`,
     prescriptionValue === null || prescriptionValue === undefined ? null : formatWorkoutPrescription(exercise),
-    exercise.rir === null || exercise.rir === undefined ? null : `RIR ${exercise.rir}`,
-    exercise.rest_seconds === null || exercise.rest_seconds === undefined ? null : `${exercise.rest_seconds}ث استراحت`,
+    exercise.rir === null || exercise.rir === undefined ? null : `RIR ${formatPersianNumber(exercise.rir, { maximumFractionDigits: 0, useGrouping: false })}`,
+    exercise.rest_seconds === null || exercise.rest_seconds === undefined ? null : `${formatPersianNumber(exercise.rest_seconds, { maximumFractionDigits: 0 })}ث استراحت`,
   ].filter((item): item is string => item !== null).join(" · ");
 }
 
@@ -991,6 +992,7 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 24,
     textAlign: "center",
+    writingDirection: "ltr",
   },
   exerciseSection: {
     borderTopColor: fiticianTokens.colors.line,
