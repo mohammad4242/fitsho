@@ -39,14 +39,15 @@ export function NutritionSummaryCard({ error = false, loading, summary }: Nutrit
         {hasTarget ? (
           <>
             <View style={styles.calorieRow}>
-              <View style={styles.calorieCopy}>
-                <Text style={styles.calorieValue}>{formatNumber(consumed ?? summary.targetCalories ?? 0)}</Text>
-                <Text style={styles.calorieLabel}>
-                  {consumed === null
-                    ? "هدف کالری روزانه"
-                    : `از ${formatNumber(summary.targetCalories ?? 0)} کیلوکالری`}
-                </Text>
-                <Text style={[styles.statusText, statusTone(summary.status)]}>{statusLabel(summary.status)}</Text>
+              <View style={styles.calorieValues}>
+                {consumed !== null ? (
+                  <CalorieMetric label="مصرف امروز" value={consumed} />
+                ) : null}
+                <CalorieMetric
+                  label="هدف کالری روزانه"
+                  value={summary.targetCalories ?? 0}
+                  withDivider={consumed !== null}
+                />
               </View>
               <MetricRing label="پیشرفت کالری امروز" progress={summary.progress} />
             </View>
@@ -71,6 +72,23 @@ export function NutritionSummaryCard({ error = false, loading, summary }: Nutrit
   );
 }
 
+function CalorieMetric({
+  label,
+  value,
+  withDivider = false,
+}: {
+  readonly label: string;
+  readonly value: number;
+  readonly withDivider?: boolean;
+}) {
+  return (
+    <View style={[styles.calorieMetric, withDivider && styles.calorieMetricDivider]}>
+      <Text style={styles.calorieValue}>{formatNumber(value)}</Text>
+      <Text style={styles.calorieLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function formatNumber(value: number): string {
   return Math.round(value).toLocaleString("fa-IR");
 }
@@ -79,21 +97,13 @@ function formatMetric(value: number | null): string {
   return value === null ? "—" : `${formatNumber(value)}g`;
 }
 
-function statusLabel(status: HomeNutritionSummary["status"]): string {
-  if (status === "pending") return "در انتظار بررسی پزشک";
-  if (status === "on_plan") return "امروز روی مسیر هستی";
-  if (status === "off_plan") return "امروز از مسیر فاصله داشتی";
-  return "هدف روزانه فعال است";
-}
-
-function statusTone(status: HomeNutritionSummary["status"]) {
-  if (status === "pending") return styles.statusPending;
-  if (status === "off_plan") return styles.statusWarning;
-  return styles.statusReady;
-}
-
 const styles = StyleSheet.create({
-  calorieCopy: { flex: 1, gap: fiticianTokens.spacing[1] },
+  calorieMetric: { flex: 1, gap: fiticianTokens.spacing[1], minWidth: 0 },
+  calorieMetricDivider: {
+    borderRightColor: fiticianTokens.colors.line,
+    borderRightWidth: 1,
+    paddingRight: fiticianTokens.spacing[3],
+  },
   calorieLabel: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -101,6 +111,12 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  calorieValues: {
+    flex: 1,
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+    minWidth: 0,
   },
   calorieRow: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[4] },
   calorieValue: {
@@ -168,16 +184,6 @@ const styles = StyleSheet.create({
     width: 46,
   },
   pressed: { opacity: 0.88, transform: [{ scale: fiticianTokens.motion.pressedScale }] },
-  statusPending: { color: fiticianTokens.colors.amber },
-  statusReady: { color: fiticianTokens.colors.success },
-  statusText: {
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  statusWarning: { color: fiticianTokens.colors.coral },
   title: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,

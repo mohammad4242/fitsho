@@ -242,7 +242,6 @@ function NutritionProfileSection({
         <Text style={styles.sectionTitle}>پروفایل تغذیه</Text>
         <Text style={styles.statusText}>{profile.onboarding_status === "completed" ? "کامل" : "در حال تکمیل"}</Text>
       </View>
-      {state.status === "offline" ? <Notice message="آخرین نسخه ذخیره‌شده نمایش داده می‌شود." variant="offline" /> : null}
       <SummaryRow label="الگوی غذایی" value={dietaryLabels[profile.dietary_pattern] ?? profile.dietary_pattern} />
       <SummaryRow label="فعالیت روزانه" value={activityLabels[profile.daily_activity_level] ?? profile.daily_activity_level} />
       <SummaryRow

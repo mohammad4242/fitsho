@@ -40,18 +40,10 @@ export function WorkoutTodayCard({ day, state }: WorkoutTodayCardProps) {
             />
           ) : (
             <View style={styles.emptyMedia}>
-              <Text style={styles.emptyMediaMark}>01</Text>
               <Text style={styles.emptyMediaText}>جلسه بعدی پس از آماده‌شدن برنامه اینجا دیده می‌شود.</Text>
             </View>
           )}
           <View pointerEvents="none" style={styles.mediaScrim} />
-          {firstExercise ? (
-            <View pointerEvents="none" style={styles.mediaCaption}>
-              <Text numberOfLines={2} style={styles.mediaTitle}>
-                {firstExercise.exercise.name_fa || firstExercise.exercise.name_en}
-              </Text>
-            </View>
-          ) : null}
         </View>
 
         <View style={styles.copy}>
@@ -69,12 +61,8 @@ export function WorkoutTodayCard({ day, state }: WorkoutTodayCardProps) {
             </View>
             <View style={styles.sessionFacts}>
               <Text style={styles.factValue}>{day ? `${formatPersianNumber(day.estimated_duration_minutes, { maximumFractionDigits: 0 })} دقیقه` : "—"}</Text>
-              <Text style={styles.factLabel}>{day ? `${formatPersianNumber(day.total_exercise_count, { maximumFractionDigits: 0 })} حرکت` : "برنامه در حال آماده‌سازی"}</Text>
             </View>
           </View>
-          {state === "offline" || state === "stale" ? (
-            <Text style={styles.stateText}>آخرین نسخه ذخیره‌شده نمایش داده می‌شود.</Text>
-          ) : null}
           {state === "error" ? (
             <Text style={styles.stateText}>دریافت برنامه انجام نشد؛ از بخش تمرین دوباره تلاش کن.</Text>
           ) : null}
@@ -98,18 +86,23 @@ function stateLabel(state: WorkoutHomeState, hasDay: boolean): string {
 }
 
 const styles = StyleSheet.create({
-  action: { alignSelf: "stretch", marginTop: "auto" },
-  card: { minHeight: 276 },
-  copy: { flex: 1.08, gap: fiticianTokens.spacing[3], padding: fiticianTokens.spacing[4] },
+  action: {
+    alignSelf: "stretch",
+    marginTop: "auto",
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  card: { minHeight: 216, width: "100%" },
+  copy: { flex: 1.05, gap: fiticianTokens.spacing[2], padding: fiticianTokens.spacing[3] },
   dayBadge: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    height: 50,
+    height: 44,
     justifyContent: "center",
-    width: 50,
+    width: 44,
   },
   dayLine: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[2] },
   dayNumber: {
@@ -127,12 +120,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: fiticianTokens.spacing[4],
   },
-  emptyMediaMark: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
-    fontSize: fiticianTokens.typography.fontSize.metric,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-  },
   emptyMediaText: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -149,13 +136,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  factLabel: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: 10,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
   factValue: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -164,15 +144,9 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  layout: { flexDirection: "row-reverse", minHeight: 276 },
+  layout: { flexDirection: "row-reverse", minHeight: 216 },
   layoutStacked: { flexDirection: "column" },
-  media: { borderRadius: 0, flex: 1, minHeight: 276 },
-  mediaCaption: {
-    bottom: fiticianTokens.spacing[3],
-    left: fiticianTokens.spacing[3],
-    position: "absolute",
-    right: fiticianTokens.spacing[3],
-  },
+  media: { borderRadius: 0, flex: 1, minHeight: 216 },
   mediaScrim: {
     backgroundColor: fiticianTokens.colors.scrim,
     bottom: 0,
@@ -181,23 +155,15 @@ const styles = StyleSheet.create({
     right: 0,
     top: "54%",
   },
-  mediaStacked: { flex: 0, height: 178, minHeight: 178 },
-  mediaTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.lg,
-    lineHeight: 25,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
+  mediaStacked: { flex: 0, height: 120, minHeight: 120 },
   mediaWrap: {
     backgroundColor: fiticianTokens.colors.surfaceRaised,
-    flex: 0.92,
-    minHeight: 276,
+    flex: 1.15,
+    minHeight: 216,
     overflow: "hidden",
     position: "relative",
   },
-  sessionFacts: { flex: 1, gap: 2 },
+  sessionFacts: { flex: 1 },
   stateText: {
     color: fiticianTokens.colors.amber,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
