@@ -21,15 +21,16 @@ import {
   preparedMealCatalogueLabel,
   selectDefaultFoodPortion,
 } from "./nutritionCatalogueModel";
+import { NutritionThumbnail } from "./NutritionThumbnail";
 import { useEffect } from "react";
 
 type CatalogueMode = "foods" | "meals";
 
-export function NutritionCatalogueSection() {
+export function NutritionCatalogueSection({ initialMode = "foods" }: { readonly initialMode?: CatalogueMode } = {}) {
   const auth = useMobileAuth();
   const connectivityStatus = useConnectivityStatus();
   const api = useMemo(() => createNutritionCatalogueApi(auth.request), [auth.request]);
-  const [mode, setMode] = useState<CatalogueMode>("foods");
+  const [mode, setMode] = useState<CatalogueMode>(initialMode);
   const [query, setQuery] = useState("");
   const [foodCategory, setFoodCategory] = useState<string | null>(null);
   const [mealCategory, setMealCategory] = useState<MealCatalogueCategory | null>(null);
@@ -224,12 +225,15 @@ function FoodCatalogueCard({ food, onPress }: { readonly food: FoodCatalogueItem
   const defaultPortion = selectDefaultFoodPortion(food);
   return (
     <Card onPress={onPress} style={styles.catalogueCard} variant="interactive">
-      <View style={styles.cardHeading}>
-        <View style={styles.cardCopy}>
-          <Text style={styles.cardTitle}>{food.name_fa}</Text>
-          <Text style={styles.cardEnglish}>{food.name_en}</Text>
+      <View style={styles.catalogueIdentity}>
+        <NutritionThumbnail imageUrl={food.image_url} name={food.name_fa} style={styles.catalogueThumbnail} />
+        <View style={styles.cardHeading}>
+          <View style={styles.cardCopy}>
+            <Text style={styles.cardTitle}>{food.name_fa}</Text>
+            <Text style={styles.cardEnglish}>{food.name_en}</Text>
+          </View>
+          <Text style={styles.category}>{food.category}</Text>
         </View>
-        <Text style={styles.category}>{food.category}</Text>
       </View>
       <View style={styles.macroRow}>
         {foodCatalogueMacroRows(food).slice(0, 4).map((macro) => (
@@ -250,12 +254,15 @@ function MealCatalogueCard({ meal, onPress }: { readonly meal: MealCatalogueItem
   const prepared = preparedMealCatalogueLabel(meal.calculation_mode);
   return (
     <Card onPress={onPress} style={styles.catalogueCard} variant="interactive">
-      <View style={styles.cardHeading}>
-        <View style={styles.cardCopy}>
-          <Text style={styles.cardTitle}>{meal.name_fa}</Text>
-          <Text style={styles.cardEnglish}>{meal.name_en}</Text>
+      <View style={styles.catalogueIdentity}>
+        <NutritionThumbnail imageUrl={meal.image_url} name={meal.name_fa} style={styles.catalogueThumbnail} />
+        <View style={styles.cardHeading}>
+          <View style={styles.cardCopy}>
+            <Text style={styles.cardTitle}>{meal.name_fa}</Text>
+            <Text style={styles.cardEnglish}>{meal.name_en}</Text>
+          </View>
+          <Text style={styles.category}>{mealCatalogueCategoryLabel(meal.category)}</Text>
         </View>
-        <Text style={styles.category}>{mealCatalogueCategoryLabel(meal.category)}</Text>
       </View>
       <Text style={styles.portionHint}>{meal.items.length} ماده تأییدشده در این وعده</Text>
       {prepared ? <Notice message={prepared.message} title={prepared.title} variant="info" /> : null}
@@ -268,6 +275,7 @@ function FoodDetailsSheet({ food, onClose }: { readonly food: FoodCatalogueItem 
     <Sheet onClose={onClose} title={food?.name_fa ?? "جزئیات ماده غذایی"} visible={food !== null}>
       {food ? (
         <View style={styles.sheetStack}>
+          <NutritionThumbnail imageUrl={food.image_url} name={food.name_fa} style={styles.sheetThumbnail} />
           <Text style={styles.cardEnglish}>{food.name_en}</Text>
           <Text style={styles.disclaimer}>
             مقادیر زیر برای نمایش گرد شده‌اند؛ محاسبات برنامه با دقت ذخیره‌شده سمت سرور انجام می‌شوند.
@@ -302,6 +310,7 @@ function MealDetailsSheet({ meal, onClose }: { readonly meal: MealCatalogueItem 
     <Sheet onClose={onClose} title={meal?.name_fa ?? "جزئیات وعده"} visible={meal !== null}>
       {meal ? (
         <View style={styles.sheetStack}>
+          <NutritionThumbnail imageUrl={meal.image_url} name={meal.name_fa} style={styles.sheetThumbnail} />
           <Text style={styles.cardEnglish}>{meal.name_en}</Text>
           <Text style={styles.sheetTitle}>مواد تشکیل‌دهنده</Text>
           <View style={styles.detailStack}>
@@ -438,6 +447,14 @@ const styles = StyleSheet.create({
   },
   cardStack: {
     gap: fiticianTokens.spacing[3],
+  },
+  catalogueIdentity: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+  },
+  catalogueThumbnail: {
+    flexShrink: 0,
   },
   cardTitle: {
     color: fiticianTokens.colors.ink,
@@ -607,6 +624,11 @@ const styles = StyleSheet.create({
   },
   sheetStack: {
     gap: fiticianTokens.spacing[3],
+  },
+  sheetThumbnail: {
+    alignSelf: "flex-end",
+    height: 128,
+    width: 128,
   },
   sheetTitle: {
     color: fiticianTokens.colors.ink,

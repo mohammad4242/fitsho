@@ -7,7 +7,7 @@ import { ApiError } from "@fitician/core";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
-import { Button, Card, Dialog, EmptyState, Notice, Sheet, Skeleton } from "../ui/components";
+import { Button, Card, Dialog, DisclosureCard, EmptyState, Notice, Sheet, Skeleton } from "../ui/components";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { canGenerateNutritionEstimate, formatNutritionNumber } from "./nutritionModel";
@@ -42,6 +42,7 @@ import {
   selectNutritionPlan,
   type PreparedRecipePresentation,
 } from "./nutritionPlanModel";
+import { NutritionThumbnail } from "./NutritionThumbnail";
 import {
   ExpoNutritionPlanPdfStore,
   type StoredNutritionPlanPdf,
@@ -609,14 +610,12 @@ function NutritionMealCard({
   }
 
   return (
-    <View style={styles.mealCard}>
-      <View style={styles.mealHeading}>
-        <View style={styles.mealCopy}>
-          <Text style={styles.mealTitle}>{mealName}</Text>
-          {meal.name_en && meal.name_en !== meal.name_fa ? <Text style={styles.mealEnglish}>{meal.name_en}</Text> : null}
-        </View>
-        <Text style={styles.mealMeta}>{mealRoleLabel(meal.slot_role)} · {formatNutritionPlanMoney(meal.cost_irr)}</Text>
-      </View>
+    <DisclosureCard
+      leading={<NutritionThumbnail imageUrl={meal.image_url} name={mealName} style={styles.mealThumbnail} />}
+      summary={`${mealRoleLabel(meal.slot_role)} · ${formatNutritionPlanMoney(meal.cost_irr)}`}
+      style={styles.mealCard}
+      title={mealName}
+    >
       {meal.is_locked ? <Text style={styles.lockedLabel}>این وعده قفل شده است</Text> : null}
       {meal.foods.length > 0 ? (
         <View style={styles.foodStack}>
@@ -700,7 +699,7 @@ function NutritionMealCard({
       >
         {previewRequiresReview(preview) ? <Notice message="این تغییر نیازمند بررسی دوباره پزشک است." variant="warning" /> : null}
       </Dialog>
-    </View>
+    </DisclosureCard>
   );
 }
 
@@ -758,6 +757,7 @@ function ReplacementSheet({
                 onPress={() => onSelect(id)}
                 style={[styles.option, selected && styles.optionSelected]}
               >
+                <NutritionThumbnail imageUrl={option.image_url} name={name} style={styles.optionThumbnail} />
                 <Text style={[styles.optionName, selected && styles.optionNameSelected]}>{name}</Text>
                 <Text style={styles.optionMeta}>{formatNutritionPlanMoney(option.cost_irr)}</Text>
               </Pressable>
@@ -1353,48 +1353,20 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
     gap: fiticianTokens.spacing[2],
-    padding: fiticianTokens.spacing[3],
-  },
-  mealCopy: {
-    alignItems: "flex-end",
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-  },
-  mealEnglish: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
-    writingDirection: "ltr",
+    padding: 0,
   },
   mealActions: {
     flexDirection: "row-reverse",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
-  mealHeading: {
-    alignItems: "flex-start",
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[2],
-    justifyContent: "space-between",
-  },
-  mealMeta: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
-    writingDirection: "rtl",
+  mealThumbnail: {
+    flexShrink: 0,
+    height: 64,
+    width: 64,
   },
   mealStack: {
     gap: fiticianTokens.spacing[2],
-  },
-  mealTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   nutrientChip: {
     backgroundColor: fiticianTokens.colors.surface,
@@ -1454,6 +1426,10 @@ const styles = StyleSheet.create({
   },
   optionNameSelected: {
     color: fiticianTokens.colors.aqua,
+  },
+  optionThumbnail: {
+    height: 56,
+    width: 56,
   },
   optionSelected: {
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
