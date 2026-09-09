@@ -8,21 +8,50 @@ import { createNutritionTrackingApi } from "./nutritionTrackingApi";
 import { nutritionKeys } from "../data/queryKeys";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import type { ConnectivityStatus } from "../platform/connectivity";
-import { Button, Card, MetricRing, Notice, ProgressBar, SectionHeader, Skeleton } from "../ui/components";
+import { Button, Card, MetricRing, Notice, Skeleton } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
-import { buildNutritionSummary, type NutritionSummaryMetric } from "./nutritionSummaryModel";
+import { NutritionDualMetricRing } from "./NutritionDualMetricRing";
 import { formatNutritionNumber } from "./nutritionModel";
 
-export function NutritionSummaryCard({
+type NutritionSummaryCardProps =
+  | {
+    readonly connectivityStatus: ConnectivityStatus;
+    readonly estimate: NutritionEstimate | null | undefined;
+    readonly onRefresh?: () => void;
+  }
+  | {
+    readonly error: boolean;
+    readonly loading: boolean;
+    readonly summary: {
+      readonly carbohydrate: number | null;
+      readonly consumedCalories: number | null;
+      readonly estimatedDailyExpenditureCalories: number | null;
+      readonly fat: number | null;
+      readonly progress: number;
+      readonly protein: number | null;
+      readonly status: string;
+      readonly targetCalories: number | null;
+    };
+  };
+
+export function NutritionSummaryCard(props: NutritionSummaryCardProps) {
+  if ("estimate" in props) {
+    return <NutritionEstimateSummaryCard {...props} />;
+  }
+  return <LegacyNutritionSummaryCard {...props} />;
+}
+
+function NutritionEstimateSummaryCard({
   connectivityStatus,
   estimate,
+  onRefresh,
 }: {
   readonly connectivityStatus: ConnectivityStatus;
   readonly estimate: NutritionEstimate | null | undefined;
+  readonly onRefresh?: () => void;
 }) {
   const auth = useMobileAuth();
-  const router = useRouter();
   const entryDate = useMemo(todayIsoDate, []);
   const api = useMemo(
     () => createNutritionTrackingApi(auth.request, auth.download),
@@ -39,88 +68,328 @@ export function NutritionSummaryCard({
   if (estimate === undefined) return <Skeleton height={252} />;
   if (estimate === null) return null;
 
-  const summary = buildNutritionSummary(estimate, daily?.actual_totals ?? null);
-  const trackingStatus = daily?.check_in_status ?? "not_recorded";
+  const target = (code: string) => estimate.targets[code];
+  const goalCalories = firstNumericTarget(target("goal_calories"), "preferred");
+  const tdee = firstNumericTarget(target("tdee"), "preferred", "minimum");
+  const bmr = firstNumericTarget(target("bmr"), "preferred", "minimum");
+  const activity = tdee === null || bmr === null ? null : Math.max(0, tdee - bmr);
+  const tracked = daily?.actual_totals;
+  const hasTrackedData = tracked !== undefined && (
+    daily?.data_status === "sufficient"
+    || (daily?.entries.length ?? 0) > 0
+    || Object.values(tracked).some((value) => value > 0)
+  );
+  const macros = [
+    { code: "protein_g", label: "پروتئین", target: target("protein") },
+    { code: "carbohydrate_g", label: "کربوهیدرات", target: target("carbohydrate") ?? target("carbohydrates") },
+    { code: "total_fat_g", label: "چربی", target: target("total_fat") ?? target("fat") },
+  ] as const;
+
   return (
-    <View style={styles.section}>
-      <SectionHeader eyebrow="امروز" title="سوخت و هدف روزانه" />
-      <Card variant="hero" style={styles.card}>
-        <View style={styles.cardHeader}>
-          <MetricRing
-            label="پیشرفت کالری امروز"
-            progress={summary.calories.progress ?? 0}
-            size={94}
-          />
-          <View style={styles.statusBadge}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>{trackingStatusLabel(trackingStatus)}</Text>
+    <View style={summaryStyles.section}>
+      <Card accessibilityLabel="خلاصه هدف‌ها" style={summaryStyles.card}>
+        <View style={summaryStyles.targetArea}>
+          <View style={summaryStyles.energyItem}>
+            <View style={summaryStyles.targetCopy}>
+              <Text style={summaryStyles.targetLabel}>کالری هدف</Text>
+              <Text style={summaryStyles.calorieValue}>
+                {goalCalories === null ? "تعیین نشده" : formatWebNumber(goalCalories)}
+              </Text>
+              <Text style={summaryStyles.unit}>
+                {hasTrackedData
+                  ? `دریافت امروز ${formatWebNumber(tracked?.energy_kcal ?? 0)} کیلوکالری`
+                  : "کیلوکالری روزانه"}
+              </Text>
+            </View>
+            {goalCalories !== null ? (
+              <MetricRing
+                animateOnFocus
+                label="پیشرفت کالری هدف"
+                progress={1}
+                size={82}
+                valueLabel="۱۰۰٪"
+              />
+            ) : null}
           </View>
-          <View style={styles.headerCopy}>
-            <Text style={styles.cardEyebrow}>هدف کالری</Text>
-            <Text style={styles.calorieValue}>
-              {summary.calories.target === null ? "—" : formatNutritionNumber(summary.calories.target)}
-            </Text>
-            <Text style={styles.unit}>کیلوکالری روزانه</Text>
-          </View>
+
+          {tdee !== null ? (
+            <View style={[summaryStyles.energyItem, summaryStyles.tdeeItem]}>
+              <View style={summaryStyles.targetCopy}>
+                <Text style={summaryStyles.targetLabel}>TDEE (کل مصرف روزانه)</Text>
+                <Text style={summaryStyles.tdeeValue}>{formatWebNumber(tdee)}</Text>
+                <View accessibilityLabel="تفکیک متابولیسم پایه و فعالیت" style={summaryStyles.breakdownLegend}>
+                  <View style={summaryStyles.breakdownItem}>
+                    <Text style={summaryStyles.bmrDot}>●</Text>
+                    <Text style={summaryStyles.breakdownText}>پایه: {bmr === null ? "—" : formatWebNumber(bmr)}</Text>
+                  </View>
+                  <View style={summaryStyles.breakdownItem}>
+                    <Text style={summaryStyles.activityDot}>●</Text>
+                    <Text style={summaryStyles.breakdownText}>فعالیت: {activity === null ? "—" : formatWebNumber(activity)}</Text>
+                  </View>
+                </View>
+              </View>
+              <NutritionDualMetricRing
+                label="تفکیک مصرف انرژی روزانه"
+                primaryValue={bmr ?? 0}
+                secondaryValue={activity ?? 0}
+                total={tdee}
+              />
+            </View>
+          ) : null}
         </View>
-        <View style={styles.progressBlock}>
-          <View style={styles.progressLabels}>
-            <Text style={styles.progressActual}>
-              {summary.calories.actual === null
-                ? "هنوز ثبت نشده"
-                : `${formatNutritionNumber(summary.calories.actual)} دریافت‌شده`}
-            </Text>
-            <Text style={styles.progressLabel}>پیشرفت امروز</Text>
-          </View>
-          <ProgressBar
-            label="پیشرفت کالری امروز"
-            progress={summary.calories.progress ?? 0}
-          />
+
+        <View style={summaryStyles.confidenceRow}>
+          <Text style={summaryStyles.confidence}>{confidenceLabel(estimate.confidence)}</Text>
+          {estimate.is_stale && onRefresh ? <Button label="به‌روزرسانی" onPress={onRefresh} variant="ghost" /> : null}
         </View>
-        <View style={styles.metricGrid}>
-          {summary.macros.map((metric) => <MacroMetric key={metric.code} metric={metric} />)}
+
+        <View accessibilityLabel="درشت‌مغذی‌های اصلی" style={summaryStyles.macroStrip}>
+          {macros.map((macro) => (
+            <View key={macro.code} style={summaryStyles.macroCell}>
+              <Text style={summaryStyles.macroLabel}>{macro.label}</Text>
+              <Text style={summaryStyles.macroValue}>
+                {hasTrackedData && tracked?.[macro.code] !== undefined
+                  ? `${formatWebNumber(tracked[macro.code])} گرم`
+                  : formatTargetValue(macro.target)}
+              </Text>
+            </View>
+          ))}
         </View>
+
         {dailyState.status === "offline" && daily === null ? (
           <Notice compact message="ثبت‌های امروز آفلاین در دسترس نیست؛ هدف‌های ذخیره‌شده نمایش داده می‌شوند." variant="offline" />
         ) : null}
         {dailyState.status === "error" && daily === null ? (
           <Notice compact message="دریافت ثبت‌های امروز انجام نشد؛ هدف‌های تغذیه نمایش داده می‌شوند." variant="warning" />
         ) : null}
-        <Button label="ثبت غذا" onPress={() => router.push("/member/nutrition-tracking")} variant="secondary" />
       </Card>
     </View>
   );
 }
 
-function MacroMetric({ metric }: { readonly metric: NutritionSummaryMetric }) {
+function LegacyNutritionSummaryCard({
+  error,
+  loading,
+  summary,
+}: {
+  readonly error: boolean;
+  readonly loading: boolean;
+  readonly summary: {
+    readonly carbohydrate: number | null;
+    readonly consumedCalories: number | null;
+    readonly estimatedDailyExpenditureCalories: number | null;
+    readonly fat: number | null;
+    readonly progress: number;
+    readonly protein: number | null;
+    readonly status: string;
+    readonly targetCalories: number | null;
+  };
+}) {
+  const router = useRouter();
+  if (loading) return <Skeleton height={180} />;
+
   return (
-    <View style={styles.metric}>
-      <View style={styles.metricTop}>
-        <Text style={styles.metricValue}>{metric.target === null ? "—" : formatNutritionNumber(metric.target)}</Text>
-        <Text style={styles.metricLabel}>{metric.label}</Text>
+    <Card
+      accessibilityLabel="نمایش جزئیات تغذیه"
+      onPress={() => router.push("/member/nutrition")}
+      style={styles.legacyHomeCard}
+      variant="hero"
+    >
+      <View style={styles.legacyHomeHeader}>
+        <MetricRing label="پیشرفت کالری امروز" progress={summary.progress} size={84} />
+        <View style={styles.legacyHomeCopy}>
+          <Text style={styles.cardEyebrow}>هدف کالری روزانه</Text>
+          <Text style={styles.calorieValue}>
+            {summary.targetCalories === null ? "—" : formatNutritionNumber(summary.targetCalories)}
+          </Text>
+          <Text style={styles.unit}>
+            مصرف امروز: {summary.consumedCalories === null ? "—" : formatNutritionNumber(summary.consumedCalories)}
+          </Text>
+          {summary.estimatedDailyExpenditureCalories !== null ? (
+            <Text style={styles.unit}>
+              مصرف تقریبی روزانه: {formatNutritionNumber(summary.estimatedDailyExpenditureCalories)}
+            </Text>
+          ) : null}
+        </View>
       </View>
-      <ProgressBar
-        color={metric.color}
-        label={`${metric.label} پیشرفت`}
-        progress={metric.progress ?? 0}
-      />
-      <Text style={styles.metricActual}>
-        {metric.actual === null ? "ثبت نشده" : `${formatNutritionNumber(metric.actual)} ${metric.unit}`}
-      </Text>
-    </View>
+      {error ? <Notice compact message="داده‌های تغذیه کامل دریافت نشدند." variant="warning" /> : null}
+      <View style={styles.legacyMacroRow}>
+        <Text style={styles.metricLabel}>پروتئین: {summary.protein === null ? "—" : formatNutritionNumber(summary.protein)}</Text>
+        <Text style={styles.metricLabel}>کربوهیدرات: {summary.carbohydrate === null ? "—" : formatNutritionNumber(summary.carbohydrate)}</Text>
+        <Text style={styles.metricLabel}>چربی: {summary.fat === null ? "—" : formatNutritionNumber(summary.fat)}</Text>
+      </View>
+    </Card>
   );
+}
+
+function firstNumericTarget(
+  target: NutritionEstimate["targets"][string] | undefined,
+  ...fields: readonly ("preferred" | "minimum" | "preferred_maximum" | "maximum")[]
+): number | null {
+  for (const field of fields) {
+    const value = target?.[field];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function formatTargetValue(target: NutritionEstimate["targets"][string] | undefined): string {
+  const value = firstNumericTarget(target, "preferred", "minimum", "preferred_maximum", "maximum");
+  if (value === null) return "تعیین نشده";
+  const unit = target?.unit === "kcal/day"
+    ? "کیلوکالری"
+    : target?.unit === "g/day"
+      ? "گرم"
+      : target?.unit === "mg/day"
+        ? "میلی‌گرم"
+        : target?.unit ?? "";
+  return `${formatWebNumber(value)} ${unit}`.trim();
+}
+
+function formatWebNumber(value: number): string {
+  return new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 1 }).format(value);
+}
+
+function confidenceLabel(confidence: string): string {
+  if (confidence === "high") return "اطمینان بالا";
+  if (confidence === "medium") return "اطمینان متوسط";
+  return "اطمینان پایین";
 }
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function trackingStatusLabel(status: string): string {
-  if (status === "on_plan") return "همسو با برنامه";
-  if (status === "mostly_on_plan") return "تقریباً همسو";
-  if (status === "off_plan") return "نیازمند توجه";
-  return "امروز ثبت نشده";
-}
+const summaryStyles = StyleSheet.create({
+  activityDot: {
+    color: fiticianTokens.colors.aqua,
+  },
+  bmrDot: {
+    color: fiticianTokens.colors.blue,
+  },
+  breakdownLegend: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+    marginTop: fiticianTokens.spacing[1],
+  },
+  breakdownItem: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[1],
+  },
+  breakdownText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    writingDirection: "rtl",
+  },
+  card: {
+    backgroundColor: fiticianTokens.colors.surface,
+    gap: 0,
+    overflow: "hidden",
+    padding: 0,
+  },
+  calorieValue: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.display,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 44,
+    textAlign: "right",
+  },
+  confidence: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  confidenceRow: {
+    alignItems: "center",
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    minHeight: 42,
+    paddingHorizontal: fiticianTokens.spacing[4],
+  },
+  energyItem: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+    justifyContent: "space-between",
+    minWidth: 0,
+    padding: fiticianTokens.spacing[4],
+  },
+  macroCell: {
+    alignItems: "flex-end",
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[3],
+  },
+  macroLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  macroStrip: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+    flexDirection: "row-reverse",
+  },
+  macroValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+  },
+  section: {
+    marginBottom: fiticianTokens.spacing[1],
+  },
+  targetArea: {
+    flexDirection: "column",
+  },
+  targetCopy: {
+    alignItems: "flex-end",
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+  },
+  targetLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  tdeeItem: {
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+  },
+  tdeeValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.lg,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    textAlign: "right",
+  },
+  unit: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -150,6 +419,23 @@ const styles = StyleSheet.create({
   },
   headerCopy: {
     gap: fiticianTokens.spacing[1],
+  },
+  legacyHomeCard: {
+    gap: fiticianTokens.spacing[4],
+    padding: fiticianTokens.spacing[4],
+  },
+  legacyHomeCopy: {
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+  },
+  legacyHomeHeader: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+  },
+  legacyMacroRow: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
   },
   metric: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,

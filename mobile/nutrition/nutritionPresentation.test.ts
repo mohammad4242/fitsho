@@ -1,16 +1,39 @@
 import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 
-it("keeps the daily nutrition hierarchy before secondary forms", async () => {
+it("matches the web nutrition hierarchy and removes dashboard-only sections", async () => {
   const source = await readFile(new URL("./NutritionFoundationScreen.tsx", import.meta.url), "utf8");
   expect(source).toContain("<PageHeading");
   expect(source).toContain("<NutritionDailyTools");
+  expect(source).toContain("<NutritionSummaryCard");
+  expect(source).toContain("<NutritionWeightRateCard");
+  expect(source).toContain("<NutritionTodayMeals");
+  expect(source).toContain("<NutritionScienceDetails");
+  expect(source).toContain("<NutritionDoctorSupervision");
+  expect(source).toContain("<NutritionPlanSection");
   expect(source).not.toContain("<ScreenHeader");
   expect(source.indexOf("<PageHeading")).toBeLessThan(source.indexOf("<NutritionDailyTools"));
   expect(source.indexOf("<NutritionDailyTools")).toBeLessThan(source.indexOf("<NutritionSummaryCard"));
-  expect(source.indexOf("<NutritionSummaryCard")).toBeLessThan(source.indexOf("<NutritionPlanShortcut"));
-  expect(source.indexOf("<NutritionPlanShortcut")).toBeLessThan(source.indexOf("<NutritionProfileSection"));
-  for (const route of ["nutrition-plan", "food-catalogue", "meal-catalogue"]) {
+  expect(source.indexOf("<NutritionSummaryCard")).toBeLessThan(source.indexOf("<NutritionWeightRateCard"));
+  expect(source.indexOf("<NutritionWeightRateCard")).toBeLessThan(source.indexOf("<NutritionTodayMeals"));
+  expect(source.indexOf("<NutritionTodayMeals")).toBeLessThan(source.indexOf("<NutritionScienceDetails"));
+  expect(source.indexOf("<NutritionScienceDetails")).toBeLessThan(source.indexOf("<NutritionDoctorSupervision"));
+  expect(source.indexOf("<NutritionDoctorSupervision")).toBeLessThan(source.indexOf("<NutritionPlanSection"));
+  for (const section of [
+    "NutritionProfileSection",
+    "SafetySection",
+    "StructuredExerciseSection",
+    "ReviewRequirementSection",
+    "NutritionEstimateSection",
+    "NutritionCatalogueSection",
+    "NutritionTrackingSection",
+    "NutritionAdherenceSection",
+    "NutritionClinicalSection",
+    "NutritionPlanShortcut",
+  ]) {
+    expect(source).not.toMatch(new RegExp(`\\n\\s*<${section}\\b`));
+  }
+  for (const route of ["nutrition-plan", "food-catalogue", "meal-catalogue", "nutrition-labs", "nutrition-supplements"]) {
     const text = await readFile(new URL(`../app/(member)/member/${route}.tsx`, import.meta.url), "utf8");
     expect(text).toContain('requiredCapability="nutrition"');
   }

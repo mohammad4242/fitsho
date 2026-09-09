@@ -64,7 +64,9 @@ const supplementStatusFilters: readonly { readonly label: string; readonly value
   { label: "متوقف‌شده", value: "discontinued" },
 ];
 
-export function NutritionClinicalSection() {
+export type NutritionClinicalMode = "all" | "labs" | "supplements";
+
+export function NutritionClinicalSection({ mode = "all" }: { readonly mode?: NutritionClinicalMode } = {}) {
   const auth = useMobileAuth();
   const queryClient = useQueryClient();
   const connectivityStatus = useConnectivityStatus();
@@ -305,62 +307,72 @@ export function NutritionClinicalSection() {
       <PageHeading
         eyebrow="پرونده سلامت"
         supportingText="مدارک آزمایش و دستورهای ثبت‌شده را در فضای عضو و با کنترل ایمنی دنبال کن."
-        title="آزمایش‌ها و مکمل‌ها"
+        title={mode === "labs" ? "آزمایش‌های من" : mode === "supplements" ? "مکمل‌های من" : "آزمایش‌ها و مکمل‌ها"}
       />
 
-      <LabUploadCard
-        category={category}
-        error={labUploadError}
-        laboratoryName={laboratoryName}
-        loading={labUploading}
-        notice={labUploadNotice}
-        onCategoryChange={setCategory}
-        onChooseImage={() => void chooseLabFile("image")}
-        onChooseDocument={() => void chooseLabFile("document")}
-        onLaboratoryNameChange={setLaboratoryName}
-        onRetry={selectedFile === null ? undefined : () => void uploadLabSelection(selectedFile)}
-        onTestDateChange={setTestDate}
-        onNoteChange={setUserNote}
-        note={userNote}
-        selectedFile={selectedFile}
-        testDate={testDate}
-        disabled={labUploading || connectivityStatus === "offline"}
-      />
+      {mode !== "supplements" ? (
+        <>
+          <LabUploadCard
+            category={category}
+            error={labUploadError}
+            laboratoryName={laboratoryName}
+            loading={labUploading}
+            notice={labUploadNotice}
+            onCategoryChange={setCategory}
+            onChooseImage={() => void chooseLabFile("image")}
+            onChooseDocument={() => void chooseLabFile("document")}
+            onLaboratoryNameChange={setLaboratoryName}
+            onRetry={selectedFile === null ? undefined : () => void uploadLabSelection(selectedFile)}
+            onTestDateChange={setTestDate}
+            onNoteChange={setUserNote}
+            note={userNote}
+            selectedFile={selectedFile}
+            testDate={testDate}
+            disabled={labUploading || connectivityStatus === "offline"}
+          />
 
-      <LabRequestsCard requests={requests} state={requestsState} />
-      <LabDocumentsCard
-        documents={labs}
-        error={documentError}
-        state={labsState}
-        busyId={documentBusyId}
-        onDelete={setDocumentToDelete}
-        onOpen={(document) => void openLab(document)}
-        onRetry={() => void labsQuery.refetch()}
-      />
+          <LabRequestsCard requests={requests} state={requestsState} />
+          <LabDocumentsCard
+            documents={labs}
+            error={documentError}
+            state={labsState}
+            busyId={documentBusyId}
+            onDelete={setDocumentToDelete}
+            onOpen={(document) => void openLab(document)}
+            onRetry={() => void labsQuery.refetch()}
+          />
+        </>
+      ) : null}
 
-      <SupplementOrdersCard
-        error={supplementError}
-        onAcknowledge={(order) => void acknowledge(order)}
-        onStatusFilterChange={setSupplementStatusFilter}
-        onRetry={() => void ordersQuery.refetch()}
-        orders={visibleOrders}
-        state={ordersState}
-        statusFilter={supplementStatusFilter}
-        totalOrders={orders.length}
-      />
-      {catalogue.length > 0 ? <VerifiedSupplementCatalogue items={catalogue} state={catalogueState} /> : null}
+      {mode !== "labs" ? (
+        <>
+          <SupplementOrdersCard
+            error={supplementError}
+            onAcknowledge={(order) => void acknowledge(order)}
+            onStatusFilterChange={setSupplementStatusFilter}
+            onRetry={() => void ordersQuery.refetch()}
+            orders={visibleOrders}
+            state={ordersState}
+            statusFilter={supplementStatusFilter}
+            totalOrders={orders.length}
+          />
+          {catalogue.length > 0 ? <VerifiedSupplementCatalogue items={catalogue} state={catalogueState} /> : null}
+        </>
+      ) : null}
 
-      <Dialog
-        cancelLabel="انصراف"
-        confirmLabel="حذف پرونده"
-        destructive
-        message={documentToDelete === null ? "" : `پرونده «${documentToDelete.original_filename}» حذف شود؟`}
-        onCancel={() => setDocumentToDelete(null)}
-        onClose={() => setDocumentToDelete(null)}
-        onConfirm={documentToDelete === null ? undefined : () => void deleteLab(documentToDelete)}
-        title="حذف پرونده آزمایش"
-        visible={documentToDelete !== null}
-      />
+      {mode !== "supplements" ? (
+        <Dialog
+          cancelLabel="انصراف"
+          confirmLabel="حذف پرونده"
+          destructive
+          message={documentToDelete === null ? "" : `پرونده «${documentToDelete.original_filename}» حذف شود؟`}
+          onCancel={() => setDocumentToDelete(null)}
+          onClose={() => setDocumentToDelete(null)}
+          onConfirm={documentToDelete === null ? undefined : () => void deleteLab(documentToDelete)}
+          title="حذف پرونده آزمایش"
+          visible={documentToDelete !== null}
+        />
+      ) : null}
     </View>
   );
 }

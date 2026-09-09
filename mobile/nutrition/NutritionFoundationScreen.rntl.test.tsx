@@ -56,7 +56,7 @@ beforeEach(() => {
   } as never);
 });
 
-test("puts daily nutrition actions before the real summary and keeps the plan shortcut", () => {
+test("keeps only web-equivalent daily navigation actions above the nutrition summary", () => {
   render(
     <SafeAreaProvider
       initialMetrics={{
@@ -70,14 +70,11 @@ test("puts daily nutrition actions before the real summary and keeps the plan sh
 
   expect(screen.getByRole("button", { name: "ثبت تغذیه" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "کاتالوگ" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "برنامه غذایی" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "برنامه غذایی" })).toBeNull();
 
   fireEvent.press(screen.getByRole("button", { name: "ثبت تغذیه" }));
   expect(mockPush).toHaveBeenCalledWith("/member/nutrition-tracking");
   fireEvent.press(screen.getByRole("button", { name: "کاتالوگ" }));
   expect(mockPush).toHaveBeenCalledWith("/member/food-catalogue");
 
-  fireEvent.press(screen.getByRole("button", { name: "برنامه غذایی" }));
-
-  expect(mockPush).toHaveBeenCalledWith("/member/nutrition-plan");
 });

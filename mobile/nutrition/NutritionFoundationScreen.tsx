@@ -34,11 +34,16 @@ import {
   type StructuredExercise,
 } from "./nutritionApi";
 import { NutritionPlanSection } from "./NutritionPlanSection";
-import { NutritionCatalogueSection } from "./NutritionCatalogueSection";
-import { NutritionTrackingSection } from "./NutritionTrackingSection";
-import { NutritionAdherenceSection } from "./NutritionAdherenceSection";
-import { NutritionClinicalSection } from "./NutritionClinicalSection";
 import { NutritionSummaryCard } from "./NutritionSummaryCard";
+import { NutritionTodayMeals } from "./NutritionTodayMeals";
+import { NutritionDoctorSupervision } from "./NutritionDoctorSupervision";
+import { NutritionScienceDetails } from "./NutritionScienceDetails";
+import { NutritionWeightRateCard } from "./NutritionWeightRateCard";
+import {
+  createNutritionPlanApi,
+  type WeeklyPlan,
+  type WeeklyPlanGeneration,
+} from "./nutritionPlanApi";
 
 type ChoiceOption = { readonly label: string; readonly value: string };
 
@@ -78,10 +83,10 @@ export function NutritionFoundationScreen() {
   const router = useRouter();
   const connectivityStatus = useConnectivityStatus();
   const api = useMemo(() => createNutritionApi(auth.request), [auth.request]);
-  const profileQuery = useQuery({
-    queryFn: api.getNutritionProfile,
-    queryKey: nutritionKeys.profile(),
-  });
+  const planApi = useMemo(
+    () => createNutritionPlanApi(auth.request, auth.download),
+    [auth.download, auth.request],
+  );
   const safetyQuery = useQuery({
     queryFn: api.getSafety,
     queryKey: nutritionKeys.safety(),
@@ -90,71 +95,77 @@ export function NutritionFoundationScreen() {
     queryFn: api.getCurrentEstimate,
     queryKey: nutritionKeys.estimate(),
   });
-  const reviewQuery = useQuery({
-    queryFn: api.getReviewRequirement,
-    queryKey: nutritionKeys.reviewRequirement(),
+  const latestPlanQuery = useQuery({
+    queryFn: planApi.getLatest,
+    queryKey: nutritionKeys.plan("latest"),
   });
-  const exerciseQuery = useQuery({
-    queryFn: api.getStructuredExercise,
-    queryKey: nutritionKeys.structuredExercise(),
+  const latestBundleQuery = useQuery({
+    queryFn: planApi.getLatestBundle,
+    queryKey: nutritionKeys.latestBundle(),
   });
-  const profileState = getMobileViewState(profileQuery, { connectivityStatus });
   const safetyState = getMobileViewState(safetyQuery, { connectivityStatus });
   const estimateState = getMobileViewState(estimateQuery, { connectivityStatus });
-  const reviewState = getMobileViewState(reviewQuery, { connectivityStatus });
-  const exerciseState = getMobileViewState(exerciseQuery, { connectivityStatus });
-  const profile = viewData(profileState);
+  const latestPlanState = getMobileViewState(latestPlanQuery, { connectivityStatus });
+  const latestBundleState = getMobileViewState(latestBundleQuery, { connectivityStatus });
   const safety = viewData(safetyState);
   const estimate = viewData(estimateState);
+  const latestPlan = viewData(latestPlanState) ?? null;
+  const latestBundle = viewData(latestBundleState) ?? null;
+  const planDataReady = !latestPlanQuery.isPending && !latestBundleQuery.isPending;
+  const plan = planDataReady ? resolveNutritionMainPlan(latestPlan, latestBundle) : null;
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <PageHeading
         compact
         eyebrow="امروز"
-        supportingText="وضعیت روزانه، هدف‌ها و مسیرهای ثبت تغذیه را از همین‌جا دنبال کن."
         title="تغذیه"
       />
 
       <NutritionDailyTools
-        onOpenCatalogue={() => router.push("/member/food-catalogue")}
         onOpenTracking={() => router.push("/member/nutrition-tracking")}
+        onOpenCatalogue={() => router.push("/member/food-catalogue")}
       />
 
       <NutritionSummaryCard
         connectivityStatus={connectivityStatus}
         estimate={estimate}
+        onRefresh={() => void estimateQuery.refetch()}
       />
 
-      <NutritionPlanShortcut onOpen={() => router.push("/member/nutrition-plan")} />
+      {estimate !== undefined && estimate !== null ? (
+        <NutritionWeightRateCard estimate={estimate} onRefresh={() => void estimateQuery.refetch()} />
+      ) : null}
+      {estimate !== undefined && estimate !== null && planDataReady ? <NutritionTodayMeals plan={plan} /> : null}
+      {estimate !== undefined && estimate !== null ? <NutritionScienceDetails estimate={estimate} /> : null}
+      {estimate !== undefined && estimate !== null && planDataReady ? <NutritionDoctorSupervision plan={plan} /> : null}
 
-      <NutritionProfileSection
-        onEdit={() => router.push("/member/profile")}
-        onRetry={() => void profileQuery.refetch()}
-        state={profileState}
-      />
-      <SafetySection
-        api={api}
-        connectivityStatus={connectivityStatus}
-        state={safetyState}
-      />
-      <StructuredExerciseSection state={exerciseState} />
-      <ReviewRequirementSection state={reviewState} />
-      <NutritionEstimateSection
-        api={api}
-        connectivityStatus={connectivityStatus}
-        profile={profile ?? null}
-        safety={safety ?? null}
-        onRetry={() => void estimateQuery.refetch()}
-        state={estimateState}
-      />
       <NutritionPlanSection safety={safety ?? null} />
-      <NutritionCatalogueSection />
-      <NutritionTrackingSection />
-      <NutritionAdherenceSection />
-      <NutritionClinicalSection />
     </Screen>
   );
+}
+
+function resolveNutritionMainPlan(
+  latestPlan: WeeklyPlan | null,
+  latestBundle: WeeklyPlanGeneration | null,
+): WeeklyPlan | null {
+  if (
+    latestBundle?.bundle_id
+    && latestBundle.comparison?.show_ideal_plan
+    && latestBundle.ideal_plan
+    && latestBundle.budget_plan
+  ) {
+    const selectedRole = latestBundle.selected_plan_role === "ideal"
+      || latestBundle.selected_plan_role === "ideal_reference"
+      ? "ideal"
+      : latestBundle.selected_plan_role === "budget"
+        ? "budget"
+        : latestBundle.selected_plan_id
+          ? latestBundle.selected_plan_id === latestBundle.ideal_plan.id ? "ideal" : "budget"
+          : null;
+    return selectedRole === "ideal" ? latestBundle.ideal_plan : latestBundle.budget_plan;
+  }
+  return latestPlan;
 }
 
 function NutritionDailyTools({
@@ -166,19 +177,6 @@ function NutritionDailyTools({
 }) {
   return (
     <View style={styles.dailyTools}>
-      <Card
-        accessibilityLabel="کاتالوگ"
-        onPress={onOpenCatalogue}
-        style={styles.dailyToolCard}
-        variant="interactive"
-      >
-        <View style={styles.dailyToolCopy}>
-          <AppIcon color={fiticianTokens.colors.amber} name="foodLog" size={fiticianTokens.iconSize.lg} />
-          <Text style={styles.dailyToolTitle}>کاتالوگ</Text>
-          <Text style={styles.dailyToolSubtitle}>مرجع مواد غذایی</Text>
-        </View>
-        <AppIcon color={fiticianTokens.colors.amber} name="arrowLeft" size={fiticianTokens.iconSize.md} />
-      </Card>
       <Card
         accessibilityLabel="ثبت تغذیه"
         onPress={onOpenTracking}
@@ -192,24 +190,24 @@ function NutritionDailyTools({
         </View>
         <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.md} />
       </Card>
+      <Card
+        accessibilityLabel="کاتالوگ"
+        onPress={onOpenCatalogue}
+        style={styles.dailyToolCard}
+        variant="interactive"
+      >
+        <View style={styles.dailyToolCopy}>
+          <AppIcon color={fiticianTokens.colors.amber} name="foodLog" size={fiticianTokens.iconSize.lg} />
+          <Text style={styles.dailyToolTitle}>کاتالوگ</Text>
+          <Text style={styles.dailyToolSubtitle}>مرجع مواد غذایی</Text>
+        </View>
+        <AppIcon color={fiticianTokens.colors.amber} name="arrowLeft" size={fiticianTokens.iconSize.md} />
+      </Card>
     </View>
   );
 }
 
-function NutritionPlanShortcut({ onOpen }: { readonly onOpen: () => void }) {
-  return (
-    <Card accessibilityLabel="برنامه غذایی" onPress={onOpen} style={styles.planShortcutCard} variant="hero">
-      <AppIcon color={fiticianTokens.colors.aqua} name="nutrition" size={fiticianTokens.iconSize.lg} />
-      <View style={styles.planShortcutCopy}>
-        <Text style={styles.planShortcutTitle}>برنامه غذایی</Text>
-        <Text style={styles.bodyText}>نسخه فعال، روزها، هزینه و تعویض‌های مجاز</Text>
-      </View>
-      <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.md} />
-    </Card>
-  );
-}
-
-function NutritionProfileSection({
+export function NutritionProfileSection({
   onEdit,
   onRetry,
   state,
@@ -257,7 +255,7 @@ function NutritionProfileSection({
   );
 }
 
-function SafetySection({
+export function SafetySection({
   api,
   connectivityStatus,
   state,
@@ -461,7 +459,7 @@ function SafetyEditor({
   );
 }
 
-function StructuredExerciseSection({ state }: { readonly state: MobileViewState<StructuredExercise | null> }) {
+export function StructuredExerciseSection({ state }: { readonly state: MobileViewState<StructuredExercise | null> }) {
   const exercise = viewData(state);
   if (state.status === "loading") return <Skeleton height={105} />;
   if (state.status === "error" && exercise === undefined) {
@@ -485,7 +483,7 @@ function StructuredExerciseSection({ state }: { readonly state: MobileViewState<
   );
 }
 
-function ReviewRequirementSection({ state }: { readonly state: MobileViewState<PhysicianReviewRequirement | null> }) {
+export function ReviewRequirementSection({ state }: { readonly state: MobileViewState<PhysicianReviewRequirement | null> }) {
   const review = viewData(state);
   if (state.status === "loading") return <Skeleton height={100} />;
   if (state.status === "error" && review === undefined) {
@@ -502,7 +500,7 @@ function ReviewRequirementSection({ state }: { readonly state: MobileViewState<P
   );
 }
 
-function NutritionEstimateSection({
+export function NutritionEstimateSection({
   api,
   connectivityStatus,
   onRetry,
@@ -790,24 +788,6 @@ const styles = StyleSheet.create({
   choiceTextSelected: {
     color: fiticianTokens.colors.canvas,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-  },
-  planShortcutCard: {
-    alignItems: "center",
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
-  },
-  planShortcutCopy: {
-    alignItems: "flex-end",
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-  },
-  planShortcutTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   fieldLabel: {
     color: fiticianTokens.colors.ink,
