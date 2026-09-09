@@ -12,6 +12,7 @@ it("keeps result display versioned, quality-aware, and private", async () => {
   expect(source).toMatch(/coach_review/);
   expect(source).toMatch(/doctor_review/);
   expect(source).toMatch(/schema_version === "2\.0"/);
+  expect(source).toMatch(/BodyAnalysisOverviewCard/);
   expect(source).toMatch(/PrivateMediaClient/);
   expect(source).toMatch(/ExpoPrivateMediaStore/);
   expect(source).not.toMatch(/source=\{\{ uri: photo\.content_url/);

@@ -24,6 +24,7 @@ import { Button, Card, Notice, Skeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
+import { BodyAnalysisOverviewCard } from "./BodyAnalysisOverviewCard";
 
 const activeAnalysisStates = new Set<BodyAnalysis["status"]>([
   "queued",
@@ -187,7 +188,10 @@ export function BodyAnalysisResultScreen() {
           <PhotoQualityCard analysis={analysis} />
         ) : null}
         {analysis?.experience_result !== null && analysis?.experience_result !== undefined ? (
-          <ExperienceResult experience={analysis.experience_result} />
+          <>
+            <BodyAnalysisOverviewCard experience={analysis.experience_result} />
+            <ExperienceResult experience={analysis.experience_result} />
+          </>
         ) : analysis?.normalized_result !== null && analysis?.normalized_result !== undefined ? (
           <NormalizedResult analysis={analysis} />
         ) : null}
