@@ -5,6 +5,13 @@ import { AppIcon, Button, CinematicSurface, Media } from "../../ui/components";
 import { Screen } from "../../ui/layout";
 import { fiticianTokens } from "../../ui/tokens";
 
+const processStages = [
+  { body: "تو را می‌شناسیم", number: "۰۱", title: "شناخت" },
+  { body: "برنامه‌ات را می‌سازیم", number: "۰۲", title: "برنامه" },
+  { body: "با راهنمایی اجرا می‌کنی", number: "۰۳", title: "تمرین" },
+  { body: "همراه پیشرفتت تنظیم می‌کنیم", number: "۰۴", title: "تطبیق" },
+] as const;
+
 export default function PublicEntryScreen() {
   const router = useRouter();
   return (
@@ -25,14 +32,15 @@ export default function PublicEntryScreen() {
             <View style={styles.heroIcon}>
               <AppIcon accessibilityLabel="مسیر شخصی فیتشو" color={fiticianTokens.colors.aqua} name="target" size={fiticianTokens.iconSize.lg} />
             </View>
-            <Text accessibilityRole="header" style={styles.title}>برنامه‌ای که با تو جلو می‌آید.</Text>
-            <Text style={styles.description}>مسیر هوشمند تمرین و تغذیه، متناسب با بدن، هدف و زندگی واقعی تو.</Text>
+            <Text style={styles.heroEyebrow}>بدن تو، نقطه شروع برنامه</Text>
+            <Text accessibilityRole="header" style={styles.title}>هر بدن، برنامه خودش را می‌خواهد.</Text>
+            <Text style={styles.description}>تمرین و تغذیه‌ای متناسب با بدن، هدف و مسیر تو.</Text>
             <View style={styles.pillRow}>
               <Text style={styles.pill}>تمرین</Text>
               <Text style={styles.pill}>تغذیه</Text>
               <Text style={styles.pill}>تحلیل بدن</Text>
             </View>
-            <Button label="شروع شخصی‌سازی" onPress={() => router.push("/public-onboarding")} />
+            <Button label="برنامه من را بساز" onPress={() => router.push("/public-onboarding")} />
           </View>
         </CinematicSurface>
         <View style={styles.actions}>
@@ -41,6 +49,25 @@ export default function PublicEntryScreen() {
         <Pressable accessibilityRole="button" onPress={() => router.push("/auth/register")}>
           <Text style={styles.link}>ساخت حساب جدید</Text>
         </Pressable>
+        <CinematicSurface testID="public-entry-process" style={styles.process} variant="quiet">
+          <View style={styles.processHeader}>
+            <Text style={styles.processEyebrow}>فرایند فیتشو</Text>
+            <Text accessibilityRole="header" style={styles.processTitle}>فیتشو چگونه برنامه تو را می‌سازد</Text>
+          </View>
+          <View style={styles.processList}>
+            {processStages.map((stage, index) => (
+              <View key={stage.number} style={[styles.processStage, index === processStages.length - 1 && styles.processStageLast]}>
+                <View style={styles.stageMarker}>
+                  <Text style={styles.stageNumber}>{stage.number}</Text>
+                </View>
+                <View style={styles.stageCopy}>
+                  <Text style={styles.stageTitle}>{stage.title}</Text>
+                  <Text style={styles.stageBody}>{stage.body}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </CinematicSurface>
       </View>
     </Screen>
   );
@@ -80,6 +107,15 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 28,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  heroEyebrow: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 22,
     textAlign: "right",
     writingDirection: "rtl",
   },
@@ -147,6 +183,45 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
+  process: {
+    padding: fiticianTokens.spacing[4],
+  },
+  processEyebrow: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    letterSpacing: 0.4,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  processHeader: {
+    gap: fiticianTokens.spacing[2],
+  },
+  processList: {
+    marginTop: fiticianTokens.spacing[3],
+  },
+  processStage: {
+    alignItems: "center",
+    borderBottomColor: fiticianTokens.colors.line,
+    borderBottomWidth: 1,
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  processStageLast: {
+    borderBottomWidth: 0,
+    paddingBottom: 0,
+  },
+  processTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 28,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   screen: {
     paddingBottom: fiticianTokens.spacing[5],
     paddingTop: fiticianTokens.spacing[3],
@@ -157,6 +232,44 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h1,
     lineHeight: 42,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  stageBody: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  stageCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  stageMarker: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  stageNumber: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    writingDirection: "ltr",
+  },
+  stageTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 22,
     textAlign: "right",
     writingDirection: "rtl",
   },
