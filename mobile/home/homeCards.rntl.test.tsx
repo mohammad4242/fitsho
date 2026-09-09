@@ -11,6 +11,7 @@ const mockPush = jest.fn();
 
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush }),
+  useFocusEffect: () => undefined,
 }));
 jest.mock("expo-video", () => ({
   VideoView: () => null,
@@ -26,6 +27,7 @@ test("renders calorie progress as a real accessible metric ring", () => {
       summary={{
         carbohydrate: 180,
         consumedCalories: 750,
+        estimatedDailyExpenditureCalories: 2557,
         fat: 62,
         progress: 0.375,
         protein: 130,
@@ -49,6 +51,7 @@ test("keeps the nutrition summary on the quiet web card surface", () => {
       summary={{
         carbohydrate: 180,
         consumedCalories: 750,
+        estimatedDailyExpenditureCalories: 2557,
         fat: 62,
         progress: 0.375,
         protein: 130,
@@ -68,6 +71,7 @@ test("shows tracked calories beside the daily calorie goal", () => {
       summary={{
         carbohydrate: 180,
         consumedCalories: 750,
+        estimatedDailyExpenditureCalories: 2557,
         fat: 62,
         progress: 0.375,
         protein: 130,
@@ -81,6 +85,28 @@ test("shows tracked calories beside the daily calorie goal", () => {
   expect(screen.getByText("مصرف امروز")).toBeTruthy();
   expect(screen.getByText("۲٬۰۰۰")).toBeTruthy();
   expect(screen.getByText("هدف کالری روزانه")).toBeTruthy();
+  expect(screen.getByText("۲٬۵۵۷")).toBeTruthy();
+  expect(screen.getByText("مصرف تقریبی روزانه")).toBeTruthy();
+});
+
+test("omits estimated daily expenditure when the estimate has no TDEE", () => {
+  render(
+    <NutritionSummaryCard
+      loading={false}
+      summary={{
+        carbohydrate: 180,
+        consumedCalories: 750,
+        estimatedDailyExpenditureCalories: null,
+        fat: 62,
+        progress: 0.375,
+        protein: 130,
+        status: "on_plan",
+        targetCalories: 2000,
+      }}
+    />,
+  );
+
+  expect(screen.queryByText("مصرف تقریبی روزانه")).toBeNull();
 });
 
 test("does not render a decorative empty day number or stale snapshot sentence", () => {

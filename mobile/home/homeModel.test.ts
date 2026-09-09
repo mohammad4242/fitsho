@@ -78,8 +78,11 @@ it("prefers daily plan totals and actual tracking while preserving safe fallback
     } as never,
     {
       targets: {
-        energy_kcal: { preferred: 2300, minimum: 2000 },
-        protein_g: { preferred: 145, minimum: 120 },
+        goal_calories: { preferred: 2300, minimum: 2000 },
+        tdee: { preferred: 2557, minimum: 2400 },
+        protein: { preferred: 145, minimum: 120 },
+        carbohydrate: { preferred: 240, minimum: 200 },
+        total_fat: { preferred: 70, minimum: 50 },
       },
     } as never,
     {
@@ -92,6 +95,7 @@ it("prefers daily plan totals and actual tracking while preserving safe fallback
   );
 
   expect(summary.targetCalories).toBe(2200);
+  expect(summary.estimatedDailyExpenditureCalories).toBe(2557);
   expect(summary.consumedCalories).toBe(880);
   expect(summary.progress).toBeCloseTo(0.4);
   expect(summary.protein).toBe(64);
@@ -100,9 +104,33 @@ it("prefers daily plan totals and actual tracking while preserving safe fallback
   expect(summary.status).toBe("on_plan");
 });
 
+it("uses estimate metric names when the daily plan has no nutrient totals", () => {
+  const summary = nutritionSummary(
+    { days: [], physician_approved: true } as never,
+    {
+      targets: {
+        goal_calories: { preferred: 2778, minimum: 2500 },
+        tdee: { preferred: 2557, minimum: 2400 },
+        protein: { preferred: 145, minimum: 120 },
+        carbohydrate: { preferred: 240, minimum: 200 },
+        total_fat: { preferred: 70, minimum: 50 },
+      },
+    } as never,
+    null,
+    "2026-09-09",
+  );
+
+  expect(summary.targetCalories).toBe(2778);
+  expect(summary.estimatedDailyExpenditureCalories).toBe(2557);
+  expect(summary.protein).toBe(145);
+  expect(summary.carbohydrate).toBe(240);
+  expect(summary.fat).toBe(70);
+});
+
 it("returns an empty nutrition state when neither plan nor estimate exists", () => {
   expect(nutritionSummary(null, null, null, "2026-09-09")).toMatchObject({
     status: "empty",
+    estimatedDailyExpenditureCalories: null,
     targetCalories: null,
     progress: 0,
   });

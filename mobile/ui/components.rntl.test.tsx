@@ -1,12 +1,18 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
-import { Text } from "react-native";
+import { Animated, Text } from "react-native";
+import { Circle } from "react-native-svg";
+
+jest.mock("expo-router", () => ({
+  useFocusEffect: (effect: () => void) => effect(),
+}));
 
 import { Button } from "./components/Button";
 import { TextField } from "./components/Input";
 import { MetricRing } from "./components/MetricRing";
 import { Dialog, Sheet } from "./components/Overlay";
 import { Notice } from "./components/Feedback";
+import { calculateRingGeometry } from "./visualMetrics";
 
 test("renders the shared button with native accessibility and press behavior", () => {
   const onPress = jest.fn();
@@ -55,6 +61,25 @@ test("exposes metric progress and its visible value to assistive technology", ()
   const ring = screen.getByRole("progressbar", { name: "پیشرفت کالری امروز" });
   expect(ring.props.accessibilityValue).toEqual({ max: 100, min: 0, now: 38 });
   expect(screen.getByText("۳۸٪")).toBeTruthy();
+});
+
+test("keeps the shared ring static unless focus animation is explicitly enabled", () => {
+  render(<MetricRing label="پیشرفت کالری امروز" progress={0.375} />);
+
+  const progressCircle = screen.UNSAFE_getAllByType(Circle)[1];
+  expect(progressCircle.props.strokeDashoffset).toBe(calculateRingGeometry(92, 8, 0.375).dashOffset);
+});
+
+test("uses the requested duration for the opt-in focus entrance animation", () => {
+  const timing = jest.spyOn(Animated, "timing").mockReturnValue({ start: jest.fn() } as never);
+
+  render(<MetricRing animateOnFocus animationDuration={900} label="پیشرفت کالری امروز" progress={0.375} />);
+
+  expect(timing).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ duration: 900, toValue: 0.375, useNativeDriver: false }),
+  );
+  timing.mockRestore();
 });
 
 test("keeps Persian overlays direction-aware", () => {

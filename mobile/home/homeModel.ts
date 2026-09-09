@@ -13,6 +13,7 @@ export type HomeNutritionSummary = {
   readonly progress: number;
   readonly status: HomeNutritionStatus;
   readonly targetCalories: number | null;
+  readonly estimatedDailyExpenditureCalories: number | null;
 };
 
 export function currentWorkoutDay(plan: Pick<WorkoutPlan, "days"> | null | undefined): WorkoutDay | null {
@@ -28,10 +29,11 @@ export function nutritionSummary(
   const day = plan?.days.find((item) => item.plan_date === date) ?? plan?.days[0];
   const planned = day?.nutrient_totals ?? {};
   const targets = estimate?.targets ?? {};
-  const targetCalories = numberValue(planned.energy_kcal) ?? targetValue(targets.energy_kcal);
-  const targetProtein = numberValue(planned.protein_g) ?? targetValue(targets.protein_g);
-  const targetCarbohydrate = numberValue(planned.carbohydrate_g) ?? targetValue(targets.carbohydrate_g);
-  const targetFat = numberValue(planned.total_fat_g) ?? targetValue(targets.total_fat_g);
+  const targetCalories = numberValue(planned.energy_kcal) ?? firstTarget(targets.goal_calories);
+  const targetProtein = numberValue(planned.protein_g) ?? firstTarget(targets.protein);
+  const targetCarbohydrate = numberValue(planned.carbohydrate_g) ?? firstTarget(targets.carbohydrate);
+  const targetFat = numberValue(planned.total_fat_g) ?? firstTarget(targets.total_fat);
+  const estimatedDailyExpenditureCalories = firstTarget(targets.tdee);
   const hasActual = tracking != null && (
     tracking.data_status === "sufficient"
     || tracking.entries.length > 0
@@ -59,11 +61,16 @@ export function nutritionSummary(
       : 0,
     status,
     targetCalories,
+    estimatedDailyExpenditureCalories,
   };
 }
 
-function targetValue(target: { readonly preferred: number | null; readonly minimum: number | null } | undefined): number | null {
-  return target?.preferred ?? target?.minimum ?? null;
+function firstTarget(target: NutritionEstimate["targets"][string] | undefined): number | null {
+  for (const value of [target?.preferred, target?.minimum, target?.preferred_maximum, target?.maximum]) {
+    const normalized = numberValue(value);
+    if (normalized !== null) return normalized;
+  }
+  return null;
 }
 
 function numberValue(value: number | undefined | null): number | null {

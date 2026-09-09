@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
   },
-  card: { minHeight: 216, width: "100%" },
+  card: { minHeight: 204, width: "100%" },
   copy: { flex: 1.05, gap: fiticianTokens.spacing[2], padding: fiticianTokens.spacing[3] },
   dayBadge: {
     alignItems: "center",
@@ -144,9 +144,9 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  layout: { flexDirection: "row-reverse", minHeight: 216 },
+  layout: { flexDirection: "row-reverse", minHeight: 204 },
   layoutStacked: { flexDirection: "column" },
-  media: { borderRadius: 0, flex: 1, minHeight: 216 },
+  media: { borderRadius: 0, flex: 1, minHeight: 204 },
   mediaScrim: {
     backgroundColor: fiticianTokens.colors.scrim,
     bottom: 0,
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   mediaWrap: {
     backgroundColor: fiticianTokens.colors.surfaceRaised,
     flex: 1.15,
-    minHeight: 216,
+    minHeight: 204,
     overflow: "hidden",
     position: "relative",
   },

@@ -48,8 +48,20 @@ export function NutritionSummaryCard({ error = false, loading, summary }: Nutrit
                   value={summary.targetCalories ?? 0}
                   withDivider={consumed !== null}
                 />
+                {summary.estimatedDailyExpenditureCalories !== null ? (
+                  <CalorieMetric
+                    label="مصرف تقریبی روزانه"
+                    value={summary.estimatedDailyExpenditureCalories}
+                    withDivider
+                  />
+                ) : null}
               </View>
-              <MetricRing label="پیشرفت کالری امروز" progress={summary.progress} />
+              <MetricRing
+                animateOnFocus
+                animationDuration={900}
+                label="پیشرفت کالری امروز"
+                progress={summary.progress}
+              />
             </View>
             <MetricStrip
               items={[
@@ -115,10 +127,10 @@ const styles = StyleSheet.create({
   calorieValues: {
     flex: 1,
     flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
+    gap: fiticianTokens.spacing[2],
     minWidth: 0,
   },
-  calorieRow: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[4] },
+  calorieRow: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[3] },
   calorieValue: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
@@ -132,13 +144,13 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.extraLarge,
     borderWidth: 1,
     elevation: fiticianTokens.shadows.card.elevation,
-    minHeight: 236,
+    minHeight: 220,
     shadowColor: fiticianTokens.shadows.card.color,
     shadowOffset: fiticianTokens.shadows.card.offset,
     shadowOpacity: fiticianTokens.shadows.card.opacity,
     shadowRadius: fiticianTokens.shadows.card.radius,
   },
-  content: { gap: fiticianTokens.spacing[4], padding: fiticianTokens.spacing[4] },
+  content: { gap: fiticianTokens.spacing[3], padding: fiticianTokens.spacing[4] },
   emptyBlock: { gap: fiticianTokens.spacing[2] },
   emptyText: {
     color: fiticianTokens.colors.muted,
