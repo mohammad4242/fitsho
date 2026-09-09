@@ -5,36 +5,22 @@ import {
   StyleSheet,
   Text,
   View,
-  type ImageSourcePropType,
 } from "react-native";
 
 import type { BodyAnalysisExperienceV4, BodyPhotoView } from "@fitician/core/body-photos";
 
-import { AppIcon, Card, ProgressBar, SectionHeader } from "../ui/components";
+import { AppIcon, Card, MetricRing, ProgressBar, SectionHeader } from "../ui/components";
 import type { FiticianIconName } from "../ui/icons";
 import { fiticianTokens } from "../ui/tokens";
 import {
+  buildBodyAnalysisExperienceCopy,
   bodyBmiLabel,
   bodyMetricProgress,
   buildBodyIndicatorSummary,
   type BodyIndicatorPresentation,
   type BodyIndicatorTone,
 } from "./bodyAnalysisPresentation";
-
-type BodyAssetSet = Record<BodyPhotoView, ImageSourcePropType>;
-
-const bodyAssets: Record<"female" | "male", BodyAssetSet> = {
-  female: {
-    back: require("../assets/body-analysis/female-back.jpg"),
-    front: require("../assets/body-analysis/female-front.jpg"),
-    side: require("../assets/body-analysis/female-side.jpg"),
-  },
-  male: {
-    back: require("../assets/body-analysis/male-back.jpg"),
-    front: require("../assets/body-analysis/male-front.jpg"),
-    side: require("../assets/body-analysis/male-side.jpg"),
-  },
-};
+import { bodyAssets } from "./bodyAnalysisAssets";
 
 const viewLabels: Record<BodyPhotoView, string> = {
   back: "پشت",
@@ -58,6 +44,7 @@ export function BodyAnalysisOverviewCard({
   const bodyFat = experience.body_composition.estimated_body_fat_percent;
   const bmi = experience.body_composition.bmi;
   const indicators = buildBodyIndicatorSummary(experience);
+  const experienceCopy = buildBodyAnalysisExperienceCopy(experience);
 
   return (
     <View style={styles.container}>
@@ -119,14 +106,14 @@ export function BodyAnalysisOverviewCard({
         <BodyMetricCard
           icon="target"
           label="درصد چربی تخمینی"
-          note="برآورد تصویری"
+          note={experience.body_composition.body_fat_is_estimate ? "تخمینی بر پایه اندازه‌های بدنی" : ""}
           progress={bodyMetricProgress(bodyFat, 10, 35)}
           value={bodyFat === null ? "—" : `${formatMetric(bodyFat)}٪`}
         />
         <BodyMetricCard
           icon="bodyAnalysis"
           label="شاخص توده بدنی"
-          note={bodyBmiLabel(bmi)}
+          note={bmi === null ? "ثبت نشده" : bodyBmiLabel(bmi)}
           progress={bodyMetricProgress(bmi, 15, 35)}
           value={bmi === null ? "—" : formatMetric(bmi)}
         />
@@ -138,15 +125,15 @@ export function BodyAnalysisOverviewCard({
             <AppIcon color={fiticianTokens.colors.aqua} name="bodyAnalysis" size={20} />
           </View>
           <View style={styles.headingCopy}>
-            <Text style={styles.cardEyebrow}>برداشت اولیه</Text>
-            <Text style={styles.cardTitle}>{firstImpressionTitle(experience)}</Text>
+            <Text style={styles.cardTitle}>{experienceCopy.firstLookTitle}</Text>
           </View>
         </View>
-        <Text style={styles.body}>{firstImpressionBody(experience)}</Text>
+        <Text style={styles.body}>{experienceCopy.firstLook}</Text>
+        {experienceCopy.route ? <Text style={styles.route}>{experienceCopy.route}</Text> : null}
       </Card>
 
       <View style={styles.indicatorSection}>
-        <SectionHeader eyebrow="تحلیل تصویری" title="سه شاخص کلیدی" />
+        <SectionHeader eyebrow="نشانه‌های کاربردی" title="شاخص‌های بصری بدن" />
         <View style={styles.indicatorGrid}>
           {indicators.map((indicator) => (
             <IndicatorCard indicator={indicator} key={indicator.id} />
@@ -197,29 +184,20 @@ function IndicatorCard({ indicator }: { readonly indicator: BodyIndicatorPresent
           <Text style={styles.indicatorTitle}>{indicator.title}</Text>
           <Text style={styles.indicatorCaption}>{indicator.caption}</Text>
         </View>
-        <Text style={[styles.indicatorScore, { color }]}>
-          {indicator.score === null ? "—" : `${Math.round(indicator.score)}٪`}
-        </Text>
       </View>
-      <ProgressBar color={color} label={`امتیاز ${indicator.title}`} progress={(indicator.score ?? 0) / 100} />
+      <View style={styles.indicatorDetail}>
+        <MetricRing
+          color={color}
+          label={`امتیاز ${indicator.title}`}
+          progress={(indicator.score ?? 0) / 100}
+          size={76}
+          strokeWidth={6}
+          showLabel={false}
+          valueLabel={indicator.score === null ? "—" : `${Math.round(indicator.score)}٪`}
+        />
+      </View>
     </Card>
   );
-}
-
-function firstImpressionTitle(experience: BodyAnalysisExperienceV4): string {
-  if (experience.assessment_status === "partial") return "ارزیابی اولیه هنوز کامل نیست";
-  if (experience.direction.status === "goal_confirmation_required") return "یک مسیر قابل تنظیم برای تو آماده است";
-  return "تصویر اولیه‌ی بدنت آماده است";
-}
-
-function firstImpressionBody(experience: BodyAnalysisExperienceV4): string {
-  if (experience.assessment_status === "partial") {
-    return "بعضی شاخص‌ها به دلیل کیفیت یا محدودیت نماها قابل ارزیابی نیستند.";
-  }
-  if (experience.direction.status === "goal_confirmation_required") {
-    return "با تأیید هدف فعلی، پیشنهادهای تمرین و تغذیه دقیق‌تر با وضعیت بدنت هماهنگ می‌شوند.";
-  }
-  return "این خلاصه از داده‌های نشست فعلی ساخته شده و مبنای شخصی‌سازی مسیر توست.";
 }
 
 function formatMetric(value: number): string {
@@ -238,14 +216,6 @@ const styles = StyleSheet.create({
   bodyImage: {
     height: "100%",
     width: "100%",
-  },
-  cardEyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   cardHeading: {
     alignItems: "center",
@@ -335,6 +305,9 @@ const styles = StyleSheet.create({
   impressionCard: {
     gap: fiticianTokens.spacing[3],
   },
+  indicatorDetail: {
+    alignItems: "flex-end",
+  },
   indicatorCaption: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -422,13 +395,12 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   metricCard: {
-    flex: 1,
     gap: fiticianTokens.spacing[3],
     minWidth: 0,
     padding: fiticianTokens.spacing[3],
   },
   metricGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "column",
     gap: fiticianTokens.spacing[3],
   },
   metricIconRow: {
@@ -466,6 +438,14 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.metric,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     textAlign: "right",
+  },
+  route: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    lineHeight: 23,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   viewTab: {
     alignItems: "center",

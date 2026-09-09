@@ -5,7 +5,6 @@ import { Image, StyleSheet, Text, View } from "react-native";
 import { ApiError } from "@fitician/core";
 import type {
   BodyAnalysis,
-  BodyAnalysisExperienceRegion,
   BodyArea,
   BodyPhoto,
   BodyPhotoSession,
@@ -20,11 +19,23 @@ import type {
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { PrivateMediaClient } from "../media/privateMedia";
 import { ExpoPrivateMediaStore } from "../media/privateMediaStore";
-import { Button, Card, Notice, ScreenHeader, Skeleton } from "../ui/components";
+import {
+  Button,
+  Card,
+  DisclosureCard,
+  AppIcon,
+  Notice,
+  PageHeading,
+  ProgressBar,
+  SectionHeader,
+  Skeleton,
+} from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
+import { BodyAnalysisMuscleSection } from "./BodyAnalysisMuscleSection";
 import { BodyAnalysisOverviewCard } from "./BodyAnalysisOverviewCard";
+import { bodyAreaLabel } from "./bodyAnalysisPresentation";
 
 const activeAnalysisStates = new Set<BodyAnalysis["status"]>([
   "queued",
@@ -163,66 +174,54 @@ export function BodyAnalysisResultScreen() {
   return (
     <Screen contentContainerStyle={styles.screen}>
       <View style={styles.content}>
-        <ScreenHeader
+        <PageHeading
           action={<Button label="تاریخچه" onPress={() => router.replace("/member/body-analysis-history")} style={styles.headerAction} variant="ghost" />}
-          compact
           eyebrow="تحلیل بدن"
-          subtitle={`وضعیت نشست: ${sessionStatusLabel(session.state)}`}
-          title="نتیجه نشست"
+          supportingText={`جلسه ثبت‌شده در ${formatSessionDate(session.created_at)} · وضعیت: ${sessionStatusLabel(session.state)}`}
+          title="تحلیل بدن"
         />
         {analysis === null ? (
-          <Notice message="نتیجه هنوز آماده نشده است." variant="info" />
+          <Notice message="تحلیل این جلسه هنوز آغاز نشده است." variant="info" />
         ) : activeAnalysisStates.has(analysis.status) ? (
-          <Notice message={analysisStatusLabel(analysis.status)} variant="info" />
+          <Notice message={`${analysisStatusLabel(analysis.status)} می‌توانی از این صفحه خارج شوی و هم‌زمان از فیتشو استفاده کنی.`} variant="info" />
         ) : null}
         {failedAnalysis ? (
           <Notice
-            message={analysis.safe_error_message ?? "تحلیل کامل نشد. دوباره تلاش کن."}
+            message={analysisFailureMessage(analysis)}
             variant="danger"
           />
         ) : null}
         {actionError !== null ? <Notice message={actionError} variant="danger" /> : null}
+        {analysis !== null && failedAnalysis && analysis.photo_validation !== null ? (
+          <PhotoQualityCard analysis={analysis} />
+        ) : null}
         {analysis === null || failedAnalysis ? (
           <Button disabled={actionBusy} label="تلاش دوباره" loading={actionBusy} onPress={() => void retry()} />
-        ) : null}
-        {analysis !== null && analysis.result_version !== null ? (
-          <ResultVersionCard analysis={analysis} />
-        ) : null}
-        {analysis?.photo_validation !== null && analysis?.photo_validation !== undefined ? (
-          <PhotoQualityCard analysis={analysis} />
         ) : null}
         {analysis?.experience_result !== null && analysis?.experience_result !== undefined ? (
           <>
             <BodyAnalysisOverviewCard experience={analysis.experience_result} />
-            <ExperienceResult experience={analysis.experience_result} />
+            <BodyAnalysisMuscleSection experience={analysis.experience_result} />
           </>
         ) : analysis?.normalized_result !== null && analysis?.normalized_result !== undefined ? (
           <NormalizedResult analysis={analysis} />
         ) : null}
-        {analysis !== null ? <ReviewStatusCard analysis={analysis} /> : null}
+        {analysis !== null && hasAnalysisResult(analysis) ? <ReviewStatusCard analysis={analysis} /> : null}
         {comparison !== null ? <ComparisonCard comparison={comparison} /> : null}
-        {session.photos.length > 0 ? <PhotoStrip photoUris={photoUris} photos={session.photos} /> : null}
+        {analysis !== null && hasAnalysisResult(analysis) ? (
+          <PrivacyDisclaimer />
+        ) : null}
+        {session.photos.length > 0 ? <PhotoDetails photoUris={photoUris} photos={session.photos} /> : null}
+        {analysis !== null && analysis.result_version !== null ? <ResultDetailsDisclosure analysis={analysis} /> : null}
+        {analysis?.normalized_result !== null && analysis?.normalized_result !== undefined ? (
+          <Button label="مشاهده برنامه تمرینی" onPress={() => router.push("/member/workouts")} />
+        ) : null}
         <View style={styles.actions}>
           <Button label="تاریخچه" onPress={() => router.replace("/member/body-analysis-history")} variant="secondary" />
           <Button label="بازگشت" onPress={() => router.replace("/member")} variant="ghost" />
         </View>
       </View>
     </Screen>
-  );
-}
-
-function ResultVersionCard({ analysis }: { readonly analysis: BodyAnalysis }) {
-  return (
-    <Card style={styles.card}>
-      <Text style={styles.cardTitle}>نسخه نتیجه</Text>
-      <Text style={styles.body}>نسخه {analysis.result_version} · منبع {resultSourceLabel(analysis.result_source)}</Text>
-      <Text style={styles.body}>اعتماد کلی: {formatPercent(analysis.overall_confidence)}</Text>
-      {analysis.unverified_warning ? (
-        <Notice message="این نتیجه هنوز توسط هر دو متخصص تأیید نشده است." variant="warning" />
-      ) : (
-        <Notice message="این نسخه توسط روند بررسی تخصصی تأیید شده است." variant="success" />
-      )}
-    </Card>
   );
 }
 
@@ -240,43 +239,6 @@ function PhotoQualityCard({ analysis }: { readonly analysis: BodyAnalysis }) {
         </Text>
       ))}
     </Card>
-  );
-}
-
-function ExperienceResult({
-  experience,
-}: {
-  readonly experience: NonNullable<BodyAnalysis["experience_result"]>;
-}) {
-  const focus = experience.regions.filter((region) => (
-    region.display_classification === "primary_priority"
-    || region.display_classification === "room_to_grow"
-  )).slice(0, 3);
-  const strengths = experience.regions.filter((region) => region.display_classification === "stronger").slice(0, 3);
-  return (
-    <View style={styles.section}>
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>برداشت اولیه</Text>
-        <Text style={styles.body}>وضعیت ارزیابی: {experience.assessment_status === "complete" ? "کامل" : "ناقص"}</Text>
-        <Text style={styles.body}>نتیجه: {experience.first_impression.message_key}</Text>
-      </Card>
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>اولویت‌های قابل مشاهده</Text>
-        {focus.length === 0 ? <Text style={styles.body}>اولویت مشخصی ثبت نشده است.</Text> : focus.map(regionText)}
-      </Card>
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>نقاط قوت قابل مشاهده</Text>
-        {strengths.length === 0 ? <Text style={styles.body}>نقطه قوت جداگانه‌ای ثبت نشده است.</Text> : strengths.map(regionText)}
-      </Card>
-    </View>
-  );
-}
-
-function regionText(region: BodyAnalysisExperienceRegion) {
-  return (
-    <Text key={region.area} style={styles.body}>
-      {bodyAreaLabel(region.area)} · {regionClassificationLabel(region.display_classification)}
-    </Text>
   );
 }
 
@@ -306,63 +268,121 @@ function NormalizedResult({ analysis }: { readonly analysis: BodyAnalysis }) {
 
 function ReviewStatusCard({ analysis }: { readonly analysis: BodyAnalysis }) {
   return (
-    <Card style={styles.card}>
-      <Text style={styles.cardTitle}>وضعیت بررسی تخصصی</Text>
-      <Text style={styles.body}>مربی: {reviewLabel(analysis.coach_review.decision)}</Text>
-      <Text style={styles.body}>پزشک: {reviewLabel(analysis.doctor_review.decision)}</Text>
+    <View style={styles.section}>
+      <SectionHeader eyebrow="نظر متخصصان" title="بازبینی متخصصان" />
+      <Card style={styles.card}>
+        <ReviewRow label="نظر پزشک" review={analysis.doctor_review} />
+        <ReviewRow label="نظر مربی" review={analysis.coach_review} />
+      </Card>
       <Text style={styles.muted}>{analysis.fully_reviewed ? "هر دو بررسی تکمیل شده است." : "نتیجه تا تکمیل بررسی‌ها مقدماتی است."}</Text>
-    </Card>
+    </View>
+  );
+}
+
+function ReviewRow({
+  label,
+  review,
+}: {
+  readonly label: string;
+  readonly review: BodyAnalysis["coach_review"];
+}) {
+  const approved = review.decision === "approved";
+  return (
+    <View accessibilityLabel={`${label}: ${reviewLabel(review.decision)}`} style={styles.reviewRow}>
+      <View style={[styles.reviewDot, approved && styles.reviewDotApproved]} />
+      <Text style={styles.body}>{label}</Text>
+      <Text style={[styles.reviewValue, approved && styles.reviewValueApproved]}>{reviewLabel(review.decision)}</Text>
+    </View>
   );
 }
 
 function ComparisonCard({ comparison }: { readonly comparison: BodyProgressComparison }) {
   const normalized = comparison.normalized_result;
   return (
-    <Card style={styles.card}>
-      <Text style={styles.cardTitle}>مقایسه با نشست قبلی</Text>
+    <View style={styles.section}>
+      <SectionHeader eyebrow="از جلسه قبلی تا امروز" title="مقایسه پیشرفت" />
+      <Card style={styles.card}>
       {normalized.schema_version === "2.0" ? (
         <V2Comparison comparison={normalized} />
       ) : (
         <LegacyComparison comparison={normalized} />
       )}
-    </Card>
+      </Card>
+    </View>
   );
 }
 
 function V2Comparison({ comparison }: { readonly comparison: NormalizedBodyProgressComparisonV2 }) {
   const measurements = comparison.measurement_deltas.filter(isAvailableMeasurement);
-  const changes = comparison.visual_transitions.filter((item) => item.state !== "unchanged").slice(0, 4);
+  const biggestChange = selectBiggestChange(comparison.visual_transitions);
   return (
     <View style={styles.section}>
-      <Text style={styles.body}>فاصله دو نشست: {comparison.interval_days} روز</Text>
+      <Text style={styles.body}>
+        {formatNumber(comparison.interval_days)} روز بین {formatDate(comparison.previous_session_date)} و {formatDate(comparison.current_session_date)}
+      </Text>
+      <ChangeSummary transition={biggestChange} />
+      <SectionHeader title="اندازه‌گیری‌ها" />
       {measurements.length === 0 ? (
-        <Text style={styles.muted}>اندازه قابل مقایسه‌ای ثبت نشده است.</Text>
-      ) : measurements.map(measurementText)}
-      {changes.length === 0 ? (
-        <Text style={styles.muted}>تغییر بصری قابل اتکایی ثبت نشده است.</Text>
-      ) : changes.map(visualChangeText)}
+        <Text style={styles.muted}>برای این دو بررسی اندازه‌گیری دقیقی ثبت نشده.</Text>
+      ) : measurements.map((measurement) => <MeasurementComparison key={measurement.measurement} delta={measurement} />)}
+      {comparison.visual_transitions.length > 0 ? (
+        <DisclosureCard summary="مشاهده‌های تصویری استاندارد، نه اندازه‌گیری مستقیم عضله" title="جزئیات تغییرهای تصویری">
+          <View style={styles.section}>
+            {comparison.visual_transitions.map(visualChangeText)}
+          </View>
+        </DisclosureCard>
+      ) : null}
     </View>
   );
 }
 
 function LegacyComparison({ comparison }: { readonly comparison: NormalizedBodyProgressComparisonV1 }) {
   const changes = comparison.areas.filter((item) => item.state !== "unchanged").slice(0, 4);
-  return changes.length === 0 ? (
-    <Text style={styles.muted}>مقایسه بصری قابل اتکایی ثبت نشده است.</Text>
-  ) : (
-    <View style={styles.section}>{changes.map((item) => (
-      <Text key={item.body_area} style={styles.body}>
-        {bodyAreaLabel(item.body_area)} · {progressStateLabel(item.state)}
-      </Text>
-    ))}</View>
+  return <ChangeSummary transition={selectBiggestChange(comparison.areas)} empty={changes.length === 0} />;
+}
+
+function ChangeSummary({
+  empty = false,
+  transition,
+}: {
+  readonly empty?: boolean;
+  readonly transition: { body_area: BodyArea; state: BodyProgressState } | null;
+}) {
+  return (
+    <View style={styles.changeSummary}>
+      <Text style={styles.changeTitle}>بیشترین تغییر</Text>
+      {transition === null || empty ? (
+        <Text style={styles.muted}>تغییر واضحی نسبت به بررسی قبلی دیده نشد.</Text>
+      ) : (
+        <>
+          <Text style={styles.changeArea}>{bodyAreaLabel(transition.body_area)}</Text>
+          <Text style={styles.body}>
+            {transition.state === "improved" ? "نسبت به بررسی قبلی بیشترین تغییر مثبت رو داشته." : "نسبت به بررسی قبلی ضعیف‌تر دیده شده."}
+          </Text>
+        </>
+      )}
+    </View>
   );
 }
 
-function measurementText(delta: BodyProgressMeasurementDelta) {
+function MeasurementComparison({ delta }: { readonly delta: BodyProgressMeasurementDelta }) {
+  const previous = delta.previous ?? 0;
+  const current = delta.current ?? 0;
+  const maximum = Math.max(1, previous, current);
+  const unit = delta.unit === "kg" ? "کیلوگرم" : "سانتی‌متر";
   return (
-    <Text key={delta.measurement} style={styles.body}>
-      {measurementLabel(delta.measurement)}: {formatNumber(delta.previous)} ← {formatNumber(delta.current)} {delta.unit === "kg" ? "کیلو" : "سانتی‌متر"}
-    </Text>
+    <View style={styles.measurement}>
+      <View style={styles.measurementHeading}>
+        <Text style={styles.cardTitle}>{measurementLabel(delta.measurement)}</Text>
+        <Text style={styles.muted}>{unit}</Text>
+      </View>
+      <ProgressBar color={fiticianTokens.colors.muted} label={`قبلی ${measurementLabel(delta.measurement)}`} progress={previous / maximum} />
+      <ProgressBar label={`فعلی ${measurementLabel(delta.measurement)}`} progress={current / maximum} />
+      <View style={styles.measurementValues}>
+        <Text style={styles.muted}>قبلی: {formatNumber(delta.previous)} {unit}</Text>
+        <Text style={styles.body}>فعلی: {formatNumber(delta.current)} {unit}</Text>
+      </View>
+    </View>
   );
 }
 
@@ -374,7 +394,32 @@ function visualChangeText(transition: BodyProgressVisualTransition) {
   );
 }
 
-function PhotoStrip({
+function selectBiggestChange(
+  transitions: Array<Pick<BodyProgressVisualTransition, "body_area" | "state" | "change_confidence">>,
+): { body_area: BodyArea; state: BodyProgressState } | null {
+  const meaningful = transitions.filter((transition) => (
+    transition.state === "improved" || transition.state === "declined_or_less_balanced"
+  ));
+  if (meaningful.length === 0) return null;
+  const biggest = [...meaningful].sort((left, right) => right.change_confidence - left.change_confidence)[0];
+  return biggest === undefined ? null : { body_area: biggest.body_area, state: biggest.state };
+}
+
+function PrivacyDisclaimer() {
+  return (
+    <Card style={styles.disclaimerCard} variant="glass">
+      <View style={styles.disclaimerHeading}>
+        <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={20} />
+        <Text style={styles.cardTitle}>فقط تحلیل رشد قابل‌مشاهده</Text>
+      </View>
+      <Text style={styles.body}>
+        دوست عزیزم، این بررسی توسط AI انجام شده و ممکنه اشتباه کنه. برای تحلیل تخصصی‌تر منتظر نظر پزشک و مربی بمون.
+      </Text>
+    </Card>
+  );
+}
+
+function PhotoDetails({
   photoUris,
   photos,
 }: {
@@ -382,8 +427,11 @@ function PhotoStrip({
   readonly photos: BodyPhoto[];
 }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.cardTitle}>تصاویر خصوصی نشست</Text>
+    <DisclosureCard
+      icon="shield"
+      summary="فقط نسخهٔ خصوصی و احراز‌شدهٔ عکس‌ها در این دستگاه نمایش داده می‌شود."
+      title="نماهای ناشناس‌شده بدن"
+    >
       <View style={styles.photoRow}>
         {photos.map((photo) => (
           <View key={photo.id} style={styles.photoItem}>
@@ -400,7 +448,31 @@ function PhotoStrip({
           </View>
         ))}
       </View>
-    </View>
+    </DisclosureCard>
+  );
+}
+
+function ResultDetailsDisclosure({ analysis }: { readonly analysis: BodyAnalysis }) {
+  const validation = analysis.photo_validation;
+  return (
+    <DisclosureCard
+      icon="shield"
+      summary="اطلاعات فنی و وضعیت کیفیت ورودی، برای بررسی بیشتر"
+      title="جزئیات فنی نتیجه"
+    >
+      <View style={styles.section}>
+        <Text style={styles.body}>نسخه پردازش: {analysis.result_version ?? "—"}</Text>
+        <Text style={styles.body}>قرارداد داده: {analysis.schema_version}</Text>
+        <Text style={styles.body}>منبع نتیجه: {resultSourceLabel(analysis.result_source)}</Text>
+        <Text style={styles.body}>اطمینان کلی: {formatPercent(analysis.overall_confidence)}</Text>
+        {validation ? (
+          <>
+            <Text style={styles.body}>{validation.accepted ? "سه تصویر برای تحلیل قابل استفاده بود." : "کیفیت تصویر نیاز به اصلاح دارد."}</Text>
+            <Text style={styles.body}>اطمینان بررسی عکس: {formatPercent(validation.confidence)}</Text>
+          </>
+        ) : null}
+      </View>
+    </DisclosureCard>
   );
 }
 
@@ -439,6 +511,14 @@ function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function formatSessionDate(value: string): string {
+  return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" }).format(new Date(value));
+}
+
 function sessionStatusLabel(status: BodyPhotoSession["state"]): string {
   const labels: Record<BodyPhotoSession["state"], string> = {
     analyzing: "در حال تحلیل",
@@ -457,10 +537,34 @@ function sessionStatusLabel(status: BodyPhotoSession["state"]): string {
 }
 
 function analysisStatusLabel(status: BodyAnalysis["status"]): string {
-  if (status === "queued") return "تحلیل در صف پردازش است.";
+  if (status === "queued") return "تحلیل در صف است.";
   if (status === "validating") return "کیفیت تصاویر در حال بررسی است.";
-  if (status === "analyzing") return "تحلیل در حال انجام است.";
+  if (status === "analyzing") return "در حال تحلیل رشد قابل‌مشاهده بدن";
   return status === "review_pending" ? "نتیجه در انتظار بررسی تخصصی است." : "نتیجه آماده است.";
+}
+
+function analysisFailureMessage(analysis: BodyAnalysis): string {
+  const providerMessages: Record<string, string> = {
+    connection_failure: "فیتشو به سرویس تحلیل وصل نشد. شبکهٔ بک‌اند یا تنظیم پراکسی را بررسی کن.",
+    invalid_output: "پاسخ تحلیل معتبر نبود. بعداً دوباره تلاش کن یا مدل سازگار دیگری انتخاب کن.",
+    malformed_response: "پاسخ تحلیل قابل‌خواندن نبود. بعداً دوباره تلاش کن.",
+    model_not_found: "مدل انتخاب‌شده در دسترس نیست. بعداً دوباره تلاش کن.",
+    not_configured: "سرویس تحلیل بدن هنوز پیکربندی نشده است.",
+    provider_unavailable: "سرویس تحلیل بدن موقتاً در دسترس نیست.",
+    rate_limited: "سرویس تحلیل بدن موقتاً محدود شده است. کمی بعد دوباره تلاش کن.",
+    timeout: "سرویس تحلیل بدن در زمان تعیین‌شده پاسخ نداد. دوباره تلاش کن.",
+    unauthorized: "دسترسی سرویس تحلیل بدن پذیرفته نشد. دوباره تلاش کن.",
+  };
+  return providerMessages[analysis.error_code ?? ""]
+    ?? analysis.safe_error_message
+    ?? "تحلیل بدن تکمیل نشد. برنامه تمرینی بدون شخصی‌سازی عکس همچنان در دسترس است.";
+}
+
+function hasAnalysisResult(analysis: BodyAnalysis): boolean {
+  return (
+    (analysis.experience_result !== null && analysis.experience_result !== undefined)
+    || analysis.normalized_result !== null
+  );
 }
 
 function resultSourceLabel(source: BodyAnalysis["result_source"]): string {
@@ -484,14 +588,6 @@ function classificationLabel(value: string): string {
   return "متعادل";
 }
 
-function regionClassificationLabel(value: BodyAnalysisExperienceRegion["display_classification"]): string {
-  if (value === "stronger") return "قوی‌تر";
-  if (value === "room_to_grow") return "جای رشد";
-  if (value === "primary_priority") return "اولویت اصلی";
-  if (value === "not_assessable") return "قابل ارزیابی نیست";
-  return "متعادل";
-}
-
 function progressStateLabel(value: BodyProgressState): string {
   if (value === "improved") return "بهبود یافته";
   if (value === "declined_or_less_balanced") return "نیازمند توجه";
@@ -511,25 +607,6 @@ function photoQualityReasonLabel(value: string): string {
     wrong_view: "نمای تصویر با نمای انتخاب‌شده هماهنگ نیست",
   };
   return labels[value] ?? "نیازمند بررسی";
-}
-
-function bodyAreaLabel(area: BodyArea): string {
-  const labels: Record<BodyArea, string> = {
-    arms: "بازوها",
-    back: "پشت",
-    calves: "ساق پا",
-    chest: "سینه",
-    forearms: "ساعدها",
-    glutes: "باسن",
-    hamstrings: "همسترینگ",
-    lats: "زیربغل",
-    quads: "چهارسر ران",
-    shoulders: "سرشانه‌ها",
-    symmetry: "تقارن",
-    visible_alignment_or_posture: "هم‌راستایی و وضعیت بدن",
-    waist_midsection: "کمر و میان‌تنه",
-  };
-  return labels[area];
 }
 
 function measurementLabel(value: BodyProgressMeasurementDelta["measurement"]): string {
@@ -570,6 +647,30 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  changeArea: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  changeSummary: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[1],
+    padding: fiticianTokens.spacing[3],
+  },
+  changeTitle: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   card: {
     gap: fiticianTokens.spacing[2],
   },
@@ -589,6 +690,14 @@ const styles = StyleSheet.create({
   content: {
     gap: fiticianTokens.spacing[4],
     paddingBottom: fiticianTokens.spacing[6],
+  },
+  disclaimerCard: {
+    gap: fiticianTokens.spacing[3],
+  },
+  disclaimerHeading: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
   },
   headerAction: {
     minHeight: 42,
@@ -615,6 +724,20 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  measurement: {
+    gap: fiticianTokens.spacing[2],
+  },
+  measurementHeading: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+  },
+  measurementValues: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[3],
+    justifyContent: "space-between",
+  },
   photo: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderRadius: fiticianTokens.radii.medium,
@@ -629,6 +752,35 @@ const styles = StyleSheet.create({
   photoRow: {
     flexDirection: "row",
     gap: fiticianTokens.spacing[2],
+  },
+  reviewDot: {
+    backgroundColor: fiticianTokens.colors.muted,
+    borderRadius: fiticianTokens.radii.pill,
+    height: 9,
+    width: 9,
+  },
+  reviewDotApproved: {
+    backgroundColor: fiticianTokens.colors.success,
+  },
+  reviewRow: {
+    alignItems: "center",
+    borderBottomColor: fiticianTokens.colors.line,
+    borderBottomWidth: 1,
+    flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[2],
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+  },
+  reviewValue: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    marginInlineStart: "auto",
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  reviewValueApproved: {
+    color: fiticianTokens.colors.success,
   },
   section: {
     gap: fiticianTokens.spacing[3],

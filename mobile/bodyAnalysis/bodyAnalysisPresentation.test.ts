@@ -5,6 +5,9 @@ import type { BodyAnalysisExperienceV4 } from "@fitician/core/body-photos";
 import {
   bodyBmiLabel,
   bodyMetricProgress,
+  bodyRegionClassificationLabel,
+  bodyRegionInsight,
+  buildBodyAnalysisExperienceCopy,
   buildBodyProgressLandingSummary,
   buildBodyIndicatorSummary,
 } from "./bodyAnalysisPresentation";
@@ -63,4 +66,28 @@ it("keeps incomplete uploads separate and preserves the web newest-first analysi
   expect(summary.incomplete).toEqual([incomplete]);
   expect(summary.submitted).toEqual([latest, previous]);
   expect(summary.latestAnalysis).toBe(latest);
+});
+
+it("keeps the V4 result copy data-driven and aligned with Web classifications", () => {
+  const result = buildBodyAnalysisExperienceCopy({
+    ...experience,
+    first_impression: {
+      message_key: "body_analysis.first_impression.primary_priority",
+      parameters: { areas: ["shoulders"] },
+    },
+    direction: {
+      status: "aligned_with_current_goal",
+      goal: "build_muscle",
+      reason_codes: ["current_goal_preserved"],
+    },
+    regions: [{ area: "shoulders", display_classification: "primary_priority" }],
+  } as unknown as BodyAnalysisExperienceV4);
+
+  expect(result.firstLook).toContain("سرشانه");
+  expect(result.route).toContain("عضله‌سازی");
+  expect(bodyRegionClassificationLabel("primary_priority")).toBe("ناحیهٔ اولویت‌دار");
+  expect(bodyRegionInsight({
+    area: "shoulders",
+    display_classification: "primary_priority",
+  } as never)).toContain("عقب‌تره");
 });

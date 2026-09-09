@@ -8,6 +8,7 @@ export interface MetricRingProps {
   readonly color?: string;
   readonly label: string;
   readonly progress: number;
+  readonly showLabel?: boolean;
   readonly size?: number;
   readonly strokeWidth?: number;
   readonly style?: StyleProp<ViewStyle>;
@@ -18,6 +19,7 @@ export function MetricRing({
   color = fiticianTokens.colors.aqua,
   label,
   progress,
+  showLabel = true,
   size = 92,
   strokeWidth = 8,
   style,
@@ -61,7 +63,7 @@ export function MetricRing({
       </Svg>
       <View pointerEvents="none" style={styles.copy}>
         <Text style={styles.value}>{valueLabel ?? `${percent.toLocaleString("fa-IR")}٪`}</Text>
-        <Text numberOfLines={1} style={styles.label}>{label}</Text>
+        {showLabel ? <Text numberOfLines={1} style={styles.label}>{label}</Text> : null}
       </View>
     </View>
   );
