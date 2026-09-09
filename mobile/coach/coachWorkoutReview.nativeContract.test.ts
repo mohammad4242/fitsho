@@ -8,7 +8,17 @@ it("keeps the native coach workflow online-write gated and revision-aware", asyn
   expect(source).toMatch(/isCoachReviewReadOnly/);
   expect(source).toMatch(/api\.approve/);
   expect(source).toMatch(/api\.reject/);
+  expect(source).toMatch(/api\.renew/);
   expect(source).toMatch(/api\.saveDraft/);
   expect(source).toMatch(/draft_revision/);
   expect(source).toMatch(/connectivityStatus/);
+  expect(source).toMatch(/PageHeading/);
+  expect(source).toMatch(/SegmentedControl/);
+  expect(source).toMatch(/useAndroidBackHandler/);
+  expect(source).toMatch(/قفل بازبینی تا/);
+  expect(source).toMatch(/نسخه اولیه فعال می‌ماند تا نسخه تو با اعتبارسنجی کامل تأیید شود/);
+  expect(source).toMatch(/برگشت برای اصلاح/);
+  expect(source).toMatch(/تأیید و ارسال برای کاربر/);
+  expect(source).toMatch(/DisclosureCard/);
+  expect(source).toMatch(/انتخاب حرکت/);
 });
