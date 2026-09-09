@@ -45,6 +45,11 @@ import {
   type OnboardingFormValidationError,
 } from "./onboardingForms";
 import {
+  getQuestionProgress,
+  nextQuestionIndex,
+  previousQuestionIndex,
+} from "./onboardingQuestionFlow";
+import {
   emptyExerciseFormValues,
   emptyNutritionBasicsFormValues,
   emptyNutritionPreferencesFormValues,
@@ -509,69 +514,77 @@ export function SharedProfileStage({
       progress="۱ از ۲"
       title="اول خودت را معرفی کن"
     >
-      <Card variant="glass">
-        <View style={styles.formStack}>
-          <ControlledTextField control={control} label="نام نمایشی" name="display_name" />
-          <ControlledTextField
-            control={control}
-            keyboardType="numbers-and-punctuation"
-            label="تاریخ تولد"
-            name="birth_date"
-            placeholder="۱۳۷۵/۰۱/۰۱"
-            textDirection="ltr"
-            normalizeInput
-          />
-          <ControlledChoice control={control} label="جنسیت" name="sex" options={sexOptions} />
-          <View style={styles.twoColumns}>
+      <GuidedQuestionFlow busy={busy} nextLabel="ادامه" onBack={onBack} onSubmit={submit}>
+        {[
+          <View key="identity" style={styles.formStack}>
+            <ControlledTextField control={control} label="نام نمایشی" name="display_name" />
             <ControlledTextField
               control={control}
-              keyboardType="decimal-pad"
-              label="قد (سانتی‌متر)"
-              name="height_cm"
+              keyboardType="numbers-and-punctuation"
+              label="تاریخ تولد"
+              name="birth_date"
+              placeholder="۱۳۷۵/۰۱/۰۱"
               textDirection="ltr"
               normalizeInput
             />
+            <ControlledChoice control={control} label="جنسیت" name="sex" options={sexOptions} />
+          </View>,
+          <View key="body" style={styles.formStack}>
+            <Text style={styles.questionTitle}>بدنت را بهتر بشناسیم</Text>
+            <Text style={styles.helper}>اعداد را با واحد مشخص وارد کن تا برنامه دقیق‌تر تنظیم شود.</Text>
+            <View style={styles.twoColumns}>
+              <ControlledTextField
+                control={control}
+                keyboardType="decimal-pad"
+                label="قد (سانتی‌متر)"
+                name="height_cm"
+                textDirection="ltr"
+                normalizeInput
+              />
+              <ControlledTextField
+                control={control}
+                keyboardType="decimal-pad"
+                label="وزن (کیلوگرم)"
+                name="current_weight_kg"
+                textDirection="ltr"
+                normalizeInput
+              />
+            </View>
+          </View>,
+          <View key="goal" style={styles.formStack}>
+            <Text style={styles.questionTitle}>هدف تو چیست؟</Text>
+            <Text style={styles.sectionLabel}>اندازه‌های اختیاری</Text>
+            <Text style={styles.helper}>برای دقت بیشتر، اندازه را با حداکثر دو رقم اعشار وارد کن.</Text>
+            <View style={styles.twoColumns}>
+              <ControlledTextField
+                control={control}
+                keyboardType="decimal-pad"
+                label="دور شانه"
+                name="shoulder_circumference_cm"
+                textDirection="ltr"
+                normalizeInput
+              />
+              <ControlledTextField
+                control={control}
+                keyboardType="decimal-pad"
+                label="دور کمر"
+                name="waist_circumference_cm"
+                textDirection="ltr"
+                normalizeInput
+              />
+            </View>
             <ControlledTextField
               control={control}
               keyboardType="decimal-pad"
-              label="وزن (کیلوگرم)"
-              name="current_weight_kg"
+              label="دور باسن"
+              name="hip_circumference_cm"
               textDirection="ltr"
               normalizeInput
             />
-          </View>
-          <Text style={styles.sectionLabel}>اندازه‌های اختیاری</Text>
-          <Text style={styles.helper}>برای دقت بیشتر، اندازه را با حداکثر دو رقم اعشار وارد کن.</Text>
-          <View style={styles.twoColumns}>
-            <ControlledTextField
-              control={control}
-              keyboardType="decimal-pad"
-              label="دور شانه"
-              name="shoulder_circumference_cm"
-              textDirection="ltr"
-              normalizeInput
-            />
-            <ControlledTextField
-              control={control}
-              keyboardType="decimal-pad"
-              label="دور کمر"
-              name="waist_circumference_cm"
-              textDirection="ltr"
-              normalizeInput
-            />
-          </View>
-          <ControlledTextField
-            control={control}
-            keyboardType="decimal-pad"
-            label="دور باسن"
-            name="hip_circumference_cm"
-            textDirection="ltr"
-            normalizeInput
-          />
-          <ControlledChoice control={control} label="هدف اصلی" name="fitness_goal" options={fitnessGoalOptions} />
-        </View>
-      </Card>
-      <ActionBar busy={busy} onBack={onBack} onNext={submit} nextLabel="ادامه" />
+            <ControlledChoice control={control} label="هدف اصلی" name="fitness_goal" options={fitnessGoalOptions} />
+          </View>,
+        ]}
+      </GuidedQuestionFlow>
     </StageFrame>
   );
 }
@@ -607,76 +620,81 @@ export function TrainingProfileStage({
       progress="۲ از ۲"
       title="برنامه تمرینت را تنظیم کن"
     >
-      <Card variant="glass">
-        <View style={styles.formStack}>
-          <ControlledChoice control={control} label="سطح تجربه" name="experience_level" options={experienceOptions} />
-          <ControlledTextField
-            control={control}
-            hint="اگر تمرین منظم نداشتی، خالی بگذار."
-            keyboardType="number-pad"
-            label="سابقه تمرین (ماه، اختیاری)"
-            name="training_age_months"
-            textDirection="ltr"
-            normalizeInput
-          />
-          <ControlledTextField
-            control={control}
-            keyboardType="number-pad"
-            label="روزهای تمرین در هفته"
-            name="training_days_per_week"
-            textDirection="ltr"
-            normalizeInput
-          />
-          <ControlledChoice control={control} label="محل تمرین" name="training_location" options={trainingLocationOptions} />
-          {location === "home" ? (
-            <>
-              <ControlledChoice
-                control={control}
-                label="امکانات اصلی خانه"
-                name="home_training_setup"
-                options={homeSetupOptions}
-                onChangeValue={(value) => {
-                  if (value === "bodyweight_only") {
-                    setValue("available_equipment", ["bodyweight", "pull_up_bar"]);
-                  } else if (value === "dumbbells_available") {
-                    setValue("available_equipment", ["bodyweight", "dumbbell"]);
-                  }
-                }}
-              />
-              <ControlledMultiChoice
-                control={control}
-                label="تجهیزات در دسترس"
-                name="available_equipment"
-                options={equipmentOptions}
-              />
-            </>
-          ) : null}
-          <ControlledChoice
-            control={control}
-            label="زمان هر جلسه"
-            name="session_duration_minutes"
-            options={sessionDurationOptions}
-          />
-          <ControlledChoice control={control} label="شدت معمول تمرین" name="training_intensity" options={intensityOptions} />
-          <ControlledMultiChoice
-            allowEmpty
-            control={control}
-            label="موارد احتیاط"
-            name="training_cautions"
-            options={cautionOptions}
-            emptyLabel="موردی ندارم"
-          />
-          <ControlledMultiChoice
-            control={control}
-            label="روزهای ترجیحی (اختیاری)"
-            name="preferred_weekdays"
-            options={weekdayOptions}
-            numericValues
-          />
-          <ControlledChoice control={control} label="مدت برنامه" name="plan_duration_weeks" options={planDurationOptions} />
-        </View>
-      </Card>
-      <ActionBar busy={busy} onBack={onBack} onNext={submit} nextLabel="ذخیره و ادامه" />
+      <GuidedQuestionFlow busy={busy} nextLabel="ذخیره و ادامه" onBack={onBack} onSubmit={submit}>
+        {[
+          <View key="experience" style={styles.formStack}>
+            <ControlledChoice control={control} label="سطح تجربه" name="experience_level" options={experienceOptions} />
+            <ControlledTextField
+              control={control}
+              hint="اگر تمرین منظم نداشتی، خالی بگذار."
+              keyboardType="number-pad"
+              label="سابقه تمرین (ماه، اختیاری)"
+              name="training_age_months"
+              textDirection="ltr"
+              normalizeInput
+            />
+          </View>,
+          <View key="setup" style={styles.formStack}>
+            <ControlledTextField
+              control={control}
+              keyboardType="number-pad"
+              label="روزهای تمرین در هفته"
+              name="training_days_per_week"
+              textDirection="ltr"
+              normalizeInput
+            />
+            <ControlledChoice control={control} label="محل تمرین" name="training_location" options={trainingLocationOptions} />
+            {location === "home" ? (
+              <>
+                <ControlledChoice
+                  control={control}
+                  label="امکانات اصلی خانه"
+                  name="home_training_setup"
+                  options={homeSetupOptions}
+                  onChangeValue={(value) => {
+                    if (value === "bodyweight_only") {
+                      setValue("available_equipment", ["bodyweight", "pull_up_bar"]);
+                    } else if (value === "dumbbells_available") {
+                      setValue("available_equipment", ["bodyweight", "dumbbell"]);
+                    }
+                  }}
+                />
+                <ControlledMultiChoice
+                  control={control}
+                  label="تجهیزات در دسترس"
+                  name="available_equipment"
+                  options={equipmentOptions}
+                />
+              </>
+            ) : null}
+          </View>,
+          <View key="plan" style={styles.formStack}>
+            <ControlledChoice
+              control={control}
+              label="زمان هر جلسه"
+              name="session_duration_minutes"
+              options={sessionDurationOptions}
+            />
+            <ControlledChoice control={control} label="شدت معمول تمرین" name="training_intensity" options={intensityOptions} />
+            <ControlledMultiChoice
+              allowEmpty
+              control={control}
+              label="موارد احتیاط"
+              name="training_cautions"
+              options={cautionOptions}
+              emptyLabel="موردی ندارم"
+            />
+            <ControlledMultiChoice
+              control={control}
+              label="روزهای ترجیحی (اختیاری)"
+              name="preferred_weekdays"
+              options={weekdayOptions}
+              numericValues
+            />
+            <ControlledChoice control={control} label="مدت برنامه" name="plan_duration_weeks" options={planDurationOptions} />
+          </View>,
+        ]}
+      </GuidedQuestionFlow>
     </StageFrame>
   );
 }
@@ -710,42 +728,47 @@ export function SafetyStage({
           variant="warning"
         />
       ) : null}
-      <Card variant="glass">
-        <View style={styles.formStack}>
-          <ControlledMultiChoice control={control} label="شرایط پزشکی" name="conditions" options={conditionOptions} csvValues />
-          <ControlledTextField
-            control={control}
-            hint="نام داروها را با ویرگول جدا کن."
-            label="داروهای مصرفی"
-            name="medications"
-          />
-          <ToggleField control={control} label="سابقه واکنش خطرناک غذایی" name="dangerous_food_reaction_history" />
-          <ToggleField control={control} label="بارداری" name="pregnant" />
-          <ToggleField control={control} label="شیردهی" name="breastfeeding" />
-          <ToggleField control={control} label="اختلال خوردن تشخیص داده‌شده" name="eating_disorder_diagnosed" />
-          <ToggleField control={control} label="علائم فعال اختلال خوردن" name="eating_disorder_active_symptoms" />
-          <ToggleField control={control} label="علائم اورژانسی یا خطرناک" name="emergency_or_danger_symptoms" />
-          <ToggleField control={control} label="تداخل پیچیده دارو و غذا" name="complex_medication_food_interaction" />
-          <ControlledTextField
-            control={control}
-            label="محدودیت غذایی پزشک (اختیاری)"
-            name="physician_dietary_restrictions"
-            multiline
-          />
-          <ControlledTextField
-            control={control}
-            label="توضیح مهم دیگر (اختیاری)"
-            name="other_relevant_condition"
-            multiline
-          />
-        </View>
-      </Card>
-      <ActionBar
+      <GuidedQuestionFlow
         busy={busy}
-        onBack={onBack}
-        onNext={handleSubmit((values) => onSubmit(safetyInputFromForm(values)))}
         nextLabel={blocked ? "ارزیابی دوباره" : "ادامه"}
-      />
+        onBack={onBack}
+        onSubmit={() => void handleSubmit((values) => onSubmit(safetyInputFromForm(values)))()}
+      >
+        {[
+          <View key="medical" style={styles.formStack}>
+            <ControlledMultiChoice control={control} label="شرایط پزشکی" name="conditions" options={conditionOptions} csvValues />
+            <ControlledTextField
+              control={control}
+              hint="نام داروها را با ویرگول جدا کن."
+              label="داروهای مصرفی"
+              name="medications"
+            />
+          </View>,
+          <View key="history" style={styles.formStack}>
+            <ToggleField control={control} label="سابقه واکنش خطرناک غذایی" name="dangerous_food_reaction_history" />
+            <ToggleField control={control} label="بارداری" name="pregnant" />
+            <ToggleField control={control} label="شیردهی" name="breastfeeding" />
+            <ToggleField control={control} label="اختلال خوردن تشخیص داده‌شده" name="eating_disorder_diagnosed" />
+            <ToggleField control={control} label="علائم فعال اختلال خوردن" name="eating_disorder_active_symptoms" />
+          </View>,
+          <View key="safety" style={styles.formStack}>
+            <ToggleField control={control} label="علائم اورژانسی یا خطرناک" name="emergency_or_danger_symptoms" />
+            <ToggleField control={control} label="تداخل پیچیده دارو و غذا" name="complex_medication_food_interaction" />
+            <ControlledTextField
+              control={control}
+              label="محدودیت غذایی پزشک (اختیاری)"
+              name="physician_dietary_restrictions"
+              multiline
+            />
+            <ControlledTextField
+              control={control}
+              label="توضیح مهم دیگر (اختیاری)"
+              name="other_relevant_condition"
+              multiline
+            />
+          </View>,
+        ]}
+      </GuidedQuestionFlow>
     </StageFrame>
   );
 }
@@ -771,39 +794,42 @@ export function ExerciseStage({
       progress="۲ از ۴"
       title="خارج از فیتشو هم تمرین می‌کنی؟"
     >
-      <Card variant="glass">
-        <View style={styles.formStack}>
-          <ToggleField control={control} label="تمرین منظم دارم" name="trains" />
-          {trains ? (
-            <>
-              <ControlledChoice control={control} label="نوع فعالیت" name="exercise_type" options={exerciseTypeOptions} />
-              <ControlledTextField
-                control={control}
-                keyboardType="number-pad"
-                label="روز در هفته"
-                name="days_per_week"
-                textDirection="ltr"
-                normalizeInput
-              />
-              <ControlledTextField
-                control={control}
-                keyboardType="number-pad"
-                label="دقیقه در هر جلسه"
-                name="minutes_per_session"
-                textDirection="ltr"
-                normalizeInput
-              />
-              <ControlledChoice control={control} label="شدت فعالیت" name="intensity" options={intensityOptions} />
-            </>
-          ) : null}
-        </View>
-      </Card>
-      <ActionBar
+      <GuidedQuestionFlow
         busy={busy}
-        onBack={onBack}
-        onNext={handleSubmit((values) => onSubmit(exerciseInputFromForm(values)))}
         nextLabel="ادامه"
-      />
+        onBack={onBack}
+        onSubmit={() => void handleSubmit((values) => onSubmit(exerciseInputFromForm(values)))()}
+      >
+        {[
+          <View key="activity" style={styles.formStack}>
+            <ToggleField control={control} label="تمرین منظم دارم" name="trains" />
+          </View>,
+          ...(trains
+            ? [
+                <View key="details" style={styles.formStack}>
+                  <ControlledChoice control={control} label="نوع فعالیت" name="exercise_type" options={exerciseTypeOptions} />
+                  <ControlledTextField
+                    control={control}
+                    keyboardType="number-pad"
+                    label="روز در هفته"
+                    name="days_per_week"
+                    textDirection="ltr"
+                    normalizeInput
+                  />
+                  <ControlledTextField
+                    control={control}
+                    keyboardType="number-pad"
+                    label="دقیقه در هر جلسه"
+                    name="minutes_per_session"
+                    textDirection="ltr"
+                    normalizeInput
+                  />
+                  <ControlledChoice control={control} label="شدت فعالیت" name="intensity" options={intensityOptions} />
+                </View>,
+              ]
+            : []),
+        ]}
+      </GuidedQuestionFlow>
     </StageFrame>
   );
 }
@@ -838,39 +864,42 @@ export function NutritionBasicsStage({
       progress="۳ از ۴"
       title="شرایط واقعی زندگی‌ات را بگو"
     >
-      <Card variant="glass">
-        <View style={styles.formStack}>
-          <ControlledChoice control={control} label="فعالیت روزانه" name="daily_activity_level" options={activityOptions} />
-          <ControlledTextField
-            control={control}
-            hint="مبلغ را به تومان وارد کن."
-            keyboardType="number-pad"
-            label="بودجه ماهانه غذا"
-            name="monthly_food_budget_toman"
-            textDirection="ltr"
-            normalizeInput
-          />
-          <ControlledChoice control={control} label="نوع بودجه" name="budget_style" options={budgetStyleOptions} />
-          <ControlledTextField
-            control={control}
-            hint="اختیاری؛ مقدار امن پیش‌فرض در صورت خالی بودن استفاده می‌شود."
-            keyboardType="decimal-pad"
-            label="تغییر وزن هفتگی (کیلوگرم)"
-            name="target_weight_change_kg_per_week"
-            textDirection="ltr"
-            normalizeInput
-          />
-          <ControlledChoice
-            control={control}
-            label="الگوی تغذیه"
-            name="dietary_pattern"
-            options={dietaryOptions}
-          />
-          <ControlledTextField control={control} label="حساسیت‌های غذایی" name="allergies" />
-          <ControlledTextField control={control} label="عدم تحمل غذایی" name="intolerances" />
-        </View>
-      </Card>
-      <ActionBar busy={busy} onBack={onBack} onNext={submit} nextLabel="ادامه" />
+      <GuidedQuestionFlow busy={busy} nextLabel="ادامه" onBack={onBack} onSubmit={submit}>
+        {[
+          <View key="budget" style={styles.formStack}>
+            <ControlledChoice control={control} label="فعالیت روزانه" name="daily_activity_level" options={activityOptions} />
+            <ControlledTextField
+              control={control}
+              hint="مبلغ را به تومان وارد کن."
+              keyboardType="number-pad"
+              label="بودجه ماهانه غذا"
+              name="monthly_food_budget_toman"
+              textDirection="ltr"
+              normalizeInput
+            />
+            <ControlledChoice control={control} label="نوع بودجه" name="budget_style" options={budgetStyleOptions} />
+          </View>,
+          <View key="preferences" style={styles.formStack}>
+            <ControlledTextField
+              control={control}
+              hint="اختیاری؛ مقدار امن پیش‌فرض در صورت خالی بودن استفاده می‌شود."
+              keyboardType="decimal-pad"
+              label="تغییر وزن هفتگی (کیلوگرم)"
+              name="target_weight_change_kg_per_week"
+              textDirection="ltr"
+              normalizeInput
+            />
+            <ControlledChoice
+              control={control}
+              label="الگوی تغذیه"
+              name="dietary_pattern"
+              options={dietaryOptions}
+            />
+            <ControlledTextField control={control} label="حساسیت‌های غذایی" name="allergies" />
+            <ControlledTextField control={control} label="عدم تحمل غذایی" name="intolerances" />
+          </View>,
+        ]}
+      </GuidedQuestionFlow>
     </StageFrame>
   );
 }
@@ -928,56 +957,61 @@ export function NutritionPreferencesStage({
       progress="۴ از ۴"
       title="برنامه غذایی را برای زندگی‌ات تنظیم کن"
     >
-      <Card variant="glass">
-        <View style={styles.formStack}>
-          <ControlledTextField
-            control={control}
-            keyboardType="number-pad"
-            label="وعده اصلی در روز"
-            name="meals_per_day"
-            textDirection="ltr"
-            normalizeInput
-          />
-          <ControlledTextField
-            control={control}
-            keyboardType="number-pad"
-            label="میان‌وعده در روز"
-            name="snacks_per_day"
-            textDirection="ltr"
-            normalizeInput
-          />
-          <ControlledChoice
-            control={control}
-            label="شروع هفته برنامه"
-            name="preferred_plan_start_day"
-            options={[
-              { label: "شنبه", value: "saturday" },
-              { label: "یکشنبه", value: "sunday" },
-              { label: "دوشنبه", value: "monday" },
-              { label: "سه‌شنبه", value: "tuesday" },
-              { label: "چهارشنبه", value: "wednesday" },
-              { label: "پنجشنبه", value: "thursday" },
-              { label: "جمعه", value: "friday" },
-            ]}
-          />
-          <ControlledTextField control={control} label="غذاهای مورد علاقه" name="favourite_foods" />
-          <ControlledTextField control={control} label="غذاهای نامطلوب" name="disliked_foods" />
-          <ControlledTextField control={control} label="محدودیت فرهنگی یا مذهبی" name="religious_cultural_exclusions" />
-          <ControlledTextField control={control} label="شرایط کاری یا شیفت (اختیاری)" name="work_shift_context" />
-          <ToggleField control={control} label="یادآوری ثبت روزانه فعال باشد" name="daily_check_in_enabled" />
-          {checkIn ? (
+      <GuidedQuestionFlow busy={busy} nextLabel="بازبینی برنامه" onBack={onBack} onSubmit={submit}>
+        {[
+          <View key="schedule" style={styles.formStack}>
             <ControlledTextField
               control={control}
-              label="زمان یادآوری"
-              name="preferred_check_in_time"
-              placeholder="۲۱:۰۰"
+              keyboardType="number-pad"
+              label="وعده اصلی در روز"
+              name="meals_per_day"
               textDirection="ltr"
               normalizeInput
             />
-          ) : null}
-        </View>
-      </Card>
-      <ActionBar busy={busy} onBack={onBack} onNext={submit} nextLabel="بازبینی برنامه" />
+            <ControlledTextField
+              control={control}
+              keyboardType="number-pad"
+              label="میان‌وعده در روز"
+              name="snacks_per_day"
+              textDirection="ltr"
+              normalizeInput
+            />
+            <ControlledChoice
+              control={control}
+              label="شروع هفته برنامه"
+              name="preferred_plan_start_day"
+              options={[
+                { label: "شنبه", value: "saturday" },
+                { label: "یکشنبه", value: "sunday" },
+                { label: "دوشنبه", value: "monday" },
+                { label: "سه‌شنبه", value: "tuesday" },
+                { label: "چهارشنبه", value: "wednesday" },
+                { label: "پنجشنبه", value: "thursday" },
+                { label: "جمعه", value: "friday" },
+              ]}
+            />
+          </View>,
+          <View key="preferences" style={styles.formStack}>
+            <ControlledTextField control={control} label="غذاهای مورد علاقه" name="favourite_foods" />
+            <ControlledTextField control={control} label="غذاهای نامطلوب" name="disliked_foods" />
+            <ControlledTextField control={control} label="محدودیت فرهنگی یا مذهبی" name="religious_cultural_exclusions" />
+            <ControlledTextField control={control} label="شرایط کاری یا شیفت (اختیاری)" name="work_shift_context" />
+          </View>,
+          <View key="check-in" style={styles.formStack}>
+            <ToggleField control={control} label="یادآوری ثبت روزانه فعال باشد" name="daily_check_in_enabled" />
+            {checkIn ? (
+              <ControlledTextField
+                control={control}
+                label="زمان یادآوری"
+                name="preferred_check_in_time"
+                placeholder="۲۱:۰۰"
+                textDirection="ltr"
+                normalizeInput
+              />
+            ) : null}
+          </View>,
+        ]}
+      </GuidedQuestionFlow>
     </StageFrame>
   );
 }
@@ -1072,6 +1106,58 @@ function ActionBar({
     <View style={styles.actions}>
       {onBack ? <Button disabled={busy} label="قبلی" onPress={onBack} variant="secondary" /> : null}
       <Button disabled={busy} label={nextLabel} loading={busy} onPress={() => void onNext()} style={styles.nextButton} />
+    </View>
+  );
+}
+
+function GuidedQuestionFlow({
+  busy,
+  children,
+  nextLabel,
+  onBack,
+  onSubmit,
+}: {
+  readonly busy: boolean;
+  readonly children: readonly ReactNode[];
+  readonly nextLabel: string;
+  readonly onBack?: () => boolean;
+  readonly onSubmit: () => void;
+}) {
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const questionCount = Math.max(1, children.length);
+  const progress = getQuestionProgress(questionIndex, questionCount);
+
+  useEffect(() => {
+    setQuestionIndex((current) => Math.min(current, questionCount - 1));
+  }, [questionCount]);
+
+  function goBack() {
+    if (questionIndex > 0) {
+      setQuestionIndex(previousQuestionIndex(questionIndex));
+      return true;
+    }
+    return onBack?.() ?? false;
+  }
+
+  function goNext() {
+    if (questionIndex < questionCount - 1) {
+      setQuestionIndex(nextQuestionIndex(questionIndex, questionCount));
+      return;
+    }
+    onSubmit();
+  }
+
+  return (
+    <View style={styles.questionFlow}>
+      <View style={styles.questionMeta}>
+        <Text style={styles.questionEyebrow}>مسیر هدایت‌شده</Text>
+        <Text style={styles.questionProgress}>سؤال {progress.current} از {progress.total}</Text>
+      </View>
+      <ProgressBar label="پیشرفت سؤال‌ها" progress={progress.progress} />
+      <Card variant="glass" style={styles.questionCard}>
+        {children[questionIndex] ?? null}
+      </Card>
+      <ActionBar busy={busy} onBack={goBack} onNext={goNext} nextLabel={questionIndex === questionCount - 1 ? nextLabel : "ادامه"} />
     </View>
   );
 }
@@ -1599,6 +1685,39 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    writingDirection: "rtl",
+  },
+  questionCard: {
+    minHeight: 220,
+  },
+  questionEyebrow: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  questionFlow: {
+    gap: fiticianTokens.spacing[3],
+  },
+  questionMeta: {
+    alignItems: "center",
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+  },
+  questionProgress: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    writingDirection: "rtl",
+  },
+  questionTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 30,
+    textAlign: "right",
     writingDirection: "rtl",
   },
   recommended: {

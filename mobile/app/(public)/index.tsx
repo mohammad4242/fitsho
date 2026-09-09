@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { AppIcon, Button, Card } from "../../ui/components";
+import { AppIcon, Button, CinematicSurface, Media } from "../../ui/components";
 import { Screen } from "../../ui/layout";
 import { fiticianTokens } from "../../ui/tokens";
 
@@ -14,20 +14,28 @@ export default function PublicEntryScreen() {
           <Text style={styles.brand}>FITICIAN</Text>
           <Text style={styles.eyebrow}>PERSONAL PERFORMANCE</Text>
         </View>
-        <Card variant="hero" style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <AppIcon accessibilityLabel="مسیر شخصی فیتشو" color={fiticianTokens.colors.aqua} name="target" size={fiticianTokens.iconSize.xl} />
+        <CinematicSurface accent style={styles.hero} variant="hero">
+          <Media
+            accessibilityLabel="تمرین قدرتی فیتیشن"
+            source={require("../../assets/public-entry-hero.jpg")}
+            style={styles.heroMedia}
+          />
+          <View pointerEvents="none" style={styles.heroScrim} />
+          <View style={styles.heroContent}>
+            <View style={styles.heroIcon}>
+              <AppIcon accessibilityLabel="مسیر شخصی فیتشو" color={fiticianTokens.colors.aqua} name="target" size={fiticianTokens.iconSize.lg} />
+            </View>
+            <Text accessibilityRole="header" style={styles.title}>برنامه‌ای که با تو جلو می‌آید.</Text>
+            <Text style={styles.description}>مسیر هوشمند تمرین و تغذیه، متناسب با بدن، هدف و زندگی واقعی تو.</Text>
+            <View style={styles.pillRow}>
+              <Text style={styles.pill}>تمرین</Text>
+              <Text style={styles.pill}>تغذیه</Text>
+              <Text style={styles.pill}>تحلیل بدن</Text>
+            </View>
+            <Button label="شروع شخصی‌سازی" onPress={() => router.push("/public-onboarding")} />
           </View>
-          <Text accessibilityRole="header" style={styles.title}>برنامه‌ای که با تو جلو می‌آید.</Text>
-          <Text style={styles.description}>مسیر هوشمند تمرین و تغذیه، متناسب با بدن، هدف و زندگی واقعی تو.</Text>
-          <View style={styles.pillRow}>
-            <Text style={styles.pill}>تمرین</Text>
-            <Text style={styles.pill}>تغذیه</Text>
-            <Text style={styles.pill}>تحلیل بدن</Text>
-          </View>
-        </Card>
+        </CinematicSurface>
         <View style={styles.actions}>
-          <Button label="شروع شخصی‌سازی" onPress={() => router.push("/public-onboarding")} />
           <Button label="ورود به حساب" onPress={() => router.push("/auth/sign-in")} variant="secondary" />
         </View>
         <Pressable accessibilityRole="button" onPress={() => router.push("/auth/register")}>
@@ -76,8 +84,23 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   hero: {
+    minHeight: 500,
+  },
+  heroContent: {
     gap: fiticianTokens.spacing[4],
+    justifyContent: "flex-end",
+    minHeight: 500,
     padding: fiticianTokens.spacing[5],
+  },
+  heroMedia: {
+    borderRadius: 0,
+    bottom: 0,
+    height: "100%",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: "100%",
   },
   heroIcon: {
     alignItems: "center",
@@ -85,9 +108,17 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    height: 64,
+    height: 52,
     justifyContent: "center",
-    width: 64,
+    width: 52,
+  },
+  heroScrim: {
+    backgroundColor: "rgba(2,6,7,0.64)",
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
   },
   link: {
     color: fiticianTokens.colors.aqua,
@@ -117,6 +148,8 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
   },
   screen: {
+    paddingBottom: fiticianTokens.spacing[5],
+    paddingTop: fiticianTokens.spacing[3],
     justifyContent: "center",
   },
   title: {

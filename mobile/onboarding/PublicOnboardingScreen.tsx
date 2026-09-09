@@ -7,7 +7,7 @@ import type { ProductMode } from "@fitician/core/profile";
 
 import { PUBLIC_ONBOARDING_SOURCE } from "../auth/authRoute";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { AppIcon, Button, Card, Notice, ProgressBar } from "../ui/components";
+import { AppIcon, Button, Card, Notice, ProgressBar, StateSkeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -92,6 +92,7 @@ export function PublicOnboardingScreen() {
   if (loading || state === null) {
     return (
       <Screen contentWidth="reading" contentContainerStyle={styles.loadingScreen}>
+        <StateSkeleton style={styles.loadingSkeleton} variant="hero" />
         <ActivityIndicator accessibilityLabel="در حال آماده‌سازی" color={fiticianTokens.colors.aqua} />
         <Text style={styles.loadingText}>در حال آماده‌سازی مسیر شخصی تو…</Text>
       </Screen>
@@ -315,6 +316,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: fiticianTokens.spacing[4],
     justifyContent: "center",
+  },
+  loadingSkeleton: {
+    alignSelf: "stretch",
   },
   loadingText: {
     color: fiticianTokens.colors.muted,
