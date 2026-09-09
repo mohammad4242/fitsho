@@ -129,6 +129,11 @@ test("uses only the English card title and labels when the native direction is L
   expect(screen.getByTestId("exercise-media-card-title").props.children).toBe("Dumbbell Incline Bench Press");
   expect(screen.getByRole("radio", { name: "Male video" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "Female video" })).toBeTruthy();
+  expect(screen.getByTestId("exercise-detail-breadcrumb")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Exercise details" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Instructions" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Safety" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "مشخصات حرکت" })).toBeNull();
 });
 
 test("does not switch media from a normal player-control tap", () => {

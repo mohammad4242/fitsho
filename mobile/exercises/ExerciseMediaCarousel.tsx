@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     writingDirection: "ltr",
   },
   surface: {
-    aspectRatio: 1.45,
+    aspectRatio: 4 / 3,
     backgroundColor: fiticianTokens.colors.canvas,
     overflow: "hidden",
     width: "100%",

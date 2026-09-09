@@ -25,6 +25,12 @@ it("uses the compact localized media carousel card", async () => {
 
   expect(source).toContain("<ExerciseMediaCarousel");
   expect(source).toContain("<GenderMediaSelector");
+  expect(source).toContain("exercise-detail-breadcrumb");
+  expect(source).not.toContain("<ScreenHeader");
+  expect(source).toContain('direction={language === "en" ? "ltr" : "rtl"}');
+  expect(source.indexOf('testID="exercise-detail-breadcrumb"')).toBeLessThan(source.indexOf("<ExerciseMediaPanel"));
+  const mediaPanel = source.slice(source.indexOf("function ExerciseMediaPanel"), source.indexOf("function ExerciseInformation"));
+  expect(mediaPanel.indexOf("<GenderMediaSelector")).toBeLessThan(mediaPanel.indexOf('testID="exercise-media-card-title"'));
   expect(source).toContain("languageForDirection");
   expect(source).toContain("availableMediaPresentations");
   expect(source).toContain('api.get(slug ?? "", "unspecified")');
@@ -34,4 +40,12 @@ it("uses the compact localized media carousel card", async () => {
   expect(source).not.toContain("exerciseSecondaryTitle");
   expect(source).not.toContain("PresentationChip");
   expect(source).not.toContain("PublicExerciseVideoCache");
+});
+
+it("matches the web media aspect ratio while keeping native media controls", async () => {
+  const source = await readFile(new URL("./ExerciseMediaCarousel.tsx", import.meta.url), "utf8");
+
+  expect(source).toContain("aspectRatio: 4 / 3");
+  expect(source).toContain("nativeControls");
+  expect(source).toContain("MEDIA_SWIPE_THRESHOLD");
 });
