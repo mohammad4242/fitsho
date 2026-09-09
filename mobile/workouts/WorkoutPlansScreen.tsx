@@ -6,7 +6,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { workoutKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
-import { AppIcon, Button, Card, EmptyState, Notice, Skeleton } from "../ui/components";
+import {
+  AppIcon,
+  Button,
+  Card,
+  CinematicSurface,
+  EmptyState,
+  MetricStrip,
+  Notice,
+  ScreenHeader,
+  Skeleton,
+} from "../ui/components";
 import { Screen } from "../ui/layout";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
@@ -135,19 +145,19 @@ export function WorkoutPlansScreen() {
   }
 
   return (
-    <Screen contentWidth="reading">
-      <View style={styles.header}>
-        <Text style={styles.brand}>FITICIAN</Text>
-        <Text accessibilityRole="header" style={styles.title}>برنامه تمرینی</Text>
-        <Text style={styles.intro}>
-          برنامه‌ات را ببین، توضیح مربی را بخوان و نسخه‌ای را که برای تمرین آماده است نگه دار.
-        </Text>
-        <Button
+    <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
+      <ScreenHeader
+        action={<Button
           label="کتابخانه حرکات"
           onPress={() => router.push("/member/exercises")}
-          variant="secondary"
-        />
-      </View>
+          style={styles.headerAction}
+          variant="ghost"
+        />}
+        compact
+        eyebrow="برنامه شخصی تو"
+        subtitle="جلسه‌ها، توضیح مربی و نسخه قابل اجرای برنامه"
+        title="برنامه تمرینی"
+      />
 
       {connectivityStatus === "offline" && displayedPlan !== undefined ? (
         <Notice message="اتصال اینترنت برقرار نیست؛ آخرین برنامهٔ ذخیره‌شده نمایش داده می‌شود." variant="offline" />
@@ -316,20 +326,24 @@ function PlanView({
 
   return (
     <View style={styles.planSection}>
-      <Card style={styles.overviewCard}>
-        <View style={styles.planHeading}>
-          <View style={styles.planHeadingCopy}>
-            <Text style={styles.sectionEyebrow}>{historical ? "نسخهٔ قبلی" : "برنامهٔ فعلی"}</Text>
-            <Text style={styles.planTitle}>{plan.status === "failed" ? "ساخت برنامه ناموفق بود" : "برنامهٔ تمرینی هفتگی"}</Text>
+      <CinematicSurface accent style={styles.overviewCard} variant="hero">
+        <View style={styles.overviewContent}>
+          <View style={styles.planHeading}>
+            <View style={styles.planHeadingCopy}>
+              <Text style={styles.sectionEyebrow}>{historical ? "نسخهٔ قبلی" : "برنامهٔ فعلی"}</Text>
+              <Text style={styles.planTitle}>{plan.status === "failed" ? "ساخت برنامه ناموفق بود" : "برنامهٔ تمرینی هفتگی"}</Text>
+            </View>
+            <StatusPill status={summaryStatus} />
           </View>
-          <StatusPill status={summaryStatus} />
+          <MetricStrip
+            items={[
+              { label: "مدت برنامه", value: `${plan.plan_duration_weeks} هفته` },
+              { label: "روزهای تمرین", value: `${plan.days.length} روز` },
+              ...(averageDuration === null ? [] : [{ label: "میانگین جلسه", value: `${averageDuration} دقیقه` }]),
+            ]}
+          />
         </View>
-        <View style={styles.statsRow}>
-          <Stat label="مدت برنامه" value={`${plan.plan_duration_weeks} هفته`} />
-          <Stat label="روزهای تمرین" value={`${plan.days.length} روز`} />
-          {averageDuration !== null ? <Stat label="میانگین جلسه" value={`${averageDuration} دقیقه`} /> : null}
-        </View>
-      </Card>
+      </CinematicSurface>
 
       <View style={styles.statusStack}>
         {historical ? <Notice compact message="این نسخه فقط برای مشاهدهٔ تاریخچه است و قابل اجرا نیست." variant="info" /> : null}
@@ -431,7 +445,7 @@ function WorkoutDayCard({
 }) {
   const leadExercise = day.exercises[0];
   return (
-    <Card onPress={onToggle} style={styles.dayCard} variant={expanded ? "raised" : "interactive"}>
+    <Card onPress={onToggle} style={[styles.dayCard, expanded && styles.dayCardExpanded]} variant={expanded ? "raised" : "interactive"}>
       <View style={styles.dayHeader}>
         {leadExercise ? (
           <Pressable
@@ -441,7 +455,7 @@ function WorkoutDayCard({
               event.stopPropagation();
               onOpenExercise(leadExercise.exercise.slug);
             }}
-            style={({ pressed }) => [styles.dayMediaButton, pressed && styles.mediaPressed]}
+            style={({ pressed }) => [styles.dayMediaButton, expanded && styles.dayMediaButtonExpanded, pressed && styles.mediaPressed]}
           >
             <ExerciseMedia
               accessibilityLabel={`پیش‌نمایش ${leadExercise.exercise.name_fa || leadExercise.exercise.name_en}`}
@@ -449,7 +463,7 @@ function WorkoutDayCard({
               mediaType={leadExercise.exercise.media_type}
               name={leadExercise.exercise.name_fa || leadExercise.exercise.name_en}
               path={leadExercise.exercise.media_path}
-              style={styles.dayMedia}
+              style={[styles.dayMedia, expanded && styles.dayMediaExpanded]}
             />
             <View pointerEvents="none" style={styles.dayMediaBadge}>
               <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
@@ -461,9 +475,12 @@ function WorkoutDayCard({
           <Text style={styles.dayTitle}>{day.title_fa || day.title_en}</Text>
           <Text style={styles.dayMeta}>{day.estimated_duration_minutes} دقیقه · {day.total_exercise_count} حرکت</Text>
         </View>
-        <Text accessibilityLabel={expanded ? "بستن جزئیات روز" : "باز کردن جزئیات روز"} style={styles.chevron}>
-          {expanded ? "⌃" : "⌄"}
-        </Text>
+        <AppIcon
+          accessibilityLabel={expanded ? "بستن جزئیات روز" : "باز کردن جزئیات روز"}
+          color={fiticianTokens.colors.aqua}
+          name={expanded ? "chevronUp" : "chevronDown"}
+          size={fiticianTokens.iconSize.md}
+        />
       </View>
       {expanded ? (
         <View style={styles.dayDetails}>
@@ -491,13 +508,13 @@ function WorkoutExerciseRow({
   readonly onOpen: () => void;
 }) {
   return (
-    <View style={styles.exerciseRow}>
-      <Pressable
-        accessibilityLabel={`باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
-        accessibilityRole="button"
-        onPress={onOpen}
-        style={({ pressed }) => [styles.exerciseMediaButton, pressed && styles.mediaPressed]}
-      >
+    <Pressable
+      accessibilityLabel={`باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
+      accessibilityRole="button"
+      onPress={onOpen}
+      style={({ pressed }) => [styles.exerciseRow, pressed && styles.exerciseRowPressed]}
+    >
+      <View style={styles.exerciseMediaButton}>
         <ExerciseMedia
           accessibilityLabel={`پیش‌نمایش ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
           compact
@@ -509,11 +526,9 @@ function WorkoutExerciseRow({
         <View pointerEvents="none" style={styles.exerciseMediaBadge}>
           <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
         </View>
-      </Pressable>
+      </View>
       <View style={styles.exerciseCopy}>
-        <Pressable accessibilityRole="button" onPress={onOpen}>
-          <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>
-        </Pressable>
+        <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>
         <Text style={styles.exerciseSecondary}>{exercise.exercise.name_en}</Text>
         <View style={styles.exerciseStats}>
           <WorkoutMetric label="ست" value={String(exercise.sets)} />
@@ -532,8 +547,8 @@ function WorkoutExerciseRow({
           </Text>
         ) : null}
       </View>
-      <Button label="راهنما" onPress={onOpen} variant="ghost" />
-    </View>
+      <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
+    </Pressable>
   );
 }
 
@@ -600,15 +615,6 @@ function StatusPill({ status }: { readonly status: ReturnType<typeof getWorkoutP
   return <Text style={[styles.statusPill, status === "active" ? styles.statusActive : styles.statusPending]}>{label}</Text>;
 }
 
-function Stat({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
 function PlanSkeleton() {
   return (
     <View style={styles.skeletonGroup}>
@@ -669,28 +675,21 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  brand: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    letterSpacing: 1.4,
-    textAlign: "left",
-    writingDirection: "ltr",
-  },
-  chevron: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-  },
   dayCard: {
     gap: fiticianTokens.spacing[3],
+  },
+  dayCardExpanded: {
+    borderColor: fiticianTokens.colors.lineStrong,
   },
   dayMedia: {
     borderRadius: fiticianTokens.radii.medium,
     height: 78,
     minHeight: 0,
     width: 96,
+  },
+  dayMediaExpanded: {
+    height: 94,
+    width: 122,
   },
   dayMediaBadge: {
     alignItems: "center",
@@ -709,6 +708,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
     width: 96,
+  },
+  dayMediaButtonExpanded: {
+    height: 94,
+    width: 122,
   },
   dayDetails: {
     gap: fiticianTokens.spacing[3],
@@ -807,6 +810,11 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     paddingBottom: fiticianTokens.spacing[3],
+    paddingTop: fiticianTokens.spacing[1],
+  },
+  exerciseRowPressed: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    opacity: 0.9,
   },
   exerciseSecondary: {
     color: fiticianTokens.colors.muted,
@@ -839,10 +847,9 @@ const styles = StyleSheet.create({
   generateSection: {
     marginTop: fiticianTokens.spacing[3],
   },
-  header: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[2],
-    marginBottom: fiticianTokens.spacing[4],
+  headerAction: {
+    minHeight: 42,
+    paddingHorizontal: fiticianTokens.spacing[3],
   },
   historyCard: {
     gap: fiticianTokens.spacing[2],
@@ -913,16 +920,12 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  intro: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    lineHeight: 27,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
   overviewCard: {
+    minHeight: 150,
+  },
+  overviewContent: {
     gap: fiticianTokens.spacing[4],
+    padding: fiticianTokens.spacing[4],
   },
   pdfActions: {
     gap: fiticianTokens.spacing[2],
@@ -944,8 +947,16 @@ const styles = StyleSheet.create({
   planSection: {
     gap: fiticianTokens.spacing[3],
   },
+  screen: {
+    gap: fiticianTokens.spacing[3],
+    paddingBottom: fiticianTokens.spacing[7],
+    paddingTop: fiticianTokens.spacing[3],
+  },
   statusStack: {
+    borderRightColor: fiticianTokens.colors.lineStrong,
+    borderRightWidth: 2,
     gap: fiticianTokens.spacing[2],
+    paddingRight: fiticianTokens.spacing[2],
   },
   planTitle: {
     color: fiticianTokens.colors.ink,
@@ -973,29 +984,6 @@ const styles = StyleSheet.create({
   skeletonGroup: {
     gap: fiticianTokens.spacing[3],
   },
-  stat: {
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-  },
-  statLabel: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  statValue: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  statsRow: {
-    flexDirection: "row-reverse",
-    gap: fiticianTokens.spacing[3],
-  },
   statusActive: {
     backgroundColor: "rgba(102,200,159,0.16)",
     color: fiticianTokens.colors.success,
@@ -1012,14 +1000,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[1],
     textAlign: "center",
-    writingDirection: "rtl",
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h1,
-    lineHeight: 40,
-    textAlign: "right",
     writingDirection: "rtl",
   },
 });

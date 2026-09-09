@@ -5,7 +5,15 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { workoutKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
-import { Button, Card, Notice, Skeleton, TextField } from "../ui/components";
+import {
+  Button,
+  Card,
+  CinematicSurface,
+  MetricStrip,
+  Notice,
+  Skeleton,
+  TextField,
+} from "../ui/components";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import type { WorkoutPlan } from "./workoutApi";
@@ -153,20 +161,24 @@ export function WorkoutCyclePanel({
 function CycleSummary({ cycle }: { readonly cycle: WorkoutCycleCurrent }) {
   const week = workoutCycleWeekDisplay(cycle);
   return (
-    <Card style={styles.summaryCard}>
-      <View style={styles.summaryHeading}>
-        <View style={styles.summaryCopy}>
-          <Text style={styles.sectionEyebrow}>چرخهٔ تمرین</Text>
-          <Text style={styles.sectionTitle}>چرخهٔ فعلی</Text>
+    <CinematicSurface accent variant="quiet">
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryHeading}>
+          <View style={styles.summaryCopy}>
+            <Text style={styles.sectionEyebrow}>چرخهٔ تمرین</Text>
+            <Text style={styles.sectionTitle}>چرخهٔ فعلی</Text>
+          </View>
+          <Text style={styles.cycleStatus}>{cycle.status === "active" ? "فعال" : "تکمیل‌شده"}</Text>
         </View>
-        <Text style={styles.cycleStatus}>{cycle.status === "active" ? "فعال" : "تکمیل‌شده"}</Text>
+        <MetricStrip
+          items={[
+            { accent: fiticianTokens.colors.aqua, label: "هفته فعلی", value: String(week.currentWeek) },
+            { label: "کل چرخه", value: `${week.durationWeeks} هفته` },
+            { label: "شروع", value: formatDate(cycle.started_at) },
+          ]}
+        />
       </View>
-      <View style={styles.weekCard}>
-        <Text style={styles.weekValue}>{week.currentWeek} از {week.durationWeeks}</Text>
-        <Text style={styles.weekLabel}>هفتهٔ فعلی</Text>
-      </View>
-      <Text style={styles.bodyText}>شروع چرخه: {formatDate(cycle.started_at)}</Text>
-    </Card>
+    </CinematicSurface>
   );
 }
 
@@ -748,6 +760,7 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     gap: fiticianTokens.spacing[3],
+    padding: fiticianTokens.spacing[4],
   },
   summaryCopy: {
     flex: 1,
@@ -764,30 +777,6 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  weekCard: {
-    alignItems: "flex-end",
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.medium,
-    borderWidth: 1,
-    gap: fiticianTokens.spacing[1],
-    padding: fiticianTokens.spacing[3],
-  },
-  weekLabel: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  weekValue: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-    lineHeight: 32,
     textAlign: "right",
     writingDirection: "rtl",
   },
