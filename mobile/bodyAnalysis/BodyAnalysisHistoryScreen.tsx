@@ -9,7 +9,7 @@ import type {
 } from "@fitician/core/body-photos";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
-import { Button, Card, EmptyState, Notice, Skeleton } from "../ui/components";
+import { Button, Card, EmptyState, Notice, ScreenHeader, Skeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
@@ -92,15 +92,16 @@ export function BodyAnalysisHistoryScreen() {
   }
 
   return (
-    <Screen>
+    <Screen contentContainerStyle={styles.screen}>
       <View style={styles.content}>
-        <Text style={styles.eyebrow}>تحلیل بدن</Text>
-        <Text style={styles.title}>تاریخچه و روند پیشرفت</Text>
-        <Text style={styles.body}>
-          نشست‌ها، وضعیت بررسی تخصصی و نسخه نتیجه را از همین‌جا دنبال کن.
-        </Text>
+        <ScreenHeader
+          action={<Button label="تحلیل جدید" onPress={() => router.push("/member/body-analysis")} style={styles.headerAction} />}
+          compact
+          eyebrow="تحلیل بدن"
+          subtitle="نشست‌ها، وضعیت بررسی تخصصی و نسخه نتیجه را از همین‌جا دنبال کن."
+          title="تاریخچه و روند پیشرفت"
+        />
         <View style={styles.actions}>
-          <Button label="تحلیل جدید" onPress={() => router.push("/member/body-analysis")} />
           <Button label="بازگشت" onPress={() => router.replace("/member")} variant="ghost" />
         </View>
         {timeline.items.length === 0 ? (
@@ -264,13 +265,9 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     padding: fiticianTokens.spacing[3],
   },
-  eyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
+  headerAction: {
+    minHeight: 42,
+    paddingHorizontal: fiticianTokens.spacing[3],
   },
   list: {
     gap: fiticianTokens.spacing[3],
@@ -290,6 +287,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  screen: {
+    paddingBottom: fiticianTokens.spacing[7],
+    paddingTop: fiticianTokens.spacing[3],
   },
   status: {
     color: fiticianTokens.colors.aqua,

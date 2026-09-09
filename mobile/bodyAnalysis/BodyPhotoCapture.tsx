@@ -22,7 +22,7 @@ import type { BodyPhotoSide, BodyPhotoView } from "@fitician/core/body-photos";
 import type { Sex } from "@fitician/core/profile";
 
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { Button, Notice } from "../ui/components";
+import { Button, Notice, ScreenHeader } from "../ui/components";
 import { fiticianTokens } from "../ui/tokens";
 import {
   GHOST_SCALE_MAX,
@@ -332,11 +332,12 @@ export function BodyPhotoCapture({
 
   return (
     <View style={styles.container}>
-      <View style={styles.heading}>
-        <Text style={styles.eyebrow}>ثبت تصویر · {viewLabel(view)}</Text>
-        <Text style={styles.title}>در جای درست بایست</Text>
-        <Text style={styles.body}>شبح فقط راهنمای حالت و موقعیت است؛ ظاهر بدن معیار رد شدن نیست.</Text>
-      </View>
+      <ScreenHeader
+        compact
+        eyebrow={`ثبت تصویر · ${viewLabel(view)}`}
+        subtitle="شبح فقط راهنمای حالت و موقعیت است؛ ظاهر بدن معیار رد شدن نیست."
+        title="در جای درست بایست"
+      />
 
       <View style={styles.sourceTabs}>
         <Button

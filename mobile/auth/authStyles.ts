@@ -121,6 +121,10 @@ export const authStyles = StyleSheet.create({
     paddingBottom: fiticianTokens.spacing[7],
     paddingTop: fiticianTokens.spacing[4],
   },
+  shell: {
+    padding: fiticianTokens.spacing[5],
+    width: "100%",
+  },
   title: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,

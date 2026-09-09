@@ -8,7 +8,7 @@ import { createNutritionTrackingApi } from "./nutritionTrackingApi";
 import { nutritionKeys } from "../data/queryKeys";
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import type { ConnectivityStatus } from "../platform/connectivity";
-import { Button, Card, Notice, ProgressBar, SectionHeader, Skeleton } from "../ui/components";
+import { Button, Card, MetricRing, Notice, ProgressBar, SectionHeader, Skeleton } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { buildNutritionSummary, type NutritionSummaryMetric } from "./nutritionSummaryModel";
@@ -46,6 +46,11 @@ export function NutritionSummaryCard({
       <SectionHeader eyebrow="امروز" title="سوخت و هدف روزانه" />
       <Card variant="hero" style={styles.card}>
         <View style={styles.cardHeader}>
+          <MetricRing
+            label="پیشرفت کالری امروز"
+            progress={summary.calories.progress ?? 0}
+            size={94}
+          />
           <View style={styles.statusBadge}>
             <View style={styles.statusDot} />
             <Text style={styles.statusText}>{trackingStatusLabel(trackingStatus)}</Text>
@@ -132,6 +137,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     alignItems: "flex-start",
     flexDirection: "row-reverse",
+    gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
   calorieValue: {

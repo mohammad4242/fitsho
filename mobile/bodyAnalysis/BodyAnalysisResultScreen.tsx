@@ -20,7 +20,7 @@ import type {
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { PrivateMediaClient } from "../media/privateMedia";
 import { ExpoPrivateMediaStore } from "../media/privateMediaStore";
-import { Button, Card, Notice, Skeleton } from "../ui/components";
+import { Button, Card, Notice, ScreenHeader, Skeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
@@ -161,11 +161,15 @@ export function BodyAnalysisResultScreen() {
 
   const failedAnalysis = analysis?.status === "failed";
   return (
-    <Screen>
+    <Screen contentContainerStyle={styles.screen}>
       <View style={styles.content}>
-        <Text style={styles.eyebrow}>تحلیل بدن</Text>
-        <Text style={styles.title}>نتیجه نشست</Text>
-        <Text style={styles.body}>وضعیت نشست: {sessionStatusLabel(session.state)}</Text>
+        <ScreenHeader
+          action={<Button label="تاریخچه" onPress={() => router.replace("/member/body-analysis-history")} style={styles.headerAction} variant="ghost" />}
+          compact
+          eyebrow="تحلیل بدن"
+          subtitle={`وضعیت نشست: ${sessionStatusLabel(session.state)}`}
+          title="نتیجه نشست"
+        />
         {analysis === null ? (
           <Notice message="نتیجه هنوز آماده نشده است." variant="info" />
         ) : activeAnalysisStates.has(analysis.status) ? (
@@ -586,13 +590,9 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[4],
     paddingBottom: fiticianTokens.spacing[6],
   },
-  eyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
+  headerAction: {
+    minHeight: 42,
+    paddingHorizontal: fiticianTokens.spacing[3],
   },
   issueText: {
     color: fiticianTokens.colors.amber,
@@ -632,6 +632,10 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: fiticianTokens.spacing[3],
+  },
+  screen: {
+    paddingBottom: fiticianTokens.spacing[7],
+    paddingTop: fiticianTokens.spacing[3],
   },
   status: {
     color: fiticianTokens.colors.aqua,

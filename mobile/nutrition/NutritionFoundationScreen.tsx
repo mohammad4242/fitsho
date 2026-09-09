@@ -13,7 +13,7 @@ import {
   safetyInputFromForm,
   type SafetyFormValues,
 } from "../onboarding/onboardingModel";
-import { Button, Card, Notice, Skeleton, TextField } from "../ui/components";
+import { Button, Card, Notice, ScreenHeader, Skeleton, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
@@ -109,14 +109,13 @@ export function NutritionFoundationScreen() {
   const estimate = viewData(estimateState);
 
   return (
-    <Screen contentWidth="reading">
-      <View style={styles.header}>
-        <Text style={styles.brand}>FITICIAN</Text>
-        <Text accessibilityRole="header" style={styles.title}>تغذیه</Text>
-        <Text style={styles.intro}>
-          وضعیت ایمنی، اطلاعات پایه و برآوردهای تغذیه‌ای تو از همین‌جا قابل مشاهده است.
-        </Text>
-      </View>
+    <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
+      <ScreenHeader
+        compact
+        eyebrow="سوخت، عادت و هدف"
+        subtitle="وضعیت ایمنی، اطلاعات پایه و برآوردهای تغذیه‌ای تو از همین‌جا قابل مشاهده است."
+        title="تغذیه"
+      />
 
       <NutritionSummaryCard
         connectivityStatus={connectivityStatus}
@@ -674,15 +673,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  brand: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    letterSpacing: 1.4,
-    textAlign: "left",
-    writingDirection: "ltr",
-  },
   choice: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
@@ -727,22 +717,14 @@ const styles = StyleSheet.create({
   formStack: {
     gap: fiticianTokens.spacing[3],
   },
-  header: {
-    alignItems: "flex-end",
-    gap: fiticianTokens.spacing[2],
-    marginBottom: fiticianTokens.spacing[4],
-  },
-  intro: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    lineHeight: 27,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
   sectionCard: {
     gap: fiticianTokens.spacing[3],
     marginBottom: fiticianTokens.spacing[3],
+  },
+  screen: {
+    gap: fiticianTokens.spacing[3],
+    paddingBottom: fiticianTokens.spacing[7],
+    paddingTop: fiticianTokens.spacing[3],
   },
   sectionHeading: {
     alignItems: "flex-start",
@@ -809,14 +791,6 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "left",
     writingDirection: "ltr",
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h1,
-    lineHeight: 40,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   toggleLabel: {
     color: fiticianTokens.colors.ink,

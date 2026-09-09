@@ -7,7 +7,7 @@ import type {
 } from "@fitician/core/profile";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
-import { Button, Card, Notice, Skeleton, TextField } from "../ui/components";
+import { Button, Card, Notice, ScreenHeader, Skeleton, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createProfileApi } from "../profile/profileApi";
@@ -121,13 +121,14 @@ export function BodyAnalysisRequirements({
   }
 
   return (
-    <Screen>
+    <Screen contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <Text style={styles.eyebrow}>مرحله اول · اندازه‌گیری</Text>
-        <Text style={styles.title}>اندازه‌ها را تأیید کن</Text>
-        <Text style={styles.body}>
-          برای تفسیر بهتر عکس‌ها، این اندازه‌ها باید مربوط به همین روز باشند.
-        </Text>
+        <ScreenHeader
+          compact
+          eyebrow="مرحله اول · اندازه‌گیری"
+          subtitle="برای تفسیر بهتر عکس‌ها، این اندازه‌ها باید مربوط به همین روز باشند."
+          title="اندازه‌ها را تأیید کن"
+        />
 
         <Card style={styles.panel}>
           <Text style={styles.sectionTitle}>اندازه‌های اصلی</Text>
@@ -271,6 +272,10 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
     writingDirection: "rtl",
+  },
+  screen: {
+    paddingBottom: fiticianTokens.spacing[7],
+    paddingTop: fiticianTokens.spacing[3],
   },
   title: {
     color: fiticianTokens.colors.ink,

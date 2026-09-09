@@ -27,7 +27,7 @@ import type {
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { AppIcon, Button, Card, FormField, Notice, TextField } from "../ui/components";
+import { AppIcon, Button, Card, FormField, Notice, ScreenHeader, TextField } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { useMobileRouteSnapshot, useRefreshMobileProfileStatus } from "../ui/navigation/RouteGuards";
@@ -400,12 +400,12 @@ export function ProfileScreen() {
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <View style={styles.brandRow}>
-        <Text style={styles.brand}>FITICIAN</Text>
-        <Text style={styles.eyebrow}>حساب کاربری</Text>
-      </View>
-      <Text accessibilityRole="header" style={styles.title}>پروفایل من</Text>
-      <Text style={styles.intro}>اطلاعات بدنی، تنظیمات تمرین و ترجیحات تغذیه‌ای را از همین‌جا به‌روز کن.</Text>
+      <ScreenHeader
+        compact
+        eyebrow="حساب کاربری"
+        subtitle="اطلاعات بدنی، تنظیمات تمرین و ترجیحات تغذیه‌ای را از همین‌جا به‌روز کن."
+        title="پروفایل من"
+      />
 
       <ProfileOverviewCard mode={loaded.mode} shared={loaded.shared} />
       <Card style={styles.identityCard} variant="raised">
@@ -1065,11 +1065,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.4,
     writingDirection: "ltr",
   },
-  brandRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
   centered: {
     alignItems: "center",
     gap: fiticianTokens.spacing[3],
@@ -1109,12 +1104,6 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
   },
-  eyebrow: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    writingDirection: "rtl",
-  },
   formCard: {
     gap: fiticianTokens.spacing[4],
   },
@@ -1131,14 +1120,6 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  intro: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    lineHeight: 27,
     textAlign: "right",
     writingDirection: "rtl",
   },
@@ -1278,14 +1259,6 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     gap: fiticianTokens.spacing[3],
     justifyContent: "flex-end",
-  },
-  title: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h1,
-    lineHeight: 42,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   twoColumns: {
     flexDirection: "row-reverse",
