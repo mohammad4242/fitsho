@@ -117,13 +117,49 @@ it("places route guards at group boundaries and hides capability tabs", async ()
   );
 });
 
-it("uses native icons and safe-area-aware member tab navigation", async () => {
+it("uses the custom safe-area-aware member tab navigation", async () => {
   const route = resolve(appRoot, "(member)/member/(tabs)/_layout.tsx");
   const source = await readFile(route, "utf8");
-  expect(source).toContain("AppIcon");
-  expect(source).toContain("tabBarIcon");
+  expect(source).toContain("MemberBottomTabBar");
+  expect(source).toContain("tabBar");
   expect(source).toContain("useSafeAreaInsets");
+  expect(source).toContain("safeAreaInsets");
+  expect(source).not.toContain("surfaceTranslucent");
+});
+
+it("defines web-equivalent member bottom-bar icons and styling", async () => {
+  const component = resolve(dirname(appRoot), "ui/navigation/MemberBottomTabBar.tsx");
+  const source = await readFile(component, "utf8");
+
+  expect(source).toContain('home:');
+  expect(source).toContain('dumbbell:');
+  expect(source).toContain('nutrition:');
+  expect(source).toContain('progress:');
+  expect(source).toContain('more:');
+  expect(source).toContain('d="m3 10 9-7 9 7"');
+  expect(source).toContain('d="M7 8v8M4.5 9.5v5M2.5 11v2');
+  expect(source).toContain('d="M12 21c5-3 7-7 7-11');
+  expect(source).toContain('d="M4 19V5M4 19h16"');
+  expect(source).toContain('<Circle cx="5" cy="12" r="1" />');
+  expect(source).toMatch(/index: "home"/);
+  expect(source).toMatch(/workouts: "dumbbell"/);
+  expect(source).toMatch(/nutrition: "nutrition"/);
+  expect(source).toMatch(/"body-analysis": "progress"/);
+  expect(source).toMatch(/more: "more"/);
+  expect(source).toContain("aquaAtmosphere");
+  expect(source).toContain("activeIndicator");
+  expect(source).toContain("insets.bottom");
   expect(source).toContain("paddingBottom");
+  expect(source).toContain("NAVIGATION_CONTENT_HEIGHT");
+  expect(source).toContain('backgroundColor: fiticianTokens.colors.canvas');
+  expect(source).toContain('borderTopWidth: 1');
+  expect(source).toContain('display !== "none"');
+  expect(source).toContain('type: "tabPress"');
+  expect(source).toContain('type: "tabLongPress"');
+  expect(source).toContain('navigation.navigate(route.name, route.params)');
+  expect(source).toContain('accessibilityRole="button"');
+  expect(source).toContain('accessibilityState={{ selected: focused }}');
+  expect(source).not.toContain("surfaceTranslucent");
 });
 
 it("keeps account deletion available to any signed-in role without admin routes", async () => {
@@ -171,9 +207,14 @@ it("keeps Body Progress capability-aware and More as the fifth member tab", asyn
   );
   const tabNames = Array.from(source.matchAll(/<Tabs\.Screen\s+name="([^"]+)"/g), (match) => match[1]);
   expect(tabNames).toEqual(["index", "workouts", "nutrition", "body-analysis", "more"]);
+  expect(source).toContain('tabBarLabel: "امروز"');
+  expect(source).toContain('tabBarLabel: "تمرین"');
+  expect(source).toContain('tabBarLabel: "تغذیه"');
+  expect(source).toContain('tabBarLabel: "Body Analysis"');
   expect(source).toContain('tabBarLabel: "بیشتر"');
   expect(source).toContain('name="body-analysis"');
-  expect(source).toContain('tabBarLabel: "روند بدن"');
+  expect(source).toMatch(/name="workouts"[\s\S]*?href: showTraining \? undefined : null/);
+  expect(source).toMatch(/name="nutrition"[\s\S]*?href: showNutrition \? undefined : null/);
   expect(source).toMatch(/name="body-analysis"[\s\S]*?href: showTraining \? undefined : null/);
   expect(source).not.toContain('name="profile"');
   await expect(

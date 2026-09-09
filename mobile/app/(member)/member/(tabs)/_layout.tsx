@@ -1,8 +1,7 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppIcon } from "../../../../ui/components";
-import { fiticianTokens } from "../../../../ui/tokens";
+import { MemberBottomTabBar } from "../../../../ui/navigation/MemberBottomTabBar";
 import { decideMobileRoute, type MobileRouteSnapshot } from "../../../../ui/navigation/routePolicy";
 import { useMobileRouteSnapshot } from "../../../../ui/navigation/RouteGuards";
 
@@ -14,47 +13,24 @@ export default function MemberTabsLayout() {
 
   return (
     <Tabs
+      safeAreaInsets={insets}
+      tabBar={(props) => <MemberBottomTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: fiticianTokens.colors.aqua,
         tabBarHideOnKeyboard: true,
-        tabBarInactiveTintColor: fiticianTokens.colors.muted,
-        tabBarItemStyle: {
-          minHeight: fiticianTokens.layout.minimumTouchTarget,
-        },
-        tabBarLabelPosition: "below-icon",
-        tabBarLabelStyle: {
-          fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-          fontSize: fiticianTokens.typography.fontSize.compact,
-          lineHeight: 18,
-        },
-        tabBarStyle: {
-          backgroundColor: fiticianTokens.colors.surfaceTranslucent,
-          borderTopColor: fiticianTokens.colors.line,
-          borderTopWidth: 1,
-          height: 64 + Math.max(insets.bottom, 8),
-          paddingBottom: Math.max(insets.bottom, 8),
-          paddingTop: 8,
-        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          tabBarIcon: ({ color, focused }) => (
-            <AppIcon color={color} name="home" size={focused ? fiticianTokens.iconSize.lg : fiticianTokens.iconSize.md} />
-          ),
-          tabBarLabel: "خانه",
-          title: "خانه",
+          tabBarLabel: "امروز",
+          title: "امروز",
         }}
       />
       <Tabs.Screen
         name="workouts"
         options={{
           href: showTraining ? undefined : null,
-          tabBarIcon: ({ color, focused }) => (
-            <AppIcon color={color} name="training" size={focused ? fiticianTokens.iconSize.lg : fiticianTokens.iconSize.md} />
-          ),
           tabBarLabel: "تمرین",
           title: "تمرین",
         }}
@@ -63,9 +39,6 @@ export default function MemberTabsLayout() {
         name="nutrition"
         options={{
           href: showNutrition ? undefined : null,
-          tabBarIcon: ({ color, focused }) => (
-            <AppIcon color={color} name="nutrition" size={focused ? fiticianTokens.iconSize.lg : fiticianTokens.iconSize.md} />
-          ),
           tabBarLabel: "تغذیه",
           title: "تغذیه",
         }}
@@ -74,19 +47,13 @@ export default function MemberTabsLayout() {
         name="body-analysis"
         options={{
           href: showTraining ? undefined : null,
-          tabBarIcon: ({ color, focused }) => (
-            <AppIcon color={color} name="bodyAnalysis" size={focused ? fiticianTokens.iconSize.lg : fiticianTokens.iconSize.md} />
-          ),
-          tabBarLabel: "روند بدن",
-          title: "روند بدن",
+          tabBarLabel: "Body Analysis",
+          title: "Body Analysis",
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
-          tabBarIcon: ({ color, focused }) => (
-            <AppIcon color={color} name="more" size={focused ? fiticianTokens.iconSize.lg : fiticianTokens.iconSize.md} />
-          ),
           tabBarLabel: "بیشتر",
           title: "بیشتر",
         }}
