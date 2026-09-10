@@ -1,3 +1,4 @@
+import { nutritionProgressTone, type NutritionProgressTone } from "@fitician/core";
 import { useRouter } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -11,10 +12,19 @@ export interface NutritionSummaryCardProps {
   readonly summary: HomeNutritionSummary;
 }
 
+const nutritionRingColors: Record<NutritionProgressTone, string> = {
+  blue: fiticianTokens.colors.blue,
+  green: fiticianTokens.colors.success,
+  red: fiticianTokens.colors.danger,
+};
+
 export function NutritionSummaryCard({ error = false, loading, summary }: NutritionSummaryCardProps) {
   const router = useRouter();
   const hasTarget = summary.targetCalories !== null;
   const consumed = summary.consumedCalories;
+  const aboveTargetCalories = consumed !== null && summary.targetCalories !== null
+    ? Math.max(0, consumed - summary.targetCalories)
+    : 0;
 
   if (loading && !hasTarget) return <StateSkeleton variant="card" />;
 
@@ -59,10 +69,14 @@ export function NutritionSummaryCard({ error = false, loading, summary }: Nutrit
               <MetricRing
                 animateOnFocus
                 animationDuration={900}
+                color={nutritionRingColors[nutritionProgressTone(summary.progress)]}
                 label="پیشرفت کالری امروز"
                 progress={summary.progress}
               />
             </View>
+            {aboveTargetCalories > 0 ? (
+              <Text style={styles.overageText}>{formatNumber(aboveTargetCalories)} کالری بیشتر از هدف روزانه</Text>
+            ) : null}
             <MetricStrip
               items={[
                 { accent: fiticianTokens.colors.aqua, label: "پروتئین", value: formatMetric(summary.protein) },
@@ -126,11 +140,11 @@ const styles = StyleSheet.create({
   },
   calorieValues: {
     flex: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     minWidth: 0,
   },
-  calorieRow: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[3] },
+  calorieRow: { alignItems: "center", flexDirection: "row", gap: fiticianTokens.spacing[3] },
   calorieValue: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
@@ -175,6 +189,14 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  overageText: {
+    color: fiticianTokens.colors.danger,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
   eyebrow: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -183,7 +205,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  header: { alignItems: "center", flexDirection: "row-reverse", justifyContent: "space-between" },
+  header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   headingCopy: { flex: 1, gap: 2 },
   iconBadge: {
     alignItems: "center",

@@ -266,13 +266,13 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.h3,
   },
   profileCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
   profileRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   profileSubtitle: {

@@ -1030,7 +1030,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.large,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     minWidth: 0,
     overflow: "hidden",
     width: "100%",
@@ -1167,7 +1167,7 @@ const styles = StyleSheet.create({
     borderRightColor: fiticianTokens.colors.amber,
   },
   libraryButton: {
-    alignSelf: "flex-end",
+    alignSelf: "flex-start",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -1183,7 +1183,7 @@ const styles = StyleSheet.create({
   },
   pageHeader: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     marginBottom: fiticianTokens.spacing[1],
@@ -1217,7 +1217,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: 14,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 10,
     minHeight: 52,
     paddingHorizontal: 12,
@@ -1285,8 +1285,8 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   scheduleHeading: {
-    alignItems: "flex-end",
-    flexDirection: "row-reverse",
+    alignItems: "center",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     marginBottom: fiticianTokens.spacing[2],
@@ -1460,7 +1460,7 @@ const styles = StyleSheet.create({
   exerciseAction: {
     alignItems: "center",
     alignSelf: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[1],
     paddingVertical: 2,
   },
@@ -1567,7 +1567,7 @@ const styles = StyleSheet.create({
   },
   exerciseStat: {
     alignItems: "baseline",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexShrink: 0,
     gap: 2,
   },
@@ -1590,7 +1590,7 @@ const styles = StyleSheet.create({
   },
   exerciseStatsRow: {
     alignItems: "baseline",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
     minWidth: 0,
@@ -1619,7 +1619,7 @@ const styles = StyleSheet.create({
   },
   historyRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },

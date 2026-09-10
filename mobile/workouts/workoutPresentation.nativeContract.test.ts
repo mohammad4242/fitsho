@@ -165,6 +165,25 @@ it("keeps workout media first in the existing RTL row containers", async () => {
   expect(exerciseRow).not.toContain('flexDirection: "row-reverse"');
 });
 
+it("uses native RTL ordering for workout summaries and actions", async () => {
+  const plansSource = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+  const cycleSource = await readFile(new URL("./WorkoutCyclePanel.tsx", import.meta.url), "utf8");
+
+  for (const styleName of ["contextStrip", "pageHeader", "reviewBanner", "scheduleHeading", "exerciseAction", "exerciseStat", "exerciseStatsRow", "historyRow"]) {
+    const style = plansSource.slice(plansSource.indexOf(`${styleName}:`), plansSource.indexOf(`${styleName}:`) + 240);
+    expect(style).toContain('flexDirection: "row"');
+    expect(style).not.toContain('flexDirection: "row-reverse"');
+  }
+  expect(plansSource).toContain('alignSelf: "flex-start"');
+  expect(plansSource).not.toContain('alignSelf: "flex-end"');
+
+  for (const styleName of ["choiceRow", "formHeading", "summaryHeading", "summaryMetrics"]) {
+    const style = cycleSource.slice(cycleSource.indexOf(`${styleName}:`), cycleSource.indexOf(`${styleName}:`) + 220);
+    expect(style).toContain('flexDirection: "row"');
+    expect(style).not.toContain('flexDirection: "row-reverse"');
+  }
+});
+
 it("shows alternatives independently of executability and keeps the web action order", async () => {
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
   const row = source.slice(source.indexOf("function WorkoutExerciseRow"), source.indexOf("function WorkoutHistory"));

@@ -712,7 +712,7 @@ const styles = StyleSheet.create({
   },
   choiceRow: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
   },
   formHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -807,7 +807,7 @@ const styles = StyleSheet.create({
   },
   summaryHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
   },
   summaryMetrics: {
     alignItems: "stretch",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     minHeight: 42,
     width: "100%",
   },

@@ -18,8 +18,8 @@ export default function PublicEntryScreen() {
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <View style={styles.content}>
         <View style={styles.brandRow}>
-          <Text style={styles.brand}>FITICIAN</Text>
           <Text style={styles.eyebrow}>PERSONAL PERFORMANCE</Text>
+          <Text style={styles.brand}>FITICIAN</Text>
         </View>
         <CinematicSurface accent style={styles.hero} variant="hero">
           <Media
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   },
   brandRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   content: {
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   pillRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingVertical: fiticianTokens.spacing[2],

@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 44,
   },
-  dayLine: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[2] },
+  dayLine: { alignItems: "center", flexDirection: "row", gap: fiticianTokens.spacing[2] },
   dayNumber: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  layout: { flexDirection: "row-reverse", minHeight: 204 },
+  layout: { flexDirection: "row", minHeight: 204 },
   layoutStacked: { flexDirection: "column" },
   media: { borderRadius: 0, flex: 1, minHeight: 204 },
   mediaScrim: {
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
     borderRadius: fiticianTokens.radii.pill,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 5,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: 5,

@@ -1,13 +1,26 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
 import { Circle } from "react-native-svg";
+import { StyleSheet } from "react-native";
+import type { ReactTestInstance } from "react-test-renderer";
 
 import { NutritionSummaryCard } from "./NutritionSummaryCard";
 import { QuickActionCard } from "./QuickActionCard";
 import { WorkoutTodayCard } from "./WorkoutTodayCard";
 import { AppIcon, CinematicSurface } from "../ui/components";
+import { fiticianTokens } from "../ui/tokens";
 
 const mockPush = jest.fn();
+
+function findAncestorStyle(node: ReactTestInstance, key: string): Record<string, unknown> {
+  let current = node.parent;
+  while (current !== null) {
+    const style = StyleSheet.flatten(current.props.style) as Record<string, unknown> | undefined;
+    if (style?.[key] !== undefined) return style;
+    current = current.parent;
+  }
+  throw new Error(`Ancestor style ${key} not found`);
+}
 
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -87,6 +100,7 @@ test("shows tracked calories beside the daily calorie goal", () => {
   expect(screen.getByText("هدف کالری روزانه")).toBeTruthy();
   expect(screen.getByText("۲٬۵۵۷")).toBeTruthy();
   expect(screen.getByText("مصرف تقریبی روزانه")).toBeTruthy();
+  expect(findAncestorStyle(screen.getByText("تغذیه روزانه"), "flexDirection")).toMatchObject({ flexDirection: "row" });
 });
 
 test("omits estimated daily expenditure when the estimate has no TDEE", () => {
@@ -137,4 +151,68 @@ test("uses the same moderately larger icon in both quick action cards", () => {
   );
 
   expect(screen.UNSAFE_getAllByType(AppIcon).map((icon) => icon.props.size)).toEqual([26, 26]);
+  expect(findAncestorStyle(screen.getByText("تحلیل بدن"), "flexDirection")).toMatchObject({ flexDirection: "row" });
+});
+
+test("uses green below 60 percent for nutrition progress", () => {
+  render(
+    <NutritionSummaryCard
+      loading={false}
+      summary={{
+        carbohydrate: 180,
+        consumedCalories: 1_198,
+        estimatedDailyExpenditureCalories: 2557,
+        fat: 62,
+        progress: 0.599,
+        protein: 130,
+        status: "on_plan",
+        targetCalories: 2000,
+      }}
+    />,
+  );
+
+  expect(screen.UNSAFE_getAllByType(Circle)[1].props.stroke).toBe(fiticianTokens.colors.success);
+});
+
+test("uses blue at the exact 60 percent nutrition progress boundary", () => {
+  render(
+    <NutritionSummaryCard
+      loading={false}
+      summary={{
+        carbohydrate: 180,
+        consumedCalories: 1200,
+        estimatedDailyExpenditureCalories: 2557,
+        fat: 62,
+        progress: 0.6,
+        protein: 130,
+        status: "on_plan",
+        targetCalories: 2000,
+      }}
+    />,
+  );
+
+  expect(screen.UNSAFE_getAllByType(Circle)[1].props.stroke).toBe(fiticianTokens.colors.blue);
+});
+
+test("uses danger at 90 percent and explains intake above target", () => {
+  render(
+    <NutritionSummaryCard
+      loading={false}
+      summary={{
+        carbohydrate: 180,
+        consumedCalories: 2200,
+        estimatedDailyExpenditureCalories: 2557,
+        fat: 62,
+        progress: 1.1,
+        protein: 130,
+        status: "off_plan",
+        targetCalories: 2000,
+      }}
+    />,
+  );
+
+  expect(screen.UNSAFE_getAllByType(Circle)[1].props.stroke).toBe(fiticianTokens.colors.danger);
+  expect(screen.getByText("۲۰۰ کالری بیشتر از هدف روزانه")).toBeTruthy();
+  expect(screen.getByRole("progressbar", { name: "پیشرفت کالری امروز" }).props.accessibilityValue)
+    .toEqual({ max: 100, min: 0, now: 100 });
 });

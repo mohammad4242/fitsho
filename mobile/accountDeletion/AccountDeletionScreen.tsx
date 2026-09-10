@@ -131,8 +131,8 @@ export function AccountDeletionScreen() {
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <View style={styles.brandRow}>
-        <Text style={styles.brand}>FITICIAN</Text>
         <Button label="بازگشت" onPress={() => router.back()} variant="ghost" />
+        <Text style={styles.brand}>FITICIAN</Text>
       </View>
       <PageHeading
         compact={false}
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   policyCard: { gap: fiticianTokens.spacing[3] },
   brandRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
   },

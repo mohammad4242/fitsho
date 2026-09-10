@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: fiticianTokens.motion.pressedScale }],
   },
   quickGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   quickGridStacked: {

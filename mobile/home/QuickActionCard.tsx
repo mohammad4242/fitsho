@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   content: {
     alignItems: "flex-start",
     bottom: fiticianTokens.spacing[3],
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     left: fiticianTokens.spacing[3],
     position: "absolute",
