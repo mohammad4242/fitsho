@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import { AppIcon } from "../../shared/AppIcon";
 import * as api from "./api";
 import type { FoodPhotoEstimate, FoodPhotoEstimateItem } from "./api";
 import type { DailyTrackingSummary } from "./types";
 import type { NutritionAdherence } from "./types";
 import "./nutritionEstimate.css";
+
+type EntryMode = "manual" | "photo" | null;
 
 const today = new Date().toISOString().slice(0, 10);
 const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
@@ -35,7 +38,7 @@ export function NutritionTrackingPage() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [recentFoods, setRecentFoods] = useState<Awaited<ReturnType<typeof api.listRecentFoods>>>([]);
   const [history, setHistory] = useState<DailyTrackingSummary[]>([]);
-  const [photoOpen, setPhotoOpen] = useState(freeMealId !== null);
+  const [entryMode, setEntryMode] = useState<EntryMode>(freeMealId ? "photo" : null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [adherenceOpen, setAdherenceOpen] = useState(false);
   const [itemFoodSelections, setItemFoodSelections] = useState<Record<string, string>>({});
@@ -178,24 +181,61 @@ export function NutritionTrackingPage() {
       (item.fat_g ?? 0) > 0);
   const fmt = (n: number) => Math.round(n).toLocaleString(fa ? "fa-IR" : "en-US");
 
+  function toggleEntryMode(mode: Exclude<EntryMode, null>) {
+    setEntryMode((current) => current === mode ? null : mode);
+  }
+
   return <main className="nutrition-estimate-page nutrition-tracking-page" dir={fa ? "rtl" : "ltr"}>
     <section className="nutrition-estimate-hero nutrition-tracking-header">
       <div><p className="nutrition-eyebrow">{l("امروز", "Today")}</p><h1 className="fitsho-display">{l("ثبت تغذیه", "Nutrition tracking")}</h1></div>
     </section>
-    {loading && <p role="status" className="nutrition-estimate-state">{l("در حال دریافت ثبت‌های امروز…", "Loading today's entries…")}</p>}
-    <section className="nutrition-daily-panel" aria-label={l("برنامه در برابر مصرف واقعی", "Planned versus actual")}>
-      <div className="nutrition-daily-panel__calories"><span>{l("کالری ثبت‌شده", "Logged calories")}</span><strong>{Math.round(summary?.actual_totals.energy_kcal ?? 0).toLocaleString(fa ? "fa-IR" : "en-US")}</strong><small><b>{l("کالری برنامه", "Planned calories")}</b> · {Math.round(todayAdherence?.planned.energy_kcal ?? 0).toLocaleString(fa ? "fa-IR" : "en-US")} kcal</small></div>
-      <div className="fitsho-metric-strip">
-        <span><strong>{Math.round(summary?.actual_totals.protein_g ?? 0)}g</strong><small>{l("پروتئین", "Protein")}</small></span>
-        <span><strong>{summary?.entries.length ?? 0}</strong><small>{l("ثبت امروز", "Entries")}</small></span>
-        <span><strong>{summary?.data_status === "sufficient" ? l("کافی", "Good") : "—"}</strong><small>{l("کیفیت داده", "Data")}</small></span>
+
+    <section className="nutrition-entry-hub" aria-labelledby="nutrition-entry-hub-title">
+      <div className="nutrition-entry-root">
+        <span className="nutrition-entry-root__icon" aria-hidden="true"><AppIcon name="nutrition" /></span>
+        <div className="nutrition-entry-root__copy">
+          <p className="nutrition-entry-hub__eyebrow">{l("روش ثبت را انتخاب کن", "Choose how to log")}</p>
+          <h2 id="nutrition-entry-hub-title">{l("ثبت تغذیه", "Nutrition tracking")}</h2>
+          <p>{l("یک روش را برای ثبت وعده انتخاب کن", "Choose a way to log your meal")}</p>
+        </div>
+      </div>
+      <div className="nutrition-entry-branches">
+        <button
+          aria-controls="nutrition-manual-entry-panel"
+          aria-expanded={entryMode === "manual"}
+          className={`nutrition-entry-choice${entryMode === "manual" ? " is-active" : ""}`}
+          onClick={() => toggleEntryMode("manual")}
+          type="button"
+        >
+          <span className="nutrition-entry-choice__icon" aria-hidden="true"><AppIcon name="catalogue" /></span>
+          <span className="nutrition-entry-choice__copy">
+            <strong>{l("ثبت دستی", "Log manually")}</strong>
+            <small>{l("غذا را از فهرست انتخاب و مقدار را ثبت کن", "Choose a food and set its amount")}</small>
+          </span>
+          <span className="nutrition-entry-choice__indicator" aria-hidden="true" />
+        </button>
+        <button
+          aria-controls="nutrition-photo-entry-panel"
+          aria-expanded={entryMode === "photo"}
+          className={`nutrition-entry-choice${entryMode === "photo" ? " is-active" : ""}`}
+          onClick={() => toggleEntryMode("photo")}
+          type="button"
+        >
+          <span className="nutrition-entry-choice__icon" aria-hidden="true"><AppIcon name="camera" /></span>
+          <span className="nutrition-entry-choice__copy">
+            <strong>{l("عکس وعده", "Food photo")}</strong>
+            <small>{l("تخمین غذا از روی عکس", "Estimate nutrition from a meal photo")}</small>
+          </span>
+          <span className="nutrition-entry-choice__indicator" aria-hidden="true" />
+        </button>
       </div>
     </section>
-    <section className="nutrition-photo-entry"><button type="button" onClick={() => setPhotoOpen((open) => !open)} aria-expanded={photoOpen}><span className="nutrition-photo-entry__icon" aria-hidden="true">⌾</span><span><strong>{l("عکس وعده", "Food photo")}</strong><small>{l("تخمین از روی عکس غذا", "Estimate from a meal photo")}</small></span><b aria-hidden="true">+</b></button></section>
-    {photoOpen && <section className="nutrition-photo-panel">
-      <header><div><p className="eyebrow eyebrow--accent">{l("تخمین تصویری", "Photo estimate")}</p><h2>{l("عکس وعده", "Meal photo")}</h2></div></header>
+
+    {loading && <p role="status" className="nutrition-estimate-state">{l("در حال دریافت ثبت‌های امروز…", "Loading today's entries…")}</p>}
+    {entryMode === "photo" && <section aria-labelledby="nutrition-photo-panel-title" className="nutrition-entry-panel nutrition-photo-panel" id="nutrition-photo-entry-panel">
+      <header><div><p className="eyebrow eyebrow--accent">{l("تخمین تصویری", "Photo estimate")}</p><h2 id="nutrition-photo-panel-title">{l("عکس وعده", "Meal photo")}</h2></div></header>
       <div className="nutrition-photo-stage">
-        {photoPreview ? <img alt={l("پیش‌نمایش عکس وعده", "Meal photo preview")} src={photoPreview} /> : <div><span aria-hidden="true">⌾</span><strong>{l("عکس غذا را انتخاب کن", "Choose a meal photo")}</strong></div>}
+        {photoPreview ? <img alt={l("پیش‌نمایش عکس وعده", "Meal photo preview")} src={photoPreview} /> : <div><AppIcon name="camera" /><strong>{l("عکس غذا را انتخاب کن", "Choose a meal photo")}</strong></div>}
         {busy && <span className="nutrition-photo-stage__busy" role="status">{l("در حال تحلیل…", "Analyzing…")}</span>}
       </div>
       <p className="nutrition-photo-disclosure">{l(
@@ -355,15 +395,23 @@ export function NutritionTrackingPage() {
       </>;
       })()}
     </section>}
-    <section className="nutrition-checkin" aria-label={l("ثبت وضعیت امروز", "Today's check-in")}>
-      {([ ["on_plan", "طبق برنامه", "On plan"], ["mostly_on_plan", "تقریباً طبق برنامه", "Mostly on plan"], ["off_plan", "خارج از برنامه", "Off plan"], ["not_recorded", "ثبت نمی‌کنم", "Skip"] ] as const).map(([value, persian, english]) => <button className={summary?.check_in_status === value ? "is-active" : undefined} disabled={busy} key={value} onClick={() => void checkIn(value)}>{l(persian, english)}</button>)}
-    </section>
-    {error && <p role="alert" className="nutrition-estimate-state">{error}</p>}
-    {recentFoods.length > 0 && <div className="nutrition-tracking-quick nutrition-recent-foods" aria-label={l("غذاهای اخیر", "Recent foods")}>{recentFoods.map((item) => <button disabled={busy} key={item.food_id} onClick={() => void addRecentFood(item)}>{item.display_name} · {item.last_quantity_grams ?? 100} g</button>)}</div>}
-    <details className="nutrition-manual-entry">
-      <summary><span>{l("ثبت دستی وعده", "Log food manually")}</span><i aria-hidden="true" /></summary>
+
+    {entryMode === "manual" && <section aria-labelledby="nutrition-manual-panel-title" className="nutrition-entry-panel nutrition-manual-panel" id="nutrition-manual-entry-panel">
       <section className="nutrition-off-plan-card">
-        <header><h2>{l("وعده خارج از برنامه", "Food outside the plan")}</h2><p>{l("غذا را دقیق از کاتالوگ ثبت کن یا فقط یک برآورد سریع وارد کن.", "Log an exact catalogue food or enter a quick estimate.")}</p></header>
+        <header>
+          <p className="eyebrow eyebrow--accent">{l("ثبت دقیق یا سریع", "Exact or quick entry")}</p>
+          <h2 id="nutrition-manual-panel-title">{l("ثبت دستی غذا", "Manual food entry")}</h2>
+          <p>{l("غذا را دقیق از کاتالوگ ثبت کن یا فقط یک برآورد سریع وارد کن.", "Log an exact catalogue food or enter a quick estimate.")}</p>
+        </header>
+        {recentFoods.length > 0 && <div className="nutrition-recent-foods" aria-label={l("غذاهای اخیر", "Recent foods")}>
+          <div className="nutrition-recent-foods__heading">
+            <span className="nutrition-recent-foods__icon" aria-hidden="true"><AppIcon name="utensils" /></span>
+            <span><strong>{l("غذاهای اخیر", "Recent foods")}</strong><small>{l("برای ثبت سریع، یکی را انتخاب کن", "Choose one for a quick entry")}</small></span>
+          </div>
+          <div className="nutrition-recent-foods__list">
+            {recentFoods.map((item) => <button disabled={busy} key={item.food_id} onClick={() => void addRecentFood(item)} type="button">{item.display_name} · {item.last_quantity_grams ?? 100} g</button>)}
+          </div>
+        </div>}
         <fieldset className="nutrition-off-plan-group" aria-label={l("ثبت دقیق از کاتالوگ", "Exact catalogue entry")}>
           <legend>{l("ثبت دقیق از کاتالوگ", "Exact catalogue entry")}</legend>
           <div className="nutrition-off-plan-fields nutrition-off-plan-fields--catalogue">
@@ -398,8 +446,20 @@ export function NutritionTrackingPage() {
           </div>
         </fieldset>
       </section>
-    </details>
-    {summary && summary.entries.length > 0 && <section className="nutrition-estimate-notes"><h2>{l("ثبت‌های امروز", "Today's entries")}</h2><label>{l("نوع ثبت", "Entry source")} <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}><option value="all">{l("همه", "All")}</option><option value="catalogue_manual">{l("دقیق از کاتالوگ", "Exact catalogue")}</option><option value="quick_approximation">{l("تقریبی", "Approximate")}</option><option value="photo_estimated_confirmed">{l("عکس تأییدشده", "Confirmed photo")}</option><option value="planned_confirmed">{l("طبق برنامه", "Planned")}</option><option value="planned_adjusted">{l("برنامه اصلاح‌شده", "Adjusted plan")}</option></select></label><ul>{visibleEntries.map((entry) => <li key={entry.id}><span>{entry.display_name} · {entry.confidence} · {entry.source}</span>{entry.quantity_grams && !entry.planned_meal_id ? <input aria-label={l(`ویرایش مقدار ${entry.display_name}`, `Edit ${entry.display_name} amount`)} type="number" min="1" defaultValue={entry.quantity_grams} onBlur={(event) => void editEntry(entry, Number(event.target.value))} /> : null}{entry.planned_meal_id && <><button disabled={busy} onClick={() => void adjustPlanned(entry, "adjusted")}>{l("نصف مقدار", "Half portion")}</button><button disabled={busy} onClick={() => void adjustPlanned(entry, "skipped")}>{l("نخوردم", "Skipped")}</button></>}<button disabled={busy} onClick={() => void api.deleteTrackingEntry(entry.id).then(load)}>{l("حذف", "Delete")}</button></li>)}</ul></section>}
+    </section>}
+
+    {error && <p role="alert" className="nutrition-estimate-state nutrition-tracking-error">{error}</p>}
+
+    <section className="nutrition-daily-panel" aria-label={l("برنامه در برابر مصرف واقعی", "Planned versus actual")}>
+      <div className="nutrition-daily-panel__calories"><span>{l("کالری ثبت‌شده", "Logged calories")}</span><strong>{Math.round(summary?.actual_totals.energy_kcal ?? 0).toLocaleString(fa ? "fa-IR" : "en-US")}</strong><small><b>{l("کالری برنامه", "Planned calories")}</b> · {Math.round(todayAdherence?.planned.energy_kcal ?? 0).toLocaleString(fa ? "fa-IR" : "en-US")} kcal</small></div>
+      <div className="fitsho-metric-strip">
+        <span><strong>{Math.round(summary?.actual_totals.protein_g ?? 0)}g</strong><small>{l("پروتئین", "Protein")}</small></span>
+        <span><strong>{summary?.entries.length ?? 0}</strong><small>{l("ثبت امروز", "Entries")}</small></span>
+        <span><strong>{summary?.data_status === "sufficient" ? l("کافی", "Good") : "—"}</strong><small>{l("کیفیت داده", "Data")}</small></span>
+      </div>
+    </section>
+
+    {summary && summary.entries.length > 0 && <section className="nutrition-estimate-notes nutrition-tracking-entries"><h2>{l("ثبت‌های امروز", "Today's entries")}</h2><label>{l("نوع ثبت", "Entry source")} <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}><option value="all">{l("همه", "All")}</option><option value="catalogue_manual">{l("دقیق از کاتالوگ", "Exact catalogue")}</option><option value="quick_approximation">{l("تقریبی", "Approximate")}</option><option value="photo_estimated_confirmed">{l("عکس تأییدشده", "Confirmed photo")}</option><option value="planned_confirmed">{l("طبق برنامه", "Planned")}</option><option value="planned_adjusted">{l("برنامه اصلاح‌شده", "Adjusted plan")}</option></select></label><ul>{visibleEntries.map((entry) => <li key={entry.id}><span>{entry.display_name} · {entry.confidence} · {entry.source}</span>{entry.quantity_grams && !entry.planned_meal_id ? <input aria-label={l(`ویرایش مقدار ${entry.display_name}`, `Edit ${entry.display_name} amount`)} type="number" min="1" defaultValue={entry.quantity_grams} onBlur={(event) => void editEntry(entry, Number(event.target.value))} /> : null}{entry.planned_meal_id && <><button disabled={busy} onClick={() => void adjustPlanned(entry, "adjusted")} type="button">{l("نصف مقدار", "Half portion")}</button><button disabled={busy} onClick={() => void adjustPlanned(entry, "skipped")} type="button">{l("نخوردم", "Skipped")}</button></>}<button disabled={busy} onClick={() => void api.deleteTrackingEntry(entry.id).then(load)} type="button">{l("حذف", "Delete")}</button></li>)}</ul></section>}
     <section className={`nutrition-adherence-card${adherenceOpen ? " is-open" : ""}`}>
       <header className="nutrition-adherence-header">
         <h2><button aria-controls="nutrition-adherence-content" aria-expanded={adherenceOpen} onClick={() => setAdherenceOpen((open) => !open)} type="button"><span>{l("روند پایبندی", "Adherence trend")}</span><i aria-hidden="true" /></button></h2>
@@ -420,6 +480,16 @@ export function NutritionTrackingPage() {
           {adherence?.weight_trend.length ? <p>{l("روند وزن کنار پایبندی نمایش داده می‌شود و به‌تنهایی رابطه علت و معلولی را ثابت نمی‌کند.", "Weight is shown beside adherence and does not imply causation.")}</p> : null}
           <details className="nutrition-adherence-history"><summary>{l("تاریخچه ثبت‌ها", "Entry history")}</summary>{history.length === 0 ? <p>{l("در این بازه ثبتی وجود ندارد.", "There are no entries in this range.")}</p> : history.map((day) => <article key={day.entry_date}><strong>{day.entry_date}</strong><span>{day.entries.length} {l("مورد", "entries")}</span></article>)}</details>
         </div>
+      </div>
+    </section>
+
+    <section className="nutrition-checkin" aria-label={l("ثبت وضعیت امروز", "Today's check-in")}>
+      <div className="nutrition-checkin__heading">
+        <div><p className="nutrition-checkin__eyebrow">{l("آخرین مرحله امروز", "Final step today")}</p><h2>{l("وضعیت امروز را ثبت کن", "Record today's status")}</h2></div>
+        <span className="nutrition-checkin__hint">{l("اختیاری", "Optional")}</span>
+      </div>
+      <div className="nutrition-checkin__options">
+        {([ ["on_plan", "طبق برنامه", "On plan"], ["mostly_on_plan", "تقریباً طبق برنامه", "Mostly on plan"], ["off_plan", "خارج از برنامه", "Off plan"], ["not_recorded", "ثبت نمی‌کنم", "Skip"] ] as const).map(([value, persian, english]) => <button className={summary?.check_in_status === value ? "is-active" : undefined} disabled={busy} key={value} onClick={() => void checkIn(value)} type="button">{l(persian, english)}</button>)}
       </div>
     </section>
   </main>;
