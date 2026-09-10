@@ -1,3 +1,4 @@
+import { nutritionProgressRatio } from "@fitician/core";
 import type { NutritionDailyTracking } from "../nutrition/nutritionTrackingApi";
 import type { NutritionEstimate } from "../nutrition/nutritionApi";
 import type { WeeklyPlan } from "../nutrition/nutritionPlanApi";
@@ -56,9 +57,7 @@ export function nutritionSummary(
     consumedCalories,
     fat: numberValue(actual?.total_fat_g) ?? targetFat,
     protein: numberValue(actual?.protein_g) ?? targetProtein,
-    progress: targetCalories !== null && targetCalories > 0 && consumedCalories !== null
-      ? Math.min(1, Math.max(0, consumedCalories / targetCalories))
-      : 0,
+    progress: nutritionProgressRatio(consumedCalories, targetCalories),
     status,
     targetCalories,
     estimatedDailyExpenditureCalories,
