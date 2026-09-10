@@ -46,7 +46,6 @@ export function NutritionShoppingList({
   return (
     <DisclosureCard
       defaultExpanded={false}
-      direction="rtl"
       style={styles.card}
       summary="مواد لازم برای این نسخه از برنامه"
       title="لیست خرید"
@@ -110,8 +109,8 @@ function ShoppingListContent({
       )}
       {priceVisibility === "approved" ? (
         <View style={styles.totalRow}>
-          <Text style={styles.totalValue}>{formatNutritionPlanMoney(list.total_cost_irr)}</Text>
           <Text style={styles.totalLabel}>جمع هزینه مرجع تأییدشده</Text>
+          <Text style={styles.totalValue}>{formatNutritionPlanMoney(list.total_cost_irr)}</Text>
         </View>
       ) : null}
     </>
@@ -146,19 +145,19 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     padding: fiticianTokens.spacing[3],
   },
   itemAmount: {
-    alignItems: "flex-start",
+    alignItems: "stretch",
     flexShrink: 0,
     gap: fiticianTokens.spacing[1],
   },
   itemCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
@@ -166,7 +165,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "left",
     writingDirection: "ltr",
   },
   itemName: {
@@ -184,14 +183,14 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   quantity: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   totalLabel: {
@@ -205,7 +204,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderTopColor: fiticianTokens.colors.lineStrong,
     borderTopWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     paddingTop: fiticianTokens.spacing[3],
   },
@@ -214,7 +213,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
 });

@@ -1,6 +1,8 @@
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native";
+import type { ReactTestInstance } from "react-test-renderer";
 
 jest.mock("@tanstack/react-query", () => ({
   useMutation: jest.fn(() => ({ isPending: false, mutate: jest.fn() })),
@@ -83,7 +85,16 @@ const activePlan = {
 
 const shoppingList = {
   approval_status: "approved",
-  items: [],
+  items: [{
+    canonical_unit: "گرم",
+    cost_irr: 120_000,
+    food_id: "food-1",
+    name_en: "Lentils",
+    name_fa: "عدس",
+    nutrients: {},
+    required_quantity: 500,
+    slug: "lentils",
+  }],
   plan_id: "plan-1",
   plan_revision: 2,
   total_cost_irr: 0,
@@ -96,6 +107,16 @@ const idealPlan = {
   plan_role: "ideal",
   weekly_cost_irr: 12_000_000,
 };
+
+function findAncestorStyle(node: ReactTestInstance, key: string): Record<string, unknown> {
+  let current = node.parent;
+  while (current !== null) {
+    const style = StyleSheet.flatten(current.props.style) as Record<string, unknown> | undefined;
+    if (style?.[key] !== undefined) return style;
+    current = current.parent;
+  }
+  throw new Error(`Ancestor style ${key} not found`);
+}
 
 function queryResult<T>(data: T) {
   return {
@@ -176,4 +197,19 @@ test("shows active role, approval, date context, and weekly plan content first",
   expect(screen.getByRole("radio", { name: "نسخه اقتصادی، برنامه فعال شما" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "نسخه ایده‌آل" })).toBeTruthy();
   expect(screen.getAllByText("کربوهیدرات").length).toBeGreaterThanOrEqual(1);
+});
+
+test("keeps Persian plan and shopping copy stretched inside native RTL rows", () => {
+  render(
+    <SafeAreaProvider initialMetrics={{ frame: { height: 800, width: 390, x: 0, y: 0 }, insets: { bottom: 0, left: 0, right: 0, top: 0 } }}>
+      <NutritionPlanSection safety={{ can_continue_onboarding: true } as never} />
+    </SafeAreaProvider>,
+  );
+
+  expect(findAncestorStyle(screen.getByText("برنامه غذایی هفتگی"), "alignItems")).toMatchObject({ alignItems: "stretch" });
+
+  fireEvent.press(screen.getByRole("button", { name: "لیست خرید" }));
+  expect(findAncestorStyle(screen.getByText("عدس"), "alignItems")).toMatchObject({ alignItems: "stretch" });
+
+  expect(findAncestorStyle(screen.getByText("جمع هزینه مرجع تأییدشده"), "flexDirection")).toMatchObject({ flexDirection: "row" });
 });

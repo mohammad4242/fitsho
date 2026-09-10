@@ -20,7 +20,7 @@ it("uses a status-first native nutrition plan hierarchy", async () => {
   expect(shopping).toContain("DisclosureCard");
   expect(shopping).toContain('title="لیست خرید"');
   expect(shopping).toContain('summary="مواد لازم برای این نسخه از برنامه"');
-  expect(shopping).toContain('direction="rtl"');
+  expect(shopping).not.toContain('direction="rtl"');
   expect(shopping).toContain("defaultExpanded={false}");
   expect(shopping).not.toContain("این لیست تازه‌سازی نشده است؛ قبل از خرید اتصال را بررسی کن.");
   expect(shopping).not.toContain("قیمت نهایی تا تأیید پزشک نمایش داده نمی‌شود.");

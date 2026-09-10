@@ -642,8 +642,8 @@ function NutritionMealCard({
           {meal.foods.map((food) => (
             <View key={`${food.slug}-${food.food_id ?? food.item_kind}`}>
               <View style={styles.foodRow}>
-                <Text style={styles.foodAmount}>{formatNutritionNumber(food.grams)} گرم</Text>
                 <Text style={styles.foodName}>{food.name_fa || food.name_en}</Text>
+                <Text style={styles.foodAmount}>{formatNutritionNumber(food.grams)} گرم</Text>
               </View>
               <PreparedRecipeSummary summary={preparedRecipePresentation(food)} />
             </View>
@@ -1212,8 +1212,8 @@ function PlanWarnings({ codes }: { readonly codes: readonly string[] }) {
 function SummaryRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <View style={styles.summaryRow}>
-      <Text style={styles.bodyText}>{value}</Text>
       <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.bodyText}>{value}</Text>
     </View>
   );
 }
@@ -1310,11 +1310,11 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   dayCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     gap: fiticianTokens.spacing[1],
   },
   dayDate: {
@@ -1326,16 +1326,16 @@ const styles = StyleSheet.create({
   },
   dayHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   daySelector: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingBottom: fiticianTokens.spacing[1],
   },
   dayTab: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
@@ -1393,7 +1393,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   foodName: {
@@ -1408,7 +1408,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[2],
   },
@@ -1419,7 +1419,7 @@ const styles = StyleSheet.create({
     marginBottom: fiticianTokens.spacing[2],
   },
   historyCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
@@ -1434,12 +1434,12 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   historyRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   historySection: {
@@ -1469,7 +1469,7 @@ const styles = StyleSheet.create({
     padding: 0,
   },
   mealActions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -1492,7 +1492,7 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[2],
   },
   nutrientGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -1517,7 +1517,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     padding: fiticianTokens.spacing[3],
@@ -1526,7 +1526,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   optionName: {
@@ -1561,7 +1561,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
   },
   planChoice: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
@@ -1580,13 +1580,13 @@ const styles = StyleSheet.create({
   },
   planChoiceHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "space-between",
     width: "100%",
   },
   planChoiceMetric: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surface,
     borderRadius: fiticianTokens.radii.small,
     flex: 1,
@@ -1610,7 +1610,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   planChoiceMetrics: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[1],
     width: "100%",
   },
@@ -1640,7 +1640,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.ink,
   },
   planCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
@@ -1654,16 +1654,16 @@ const styles = StyleSheet.create({
   },
   planHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
   planContext: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   planContextItem: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surface,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.small,
@@ -1692,7 +1692,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
   },
   planStat: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.small,
@@ -1739,7 +1739,7 @@ const styles = StyleSheet.create({
   },
   preparedRecipeHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   preparedRecipeNutrient: {
@@ -1751,7 +1751,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   preparedRecipeNutrients: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -1779,7 +1779,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
   },
   sectionHeading: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     gap: fiticianTokens.spacing[1],
   },
   sectionHint: {
@@ -1825,11 +1825,11 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   statsGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
