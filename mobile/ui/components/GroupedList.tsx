@@ -124,6 +124,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   copy: {
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
     minWidth: 0,

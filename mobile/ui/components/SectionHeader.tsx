@@ -48,6 +48,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   copy: {
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },

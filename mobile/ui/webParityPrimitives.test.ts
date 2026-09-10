@@ -75,6 +75,9 @@ test("renders compact page headings with optional opposite action in RTL and LTR
     direction: "rtl",
     flexDirection: "row",
   });
+  expect(flattenStyle(findHostByProps(rtlRenderer, { children: "خانه" }).parent?.props.style)).toMatchObject({
+    alignItems: "stretch",
+  });
 
   const ltrRenderer = render(
     createElement(PageHeading, {
@@ -139,6 +142,9 @@ test("keeps grouped-list rows full-width and pressable", () => {
   expect(rowStyle.width).toBe("100%");
   expect(rowStyle.minHeight).toBeGreaterThanOrEqual(48);
   expect(rowStyle.flexDirection).toBe("row");
+  expect(flattenStyle(findHostByProps(renderer, { children: "تنظیمات" }).parent?.props.style)).toMatchObject({
+    alignItems: "stretch",
+  });
   act(() => row.props.onPress());
   expect(onPress).toHaveBeenCalledTimes(1);
 });
@@ -149,6 +155,9 @@ test("keeps shared Persian headers and disclosure copy on the logical RTL side",
   );
   const sectionViews = sectionRenderer.root.findAll((node) => String(node.type) === "View");
   expect(flattenStyle(sectionViews[0]?.props.style).flexDirection).toBe("row");
+  expect(flattenStyle(findHostByProps(sectionRenderer, { children: "تنظیمات" }).parent?.props.style)).toMatchObject({
+    alignItems: "stretch",
+  });
 
   const screenRenderer = render(
     createElement(ScreenHeader, { subtitle: "توضیحات فارسی", title: "داشبورد" }),
@@ -161,6 +170,9 @@ test("keeps shared Persian headers and disclosure copy on the logical RTL side",
   );
   const disclosureHeader = disclosureRenderer.root.find((node) => String(node.type) === "Pressable");
   expect(flattenStyle(disclosureHeader.props.style).flexDirection).toBe("row");
+  expect(flattenStyle(findHostByProps(disclosureRenderer, { children: "جزئیات" }).parent?.props.style)).toMatchObject({
+    alignItems: "stretch",
+  });
 });
 
 test("renders a page heading without inventing a brand row", () => {
