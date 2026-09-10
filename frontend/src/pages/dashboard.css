@@ -279,6 +279,13 @@ html[dir="rtl"] .command-card--primary::after {
   transition: --ring-progress 900ms var(--fitsho-ease);
 }
 
+.command-card__overage {
+  margin: 0 0 .65rem;
+  color: var(--fitsho-danger);
+  font-size: .7rem;
+  font-weight: 750;
+}
+
 .command-card--nutrition .fitsho-progress-ring strong {
   font-size: .9rem;
 }

@@ -255,6 +255,61 @@ it("shows calorie progress against the real target before food is tracked", asyn
   );
 });
 
+it("uses the blue tone at the exact 60 percent boundary and animates Home entry", async () => {
+  profile.productMode = "both";
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+  nutritionApi.getCurrentNutritionEstimate.mockResolvedValue({
+    confidence: "high",
+    targets: {
+      goal_calories: { preferred: 2000 },
+      protein: { preferred: 130 },
+      carbohydrate: { preferred: 280 },
+      total_fat: { preferred: 68 },
+    },
+  });
+  nutritionApi.getDailyTracking.mockResolvedValue({
+    data_status: "sufficient",
+    actual_totals: { energy_kcal: 1200, protein_g: 65, carbohydrate_g: 140, total_fat_g: 34 },
+    entries: [{ id: "entry-1" }],
+  });
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  const ring = await screen.findByRole("progressbar", { name: "پیشرفت کالری امروز" });
+  expect(ring).toHaveClass("fitsho-progress-ring--mount-animated");
+  expect(ring.style.getPropertyValue("--ring-color")).toBe("var(--fitsho-blue)");
+  expect(ring).toHaveAttribute("aria-valuenow", "1200");
+  expect(ring).toHaveAttribute("aria-valuemax", "2000");
+});
+
+it("caps an over-target ring while showing the real excess calories", async () => {
+  profile.productMode = "both";
+  workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
+  nutritionApi.getCurrentNutritionEstimate.mockResolvedValue({
+    confidence: "high",
+    targets: {
+      goal_calories: { preferred: 2000 },
+      protein: { preferred: 130 },
+      carbohydrate: { preferred: 280 },
+      total_fat: { preferred: 68 },
+    },
+  });
+  nutritionApi.getDailyTracking.mockResolvedValue({
+    data_status: "sufficient",
+    actual_totals: { energy_kcal: 2200, protein_g: 145, carbohydrate_g: 300, total_fat_g: 76 },
+    entries: [{ id: "entry-1" }],
+  });
+
+  render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+
+  const ring = await screen.findByRole("progressbar", { name: "پیشرفت کالری امروز" });
+  expect(ring).toHaveTextContent("100%");
+  expect(ring).toHaveAttribute("aria-valuenow", "2200");
+  expect(ring).toHaveAttribute("aria-valuemax", "2000");
+  expect(ring.style.getPropertyValue("--ring-color")).toBe("var(--fitsho-danger)");
+  expect(screen.getByText("۲۰۰ کیلوکالری بیشتر از هدف روزانه")).toBeInTheDocument();
+});
+
 it("shows estimated daily expenditure beside the calorie goal", async () => {
   profile.productMode = "both";
   workoutApi.getActiveWorkoutPlan.mockResolvedValue(null);
