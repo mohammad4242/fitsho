@@ -4,7 +4,7 @@ import { fiticianTokens } from "../ui/tokens";
 
 export const authStyles = StyleSheet.create({
   accentRule: {
-    alignItems: "flex-end",
+    alignItems: "flex-start",
     backgroundColor: fiticianTokens.colors.line,
     height: 2,
     overflow: "hidden",

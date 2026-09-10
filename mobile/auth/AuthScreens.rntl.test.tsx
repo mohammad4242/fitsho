@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
+import { StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 jest.mock("expo-router", () => ({ useLocalSearchParams: jest.fn(), useRouter: jest.fn() }));
@@ -12,6 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { useGoogleSignIn } from "./GoogleSignIn";
 import { useMobileAuth } from "./MobileAuthProvider";
+import { authStyles } from "./authStyles";
 import SignInScreen from "../app/(auth)/auth/sign-in";
 
 const mockPush = jest.fn();
@@ -67,6 +69,10 @@ test("presents the Web auth hierarchy with native fields and method selection", 
   expect(screen.getByRole("button", { name: "ورود به فیتشو" })).toBeTruthy();
   expect(screen.getByText("یا")).toBeTruthy();
   expect(screen.getByText("هنوز حساب نداری؟")).toBeTruthy();
+});
+
+test("anchors the auth accent rule to the logical RTL start", () => {
+  expect(StyleSheet.flatten(authStyles.accentRule)).toMatchObject({ alignItems: "flex-start" });
 });
 
 test("keeps the phone method and forgot-password route native", () => {
