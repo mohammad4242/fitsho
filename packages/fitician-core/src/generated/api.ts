@@ -3026,7 +3026,8 @@ export type paths = {
         get: operations["read_plan_api_v1_workout_plans__plan_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Plan */
+        delete: operations["delete_plan_api_v1_workout_plans__plan_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -17268,6 +17269,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkoutPlanResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_plan_api_v1_workout_plans__plan_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
