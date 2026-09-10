@@ -39,6 +39,7 @@ const plan: WorkoutPlan = {
   created_at: "2026-07-28T10:00:00Z",
   activated_at: "2026-07-28T10:00:00Z",
   plan_duration_weeks: 4,
+  generation_source: "internal_engine",
   is_stale: false,
   days: [
     {
@@ -594,6 +595,40 @@ it("shows plan context without cinematic background media", async () => {
   const schedule = screen.getByRole("list", { name: "روزهای تمرین تو" });
   const guidance = screen.getByText("قبل از شروع");
   expect(schedule.compareDocumentPosition(guidance) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("shows the internal engine as the displayed plan's pre-plan source", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({ ...plan, generation_source: "internal_engine" });
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const context = await screen.findByRole("region", { name: "خلاصه برنامه" });
+  const sourceCell = context.children[1];
+  expect(sourceCell).toHaveTextContent("پیش‌برنامه");
+  expect(sourceCell).toHaveTextContent("موتور داخلی");
+});
+
+it("shows artificial intelligence as the displayed plan's pre-plan source", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue({ ...plan, generation_source: "ai" });
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const context = await screen.findByRole("region", { name: "خلاصه برنامه" });
+  const sourceCell = context.children[1];
+  expect(sourceCell).toHaveTextContent("پیش‌برنامه");
+  expect(sourceCell).toHaveTextContent("هوش مصنوعی");
+});
+
+it("uses plan provenance instead of the current profile generation preference", async () => {
+  profileApi.getProfile.mockResolvedValue({ workout_generation_method: "ai" });
+  api.getActiveWorkoutPlan.mockResolvedValue({ ...plan, generation_source: "internal_engine" });
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const context = await screen.findByRole("region", { name: "خلاصه برنامه" });
+  const sourceCell = context.children[1];
+  expect(sourceCell).toHaveTextContent("موتور داخلی");
+  expect(sourceCell).not.toHaveTextContent("هوش مصنوعی");
 });
 
 it("shows the rounded average duration for every session instead of a range", async () => {

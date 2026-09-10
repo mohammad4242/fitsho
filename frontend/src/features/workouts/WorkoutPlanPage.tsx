@@ -294,7 +294,16 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                 {t(workoutPlanStatusLabels[summaryStatus])}
               </strong>
             </span>
-            <span><small>{t("workoutPlan.cycle")}</small><strong>{t("workoutPlan.duration", { count: number.format(summaryPlan.plan_duration_weeks) })}</strong></span>
+            <span>
+              <small>{t("workoutPlan.prePlan")}</small>
+              <strong>
+                {summaryPlan.generation_source === "ai"
+                  ? t("workoutPlan.aiSource")
+                  : summaryPlan.generation_source === "internal_engine"
+                    ? t("workoutPlan.internalEngineSource")
+                    : "—"}
+              </strong>
+            </span>
             <span><small>{t("workoutPlan.trainingDays")}</small><strong>{t("workoutPlan.daysCount", { count: number.format(summaryPlan.days.length) })}</strong></span>
             <span>
               <small>{t("workoutPlan.sessionDuration")}</small>

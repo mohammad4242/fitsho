@@ -18,6 +18,7 @@ def _plan_response() -> WorkoutPlanResponse:
         created_at=datetime(2026, 8, 14, tzinfo=UTC),
         activated_at=datetime(2026, 8, 14, tzinfo=UTC),
         plan_duration_weeks=4,
+        generation_source="ai",
         is_stale=False,
         days=[
             WorkoutDayResponse(

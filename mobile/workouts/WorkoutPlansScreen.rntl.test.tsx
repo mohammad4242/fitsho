@@ -70,6 +70,7 @@ let mockActivePlan: WorkoutPlan | null = null;
 let mockPlanById: WorkoutPlan | null = null;
 let mockHistory: WorkoutPlanVersionSummary[] = [];
 let mockCycle: unknown = null;
+let mockProfileGenerationMethod: "fitsho_coach" | "ai" = "fitsho_coach";
 
 type TestMutationOptions = {
   mutationFn?: (variables: unknown) => Promise<unknown>;
@@ -116,6 +117,7 @@ beforeEach(() => {
   mockPlanById = null;
   mockHistory = [];
   mockCycle = null;
+  mockProfileGenerationMethod = "fitsho_coach";
   mockMutate.mockClear();
   mockInvalidateQueries.mockClear();
   mockRemoveQueries.mockClear();
@@ -134,7 +136,7 @@ beforeEach(() => {
     setQueryData: mockSetQueryData,
   } as never);
   mockCreateProfileApi.mockReturnValue({
-    getProfile: resolved({ workout_generation_method: "fitsho_coach" }),
+    getProfile: resolved({ workout_generation_method: mockProfileGenerationMethod }),
     updateProfile: jest.fn(),
   } as never);
   mockCreateWorkoutPlanApi.mockReturnValue({
@@ -146,7 +148,7 @@ beforeEach(() => {
   } as never);
   mockUseQuery.mockImplementation(({ queryKey }) => {
     const key = queryKey as readonly unknown[];
-    if (key[0] === "profile") return queryResult({ workout_generation_method: "fitsho_coach" });
+    if (key[0] === "profile") return queryResult({ workout_generation_method: mockProfileGenerationMethod });
     if (key[1] === "plans") return queryResult(mockHistory);
     if (key[1] === "current-cycle") return queryResult(mockCycle);
     if (key[1] === "weekly-check-in" || key[1] === "completion-feedback") return queryResult(null);
@@ -185,6 +187,46 @@ test("renders the web-parity workout hierarchy and shared generation control", (
   expect(screen.getByRole("radio", { name: "موتور داخلی" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "هوش مصنوعی" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "ساخت برنامه تمرینی" })).toBeTruthy();
+});
+
+test("renders the displayed plan's internal engine pre-plan source", () => {
+  const plan = makePlan("active", [], "active-plan");
+  plan.generation_source = "internal_engine";
+  mockActivePlan = plan;
+  mockPlanById = plan;
+
+  renderWorkoutPlans();
+
+  const context = screen.getByLabelText("خلاصه برنامه");
+  expect(within(context).getByText("پیش‌برنامه")).toBeTruthy();
+  expect(within(context).getByText("موتور داخلی")).toBeTruthy();
+});
+
+test("renders the displayed plan's artificial intelligence pre-plan source", () => {
+  const plan = makePlan("active", [], "active-plan");
+  plan.generation_source = "ai";
+  mockActivePlan = plan;
+  mockPlanById = plan;
+
+  renderWorkoutPlans();
+
+  const context = screen.getByLabelText("خلاصه برنامه");
+  expect(within(context).getByText("پیش‌برنامه")).toBeTruthy();
+  expect(within(context).getByText("هوش مصنوعی")).toBeTruthy();
+});
+
+test("uses displayed plan provenance instead of the current profile generation preference", () => {
+  mockProfileGenerationMethod = "ai";
+  const plan = makePlan("active", [], "active-plan");
+  plan.generation_source = "internal_engine";
+  mockActivePlan = plan;
+  mockPlanById = plan;
+
+  renderWorkoutPlans();
+
+  const context = screen.getByLabelText("خلاصه برنامه");
+  expect(within(context).getByText("موتور داخلی")).toBeTruthy();
+  expect(within(context).queryByText("هوش مصنوعی")).toBeNull();
 });
 
 test("keeps generation choices as native touch actions", () => {
@@ -480,6 +522,7 @@ function makePlan(
       total_exercise_count: exercises.length,
     }],
     engine_version: "test",
+    generation_source: "internal_engine",
     id,
     is_stale: false,
     plan_duration_weeks: 4,

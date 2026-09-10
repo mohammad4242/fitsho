@@ -10588,6 +10588,8 @@ export type components = {
              * @default legacy_ai
              */
             engine_version: string;
+            /** Generation Source */
+            generation_source: ("internal_engine" | "ai") | null;
             /**
              * Id
              * Format: uuid

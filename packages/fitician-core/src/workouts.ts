@@ -143,6 +143,7 @@ export type WorkoutPlan = {
   created_at: string;
   activated_at: string | null;
   plan_duration_weeks: 4 | 6 | 8;
+  generation_source: "internal_engine" | "ai" | null;
   is_stale: boolean;
   days: WorkoutDay[];
   warnings?: string[];

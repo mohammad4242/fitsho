@@ -69,6 +69,7 @@ const detail: WorkoutReviewDetail = {
     created_at: "2026-08-09T08:00:00Z",
     activated_at: "2026-08-09T08:00:00Z",
     plan_duration_weeks: 4,
+    generation_source: "ai",
     is_stale: false,
     days: [
       {

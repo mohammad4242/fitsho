@@ -150,6 +150,9 @@ it("keeps the four context cells viable at the required phone widths", async () 
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
   const contextStrip = source.slice(source.indexOf("function PlanContextStrip"), source.indexOf("function CoachReviewBanner"));
   expect(contextStrip.match(/\{ label:/g)).toHaveLength(4);
+  expect(contextStrip).toContain('label: "پیش‌برنامه"');
+  expect(contextStrip).toContain("plan.generation_source");
+  expect(contextStrip).not.toContain('label: "دوره"');
 
   for (const width of [360, 390, 430]) {
     const contentWidth = getResponsiveLayout(width, 844).contentWidth;

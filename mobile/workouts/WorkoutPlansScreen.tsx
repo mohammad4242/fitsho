@@ -400,7 +400,7 @@ function PlanContextStrip({
   const averageDuration = workoutPlanAverageDuration(plan);
   const cells = [
     { label: "برنامه فعلی", value: statusLabel, valueStyle: statusStyle },
-    { label: "دوره", value: `دوره ${formatPersianNumber(plan.plan_duration_weeks, { maximumFractionDigits: 0 })} هفته‌ای`, valueStyle: undefined },
+    { label: "پیش‌برنامه", value: workoutGenerationSourceLabel(plan.generation_source), valueStyle: undefined },
     { label: "روزهای تمرین", value: `${formatPersianNumber(plan.days.length, { maximumFractionDigits: 0 })} روز تمرین`, valueStyle: undefined },
     { label: "زمان جلسه", value: averageDuration === null ? "—" : `${formatPersianNumber(averageDuration, { maximumFractionDigits: 0 })} دقیقه`, valueStyle: undefined },
   ];
@@ -415,6 +415,12 @@ function PlanContextStrip({
       ))}
     </View>
   );
+}
+
+function workoutGenerationSourceLabel(source: WorkoutPlan["generation_source"]): string {
+  if (source === "ai") return "هوش مصنوعی";
+  if (source === "internal_engine") return "موتور داخلی";
+  return "—";
 }
 
 function CoachReviewBanner({

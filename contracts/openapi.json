@@ -21688,6 +21688,21 @@
             "title": "Engine Version",
             "type": "string"
           },
+          "generation_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "internal_engine",
+                  "ai"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Source"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -21764,6 +21779,7 @@
           "created_at",
           "activated_at",
           "plan_duration_weeks",
+          "generation_source",
           "is_stale",
           "days"
         ],

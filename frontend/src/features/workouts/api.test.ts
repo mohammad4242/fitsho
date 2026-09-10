@@ -22,6 +22,7 @@ const plan: WorkoutPlan = {
   created_at: "2026-07-28T10:00:00Z",
   activated_at: "2026-07-28T10:00:00Z",
   plan_duration_weeks: 4,
+  generation_source: "ai",
   is_stale: false,
   days: [],
 };

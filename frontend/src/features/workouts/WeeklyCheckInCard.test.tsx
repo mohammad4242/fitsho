@@ -59,6 +59,7 @@ const plan: WorkoutPlan = {
   created_at: "2026-08-01T10:00:00Z",
   activated_at: "2026-08-01T10:00:00Z",
   plan_duration_weeks: 4,
+  generation_source: "internal_engine",
   is_stale: false,
   days: [
     { day_number: 1, title_en: "Day one", title_fa: "روز اول", estimated_duration_minutes: 40, exercises: [firstExercise] },
