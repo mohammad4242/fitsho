@@ -275,11 +275,11 @@ function ReviewBadge({
 }) {
   return (
     <View style={styles.reviewBadge}>
-      <View style={[styles.reviewDot, decision === "approved" && styles.reviewDotApproved]} />
       <View style={styles.reviewCopy}>
         <Text style={styles.reviewTitle}>{label}</Text>
         <Text style={styles.reviewState}>{reviewLabel(decision)}</Text>
       </View>
+      <View style={[styles.reviewDot, decision === "approved" && styles.reviewDotApproved]} />
     </View>
   );
 }
@@ -322,13 +322,13 @@ function sessionStateLabel(state: BodyPhotoSessionState): string {
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
   cardHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "space-between",
   },
@@ -470,12 +470,12 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     padding: fiticianTokens.spacing[3],
   },
   reviewCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     gap: 2,
   },
   reviewDot: {

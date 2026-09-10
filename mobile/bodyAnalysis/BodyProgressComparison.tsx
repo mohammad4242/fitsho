@@ -207,11 +207,11 @@ const styles = StyleSheet.create({
   },
   measurementHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   measurementValues: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",

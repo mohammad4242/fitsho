@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   sliderSummary: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   sliderTrack: {
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 2,
     padding: 2,
   },

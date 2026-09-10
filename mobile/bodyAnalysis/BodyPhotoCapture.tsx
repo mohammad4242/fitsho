@@ -477,10 +477,10 @@ function PhotoClothingGuide() {
   return (
     <View accessibilityLabel="لباس و پوشش مناسب" style={styles.clothingGuide}>
       <View style={styles.clothingHeader}>
+        <Text style={styles.clothingTitle}>لباس و پوشش مناسب</Text>
         <View style={styles.clothingIcon}>
           <AppIcon color={fiticianTokens.colors.amber} name="shield" size={18} />
         </View>
-        <Text style={styles.clothingTitle}>لباس و پوشش مناسب</Text>
       </View>
       <Text style={styles.captureHint}>
         لباس ورزشی فیت و کم‌حجم بپوش؛ از لباس گشاد، لایه‌لایه و اکسسوری‌هایی که فرم بدن را می‌پوشانند دوری کن.
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
   },
   clothingHeader: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   clothingIcon: {
@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.success,
   },
   stepList: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   title: {

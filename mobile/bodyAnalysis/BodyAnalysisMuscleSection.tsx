@@ -71,8 +71,8 @@ export function BodyAnalysisMuscleSection({
             <Text style={styles.mapTitle}>روی هر ناحیه بزن تا جزئیاتش رو ببینی</Text>
           </View>
           <View style={styles.viewBadge}>
-            <AppIcon color={fiticianTokens.colors.aqua} name="bodyAnalysis" size={16} />
             <Text style={styles.viewBadgeText}>{viewLabels[activeView]}</Text>
+            <AppIcon color={fiticianTokens.colors.aqua} name="bodyAnalysis" size={16} />
           </View>
         </View>
         <View style={styles.figureFrame}>
@@ -184,8 +184,8 @@ function RegionSummaryCard({
         <View style={styles.summaryChips}>
           {regions.slice(0, 3).map((region) => (
             <View key={region.area} style={styles.summaryChip}>
-              <View style={styles.summaryDot} />
               <Text style={styles.summaryChipText}>{bodyAreaLabel(region.area)}</Text>
+              <View style={styles.summaryDot} />
             </View>
           ))}
         </View>
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   mapHeader: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "space-between",
   },
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[3],
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[3],
   },
   summaryChips: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[1],
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[1],
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[1],
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[1],

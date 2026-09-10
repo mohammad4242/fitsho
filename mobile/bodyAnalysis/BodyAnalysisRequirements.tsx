@@ -134,11 +134,11 @@ export function BodyAnalysisRequirements({
 
         <Card style={styles.panel}>
           <View style={styles.panelHeading}>
-            <Text style={styles.stepBadge}>۰۱</Text>
             <View style={styles.panelHeadingCopy}>
               <Text style={styles.sectionTitle}>اندازه‌های پایه</Text>
               <Text style={styles.body}>قد و وزن، نقطهٔ شروع این اسکن هستند.</Text>
             </View>
+            <Text style={styles.stepBadge}>۰۱</Text>
           </View>
           <TextField
             accessibilityLabel="قد به سانتی‌متر"
@@ -162,11 +162,11 @@ export function BodyAnalysisRequirements({
 
         <Card style={styles.panel}>
           <View style={styles.panelHeading}>
-            <Text style={styles.stepBadge}>۰۲</Text>
             <View style={styles.panelHeadingCopy}>
               <Text style={styles.sectionTitle}>تناسبات بدن</Text>
               <Text style={styles.body}>متر را بدون کشیدن، در پهن‌ترین بخش هر ناحیه قرار بده.</Text>
             </View>
+            <Text style={styles.stepBadge}>۰۲</Text>
           </View>
           <TextField
             accessibilityLabel="دور شانه به سانتی‌متر"
@@ -203,6 +203,7 @@ export function BodyAnalysisRequirements({
         />
 
         <Card style={styles.confirmation} variant={confirmed ? "interactive" : "default"}>
+          <Text style={styles.confirmationText}>تأیید می‌کنم این اندازه‌ها برای همین جلسه عکس فعلی هستند.</Text>
           <Switch
             accessibilityLabel="اندازه‌ها مربوط به امروز هستند"
             onValueChange={setConfirmed}
@@ -210,7 +211,6 @@ export function BodyAnalysisRequirements({
             trackColor={{ false: fiticianTokens.colors.lineStrong, true: fiticianTokens.colors.teal }}
             value={confirmed}
           />
-          <Text style={styles.confirmationText}>تأیید می‌کنم این اندازه‌ها برای همین جلسه عکس فعلی هستند.</Text>
         </Card>
 
         {saveError ? <Notice message="ذخیره اندازه‌ها انجام نشد. دوباره تلاش کن." variant="danger" /> : null}
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   },
   confirmation: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     marginTop: fiticianTokens.spacing[2],
   },
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   },
   panelHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   panelHeadingCopy: {
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   },
   statusCard: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     padding: fiticianTokens.spacing[3],
   },

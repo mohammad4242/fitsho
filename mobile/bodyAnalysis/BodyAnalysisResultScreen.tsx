@@ -291,8 +291,8 @@ function PrivacyDisclaimer() {
   return (
     <Card style={styles.disclaimerCard} variant="glass">
       <View style={styles.disclaimerHeading}>
-        <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={20} />
         <Text style={styles.cardTitle}>فقط تحلیل رشد قابل‌مشاهده</Text>
+        <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={20} />
       </View>
       <Text style={styles.body}>
         دوست عزیزم، این بررسی توسط AI انجام شده و ممکنه اشتباه کنه. برای تحلیل تخصصی‌تر منتظر نظر پزشک و مربی بمون.
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
   },
   disclaimerHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   headerAction: {
@@ -561,11 +561,11 @@ const styles = StyleSheet.create({
   },
   measurementHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   measurementValues: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
   },

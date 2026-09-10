@@ -15,16 +15,16 @@ export function BodyAnalysisStartCard({
   return (
     <View style={styles.card}>
       <View style={styles.heading}>
-        <View style={styles.media}>
-          <Image accessibilityIgnoresInvertColors source={bodyAnalysisImage} style={styles.image} />
-          <View style={styles.scanLine} />
-        </View>
         <View style={styles.copy}>
           <Text style={styles.title}>جلسه جدید آنالیز بدن</Text>
           <View style={styles.countPill}>
-            <View style={styles.countDot} />
             <Text style={styles.countText}>{formatCount(sessionCount)} جلسه تحلیل ثبت‌شده</Text>
+            <View style={styles.countDot} />
           </View>
+        </View>
+        <View style={styles.media}>
+          <Image accessibilityIgnoresInvertColors source={bodyAnalysisImage} style={styles.image} />
+          <View style={styles.scanLine} />
         </View>
       </View>
       <BodyAnalysisCameraButton label="شروع جلسه عکس" onPress={onStart} />
@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
   },
   copy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[2],
   },
@@ -68,7 +68,8 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    alignSelf: "flex-start",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
@@ -83,7 +84,7 @@ const styles = StyleSheet.create({
   },
   heading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   image: {

@@ -17,8 +17,8 @@ export function BodyAnalysisEmptyState({ onStart }: { readonly onStart: () => vo
         <View style={[styles.corner, styles.cornerBottomRight]} />
         <View style={styles.scanLine} />
         <View style={styles.hudBadge}>
-          <View style={styles.hudDot} />
           <Text style={styles.hudText}>اسکن هوشمند دوربین و بیومتریک بدن</Text>
+          <View style={styles.hudDot} />
         </View>
       </View>
       <View style={styles.content}>
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
     bottom: 12,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     left: 12,
     paddingHorizontal: fiticianTokens.spacing[3],
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     padding: fiticianTokens.spacing[3],
   },

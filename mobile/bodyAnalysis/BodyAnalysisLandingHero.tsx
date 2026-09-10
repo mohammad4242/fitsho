@@ -24,8 +24,8 @@ export function BodyAnalysisLandingHero() {
   return (
     <View style={styles.container}>
       <View style={styles.badge}>
-        <View style={styles.badgeDot} />
         <Text style={styles.badgeText}>آنالیز هوشمند ترکیب و فرم بدن</Text>
+        <View style={styles.badgeDot} />
       </View>
       <Text accessibilityRole="header" style={styles.title}>
         <Text style={styles.titleWhite}>Body </Text>
@@ -40,12 +40,12 @@ export function BodyAnalysisLandingHero() {
       <View accessibilityLabel="امکانات آنالیز بدن" style={styles.features}>
         {featureCards.map((feature) => (
           <View key={feature.title} style={styles.featureCard}>
-            <View accessibilityLabel={feature.icon} style={styles.featureIcon}>
-              <Text style={styles.featureIconText}>{feature.icon}</Text>
-            </View>
             <View style={styles.featureCopy}>
               <Text style={styles.featureTitle}>{feature.title}</Text>
               <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
+            </View>
+            <View accessibilityLabel={feature.icon} style={styles.featureIcon}>
+              <Text style={styles.featureIconText}>{feature.icon}</Text>
             </View>
           </View>
         ))}
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.large,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     padding: fiticianTokens.spacing[3],
     width: "100%",

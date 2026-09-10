@@ -17,8 +17,8 @@ export function BodyAnalysisCameraButton({
       onPress={onPress}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
     >
-      <AppIcon color={fiticianTokens.colors.canvas} name="camera" size={20} />
       <Text style={styles.label}>{label}</Text>
+      <AppIcon color={fiticianTokens.colors.canvas} name="camera" size={20} />
     </Pressable>
   );
 }
@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.aqua,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,

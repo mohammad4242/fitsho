@@ -51,13 +51,13 @@ export function BodyAnalysisOverviewCard({
       <SectionHeader eyebrow="اسکن و شاخص‌ها" title="تصویر کلی بدن" />
       <Card variant="hero" style={styles.heroCard}>
         <View style={styles.heroHeader}>
-          <View style={styles.captureBadge}>
-            <View style={styles.captureDot} />
-            <Text style={styles.captureText}>۳ نمای استاندارد</Text>
-          </View>
           <View style={styles.heroCopy}>
             <Text style={styles.heroEyebrow}>BODY SCAN</Text>
             <Text style={styles.heroTitle}>بدن، نقطه شروع مسیر تو</Text>
+          </View>
+          <View style={styles.captureBadge}>
+            <Text style={styles.captureText}>۳ نمای استاندارد</Text>
+            <View style={styles.captureDot} />
           </View>
         </View>
 
@@ -70,8 +70,8 @@ export function BodyAnalysisOverviewCard({
             style={styles.bodyImage}
           />
           <View style={styles.mediaTag}>
-            <AppIcon accessibilityLabel="نمای بدن" color={fiticianTokens.colors.aqua} name="bodyAnalysis" size={16} />
             <Text style={styles.mediaTagText}>{viewLabels[activeView]}</Text>
+            <AppIcon accessibilityLabel="نمای بدن" color={fiticianTokens.colors.aqua} name="bodyAnalysis" size={16} />
           </View>
         </View>
 
@@ -89,14 +89,14 @@ export function BodyAnalysisOverviewCard({
                 pressed && styles.viewTabPressed,
               ]}
             >
+              <Text style={[styles.viewTabText, activeView === view && styles.viewTabTextActive]}>
+                {viewLabels[view]}
+              </Text>
               <AppIcon
                 color={activeView === view ? fiticianTokens.colors.canvas : fiticianTokens.colors.muted}
                 name="bodyAnalysis"
                 size={17}
               />
-              <Text style={[styles.viewTabText, activeView === view && styles.viewTabTextActive]}>
-                {viewLabels[view]}
-              </Text>
             </Pressable>
           ))}
         </View>
@@ -121,11 +121,11 @@ export function BodyAnalysisOverviewCard({
 
       <Card variant="glass" style={styles.impressionCard}>
         <View style={styles.cardHeading}>
-          <View style={styles.iconTile}>
-            <AppIcon color={fiticianTokens.colors.aqua} name="bodyAnalysis" size={20} />
-          </View>
           <View style={styles.headingCopy}>
             <Text style={styles.cardTitle}>{experienceCopy.firstLookTitle}</Text>
+          </View>
+          <View style={styles.iconTile}>
+            <AppIcon color={fiticianTokens.colors.aqua} name="bodyAnalysis" size={20} />
           </View>
         </View>
         <Text style={styles.body}>{experienceCopy.firstLook}</Text>
@@ -160,10 +160,10 @@ function BodyMetricCard({
   return (
     <Card style={styles.metricCard}>
       <View style={styles.metricIconRow}>
+        <Text style={styles.metricLabel}>{label}</Text>
         <View style={styles.metricIconTile}>
           <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={18} />
         </View>
-        <Text style={styles.metricLabel}>{label}</Text>
       </View>
       <Text style={styles.metricValue}>{value}</Text>
       <ProgressBar label={`پیشرفت ${label}`} progress={progress} />
@@ -177,12 +177,12 @@ function IndicatorCard({ indicator }: { readonly indicator: BodyIndicatorPresent
   return (
     <Card style={[styles.indicatorCard, { borderColor: `${color}42` }]}>
       <View style={styles.indicatorHeading}>
-        <View style={[styles.indicatorIconTile, { backgroundColor: `${color}1A` }]}>
-          <AppIcon color={color} name={indicator.icon} size={18} />
-        </View>
         <View style={styles.indicatorCopy}>
           <Text style={styles.indicatorTitle}>{indicator.title}</Text>
           <Text style={styles.indicatorCaption}>{indicator.caption}</Text>
+        </View>
+        <View style={[styles.indicatorIconTile, { backgroundColor: `${color}1A` }]}>
+          <AppIcon color={color} name={indicator.icon} size={18} />
         </View>
       </View>
       <View style={styles.indicatorDetail}>
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   },
   cardHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   cardTitle: {
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   },
   heroHeader: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
   },
   indicatorDetail: {
-    alignItems: "flex-end",
+    alignItems: "flex-start",
   },
   indicatorCaption: {
     color: fiticianTokens.colors.muted,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   },
   indicatorHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   indicatorIconTile: {
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
     bottom: fiticianTokens.spacing[3],
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
   },
   metricIconRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   metricIconTile: {
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: fiticianTokens.radii.medium,
     flex: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[1],
     justifyContent: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   viewTabs: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderRadius: fiticianTokens.radii.medium,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[1],
     padding: fiticianTokens.spacing[1],
   },

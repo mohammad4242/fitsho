@@ -38,12 +38,12 @@ export function BodyAnalysisDeleteDialog({
         <View style={styles.dialog}>
           <View style={styles.rail} />
           <View style={styles.header}>
-            <View style={styles.iconTile}>
-              <AppIcon color={fiticianTokens.colors.danger} name="delete" size={24} />
-            </View>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>حذف از Body Analysis</Text>
               <Text accessibilityRole="header" style={styles.title}>{title}</Text>
+            </View>
+            <View style={styles.iconTile}>
+              <AppIcon color={fiticianTokens.colors.danger} name="delete" size={24} />
             </View>
           </View>
           <Text style={styles.description}>
@@ -63,13 +63,13 @@ export function BodyAnalysisDeleteDialog({
           </View>
           {error !== undefined && error !== null ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
           <View style={styles.actions}>
-            <Button disabled={busy} label="نگه‌داشتن جلسه" onPress={onClose} variant="ghost" />
             <Button
               disabled={busy}
               label={busy ? "در حال حذف…" : "حذف دائمی"}
               onPress={onConfirm}
               variant="danger"
             />
+            <Button disabled={busy} label="نگه‌داشتن جلسه" onPress={onClose} variant="ghost" />
           </View>
         </View>
       </SafeAreaView>
@@ -100,7 +100,7 @@ function sessionStateLabel(state: BodyPhotoSessionState): string {
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     marginTop: fiticianTokens.spacing[4],
   },
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   headerCopy: {
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[3],
   },
   metaGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   metaLabel: {
