@@ -15,8 +15,8 @@ it("keeps result display versioned, quality-aware, and private", async () => {
   expect(source).not.toMatch(/نسخه قرارداد:/);
   expect(source).not.toMatch(/قرارداد داده:/);
   expect(source).not.toMatch(/نسخه پردازش:/);
-  expect(source).toMatch(/BodyAnalysisOverviewCard/);
-  expect(source).toMatch(/BodyAnalysisMuscleSection/);
+  expect(source).toMatch(/BodyAnalysisExperienceTabs/);
+  expect(source).toMatch(/BodyProgressTimelineItem/);
   expect(source).toMatch(/DisclosureCard/);
   expect(source).toMatch(/PrivacyDisclaimer/);
   expect(source).toMatch(/createPrivateBodyPhotoClient/);
