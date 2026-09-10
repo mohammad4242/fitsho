@@ -260,13 +260,23 @@ html[dir="rtl"] .command-card--primary::after {
   font-size: .7rem;
 }
 
+@property --ring-progress {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .command-card--nutrition .fitsho-progress-ring {
   width: 5.3rem;
   border: 1px solid rgb(80 223 206 / 12%);
   background:
     radial-gradient(circle, rgb(6 23 24 / 100%) 57%, transparent 59%),
-    conic-gradient(var(--fitsho-aqua) var(--ring-progress), rgb(255 255 255 / 7%) 0);
+    conic-gradient(var(--ring-color, var(--fitsho-aqua)) var(--ring-progress), rgb(255 255 255 / 7%) 0);
   box-shadow: 0 0 1.5rem rgb(80 223 206 / 10%);
+}
+
+.command-card--nutrition .fitsho-progress-ring--mount-animated {
+  transition: --ring-progress 900ms var(--fitsho-ease);
 }
 
 .command-card--nutrition .fitsho-progress-ring strong {
@@ -511,7 +521,8 @@ html[dir="rtl"] .command-card--primary::after {
 @media (prefers-reduced-motion: reduce) {
   .command-card,
   .command-quick-card,
-  .command-quick-card img {
+  .command-quick-card img,
+  .command-card--nutrition .fitsho-progress-ring--mount-animated {
     transition: none;
   }
 }
