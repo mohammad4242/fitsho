@@ -394,11 +394,11 @@ function PhysicianReviewCard({ plan }: { readonly plan: WeeklyPlan }) {
   return (
     <View style={[styles.reviewCard, approved ? styles.reviewApproved : styles.reviewPending]}>
       <View style={[styles.reviewBadge, RTL_ROW]}>
-        <View style={styles.doctorAvatar}>
+        <View style={[styles.doctorAvatar, approved && styles.doctorAvatarApproved]}>
           <Text style={styles.doctorEmoji}>🧑‍⚕️</Text>
         </View>
         <View style={styles.reviewContent}>
-          <Text style={styles.reviewTitle}>
+          <Text style={[styles.reviewTitle, approved ? styles.reviewTitleApproved : styles.reviewTitlePending]}>
             {approved ? "تأییدشده توسط پزشک" : "در انتظار بررسی پزشک"}
           </Text>
           {!approved ? <Text style={styles.reviewSubtitle}>پیش‌نویس موقت؛ نیازمند بررسی پزشک</Text> : null}
@@ -568,13 +568,6 @@ function NutritionDayCard({
 
   return (
     <View style={styles.dayCard}>
-      <View style={styles.dayHeading}>
-        <View style={styles.dayCopy}>
-          <Text style={styles.dayTitle}>{weekdayLabels[day.day_index] ?? `روز ${day.day_index + 1}`}</Text>
-          <Text style={styles.dayDate}>{formatPlanDate(day.plan_date)}</Text>
-        </View>
-        <Text style={styles.dayCost}>{formatNutritionPlanMoney(day.cost_irr)}</Text>
-      </View>
       <View style={styles.dailySummary}>
         <View style={styles.dailySummaryItem}>
           <Text style={styles.dailySummaryValue}>
@@ -658,7 +651,7 @@ function NutritionMealCard({
   const mealName = meal.meal_code === null || meal.meal_code === undefined
     ? mealLabel
     : `${meal.meal_code} — ${mealLabel}`;
-  const mealMacroEntries = ["energy_kcal", "protein_g", "carbohydrate_g", "fat_g", "total_fat_g", "fibre_g"].flatMap((code) => {
+  const mealMacroEntries = ["energy_kcal", "protein_g", "carbohydrate_g", "fat_g", "total_fat_g", "fibre_g", "sodium_mg", "free_sugar_g", "saturated_fat_g"].flatMap((code) => {
     const value = meal.nutrient_totals[code];
     return typeof value === "number" ? [{ code, unit: code === "energy_kcal" ? "kcal" : code.endsWith("_mg") ? "mg" : "g", value }] : [];
   });
@@ -818,7 +811,7 @@ function NutritionMealCard({
   return (
     <DisclosureCard
       leading={<NutritionThumbnail imageUrl={meal.image_url} name={mealName} style={styles.mealThumbnail} />}
-      summary={`${mealRoleLabel(meal.slot_role)} · ${formatNutritionPlanMoney(meal.cost_irr)}`}
+      summary={`${mealRoleLabel(meal.slot_role)} · ${formatNutritionNumber(meal.nutrient_totals.energy_kcal ?? 0)} kcal · ${formatNutritionPlanMoney(meal.cost_irr)}`}
       style={styles.mealCard}
       title={mealName}
     >
@@ -1495,30 +1488,6 @@ const styles = StyleSheet.create({
   dayCard: {
     gap: fiticianTokens.spacing[3],
   },
-  dayCost: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
-  dayCopy: {
-    alignItems: "stretch",
-    gap: fiticianTokens.spacing[1],
-  },
-  dayDate: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
-  dayHeading: {
-    alignItems: "flex-start",
-    direction: "rtl",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
   dailySummary: {
     backgroundColor: fiticianTokens.colors.surfaceHighlight,
     borderColor: fiticianTokens.colors.line,
@@ -1560,7 +1529,7 @@ const styles = StyleSheet.create({
   },
   dayTab: {
     alignItems: "stretch",
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    backgroundColor: fiticianTokens.colors.teal,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
@@ -1593,14 +1562,6 @@ const styles = StyleSheet.create({
   dayTabSelected: {
     backgroundColor: fiticianTokens.colors.aqua,
     borderColor: fiticianTokens.colors.aqua,
-  },
-  dayTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h3,
-    lineHeight: 28,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
   daysSection: {
     gap: fiticianTokens.spacing[3],
@@ -1783,10 +1744,11 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surface,
     borderRadius: fiticianTokens.radii.small,
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     gap: fiticianTokens.spacing[1],
-    minWidth: 0,
     padding: fiticianTokens.spacing[2],
+    width: "47%",
   },
   mealNutrientLabel: {
     color: fiticianTokens.colors.muted,
@@ -2166,6 +2128,10 @@ const styles = StyleSheet.create({
     backgroundColor: fiticianTokens.colors.successSurface,
     borderColor: fiticianTokens.colors.success,
   },
+  doctorAvatarApproved: {
+    backgroundColor: fiticianTokens.colors.successSurface,
+    borderColor: fiticianTokens.colors.success,
+  },
   reviewBadge: {
     alignItems: "center",
     gap: fiticianTokens.spacing[3],
@@ -2202,6 +2168,12 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "auto",
     writingDirection: "rtl",
+  },
+  reviewTitleApproved: {
+    color: fiticianTokens.colors.success,
+  },
+  reviewTitlePending: {
+    color: fiticianTokens.colors.amber,
   },
   preparedRecipeCard: {
     backgroundColor: fiticianTokens.colors.surface,

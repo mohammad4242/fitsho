@@ -333,6 +333,10 @@ test("shows the approved physician card with the green visual state", async () =
   expect(screen.getByText(/تاریخ تأیید:/)).toBeTruthy();
   expect(findAncestorStyle(reviewText, "borderColor")).toMatchObject({ borderColor: fiticianTokens.colors.success });
   expect(findAncestorStyle(reviewText, "backgroundColor")).toMatchObject({ backgroundColor: fiticianTokens.colors.successSurface });
+  expect(StyleSheet.flatten(reviewText.props.style)).toMatchObject({ color: fiticianTokens.colors.success });
+  expect(findAncestorStyle(screen.getByText("🧑‍⚕️"), "backgroundColor")).toMatchObject({
+    backgroundColor: fiticianTokens.colors.successSurface,
+  });
 });
 
 test("shows the pending physician card, notes, and change summary", async () => {
@@ -401,6 +405,7 @@ test("keeps meal editing controls available inside the selected day", async () =
   openNutritionPlan();
   fireEvent.press(screen.getByRole("button", { name: "LU01 — جوجه کباب + برنج + گوجه کبابی" }));
 
+  expect(screen.getByText("۷۰۰ kcal")).toBeTruthy();
   expect(screen.getByRole("button", { name: "قفل وعده" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "پسندیدم" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "کمتر پیشنهاد بده" })).toBeTruthy();
