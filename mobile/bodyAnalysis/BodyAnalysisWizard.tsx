@@ -37,6 +37,7 @@ import {
 
 export interface BodyAnalysisWizardProps {
   readonly onExit: () => void;
+  readonly onViewAnalysis?: (sessionId: string) => void;
   readonly purpose?: BodyPhotoPurpose;
   readonly sessionId?: string;
 }
@@ -65,6 +66,7 @@ const activeAnalysisStates = new Set<BodyAnalysis["status"]>([
 
 export function BodyAnalysisWizard({
   onExit,
+  onViewAnalysis,
   purpose = "initial_plan",
   sessionId,
 }: BodyAnalysisWizardProps) {
@@ -341,6 +343,8 @@ export function BodyAnalysisWizard({
         error={error}
         onExit={exitWizard}
         onRetry={() => void retryAnalysis()}
+        onViewAnalysis={onViewAnalysis}
+        sessionId={session?.id ?? null}
       />
     );
   }
@@ -649,20 +653,24 @@ function AnalysisSubmitted({
   error,
   onExit,
   onRetry,
+  onViewAnalysis,
+  sessionId,
 }: {
   readonly analysis: BodyAnalysis | null;
   readonly error: string | null;
   readonly onExit: () => void;
   readonly onRetry: () => void;
+  readonly onViewAnalysis?: (sessionId: string) => void;
+  readonly sessionId: string | null;
 }) {
   const status = analysis?.status ?? "queued";
   const failed = analysis?.status === "failed";
   return (
     <Screen scroll={false}>
       <View style={styles.statusState}>
-        <Text style={styles.eyebrow}>تحلیل بدن</Text>
-        <Text style={styles.title}>{failed ? "تحلیل کامل نشد" : "تحلیل در حال آماده‌سازی است"}</Text>
-        <Text style={styles.body}>{analysisStatusLabel(status)}</Text>
+        <Text style={styles.eyebrow}>{bodyPhotoCopy.eyebrow}</Text>
+        <Text style={styles.title}>{failed ? bodyPhotoCopy.results.analysisStatus.failed : bodyPhotoCopy.queuedTitle}</Text>
+        <Text style={styles.body}>{failed ? bodyPhotoCopy.results.failedSafe : bodyPhotoCopy.queuedBody}</Text>
         {analysis?.safe_error_message !== null && analysis?.safe_error_message !== undefined ? (
           <Notice message={analysis.safe_error_message} variant="danger" />
         ) : null}
@@ -670,20 +678,18 @@ function AnalysisSubmitted({
         {activeAnalysisStates.has(status) ? (
           <Skeleton accessibilityLabel="تحلیل بدن در حال انجام است" height={12} />
         ) : null}
-        {failed ? <Button label="تلاش دوباره" onPress={onRetry} /> : null}
+        {failed ? <Button label={bodyPhotoCopy.results.retry} onPress={onRetry} /> : null}
+        {!failed && sessionId !== null && onViewAnalysis !== undefined ? (
+          <Button
+            label={bodyPhotoCopy.results.viewAnalysis}
+            onPress={() => onViewAnalysis(sessionId)}
+            variant="secondary"
+          />
+        ) : null}
         <Button label="بازگشت به خانه" onPress={onExit} variant="secondary" />
       </View>
     </Screen>
   );
-}
-
-function analysisStatusLabel(status: BodyAnalysis["status"]): string {
-  if (status === "queued") return "در صف پردازش قرار گرفت.";
-  if (status === "validating") return "کیفیت و استاندارد تصاویر در حال بررسی است.";
-  if (status === "analyzing") return "تحلیل محلی و سرویس امن در حال انجام است.";
-  if (status === "review_pending") return "نتیجه برای بررسی مربی و پزشک ارسال شده است.";
-  if (status === "completed") return "نتیجه آماده است و پس از بررسی تخصصی نمایش داده می‌شود.";
-  return "تحلیل به پایان نرسید.";
 }
 
 function viewLabel(view: BodyPhotoView): string {

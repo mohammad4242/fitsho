@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import type { BodyPhotoView } from "@fitician/core/body-photos";
+import type { BodyAnalysis, BodyPhotoView } from "@fitician/core/body-photos";
 
 jest.mock("expo-file-system", () => ({ File: class {} }));
 jest.mock("expo-secure-store", () => ({
@@ -95,10 +95,10 @@ type UploadPhoto = (
 let createSession: jest.Mock<CreateSession>;
 let uploadPhoto: jest.Mock<UploadPhoto>;
 
-function renderWizard() {
+function renderWizard(onViewAnalysis?: (sessionId: string) => void) {
   return render(
     <SafeAreaProvider initialMetrics={{ frame: { height: 800, width: 400, x: 0, y: 0 }, insets: { bottom: 0, left: 0, right: 0, top: 0 } }}>
-      <BodyAnalysisWizard onExit={jest.fn()} />
+      <BodyAnalysisWizard onExit={jest.fn()} onViewAnalysis={onViewAnalysis} />
     </SafeAreaProvider>,
   );
 }
@@ -169,4 +169,54 @@ test("uploads each confirmed view before advancing to the next web view", async 
   expect(screen.getByText(bodyPhotoCopy.modelTraining)).toBeTruthy();
   expect(screen.getByText(bodyPhotoCopy.modelTrainingHint)).toBeTruthy();
   expect(screen.getByLabelText(bodyPhotoCopy.submit)).toBeTruthy();
+});
+
+test("shows the web queued state and opens the submitted session result", async () => {
+  const uploadedViews: BodyPhotoView[] = [];
+  const onViewAnalysis = jest.fn();
+  uploadPhoto.mockImplementation(async (_sessionId, view) => {
+    uploadedViews.push(view);
+    return {
+      ...createdSession,
+      photos: uploadedViews.map((uploadedView) => ({ view: uploadedView })),
+    } as typeof createdSession;
+  });
+  mockCreateBodyPhotoApi.mockReturnValue({
+    createSession,
+    startAnalysis: jest.fn<() => Promise<BodyAnalysis>>().mockResolvedValue({
+      id: "analysis-1",
+      session_id: createdSession.id,
+      status: "review_pending",
+    } as BodyAnalysis),
+    submitSession: jest.fn<() => Promise<typeof createdSession>>().mockResolvedValue({
+      ...createdSession,
+      photos: ["front", "side", "back"].map((view) => ({ view })),
+      state: "queued",
+      submitted_at: "2026-09-09T08:05:00Z",
+    } as unknown as typeof createdSession),
+    uploadPhoto,
+  } as never);
+
+  renderWizard(onViewAnalysis);
+  fireEvent(await screen.findByLabelText("تأیید می‌کنم این اندازه‌ها برای همین جلسه عکس فعلی هستند"), "valueChange", true);
+  fireEvent.press(await screen.findByLabelText("ذخیره و ادامه"));
+  fireEvent.press(await screen.findByLabelText("تأیید front"));
+  await waitFor(() => expect(uploadedViews).toEqual(["front"]));
+  fireEvent.press(await screen.findByLabelText("تأیید side"));
+  await waitFor(() => expect(uploadedViews).toEqual(["front", "side"]));
+  fireEvent.press(await screen.findByLabelText("تأیید back"));
+  await waitFor(() => expect(uploadedViews).toEqual(["front", "side", "back"]));
+  expect(await screen.findByText(bodyPhotoCopy.reviewTitle)).toBeTruthy();
+
+  fireEvent(
+    screen.getByLabelText(`${bodyPhotoCopy.processingConsentBefore} ${bodyPhotoCopy.processingTerms}`),
+    "valueChange",
+    true,
+  );
+  fireEvent.press(screen.getByLabelText(bodyPhotoCopy.submit));
+
+  expect(await screen.findByText(bodyPhotoCopy.queuedTitle)).toBeTruthy();
+  expect(screen.getByText(bodyPhotoCopy.queuedBody)).toBeTruthy();
+  fireEvent.press(screen.getByLabelText(bodyPhotoCopy.results.viewAnalysis));
+  expect(onViewAnalysis).toHaveBeenCalledWith(createdSession.id);
 });

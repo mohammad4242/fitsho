@@ -26,7 +26,7 @@ import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
 import { BodyAnalysisExperienceTabs } from "./BodyAnalysisExperienceTabs";
-import { bodyPhotoCopy } from "./bodyAnalysisCopy";
+import { bodyAnalysisCopy, bodyPhotoCopy } from "./bodyAnalysisCopy";
 import { bodyAreaLabel } from "./bodyAnalysisPresentation";
 import {
   createPrivateBodyPhotoClient,
@@ -156,8 +156,8 @@ export function BodyAnalysisResultScreen() {
     return (
       <Screen scroll={false}>
         <View style={styles.statusState}>
-          <Text style={styles.title}>نتیجه تحلیل بدن در دسترس نیست</Text>
-          <Notice message={actionError ?? "دریافت نتیجه تحلیل انجام نشد."} variant="danger" />
+          <Text style={styles.title}>{bodyPhotoCopy.results.loadError}</Text>
+          <Notice message={actionError ?? bodyPhotoCopy.results.loadError} variant="danger" />
           <Button label="تلاش دوباره" onPress={() => void load()} />
           <Button label="تاریخچه" onPress={() => router.replace("/member/body-analysis-history")} variant="secondary" />
         </View>
@@ -176,9 +176,9 @@ export function BodyAnalysisResultScreen() {
           title={bodyPhotoCopy.results.title}
         />
         {analysis === null ? (
-          <Notice message="تحلیل این جلسه هنوز آغاز نشده است." variant="info" />
+          <Notice message={bodyPhotoCopy.results.notStarted} variant="info" />
         ) : activeAnalysisStates.has(analysis.status) ? (
-          <Notice message={`${analysisStatusLabel(analysis.status)} می‌توانی از این صفحه خارج شوی و هم‌زمان از فیتشو استفاده کنی.`} variant="info" />
+          <Notice message={`${analysisStatusLabel(analysis.status)} · ${bodyPhotoCopy.results.processingHelp}`} variant="info" />
         ) : null}
         {failedAnalysis ? (
           <Notice
@@ -191,7 +191,7 @@ export function BodyAnalysisResultScreen() {
           <PhotoQualityCard analysis={analysis} />
         ) : null}
         {analysis === null || failedAnalysis ? (
-          <Button disabled={actionBusy} label="تلاش دوباره" loading={actionBusy} onPress={() => void retry()} />
+          <Button disabled={actionBusy} label={bodyPhotoCopy.results.retry} loading={actionBusy} onPress={() => void retry()} />
         ) : null}
         {analysis?.experience_result !== null && analysis?.experience_result !== undefined ? (
           <BodyAnalysisExperienceTabs
@@ -227,9 +227,9 @@ function PhotoQualityCard({ analysis }: { readonly analysis: BodyAnalysis }) {
   if (validation === null || validation === undefined) return null;
   return (
     <Card style={styles.card}>
-      <Text style={styles.cardTitle}>بازخورد کیفیت تصاویر</Text>
+      <Text style={styles.cardTitle}>{bodyPhotoCopy.quality.title}</Text>
       <Text style={styles.body}>{validation.accepted ? "سه تصویر برای تحلیل قابل استفاده بود." : "کیفیت تصویر نیاز به اصلاح دارد."}</Text>
-      <Text style={styles.body}>اطمینان بررسی: {formatPercent(validation.confidence)}</Text>
+      <Text style={styles.body}>{bodyPhotoCopy.quality.landmarks}: {formatPercent(validation.confidence)}</Text>
       {validation.issues.map((issue) => (
         <Text key={issue.view} style={styles.issueText}>
           {viewLabel(issue.view)}: {issue.reasons.map(photoQualityReasonLabel).join("، ")}
@@ -266,12 +266,14 @@ function NormalizedResult({ analysis }: { readonly analysis: BodyAnalysis }) {
 function ReviewStatusCard({ analysis }: { readonly analysis: BodyAnalysis }) {
   return (
     <View style={styles.section}>
-      <SectionHeader eyebrow="نظر متخصصان" title="بازبینی متخصصان" />
+      <SectionHeader eyebrow="نظر متخصصان" title={bodyPhotoCopy.results.reviewTitle} />
       <Card style={styles.card}>
-        <ReviewRow label="نظر پزشک" review={analysis.doctor_review} />
-        <ReviewRow label="نظر مربی" review={analysis.coach_review} />
+        <ReviewRow label={bodyPhotoCopy.results.reviewRoles.doctor} review={analysis.doctor_review} />
+        <ReviewRow label={bodyPhotoCopy.results.reviewRoles.coach} review={analysis.coach_review} />
       </Card>
-      <Text style={styles.muted}>{analysis.fully_reviewed ? "هر دو بررسی تکمیل شده است." : "نتیجه تا تکمیل بررسی‌ها مقدماتی است."}</Text>
+      <Text style={styles.muted}>
+        {analysis.fully_reviewed ? bodyAnalysisCopy.review.approved : bodyAnalysisCopy.review.provisional}
+      </Text>
     </View>
   );
 }
@@ -297,12 +299,10 @@ function PrivacyDisclaimer() {
   return (
     <Card style={styles.disclaimerCard} variant="glass">
       <View style={styles.disclaimerHeading}>
-        <Text style={styles.cardTitle}>فقط تحلیل رشد قابل‌مشاهده</Text>
+        <Text style={styles.cardTitle}>{bodyAnalysisCopy.disclaimer.title}</Text>
         <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={20} />
       </View>
-      <Text style={styles.body}>
-        دوست عزیزم، این بررسی توسط AI انجام شده و ممکنه اشتباه کنه. برای تحلیل تخصصی‌تر منتظر نظر پزشک و مربی بمون.
-      </Text>
+      <Text style={styles.body}>{bodyAnalysisCopy.disclaimer.body}</Text>
     </Card>
   );
 }
@@ -317,8 +317,8 @@ function PhotoDetails({
   return (
     <DisclosureCard
       icon="shield"
-      summary="فقط نسخهٔ خصوصی و احراز‌شدهٔ عکس‌ها در این دستگاه نمایش داده می‌شود."
-      title="نماهای ناشناس‌شده بدن"
+      summary={bodyPhotoCopy.results.photosLabel}
+      title={bodyPhotoCopy.results.photosLabel}
     >
       <View style={styles.photoRow}>
         {photos.map((photo) => (
@@ -327,7 +327,7 @@ function PhotoDetails({
               <Text style={styles.muted}>محافظت‌شده</Text>
             ) : (
               <Image
-                accessibilityLabel={`تصویر ${viewLabel(photo.view)}`}
+                accessibilityLabel={replaceView(bodyPhotoCopy.results.photoAlt, viewLabel(photo.view))}
                 source={{ uri: photoUris[photo.view] }}
                 style={styles.photo}
               />
@@ -379,44 +379,18 @@ function formatSessionDate(value: string): string {
 }
 
 function sessionStatusLabel(status: BodyPhotoSession["state"]): string {
-  const labels: Record<BodyPhotoSession["state"], string> = {
-    analyzing: "در حال تحلیل",
-    awaiting_consent: "در انتظار رضایت",
-    completed: "تکمیل‌شده",
-    deleted: "حذف‌شده",
-    draft: "پیش‌نویس",
-    failed: "ناموفق",
-    queued: "در صف تحلیل",
-    review_pending: "در انتظار بررسی تخصصی",
-    uploaded: "تصاویر ثبت‌شده",
-    uploading: "در حال بارگذاری",
-    validating: "در حال بررسی کیفیت",
-  };
-  return labels[status];
+  return bodyPhotoCopy.status[status];
 }
 
 function analysisStatusLabel(status: BodyAnalysis["status"]): string {
-  if (status === "queued") return "تحلیل در صف است.";
-  if (status === "validating") return "کیفیت تصاویر در حال بررسی است.";
-  if (status === "analyzing") return "در حال تحلیل رشد قابل‌مشاهده بدن";
-  return status === "review_pending" ? "نتیجه در انتظار بررسی تخصصی است." : "نتیجه آماده است.";
+  return bodyPhotoCopy.results.analysisStatus[status];
 }
 
 function analysisFailureMessage(analysis: BodyAnalysis): string {
-  const providerMessages: Record<string, string> = {
-    connection_failure: "فیتشو به سرویس تحلیل وصل نشد. شبکهٔ بک‌اند یا تنظیم پراکسی را بررسی کن.",
-    invalid_output: "پاسخ تحلیل معتبر نبود. بعداً دوباره تلاش کن یا مدل سازگار دیگری انتخاب کن.",
-    malformed_response: "پاسخ تحلیل قابل‌خواندن نبود. بعداً دوباره تلاش کن.",
-    model_not_found: "مدل انتخاب‌شده در دسترس نیست. بعداً دوباره تلاش کن.",
-    not_configured: "سرویس تحلیل بدن هنوز پیکربندی نشده است.",
-    provider_unavailable: "سرویس تحلیل بدن موقتاً در دسترس نیست.",
-    rate_limited: "سرویس تحلیل بدن موقتاً محدود شده است. کمی بعد دوباره تلاش کن.",
-    timeout: "سرویس تحلیل بدن در زمان تعیین‌شده پاسخ نداد. دوباره تلاش کن.",
-    unauthorized: "دسترسی سرویس تحلیل بدن پذیرفته نشد. دوباره تلاش کن.",
-  };
+  const providerMessages: Record<string, string> = bodyPhotoCopy.results.providerErrors;
   return providerMessages[analysis.error_code ?? ""]
     ?? analysis.safe_error_message
-    ?? "تحلیل بدن تکمیل نشد. برنامه تمرینی بدون شخصی‌سازی عکس همچنان در دسترس است.";
+    ?? bodyPhotoCopy.results.failedSafe;
 }
 
 function hasAnalysisResult(analysis: BodyAnalysis): boolean {
@@ -452,23 +426,16 @@ function classificationLabel(value: string): string {
 }
 
 function photoQualityReasonLabel(value: string): string {
-  const labels: Record<string, string> = {
-    clothing_obscures_body: "لباس فرم بدن را پوشانده است",
-    exactly_one_person_required: "فقط یک نفر باید در تصویر باشد",
-    full_body_not_visible: "تمام بدن در کادر نیست",
-    low_lighting: "نور کم است",
-    low_sharpness: "تصویر واضح نیست",
-    photo_uncertain: "کیفیت تصویر قطعی نیست",
-    unsuitable_background: "پس‌زمینه مناسب نیست",
-    wrong_view: "نمای تصویر با نمای انتخاب‌شده هماهنگ نیست",
-  };
+  const labels: Record<string, string> = bodyPhotoCopy.results.photoValidation;
   return labels[value] ?? "نیازمند بررسی";
 }
 
 function viewLabel(view: BodyPhoto["view"]): string {
-  if (view === "front") return "روبه‌رو";
-  if (view === "side") return "نیمرخ";
-  return "پشت";
+  return bodyPhotoCopy.views[view];
+}
+
+function replaceView(template: string, view: string): string {
+  return template.replace("{{view}}", view);
 }
 
 function formatPercent(value: number | null): string {

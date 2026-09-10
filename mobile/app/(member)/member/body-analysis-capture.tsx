@@ -12,6 +12,7 @@ export default function MemberBodyAnalysisCaptureScreen() {
   return (
     <BodyAnalysisWizard
       onExit={() => router.replace("/member")}
+      onViewAnalysis={(id) => router.push(`/member/body-analysis-result/${encodeURIComponent(id)}`)}
       purpose={purpose}
       sessionId={sessionId}
     />
