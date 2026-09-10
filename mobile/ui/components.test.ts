@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, it, vi } from "vitest";
 import { type ReactNode } from "react";
 
@@ -88,6 +89,13 @@ it("renders fields through a shared form-field shell with error feedback", () =>
   expect(element(children[2]).props.children).toBe("Invalid email");
   expect(element(children[1]).props.accessibilityHint).toBe("Invalid email");
   expect(element(children[1]).props.allowFontScaling).toBe(true);
+});
+
+it("lets native RTL own modal layout direction", async () => {
+  const source = await readFile(new URL("./components/Overlay.tsx", import.meta.url), "utf8");
+
+  expect(source).not.toContain('direction: "rtl"');
+  expect(source).toContain('flexDirection: "row"');
 });
 
 it("preserves font scaling and source order for the shared button label", () => {

@@ -7,6 +7,8 @@ export interface FiticianRtlConfiguration {
 
 export type MobileLanguage = "fa" | "en";
 
+export const FITICIAN_NATIVE_DIRECTION = "rtl" as const;
+
 export function languageForDirection(isRTL = I18nManager.isRTL): MobileLanguage {
   return isRTL ? "fa" : "en";
 }

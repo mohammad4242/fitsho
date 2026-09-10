@@ -12,7 +12,11 @@ vi.mock("react-native", () => native);
 
 import * as rtl from "./rtl";
 
-import { configureFiticianRtl } from "./rtl";
+import { configureFiticianRtl, FITICIAN_NATIVE_DIRECTION } from "./rtl";
+
+it("defines one native RTL direction for the app root", () => {
+  expect(FITICIAN_NATIVE_DIRECTION).toBe("rtl");
+});
 
 it("enables RTL and requests a restart when native RTL is not active", () => {
   expect(configureFiticianRtl()).toEqual({ isRTL: false, restartRequired: true });

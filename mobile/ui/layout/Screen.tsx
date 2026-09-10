@@ -16,6 +16,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { getResponsiveLayout } from "../layoutMetrics";
+import { FITICIAN_NATIVE_DIRECTION } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export type ScreenContentWidth = "content" | "full" | "reading";
@@ -87,7 +88,7 @@ export function Screen({
 const styles = StyleSheet.create({
   content: {
     alignSelf: "center",
-    direction: "rtl",
+    direction: FITICIAN_NATIVE_DIRECTION,
     flexGrow: 1,
     width: "100%",
   },

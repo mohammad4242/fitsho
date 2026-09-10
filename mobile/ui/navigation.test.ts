@@ -153,6 +153,8 @@ it("defines web-equivalent member bottom-bar icons and styling", async () => {
   expect(source).toContain("NAVIGATION_CONTENT_HEIGHT");
   expect(source).toContain('backgroundColor: fiticianTokens.colors.canvas');
   expect(source).toContain('borderTopWidth: 1');
+  expect(source).toMatch(/content:\s*\{[\s\S]*?flexDirection: "row"/);
+  expect(source).not.toContain('direction: "rtl"');
   expect(source).toContain('display !== "none"');
   expect(source).toContain('type: "tabPress"');
   expect(source).toContain('type: "tabLongPress"');

@@ -225,7 +225,6 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   content: {
-    direction: "rtl",
     flexDirection: "row",
     height: NAVIGATION_CONTENT_HEIGHT,
     paddingHorizontal: 4,
