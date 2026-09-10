@@ -90,7 +90,7 @@ export type {
 } from "./auth";
 export {
   clampNutritionProgress,
-  nutritionProgressRatio,
+  nutritionTargetToExpenditureRatio,
   nutritionProgressTone,
 } from "./nutrition-progress";
 export type { NutritionProgressTone } from "./nutrition-progress";

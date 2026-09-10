@@ -2,20 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   clampNutritionProgress,
-  nutritionProgressRatio,
+  nutritionTargetToExpenditureRatio,
   nutritionProgressTone,
 } from "./nutrition-progress";
 
-describe("nutritionProgressRatio", () => {
-  it("uses the same target-relative calculation for gain and loss targets", () => {
-    expect(nutritionProgressRatio(1_800, 3_000)).toBeCloseTo(0.6);
-    expect(nutritionProgressRatio(1_800, 1_800)).toBe(1);
+describe("nutritionTargetToExpenditureRatio", () => {
+  it("calculates the daily target against estimated expenditure", () => {
+    expect(nutritionTargetToExpenditureRatio(2_400, 3_000)).toBeCloseTo(0.8);
+    expect(nutritionTargetToExpenditureRatio(3_000, 2_400)).toBeCloseTo(1.25);
   });
 
-  it("preserves a ratio above the target and rejects invalid targets", () => {
-    expect(nutritionProgressRatio(2_000, 1_800)).toBeCloseTo(1.111111);
-    expect(nutritionProgressRatio(null, 2_000)).toBe(0);
-    expect(nutritionProgressRatio(500, 0)).toBe(0);
+  it("rejects missing, non-positive, and non-finite inputs", () => {
+    expect(nutritionTargetToExpenditureRatio(null, 2_000)).toBe(0);
+    expect(nutritionTargetToExpenditureRatio(2_000, null)).toBe(0);
+    expect(nutritionTargetToExpenditureRatio(500, 0)).toBe(0);
+    expect(nutritionTargetToExpenditureRatio(Number.NaN, 2_000)).toBe(0);
   });
 });
 

@@ -1,20 +1,20 @@
 export type NutritionProgressTone = "green" | "blue" | "red";
 
-export function nutritionProgressRatio(
-  consumedCalories: number | null | undefined,
+export function nutritionTargetToExpenditureRatio(
   targetCalories: number | null | undefined,
+  estimatedDailyExpenditureCalories: number | null | undefined,
 ): number {
   if (
-    typeof consumedCalories !== "number"
-    || !Number.isFinite(consumedCalories)
-    || consumedCalories < 0
-    || typeof targetCalories !== "number"
+    typeof targetCalories !== "number"
     || !Number.isFinite(targetCalories)
     || targetCalories <= 0
+    || typeof estimatedDailyExpenditureCalories !== "number"
+    || !Number.isFinite(estimatedDailyExpenditureCalories)
+    || estimatedDailyExpenditureCalories <= 0
   ) {
     return 0;
   }
-  return consumedCalories / targetCalories;
+  return targetCalories / estimatedDailyExpenditureCalories;
 }
 
 export function clampNutritionProgress(progress: number): number {
