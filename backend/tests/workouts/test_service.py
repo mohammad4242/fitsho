@@ -1063,7 +1063,7 @@ def test_generation_persists_valid_snapshot_for_pending_review(db: Session) -> N
     assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + ساق"
 
 
-def test_generation_keeps_existing_active_plan_when_new_plan_is_pending_review(
+def test_generation_supersedes_existing_active_plan_when_new_plan_is_pending_review(
     db: Session,
 ) -> None:
     user = _user_with_profile(db)
@@ -1073,7 +1073,26 @@ def test_generation_keeps_existing_active_plan_when_new_plan_is_pending_review(
     result = asyncio.run(_service(db).generate(user.id))
 
     assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
-    assert db.get(WorkoutPlan, active_plan.id).status is WorkoutPlanStatus.ACTIVE
+    assert db.get(WorkoutPlan, active_plan.id).status is WorkoutPlanStatus.SUPERSEDED
+    assert db.query(WorkoutPlan).filter(
+        WorkoutPlan.user_id == user.id,
+        WorkoutPlan.status.in_([WorkoutPlanStatus.ACTIVE, WorkoutPlanStatus.PENDING_REVIEW]),
+    ).count() == 1
+
+
+def test_generation_reuses_the_current_pending_plan(db: Session) -> None:
+    user = _user_with_profile(db)
+    _seed_candidates(db)
+    service = _service(db)
+
+    first = asyncio.run(service.generate(user.id))
+    second = asyncio.run(service.generate(user.id))
+
+    assert second.plan.id == first.plan.id
+    assert second.reused
+    assert second.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 1
+    assert db.query(WorkoutPlanReview).filter_by(user_id=user.id).count() == 1
 
 
 def test_generation_uses_the_deterministic_domain_engine(db: Session) -> None:
@@ -1134,6 +1153,55 @@ def test_ai_provider_unavailable_falls_back_to_one_deterministic_reviewable_plan
     assert generation.status is WorkoutGenerationStatus.SUCCEEDED
     assert generation.provider == "fitsho_domain"
     assert generation.workout_plan_id == result.plan.id
+
+
+def test_ai_generation_reuses_the_current_pending_plan(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _user_with_profile(db)
+    exercises = _seed_candidates(db)
+    templates = (
+        AiCoachProgramCandidate(
+            template=_ai_template("candidate-a", (exercises[0].id, exercises[1].id)),
+            score=100,
+        ),
+        AiCoachProgramCandidate(
+            template=_ai_template("candidate-b", (exercises[1].id, exercises[0].id)),
+            score=90,
+        ),
+    )
+    monkeypatch.setattr(
+        "app.workouts.service.select_ai_coach_candidates",
+        lambda **_kwargs: templates,
+    )
+    provider = _FailingAiCoachProvider(
+        AiCoachRecommendation(
+            selected_candidate_id="candidate-a",
+            program_explanation_fa="برنامه متعادل برای شروع.",
+            day_explanations=(),
+            model_id="test-model",
+            provider_request_id=None,
+            input_tokens=None,
+            output_tokens=None,
+        )
+    )
+    service = _service(
+        db,
+        ai_coach_provider=provider,
+        generation_method="ai",
+        deterministic_fallback_enabled=False,
+    )
+
+    first = asyncio.run(service.generate(user.id))
+    second = asyncio.run(service.generate(user.id))
+
+    assert first.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert second.plan.id == first.plan.id
+    assert second.reused
+    assert provider.calls == 1
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 1
+    assert db.query(WorkoutPlanReview).filter_by(user_id=user.id).count() == 1
 
 
 @pytest.mark.parametrize(
@@ -1321,28 +1389,34 @@ def test_request_time_seed_and_priority_are_persisted(db: Session) -> None:
     assert "PRIORITY_MUSCLE_PLACED_FIRST" in result.plan.days[0].exercises[0].reason_codes
 
 
-def test_failed_replacement_preserves_previous_active_plan(db: Session) -> None:
+def test_failed_replacement_preserves_previous_active_plan(
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     user = _user_with_profile(db)
-    exercises = _seed_candidates(db)
+    _seed_candidates(db)
     active_plan = _persist_active_plan(db, user)
-    initial = asyncio.run(_service(db).generate(user.id))
-    profile = db.get(UserProfile, user.id)
-    assert profile is not None
-    profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
-    exercises[1].needs_review = True
-    db.commit()
+    original_superseded_at = active_plan.superseded_at
+    monkeypatch.setattr(
+        "app.workouts.service.generate_program",
+        lambda *_args, **_kwargs: ProgramGenerationResult(
+            program=None,
+            error_code=GenerationErrorCode.PROGRAM_VALIDATION_FAILED,
+            errors=("TEST_VALIDATION_ERROR",),
+        ),
+    )
 
-    with pytest.raises(WorkoutConstructionUnsatisfiedError):
+    with pytest.raises(WorkoutGenerationFailedError):
         asyncio.run(_service(db).generate(user.id))
 
-    generation = (
-        db.query(WorkoutPlanGeneration)
-        .filter_by(user_id=user.id, status=WorkoutGenerationStatus.FAILED)
-        .one()
-    )
-    assert generation.error_code == "UNSATISFIED_CONSTRAINT"
-    assert initial.plan.status is WorkoutPlanStatus.PENDING_REVIEW
-    assert db.get(WorkoutPlan, active_plan.id).status is WorkoutPlanStatus.ACTIVE
+    generation = db.query(WorkoutPlanGeneration).filter_by(user_id=user.id).one()
+    assert generation.status is WorkoutGenerationStatus.FAILED
+    assert generation.error_code == "PROGRAM_VALIDATION_FAILED"
+    stored = db.get(WorkoutPlan, active_plan.id)
+    assert stored is not None
+    assert stored.status is WorkoutPlanStatus.ACTIVE
+    assert stored.superseded_at == original_superseded_at
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 1
 
 
 def test_generation_in_progress_rejects_second_request(db: Session) -> None:
@@ -1378,14 +1452,16 @@ def test_expired_plan_is_replaced_with_structured_difference(db: Session) -> Non
     assert replacement.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert replacement.plan.previous_program_id == first.id
     assert replacement.plan.difference_summary["previous_program_id"] == str(first.id)
-    assert db.get(WorkoutPlan, first.id).status is WorkoutPlanStatus.ACTIVE
+    assert db.get(WorkoutPlan, first.id).status is WorkoutPlanStatus.SUPERSEDED
 
 
 def test_active_plan_is_stale_when_profile_changes(db: Session) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
-    _persist_active_plan(db, user)
-    asyncio.run(_service(db).generate(user.id))
+    first = asyncio.run(_service(db).generate(user.id))
+    first.plan.status = WorkoutPlanStatus.ACTIVE
+    first.plan.activated_at = datetime.now(UTC)
+    db.commit()
     profile = db.get(UserProfile, user.id)
     assert profile is not None
     profile.fitness_goal = FitnessGoal.IMPROVE_FITNESS
@@ -1429,10 +1505,12 @@ def test_specialist_correction_changes_signature_and_marks_active_plan_stale(
 ) -> None:
     user = _user_with_profile(db)
     _seed_candidates(db)
-    _persist_active_plan(db, user)
     resolver = _InfluenceResolver(_body_influence())
     service = _service(db, body_analysis_resolver=resolver)
     first = asyncio.run(service.generate(user.id))
+    first.plan.status = WorkoutPlanStatus.ACTIVE
+    first.plan.activated_at = datetime.now(UTC)
+    db.commit()
 
     resolver.influence = _body_influence(
         result_version_id="2e9dd8b5-a70c-493e-b7b0-9832f9999c87",
@@ -1517,6 +1595,23 @@ def test_first_month_legacy_bodyweight_uses_fixed_template_without_engine(
     assert result.plan.engine_version == "bodyweight_template_v1"
     assert result.plan.model_id == "bw-first-month-2d-v1"
     assert result.plan.aggregate_metrics["template_slug"] == "bw-first-month-2d-v1"
+
+
+def test_bodyweight_generation_reuses_the_current_pending_plan(db: Session) -> None:
+    user = _user_with_profile(db, pure_bodyweight=True)
+    profile = get_profile(db, user.id).profile
+    profile.experience_level = ExperienceLevel.FIRST_MONTH
+    _seed_bodyweight_template_catalog(db)
+    service = _service(db)
+
+    first = asyncio.run(service.generate(user.id))
+    second = asyncio.run(service.generate(user.id))
+
+    assert second.plan.id == first.plan.id
+    assert second.reused
+    assert second.plan.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert db.query(WorkoutPlan).filter_by(user_id=user.id).count() == 1
+    assert db.query(WorkoutPlanReview).filter_by(user_id=user.id).count() == 1
 
 
 def test_bodyweight_route_uses_effective_day_override(db: Session) -> None:
@@ -1740,4 +1835,3 @@ def test_all_six_supported_bodyweight_combinations_use_fixed_route_without_engin
     assert result.plan.model_id == expected_slug
     assert result.plan.aggregate_metrics["template_slug"] == expected_slug
     assert len(result.plan.days) == training_days
-

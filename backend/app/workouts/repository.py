@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.exercises.models import Exercise, ExerciseAlternative
@@ -16,6 +16,34 @@ def get_active_plan(db: Session, user_id: UUID) -> WorkoutPlan | None:
             WorkoutPlan.user_id == user_id,
             WorkoutPlan.status == WorkoutPlanStatus.ACTIVE,
             WorkoutPlan.deleted_at.is_(None),
+        )
+        .options(
+            selectinload(WorkoutPlan.days)
+            .selectinload(WorkoutDay.exercises)
+            .selectinload(WorkoutPlanExercise.exercise)
+            .selectinload(Exercise.alternatives)
+            .selectinload(ExerciseAlternative.alternative_exercise)
+        )
+    )
+
+
+def get_current_foreground_plan(db: Session, user_id: UUID) -> WorkoutPlan | None:
+    return db.scalar(
+        select(WorkoutPlan)
+        .where(
+            WorkoutPlan.user_id == user_id,
+            WorkoutPlan.status.in_(
+                [WorkoutPlanStatus.ACTIVE, WorkoutPlanStatus.PENDING_REVIEW]
+            ),
+            WorkoutPlan.deleted_at.is_(None),
+        )
+        .order_by(
+            case(
+                (WorkoutPlan.status == WorkoutPlanStatus.PENDING_REVIEW, 0),
+                else_=1,
+            ),
+            WorkoutPlan.created_at.desc(),
+            WorkoutPlan.id.desc(),
         )
         .options(
             selectinload(WorkoutPlan.days)
@@ -116,9 +144,33 @@ def persist_pending_review_plan(
     plan: WorkoutPlan,
     generation: WorkoutPlanGeneration,
 ) -> WorkoutPlan:
+    db.add(plan)
+    db.flush()
+
+    previous_plans = list(
+        db.scalars(
+            select(WorkoutPlan)
+            .where(
+                WorkoutPlan.user_id == plan.user_id,
+                WorkoutPlan.id != plan.id,
+                WorkoutPlan.status.in_(
+                    [WorkoutPlanStatus.ACTIVE, WorkoutPlanStatus.PENDING_REVIEW]
+                ),
+                WorkoutPlan.deleted_at.is_(None),
+            )
+            .with_for_update()
+        ).all()
+    )
+    now = datetime.now(UTC)
+    from app.workout_reviews.repository import supersede_open_review
+
+    for previous in previous_plans:
+        supersede_open_review(db, previous.id)
+        previous.status = WorkoutPlanStatus.SUPERSEDED
+        previous.superseded_at = now
+
     plan.status = WorkoutPlanStatus.PENDING_REVIEW
     plan.activated_at = None
-    db.add(plan)
     db.flush()
 
     generation.workout_plan = plan

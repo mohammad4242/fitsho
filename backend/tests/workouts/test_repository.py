@@ -3,12 +3,18 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import app.workouts.repository as workout_repository
 from app.auth.models import User
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workout_reviews.models import WorkoutPlanReview
 from app.workouts.enums import WorkoutGenerationStatus, WorkoutPlanStatus
 from app.workouts.models import WorkoutPlan
-from app.workouts.repository import activate_plan, create_generation, get_active_plan
+from app.workouts.repository import (
+    activate_plan,
+    create_generation,
+    get_active_plan,
+    persist_pending_review_plan,
+)
 
 
 def make_user(db: Session) -> User:
@@ -97,3 +103,111 @@ def test_activate_plan_creates_review_and_supersedes_previous_open_review(db: Se
     assert previous_review.status is WorkoutReviewStatus.SUPERSEDED
     assert replacement_review is not None
     assert replacement_review.status is WorkoutReviewStatus.PENDING
+
+
+def test_persist_pending_review_plan_supersedes_previous_active_plan(db: Session) -> None:
+    user = make_user(db)
+    previous = new_plan(user.id, "a" * 64)
+    previous.status = WorkoutPlanStatus.ACTIVE
+    db.add(previous)
+    db.flush()
+    generation = create_generation(
+        db,
+        user_id=user.id,
+        provider="fake",
+        model_id="fake-model",
+        candidate_count=1,
+    )
+    replacement = new_plan(user.id, "c" * 64)
+
+    persist_pending_review_plan(db, replacement, generation)
+
+    foreground = list(
+        db.scalars(
+            select(WorkoutPlan).where(
+                WorkoutPlan.user_id == user.id,
+                WorkoutPlan.status.in_(
+                    [WorkoutPlanStatus.ACTIVE, WorkoutPlanStatus.PENDING_REVIEW]
+                ),
+            )
+        ).all()
+    )
+    review = db.scalar(
+        select(WorkoutPlanReview).where(WorkoutPlanReview.source_plan_id == replacement.id)
+    )
+    assert previous.status is WorkoutPlanStatus.SUPERSEDED
+    assert previous.superseded_at is not None
+    assert replacement.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert replacement.activated_at is None
+    assert [plan.id for plan in foreground] == [replacement.id]
+    assert review is not None
+    assert review.status is WorkoutReviewStatus.PENDING
+
+
+def test_persist_pending_review_plan_supersedes_previous_pending_review_and_open_review(
+    db: Session,
+) -> None:
+    user = make_user(db)
+    previous = new_plan(user.id, "a" * 64)
+    previous.status = WorkoutPlanStatus.PENDING_REVIEW
+    previous_review = WorkoutPlanReview(source_plan=previous, user_id=user.id)
+    db.add_all([previous, previous_review])
+    db.flush()
+    generation = create_generation(
+        db,
+        user_id=user.id,
+        provider="fake",
+        model_id="fake-model",
+        candidate_count=1,
+    )
+    replacement = new_plan(user.id, "c" * 64)
+
+    persist_pending_review_plan(db, replacement, generation)
+
+    assert previous.status is WorkoutPlanStatus.SUPERSEDED
+    assert previous.superseded_at is not None
+    assert previous_review.status is WorkoutReviewStatus.SUPERSEDED
+    assert replacement.status is WorkoutPlanStatus.PENDING_REVIEW
+    current_foreground_plan = getattr(workout_repository, "get_current_foreground_plan", None)
+    assert callable(current_foreground_plan)
+    if callable(current_foreground_plan):
+        assert current_foreground_plan(db, user.id) is replacement
+
+
+def test_persist_pending_review_plan_cleans_up_legacy_active_and_pending_plans(
+    db: Session,
+) -> None:
+    user = make_user(db)
+    active = new_plan(user.id, "a" * 64)
+    active.status = WorkoutPlanStatus.ACTIVE
+    pending = new_plan(user.id, "b" * 64)
+    pending.status = WorkoutPlanStatus.PENDING_REVIEW
+    pending_review = WorkoutPlanReview(source_plan=pending, user_id=user.id)
+    db.add_all([active, pending, pending_review])
+    db.flush()
+    generation = create_generation(
+        db,
+        user_id=user.id,
+        provider="fake",
+        model_id="fake-model",
+        candidate_count=1,
+    )
+    replacement = new_plan(user.id, "c" * 64)
+
+    persist_pending_review_plan(db, replacement, generation)
+
+    foreground = list(
+        db.scalars(
+            select(WorkoutPlan).where(
+                WorkoutPlan.user_id == user.id,
+                WorkoutPlan.status.in_(
+                    [WorkoutPlanStatus.ACTIVE, WorkoutPlanStatus.PENDING_REVIEW]
+                ),
+            )
+        ).all()
+    )
+    assert active.status is WorkoutPlanStatus.SUPERSEDED
+    assert pending.status is WorkoutPlanStatus.SUPERSEDED
+    assert pending_review.status is WorkoutReviewStatus.SUPERSEDED
+    assert replacement.status is WorkoutPlanStatus.PENDING_REVIEW
+    assert [plan.id for plan in foreground] == [replacement.id]

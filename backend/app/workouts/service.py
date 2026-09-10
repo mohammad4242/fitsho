@@ -110,6 +110,7 @@ from app.workouts.repository import (
     create_generation,
     fail_generation,
     get_active_plan,
+    get_current_foreground_plan,
     get_latest_completed_generation_at,
     persist_pending_review_plan,
 )
@@ -334,13 +335,13 @@ class WorkoutGenerationService:
             catalog_hash,
             context.template_fingerprint,
         )
-        active_plan = get_active_plan(self._db, request.user_id)
+        current_plan = get_current_foreground_plan(self._db, request.user_id)
         if (
-            active_plan is not None
-            and active_plan.generation_signature == signature
-            and not self._is_plan_expired(active_plan)
+            current_plan is not None
+            and current_plan.generation_signature == signature
+            and not self._is_plan_expired(current_plan)
         ):
-            return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
+            return WorkoutPlanGenerationResult(plan=current_plan, reused=True)
 
         self._enforce_cooldown(request.user_id)
         generation = self._start_generation(request.user_id, len(catalog))
@@ -414,7 +415,7 @@ class WorkoutGenerationService:
                 catalog_hash=catalog_hash,
                 catalog=catalog,
                 program=program,
-                previous=active_plan,
+                previous=current_plan,
             )
             generation.provider = "fitsho_bodyweight_template"
             generation.model_id = template.slug
@@ -463,13 +464,13 @@ class WorkoutGenerationService:
         references = load_template_references(self._db)
         reference_hash = self._template_reference_hash(references)
         signature = self._generation_signature(request, catalog_hash, reference_hash)
-        active_plan = get_active_plan(self._db, user_id)
+        current_plan = get_current_foreground_plan(self._db, user_id)
         if (
-            active_plan is not None
-            and active_plan.generation_signature == signature
-            and not self._is_plan_expired(active_plan)
+            current_plan is not None
+            and current_plan.generation_signature == signature
+            and not self._is_plan_expired(current_plan)
         ):
-            return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
+            return WorkoutPlanGenerationResult(plan=current_plan, reused=True)
 
         self._enforce_cooldown(user_id)
         if generation is None:
@@ -562,7 +563,7 @@ class WorkoutGenerationService:
                 catalog_hash=catalog_hash,
                 catalog=catalog,
                 program=result.program,
-                previous=active_plan,
+                previous=current_plan,
             )
             if fallback_reason_code is not None:
                 plan.warnings = [*plan.warnings, "AI_REASONING_FALLBACK"]
@@ -733,13 +734,13 @@ class WorkoutGenerationService:
         signature = self._ai_coach_generation_signature(
             profile, library_candidates, eligible_exercises
         )
-        active_plan = get_active_plan(self._db, user_id)
+        current_plan = get_current_foreground_plan(self._db, user_id)
         if (
-            active_plan is not None
-            and active_plan.generation_signature == signature
-            and not self._is_plan_expired(active_plan)
+            current_plan is not None
+            and current_plan.generation_signature == signature
+            and not self._is_plan_expired(current_plan)
         ):
-            return WorkoutPlanGenerationResult(plan=active_plan, reused=True)
+            return WorkoutPlanGenerationResult(plan=current_plan, reused=True)
         self._enforce_cooldown(user_id)
         catalog = {item.id: item for item in self._load_catalog(profile.sex)}
         payloads = tuple(
