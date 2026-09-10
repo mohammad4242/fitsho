@@ -6,7 +6,7 @@ import type { ReactTestInstance } from "react-test-renderer";
 
 jest.mock("expo-router", () => ({ useRouter: jest.fn() }));
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
-jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
+jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({ play: () => undefined }) }));
 
 import { useRouter } from "expo-router";
 
@@ -59,10 +59,21 @@ test("keeps the Web hero hierarchy in a concise native entry", () => {
   expect(findAncestorStyle(screen.getByText("تو را می‌شناسیم"), "flexDirection")).toMatchObject({ flexDirection: "row" });
 });
 
+test("renders the Web cinematic film and scroll-driven landing story", () => {
+  renderEntry();
+
+  expect(screen.getByTestId("public-entry-scroll")).toBeTruthy();
+  expect(screen.getByTestId("public-entry-film")).toBeTruthy();
+  expect(screen.getByTestId("public-entry-meal-scan")).toBeTruthy();
+  expect(screen.getByTestId("public-entry-process-step-understand")).toBeTruthy();
+  expect(screen.getByTestId("public-entry-body-analysis")).toBeTruthy();
+});
+
 test("keeps native entry actions connected to public onboarding and auth", () => {
   renderEntry();
 
   fireEvent.press(screen.getByRole("button", { name: "برنامه من را بساز" }));
+  fireEvent.press(screen.getByRole("button", { name: "باز کردن منو" }));
   fireEvent.press(screen.getByRole("button", { name: "ورود" }));
 
   expect(mockPush.mock.calls).toEqual([
