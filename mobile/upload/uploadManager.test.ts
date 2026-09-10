@@ -6,7 +6,6 @@ import { MobilePerformanceRecorder } from "../platform/performance";
 
 import {
   createTransportUploadExecutor,
-  OfflineUploadError,
   UploadCancellationError,
   UploadManager,
 } from "./uploadManager";
@@ -30,17 +29,21 @@ function job(operation: UploadOperation = "tracking") {
   } as const;
 }
 
-it("rejects protected offline uploads instead of silently queueing them", () => {
-  const executor = vi.fn();
+it("attempts protected uploads when reachability is stale instead of queueing them", async () => {
+  const executor = vi.fn(async <TResponse>() => ({ uploaded: true }) as TResponse);
   const manager = new UploadManager({
     executor: executor as unknown as UploadExecutor,
     isOnline: () => false,
   });
 
   for (const operation of ["photo", "medical", "consent", "plan-edit"] as const) {
-    expect(() => manager.enqueue(job(operation))).toThrow(OfflineUploadError);
+    const handle = manager.enqueue<{ uploaded: boolean }>({
+      ...job(operation),
+      idempotencyKey: `${operation}-upload-key`,
+    });
+    await expect(handle.promise).resolves.toEqual({ uploaded: true });
   }
-  expect(executor).not.toHaveBeenCalled();
+  expect(executor).toHaveBeenCalledTimes(4);
 });
 
 it("queues safe tracking uploads and flushes each idempotency key once after reconnect", async () => {

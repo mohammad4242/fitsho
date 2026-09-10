@@ -232,10 +232,6 @@ export class UploadManager {
     if (existing !== undefined) {
       return this.createHandle(existing as UploadEntry<TResponse>);
     }
-    if (!this.isOnline() && !isQueueableUploadOperation(job.operation)) {
-      throw new OfflineUploadError(job.operation);
-    }
-
     let resolvePromise!: (value: TResponse) => void;
     let rejectPromise!: (reason?: unknown) => void;
     const entry: UploadEntry<TResponse> = {
@@ -255,7 +251,7 @@ export class UploadManager {
     };
     this.entries.set(idempotencyKey, entry as UploadEntry<unknown>);
     this.emit(entry);
-    if (this.isOnline()) {
+    if (this.isOnline() || !isQueueableUploadOperation(job.operation)) {
       void this.run(entry);
     }
     return this.createHandle(entry);
@@ -307,7 +303,11 @@ export class UploadManager {
   }
 
   private async run<TResponse>(entry: UploadEntry<TResponse>): Promise<void> {
-    if (entry.status !== "queued" || entry.cancellation.signal.aborted || !this.isOnline()) {
+    if (
+      entry.status !== "queued" ||
+      entry.cancellation.signal.aborted ||
+      (!this.isOnline() && isQueueableUploadOperation(entry.job.operation))
+    ) {
       return;
     }
     entry.status = "uploading";
