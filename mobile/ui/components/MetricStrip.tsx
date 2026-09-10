@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { fiticianTokens } from "../tokens";
+import { RTL_ROW, RTL_TEXT } from "../rtl";
 
 export interface MetricStripItem {
   readonly accent?: string;
@@ -15,7 +16,7 @@ export interface MetricStripProps {
 
 export function MetricStrip({ items, style }: MetricStripProps) {
   return (
-    <View style={[styles.strip, style]}>
+    <View style={[styles.strip, RTL_ROW, style]}>
       {items.map((item, index) => (
         <View key={`${item.label}-${index}`} style={[styles.item, index > 0 && styles.divided]}>
           {item.accent ? <View style={[styles.dot, { backgroundColor: item.accent }]} /> : null}
@@ -46,26 +47,25 @@ const styles = StyleSheet.create({
     paddingVertical: fiticianTokens.spacing[3],
   },
   label: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 10,
     textAlign: "center",
-    writingDirection: "rtl",
   },
   strip: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    flexDirection: "row",
     overflow: "hidden",
   },
   value: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "center",
-    writingDirection: "rtl",
   },
 });

@@ -10,10 +10,11 @@ import {
 } from "react-native";
 
 import type { FiticianIconName } from "../icons";
+import { getRowDirectionStyle, getTextDirectionStyle, type FiticianDirection } from "../rtl";
 import { fiticianTokens } from "../tokens";
 import { AppIcon } from "./AppIcon";
 
-export type GroupedListDirection = "rtl" | "ltr";
+export type GroupedListDirection = FiticianDirection;
 
 export interface GroupedListItem {
   readonly accessibilityHint?: string;
@@ -39,7 +40,7 @@ export interface GroupedListProps {
 }
 
 export function GroupedList({ direction = "rtl", sections, style, testID }: GroupedListProps) {
-  const isRtl = direction === "rtl";
+  const textStyle = getTextDirectionStyle(direction);
 
   return (
     <View
@@ -51,7 +52,7 @@ export function GroupedList({ direction = "rtl", sections, style, testID }: Grou
           {section.title ? (
             <Text
               accessibilityRole="header"
-              style={[styles.sectionTitle, { textAlign: isRtl ? "right" : "left", writingDirection: direction }]}
+              style={[styles.sectionTitle, textStyle]}
             >
               {section.title}
             </Text>
@@ -60,6 +61,7 @@ export function GroupedList({ direction = "rtl", sections, style, testID }: Grou
             const unavailable = item.disabled === true;
             const rowStyle: StyleProp<ViewStyle> = [
               styles.row,
+              getRowDirectionStyle(direction),
               itemIndex > 0 && styles.divided,
               unavailable && styles.disabledRow,
             ];
@@ -70,7 +72,7 @@ export function GroupedList({ direction = "rtl", sections, style, testID }: Grou
                   <Text
                     allowFontScaling
                     numberOfLines={2}
-                    style={[styles.label, { textAlign: isRtl ? "right" : "left", writingDirection: direction }]}
+                    style={[styles.label, textStyle]}
                   >
                     {item.label}
                   </Text>
@@ -78,7 +80,7 @@ export function GroupedList({ direction = "rtl", sections, style, testID }: Grou
                     <Text
                       allowFontScaling
                       numberOfLines={2}
-                      style={[styles.subtitle, { textAlign: isRtl ? "right" : "left", writingDirection: direction }]}
+                      style={[styles.subtitle, textStyle]}
                     >
                       {item.subtitle}
                     </Text>

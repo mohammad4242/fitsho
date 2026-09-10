@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { RTL_LAYOUT, RTL_TEXT, getTextDirectionStyle } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export interface FormFieldProps {
@@ -32,7 +33,7 @@ export function FormField({
   const statusMessage = error ?? description;
 
   return (
-    <View style={[styles.field, style]}>
+    <View style={[styles.field, RTL_LAYOUT, style]}>
       {label ? (
         <Text style={styles.label}>
           {label}
@@ -67,7 +68,9 @@ export function TextField({
   textDirection = "rtl",
   ...textInputProps
 }: TextFieldProps) {
-  const textAlign = textDirection === "rtl" ? "right" : textDirection === "ltr" ? "left" : undefined;
+  const textStyle = textDirection === "auto"
+    ? { textAlign: undefined, writingDirection: "auto" as const }
+    : getTextDirectionStyle(textDirection);
 
   return (
     <FormField error={error} description={hint} label={label} required={required}>
@@ -81,7 +84,7 @@ export function TextField({
           styles.input,
           textInputProps.editable === false && styles.inputDisabled,
           error && styles.inputError,
-          { textAlign, writingDirection: textDirection },
+          textStyle,
           style,
         ]}
       />
@@ -100,6 +103,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
   },
   input: {
+    ...RTL_TEXT,
     backgroundColor: fiticianTokens.colors.surface,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
@@ -110,7 +114,6 @@ const styles = StyleSheet.create({
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[4],
     paddingVertical: fiticianTokens.spacing[3],
-    writingDirection: "rtl",
   },
   inputDisabled: {
     opacity: 0.58,
@@ -119,21 +122,19 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.danger,
   },
   label: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.medium,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   required: {
     color: fiticianTokens.colors.coral,
   },
   status: {
+    ...RTL_TEXT,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 18,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
 });

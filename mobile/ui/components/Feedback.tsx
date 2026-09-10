@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { fiticianTokens } from "../tokens";
+import { RTL_LAYOUT, RTL_TEXT } from "../rtl";
 import { Button } from "./Button";
 
 export interface SkeletonProps {
@@ -82,7 +83,7 @@ export function Notice({
     <View
       accessibilityLiveRegion={variant === "danger" ? "assertive" : "polite"}
       accessibilityRole="alert"
-      style={[styles.notice, noticeStyles[variant], compact && styles.compactNotice]}
+      style={[styles.notice, RTL_LAYOUT, noticeStyles[variant], compact && styles.compactNotice]}
     >
       {title ? <Text style={[styles.noticeTitle, compact && styles.compactTitle]}>{title}</Text> : null}
       <Text style={[styles.noticeMessage, compact && styles.compactMessage]}>{message}</Text>
@@ -102,7 +103,7 @@ export interface EmptyStateProps {
 
 export function EmptyState({ actionLabel, children, onAction, title }: EmptyStateProps) {
   return (
-    <View style={styles.emptyState}>
+    <View style={[styles.emptyState, RTL_LAYOUT]}>
       <Text style={styles.noticeTitle}>{title}</Text>
       {typeof children === "string" ? <Text style={styles.noticeMessage}>{children}</Text> : children}
       {actionLabel && onAction ? (
@@ -138,21 +139,19 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[4],
   },
   noticeMessage: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 22,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   noticeTitle: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 24,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   skeleton: {
     backgroundColor: fiticianTokens.colors.surfaceRaised,

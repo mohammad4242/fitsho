@@ -8,9 +8,10 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { getRowDirectionStyle, getTextDirectionStyle, type FiticianDirection } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
-export type PageHeadingDirection = "rtl" | "ltr";
+export type PageHeadingDirection = FiticianDirection;
 
 export interface PageHeadingProps extends Pick<ViewProps, "testID"> {
   readonly action?: ReactNode;
@@ -32,14 +33,13 @@ export function PageHeading({
   testID,
   title,
 }: PageHeadingProps) {
-  const isRtl = direction === "rtl";
-  const textStyle = { textAlign: isRtl ? "right" : "left", writingDirection: direction } as const;
+  const textStyle = getTextDirectionStyle(direction);
 
   return (
     <View
       style={[
         styles.container,
-        { direction, flexDirection: "row" },
+        getRowDirectionStyle(direction),
         style,
       ]}
       testID={testID}

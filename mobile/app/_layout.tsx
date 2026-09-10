@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname } from "expo-router";
-import { InteractionManager } from "react-native";
+import { InteractionManager, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { createMobileQueryClient } from "../data/queryClient";
@@ -25,7 +25,7 @@ import { configureNotificationRuntime } from "../notifications/notificationRunti
 import { NotificationRoutingBootstrap } from "../notifications/NotificationRoutingBootstrap";
 import { MobileRouteStateProviderFromAuth } from "../ui/navigation/RouteGuards";
 import { AndroidBackBehaviorProvider } from "../ui/navigation/BackBehaviorProvider";
-import { configureFiticianRtl } from "../ui/rtl";
+import { RTL_LAYOUT, configureFiticianRtl } from "../ui/rtl";
 import "../platform/backgroundSync";
 
 const queryClient = createMobileQueryClient();
@@ -92,21 +92,29 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ScreenTransitionPerformanceBootstrap />
-      <MobileAuthProvider>
-        <E2ERoleNavigator />
-        <NotificationPermissionBootstrap />
-        <NotificationRoutingBootstrap />
-        <MobileRouteStateProviderFromAuth>
-          <AndroidBackBehaviorProvider>
-            <QueryClientProvider client={queryClient}>
-              <MobileQueryCacheBoundary>
-                <Stack screenOptions={{ headerShown: false }} />
-              </MobileQueryCacheBoundary>
-            </QueryClientProvider>
-          </AndroidBackBehaviorProvider>
-        </MobileRouteStateProviderFromAuth>
-      </MobileAuthProvider>
+      <View style={[styles.appRoot, RTL_LAYOUT]}>
+        <ScreenTransitionPerformanceBootstrap />
+        <MobileAuthProvider>
+          <E2ERoleNavigator />
+          <NotificationPermissionBootstrap />
+          <NotificationRoutingBootstrap />
+          <MobileRouteStateProviderFromAuth>
+            <AndroidBackBehaviorProvider>
+              <QueryClientProvider client={queryClient}>
+                <MobileQueryCacheBoundary>
+                  <Stack screenOptions={{ headerShown: false }} />
+                </MobileQueryCacheBoundary>
+              </QueryClientProvider>
+            </AndroidBackBehaviorProvider>
+          </MobileRouteStateProviderFromAuth>
+        </MobileAuthProvider>
+      </View>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  appRoot: {
+    flex: 1,
+  },
+});

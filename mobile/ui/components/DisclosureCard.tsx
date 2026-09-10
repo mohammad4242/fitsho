@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { getRowDirectionStyle, getTextDirectionStyle, type FiticianDirection } from "../rtl";
 import { fiticianTokens as tokens } from "../tokens";
 import type { FiticianIconName } from "../icons";
 import { AppIcon } from "./AppIcon";
@@ -14,7 +15,7 @@ export interface DisclosureCardProps {
   readonly children: ReactNode;
   readonly expanded?: boolean;
   readonly defaultExpanded?: boolean;
-  readonly direction?: "rtl" | "ltr";
+  readonly direction?: FiticianDirection;
   readonly onExpandedChange?: (expanded: boolean) => void;
   readonly style?: StyleProp<ViewStyle>;
 }
@@ -25,8 +26,10 @@ export function DisclosureCard({ title, summary, icon, leading, trailing, childr
   const visible = expanded ?? open;
   // Keep visited forms mounted so closing a group cannot discard local edits.
   const [visited, setVisited] = useState(defaultExpanded || expanded === true);
+  const textStyle = getTextDirectionStyle(direction);
+
   return (
-    <Card style={[styles.card, direction === "ltr" && styles.ltr, style]}>
+    <Card direction={direction} style={[styles.card, style]}>
       <Pressable
         accessibilityLabel={title}
         accessibilityHint={summary}
@@ -37,12 +40,12 @@ export function DisclosureCard({ title, summary, icon, leading, trailing, childr
           if (expanded === undefined) setOpen(!visible);
           onExpandedChange?.(!visible);
         }}
-        style={({ pressed }) => [styles.header, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.header, getRowDirectionStyle(direction), pressed && styles.pressed]}
       >
         {leading ?? (icon ? <AppIcon name={icon} color={tokens.colors.aqua} /> : null)}
         <View style={styles.copy}>
-          <Text style={[styles.title, direction === "ltr" && styles.titleLtr]}>{title}</Text>
-          {summary ? <Text style={[styles.summary, direction === "ltr" && styles.summaryLtr]}>{summary}</Text> : null}
+          <Text style={[styles.title, direction === "ltr" && styles.titleLtr, textStyle]}>{title}</Text>
+          {summary ? <Text style={[styles.summary, direction === "ltr" && styles.summaryLtr, textStyle]}>{summary}</Text> : null}
         </View>
         {trailing}
         <AppIcon name={visible ? "chevronUp" : "chevronDown"} color={tokens.colors.aqua} />
@@ -57,13 +60,12 @@ export function DisclosureCard({ title, summary, icon, leading, trailing, childr
 
 const styles = StyleSheet.create({
   card: { padding: 0, overflow: "hidden" },
-  ltr: { direction: "ltr" },
-  header: { minHeight: tokens.layout.minimumTouchTarget, padding: tokens.spacing[3], gap: tokens.spacing[3], flexDirection: "row", alignItems: "center" },
+  header: { minHeight: tokens.layout.minimumTouchTarget, padding: tokens.spacing[3], gap: tokens.spacing[3], alignItems: "center" },
   copy: { alignItems: "stretch", flex: 1, minWidth: 0, gap: tokens.spacing[1] },
-  title: { color: tokens.colors.ink, fontFamily: tokens.typography.fontFamily.bodyPersian, fontSize: tokens.typography.fontSize.body, fontWeight: tokens.typography.fontWeight.bold, textAlign: "right", writingDirection: "rtl" },
-  titleLtr: { fontFamily: tokens.typography.fontFamily.bodyEnglish, textAlign: "left", writingDirection: "ltr" },
-  summary: { color: tokens.colors.muted, fontFamily: tokens.typography.fontFamily.bodyPersian, fontSize: tokens.typography.fontSize.xs, textAlign: "right", writingDirection: "rtl" },
-  summaryLtr: { fontFamily: tokens.typography.fontFamily.bodyEnglish, textAlign: "left", writingDirection: "ltr" },
+  title: { color: tokens.colors.ink, fontFamily: tokens.typography.fontFamily.bodyPersian, fontSize: tokens.typography.fontSize.body, fontWeight: tokens.typography.fontWeight.bold },
+  titleLtr: { fontFamily: tokens.typography.fontFamily.bodyEnglish },
+  summary: { color: tokens.colors.muted, fontFamily: tokens.typography.fontFamily.bodyPersian, fontSize: tokens.typography.fontSize.xs },
+  summaryLtr: { fontFamily: tokens.typography.fontFamily.bodyEnglish },
   body: { padding: tokens.spacing[4], gap: tokens.spacing[3], borderTopWidth: 1, borderTopColor: tokens.colors.line },
   hidden: { display: "none" },
   pressed: { opacity: 0.8 },

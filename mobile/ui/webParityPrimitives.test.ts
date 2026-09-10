@@ -158,18 +158,26 @@ test("keeps shared Persian headers and disclosure copy on the logical RTL side",
   expect(flattenStyle(findHostByProps(sectionRenderer, { children: "تنظیمات" }).parent?.props.style)).toMatchObject({
     alignItems: "stretch",
   });
+  expect(flattenStyle(sectionViews[0]?.props.style)).toMatchObject({
+    direction: "rtl",
+    flexDirection: "row",
+  });
 
   const screenRenderer = render(
     createElement(ScreenHeader, { subtitle: "توضیحات فارسی", title: "داشبورد" }),
   );
   const screenViews = screenRenderer.root.findAll((node) => String(node.type) === "View");
+  expect(flattenStyle(screenViews[0]?.props.style)).toMatchObject({ direction: "rtl" });
   expect(flattenStyle(screenViews[2]?.props.style).alignItems).toBe("stretch");
 
   const disclosureRenderer = render(
     createElement(DisclosureCard, { summary: "خلاصه فارسی", title: "جزئیات", children: "محتوا" }),
   );
   const disclosureHeader = disclosureRenderer.root.find((node) => String(node.type) === "Pressable");
-  expect(flattenStyle(disclosureHeader.props.style).flexDirection).toBe("row");
+  expect(flattenStyle(disclosureHeader.props.style)).toMatchObject({
+    direction: "rtl",
+    flexDirection: "row",
+  });
   expect(flattenStyle(findHostByProps(disclosureRenderer, { children: "جزئیات" }).parent?.props.style)).toMatchObject({
     alignItems: "stretch",
   });

@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { expect, it, vi } from "vitest";
 import { type ReactNode } from "react";
 
@@ -60,6 +59,14 @@ function element(value: unknown): NativeElement {
   return current as NativeElement;
 }
 
+function flattenStyle(style: unknown): Record<string, unknown> {
+  const resolved = typeof style === "function" ? style({ pressed: false }) : style;
+  const values = Array.isArray(resolved) ? resolved.flat(Infinity) : [resolved];
+  return Object.assign({}, ...values.filter((value): value is Record<string, unknown> => (
+    typeof value === "object" && value !== null
+  )));
+}
+
 it("renders token-based button variants and exposes busy state", () => {
   const result = element(
     Button({ label: "Save", loading: true, variant: "primary", onPress: vi.fn() }),
@@ -91,11 +98,31 @@ it("renders fields through a shared form-field shell with error feedback", () =>
   expect(element(children[1]).props.allowFontScaling).toBe(true);
 });
 
-it("lets native RTL own modal layout direction", async () => {
-  const source = await readFile(new URL("./components/Overlay.tsx", import.meta.url), "utf8");
+it("applies the shared RTL boundary to cards, forms, and modal surfaces", () => {
+  const card = element(Card({ children: "محتوا" }));
+  expect(flattenStyle(card.props.style)).toMatchObject({ direction: "rtl" });
 
-  expect(source).not.toContain('direction: "rtl"');
-  expect(source).toContain('flexDirection: "row"');
+  const field = element(TextField({ label: "نام", value: "علی", onChangeText: vi.fn() }));
+  expect(flattenStyle(field.props.style)).toMatchObject({ direction: "rtl" });
+
+  const sheet = element(Sheet({ title: "جزئیات", visible: true, onClose: vi.fn(), children: "بدنه" }));
+  expect(flattenStyle(element(sheet.props.children).props.style)).toMatchObject({ direction: "rtl" });
+
+  const dialog = element(Dialog({ message: "حذف شود؟", visible: true, onClose: vi.fn() }));
+  expect(flattenStyle(element(dialog.props.children).props.style)).toMatchObject({ direction: "rtl" });
+});
+
+it("keeps technical input values locally LTR inside the Persian form shell", () => {
+  const field = element(
+    TextField({ label: "ایمیل", textDirection: "ltr", value: "user@example.com", onChangeText: vi.fn() }),
+  );
+  const input = element((field.props.children as readonly unknown[])[1]);
+
+  expect(flattenStyle(field.props.style)).toMatchObject({ direction: "rtl" });
+  expect(flattenStyle(input.props.style)).toMatchObject({
+    textAlign: "left",
+    writingDirection: "ltr",
+  });
 });
 
 it("preserves font scaling and source order for the shared button label", () => {

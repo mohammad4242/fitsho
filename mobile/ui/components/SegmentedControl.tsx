@@ -9,9 +9,10 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { getRowDirectionStyle, getTextDirectionStyle, type FiticianDirection } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
-export type SegmentedControlDirection = "rtl" | "ltr";
+export type SegmentedControlDirection = FiticianDirection;
 
 export interface SegmentedControlOption {
   readonly label: string;
@@ -47,7 +48,7 @@ export function SegmentedControl({
     <View
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="radiogroup"
-      style={[styles.container, { direction, flexDirection: "row" }, style]}
+      style={[styles.container, getRowDirectionStyle(direction), style]}
       testID={testID}
     >
       {options.map((option) => {
@@ -72,7 +73,7 @@ export function SegmentedControl({
           >
             <Text
               allowFontScaling
-              style={[styles.label, selected && styles.selectedLabel, { writingDirection: direction }]}
+              style={[styles.label, selected && styles.selectedLabel, getTextDirectionStyle(direction, "center")]}
             >
               {option.label}
             </Text>

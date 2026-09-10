@@ -11,6 +11,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { RTL_CENTER_TEXT, RTL_ROW } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
@@ -116,9 +117,9 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
+    ...RTL_ROW,
     alignItems: "center",
     borderRadius: fiticianTokens.radii.pill,
-    flexDirection: "row",
     justifyContent: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     minWidth: fiticianTokens.layout.minimumTouchTarget,
@@ -129,12 +130,11 @@ const styles = StyleSheet.create({
     opacity: 0.48,
   },
   label: {
+    ...RTL_CENTER_TEXT,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 24,
-    textAlign: "center",
-    writingDirection: "rtl",
   },
   pressed: {
     opacity: 0.86,

@@ -39,6 +39,13 @@ function element(value: unknown): NativeElement {
   return current as NativeElement;
 }
 
+function flattenStyle(style: unknown): Record<string, unknown> {
+  const values = Array.isArray(style) ? style.flat(Infinity) : [style];
+  return Object.assign({}, ...values.filter((value): value is Record<string, unknown> => (
+    typeof value === "object" && value !== null
+  )));
+}
+
 it("wraps scrollable content in safe-area and keyboard-aware native containers", () => {
   const safeArea = element(Screen({ children: "form" }));
   const keyboard = element(safeArea.props.children);
@@ -51,6 +58,9 @@ it("wraps scrollable content in safe-area and keyboard-aware native containers",
   expect(keyboard.props.keyboardVerticalOffset).toBe(24);
   expect(scroll.type).toBe("ScrollView");
   expect(scroll.props.keyboardShouldPersistTaps).toBe("handled");
+  expect(flattenStyle(safeArea.props.style)).toMatchObject({ direction: "rtl" });
+  expect(flattenStyle(keyboard.props.style)).toMatchObject({ direction: "rtl" });
+  expect(flattenStyle(scroll.props.contentContainerStyle)).toMatchObject({ direction: "rtl" });
 });
 
 it("uses tablet gutters and reading width for non-scroll content", () => {
@@ -63,8 +73,10 @@ it("uses tablet gutters and reading width for non-scroll content", () => {
   const style = content.props.style as readonly unknown[];
 
   expect(content.type).toBe("View");
-  expect(JSON.stringify(style)).toContain('"direction":"rtl"');
-  expect(JSON.stringify(style)).toContain('"alignItems":"stretch"');
-  expect(JSON.stringify(style)).toContain('"paddingHorizontal":32');
-  expect(JSON.stringify(style)).toContain('"maxWidth":1088');
+  expect(flattenStyle(style)).toMatchObject({
+    alignItems: "stretch",
+    direction: "rtl",
+    maxWidth: 1088,
+    paddingHorizontal: 32,
+  });
 });

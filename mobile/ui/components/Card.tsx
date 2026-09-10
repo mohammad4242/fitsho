@@ -9,12 +9,14 @@ import {
 } from "react-native";
 import { type ReactNode } from "react";
 
+import { LTR_LAYOUT, RTL_LAYOUT, type FiticianDirection } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export type CardVariant = "default" | "raised" | "interactive" | "hero" | "glass";
 
 export interface CardProps extends Omit<ViewProps, "style"> {
   readonly children: ReactNode;
+  readonly direction?: FiticianDirection;
   readonly onPress?: PressableProps["onPress"];
   readonly style?: StyleProp<ViewStyle>;
   readonly variant?: CardVariant;
@@ -43,8 +45,9 @@ const variantStyles: Record<CardVariant, ViewStyle> = {
   },
 };
 
-export function Card({ children, onPress, style, variant = "default", ...viewProps }: CardProps) {
-  const cardStyle = [styles.base, variantStyles[variant], style];
+export function Card({ children, direction = "rtl", onPress, style, variant = "default", ...viewProps }: CardProps) {
+  const directionStyle = direction === "rtl" ? RTL_LAYOUT : LTR_LAYOUT;
+  const cardStyle = [styles.base, directionStyle, variantStyles[variant], style];
 
   if (!onPress) {
     return (

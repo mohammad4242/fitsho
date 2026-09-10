@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { RTL_LAYOUT, RTL_TEXT } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export interface SectionHeaderProps {
@@ -11,7 +12,7 @@ export interface SectionHeaderProps {
 
 export function SectionHeader({ actionLabel, eyebrow, onAction, title }: SectionHeaderProps) {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, RTL_LAYOUT]}>
       <View style={styles.copy}>
         {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
         <Text accessibilityRole="header" style={styles.title}>{title}</Text>
@@ -34,12 +35,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: fiticianTokens.spacing[2],
   },
   actionText: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   container: {
     alignItems: "center",
@@ -51,21 +51,20 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
+    minWidth: 0,
   },
   eyebrow: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   title: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h2,
     lineHeight: 32,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
 });

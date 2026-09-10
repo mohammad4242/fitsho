@@ -14,8 +14,11 @@ import { BottomTabBarHeightCallbackContext } from "expo-router/build/react-navig
 import { useIsKeyboardShown } from "expo-router/build/react-navigation/bottom-tabs/utils/useIsKeyboardShown";
 
 import { fiticianTokens } from "../tokens";
+import { LTR_CENTER_TEXT, RTL_CENTER_TEXT, RTL_LAYOUT, RTL_ROW } from "../rtl";
 
 const NAVIGATION_CONTENT_HEIGHT = 72;
+
+export const MEMBER_TAB_ORDER = ["index", "workouts", "nutrition", "body-analysis", "more"] as const;
 
 type NavigationIconName = "home" | "dumbbell" | "nutrition" | "progress" | "more";
 
@@ -74,7 +77,10 @@ export function MemberBottomTabBar({ state, descriptors, navigation, insets }: B
       return false;
     }
     return StyleSheet.flatten(descriptor.options.tabBarItemStyle)?.display !== "none";
-  });
+  }).sort((left, right) => (
+    MEMBER_TAB_ORDER.indexOf(left.name as (typeof MEMBER_TAB_ORDER)[number])
+    - MEMBER_TAB_ORDER.indexOf(right.name as (typeof MEMBER_TAB_ORDER)[number])
+  ));
 
   const handleLayout = (event: LayoutChangeEvent) => {
     onHeightChange?.(event.nativeEvent.layout.height);
@@ -98,6 +104,7 @@ export function MemberBottomTabBar({ state, descriptors, navigation, insets }: B
       onLayout={handleLayout}
       style={[
         styles.bar,
+        RTL_LAYOUT,
         {
           paddingBottom: Math.max(insets.bottom, 0),
           paddingLeft: Math.max(insets.left, 0),
@@ -106,7 +113,7 @@ export function MemberBottomTabBar({ state, descriptors, navigation, insets }: B
       ]}
       testID="member-bottom-tab-bar"
     >
-      <View style={styles.content}>
+      <View style={[styles.content, RTL_ROW]}>
         {visibleRoutes.map((route) => {
           const descriptor = descriptors[route.key];
           const iconName = iconByRoute[route.name];
@@ -162,7 +169,7 @@ export function MemberBottomTabBar({ state, descriptors, navigation, insets }: B
                 style={[
                   styles.label,
                   { color },
-                  isEnglish ? styles.englishLabel : styles.persianLabel,
+                  isEnglish ? [styles.englishLabel, LTR_CENTER_TEXT] : [styles.persianLabel, RTL_CENTER_TEXT],
                   focused && styles.activeLabel,
                 ]}
               >
@@ -225,7 +232,6 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   content: {
-    flexDirection: "row",
     height: NAVIGATION_CONTENT_HEIGHT,
     paddingHorizontal: 4,
   },

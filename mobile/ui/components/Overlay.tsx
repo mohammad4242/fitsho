@@ -12,6 +12,7 @@ import { type ReactNode } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { fiticianTokens } from "../tokens";
+import { RTL_LAYOUT, RTL_ROW, RTL_TEXT } from "../rtl";
 import { Button } from "./Button";
 
 interface OverlayBaseProps {
@@ -45,15 +46,15 @@ export function Sheet({
       transparent
       visible={visible}
     >
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, RTL_LAYOUT]}>
         <Pressable
           accessibilityLabel={closeLabel}
           accessibilityRole="button"
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
-        <SafeAreaView edges={["bottom"]} style={[styles.sheet, style]}>
-          <View style={styles.header}>
+        <SafeAreaView edges={["bottom"]} style={[styles.sheet, RTL_LAYOUT, style]}>
+          <View style={[styles.header, RTL_ROW]}>
             {title ? <Text accessibilityRole="header" style={styles.title}>{title}</Text> : <View />}
             <Pressable
               accessibilityLabel={closeLabel}
@@ -65,7 +66,7 @@ export function Sheet({
               <Text style={styles.closeGlyph}>×</Text>
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={[styles.content, RTL_LAYOUT]} keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
         </SafeAreaView>
@@ -108,12 +109,12 @@ export function Dialog({
       transparent
       visible={visible}
     >
-      <SafeAreaView edges={["top", "bottom"]} style={styles.dialogOverlay}>
-        <View style={styles.dialog}>
+      <SafeAreaView edges={["top", "bottom"]} style={[styles.dialogOverlay, RTL_LAYOUT]}>
+        <View style={[styles.dialog, RTL_LAYOUT]}>
           {title ? <Text accessibilityRole="header" style={styles.title}>{title}</Text> : null}
           <Text style={styles.message}>{message}</Text>
           {children}
-          <View style={styles.actions}>
+          <View style={[styles.actions, RTL_ROW]}>
             <Button label={cancelLabel} onPress={cancel} variant="ghost" />
             {onConfirm ? (
               <Button
@@ -131,7 +132,6 @@ export function Dialog({
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "flex-end",
     marginTop: fiticianTokens.spacing[5],
@@ -179,18 +179,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row",
     justifyContent: "space-between",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[4],
   },
   message: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 26,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   overlay: {
     backgroundColor: "rgba(2,6,7,0.72)",
@@ -209,13 +207,12 @@ const styles = StyleSheet.create({
     shadowRadius: fiticianTokens.shadows.focus.radius,
   },
   title: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     flex: 1,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 28,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
 });

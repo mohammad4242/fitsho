@@ -16,7 +16,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { getResponsiveLayout } from "../layoutMetrics";
-import { FITICIAN_NATIVE_DIRECTION } from "../rtl";
+import { RTL_LAYOUT } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export type ScreenContentWidth = "content" | "full" | "reading";
@@ -52,6 +52,7 @@ export function Screen({
       : responsive.contentMaxWidth;
   const contentStyle = [
     styles.content,
+    RTL_LAYOUT,
     {
       maxWidth,
       paddingHorizontal: responsive.horizontalPadding,
@@ -64,6 +65,7 @@ export function Screen({
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
+      style={RTL_LAYOUT}
     >
       {children}
     </ScrollView>
@@ -72,12 +74,12 @@ export function Screen({
   );
 
   return (
-    <SafeAreaView edges={edges} style={[styles.safeArea, style]}>
+    <SafeAreaView edges={edges} style={[styles.safeArea, RTL_LAYOUT, style]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         enabled={keyboardAware}
         keyboardVerticalOffset={keyboardVerticalOffset ?? insets.top}
-        style={styles.keyboard}
+        style={[styles.keyboard, RTL_LAYOUT]}
       >
         {body}
       </KeyboardAvoidingView>
@@ -89,7 +91,6 @@ const styles = StyleSheet.create({
   content: {
     alignItems: "stretch",
     alignSelf: "center",
-    direction: FITICIAN_NATIVE_DIRECTION,
     flexGrow: 1,
     width: "100%",
   },

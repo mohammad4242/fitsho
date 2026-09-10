@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+import { RTL_LAYOUT, RTL_ROW, RTL_TEXT } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export interface ScreenHeaderProps {
@@ -21,8 +22,8 @@ export function ScreenHeader({
   title,
 }: ScreenHeaderProps) {
   return (
-    <View style={[styles.header, compact && styles.compact]}>
-      <View style={styles.topRow}>
+    <View style={[styles.header, RTL_LAYOUT, compact && styles.compact]}>
+      <View style={[styles.topRow, RTL_ROW]}>
         <Text style={styles.brand}>{brand}</Text>
         {action}
       </View>
@@ -54,38 +55,35 @@ const styles = StyleSheet.create({
   copy: {
     alignItems: "stretch",
     gap: fiticianTokens.spacing[1],
+    minWidth: 0,
   },
   eyebrow: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   header: {
     gap: fiticianTokens.spacing[3],
     width: "100%",
   },
   subtitle: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 22,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   title: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h1,
     lineHeight: 40,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   topRow: {
     alignItems: "center",
-    flexDirection: "row",
     justifyContent: "space-between",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
   },

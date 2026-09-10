@@ -153,8 +153,8 @@ it("defines web-equivalent member bottom-bar icons and styling", async () => {
   expect(source).toContain("NAVIGATION_CONTENT_HEIGHT");
   expect(source).toContain('backgroundColor: fiticianTokens.colors.canvas');
   expect(source).toContain('borderTopWidth: 1');
-  expect(source).toMatch(/content:\s*\{[\s\S]*?flexDirection: "row"/);
-  expect(source).not.toContain('direction: "rtl"');
+  expect(source).toContain("MEMBER_TAB_ORDER");
+  expect(source).toContain("RTL_ROW");
   expect(source).toContain('display !== "none"');
   expect(source).toContain('type: "tabPress"');
   expect(source).toContain('type: "tabLongPress"');
@@ -162,6 +162,12 @@ it("defines web-equivalent member bottom-bar icons and styling", async () => {
   expect(source).toContain('accessibilityRole="button"');
   expect(source).toContain('accessibilityState={{ selected: focused }}');
   expect(source).not.toContain("surfaceTranslucent");
+});
+
+it("wraps the router in the app-wide RTL boundary", async () => {
+  const source = await readFile(resolve(appRoot, "_layout.tsx"), "utf8");
+  expect(source).toContain("RTL_LAYOUT");
+  expect(source).toContain("style={[styles.appRoot, RTL_LAYOUT]}");
 });
 
 it("keeps account deletion available to any signed-in role without admin routes", async () => {
