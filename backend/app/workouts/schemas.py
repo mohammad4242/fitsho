@@ -224,6 +224,7 @@ class WorkoutPlanResponse(BaseModel):
     created_at: datetime
     activated_at: datetime | None
     plan_duration_weeks: int
+    generation_source: Literal["internal_engine", "ai"] | None
     is_stale: bool
     days: list[WorkoutDayResponse]
     engine_version: str = "legacy_ai"

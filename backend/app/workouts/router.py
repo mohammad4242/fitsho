@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -96,6 +96,7 @@ def read_active_plan(
 )
 async def generate_plan(
     service: WorkoutGenerationServiceDependency,
+    db: DatabaseSession,
     user: CurrentUser,
     payload: ProgramGenerationOverrides | None = None,
 ) -> WorkoutPlanGenerateResponse:
@@ -154,7 +155,10 @@ async def generate_plan(
             status_code=status_code,
             detail="Workout plan generation is temporarily unavailable",
         ) from None
-    return WorkoutPlanGenerateResponse(plan=to_plan_response(result.plan), reused=result.reused)
+    return WorkoutPlanGenerateResponse(
+        plan=to_plan_response(result.plan, db=db),
+        reused=result.reused,
+    )
 
 
 @router.get("/history", response_model=list[WorkoutPlanVersionSummaryResponse])
@@ -244,6 +248,7 @@ def to_plan_response(
         created_at=plan.created_at,
         activated_at=plan.activated_at,
         plan_duration_weeks=WorkoutGenerationService.plan_duration_weeks(plan),
+        generation_source=_generation_source(plan, db),
         is_stale=is_stale,
         days=[
             WorkoutDayResponse(
@@ -302,6 +307,28 @@ def to_plan_response(
         ai_coach_program_explanation_fa=plan.ai_coach_program_explanation_fa,
         coach_review=_coach_review_response(plan, db),
     )
+
+
+def _generation_source(
+    plan: WorkoutPlan,
+    db: Session | None,
+) -> Literal["internal_engine", "ai"] | None:
+    current = plan
+    visited: set[UUID] = set()
+    while True:
+        if current.generation_method == "ai":
+            return "ai"
+        if current.generation_method == "deterministic_domain":
+            return "internal_engine"
+        if current.generation_method != "coach_review" or current.previous_program_id is None:
+            return None
+        if db is None or current.id in visited:
+            return None
+        visited.add(current.id)
+        source = db.get(WorkoutPlan, current.previous_program_id)
+        if source is None:
+            return None
+        current = source
 
 
 def _day_count_fields(exercises: list[WorkoutPlanExercise]) -> dict[str, int]:

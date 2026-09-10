@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID, uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -53,7 +54,7 @@ def _switch_user(client: TestClient, email: str) -> UUID:
     return _register(client, email)
 
 
-def _plan(db: Session, user_id: UUID) -> WorkoutPlan:
+def _plan(db: Session, user_id: UUID, *, generation_method: str = "ai") -> WorkoutPlan:
     exercise = Exercise(
         slug=f"coach-api-{uuid4().hex}",
         name_en="Chest Press",
@@ -101,7 +102,7 @@ def _plan(db: Session, user_id: UUID) -> WorkoutPlan:
         prompt_version="v1",
         generation_policy_version="v1",
         candidate_set_hash="b" * 64,
-        generation_method="ai",
+        generation_method=generation_method,
         exercise_catalog_snapshot={"exercises": {str(exercise.id): snapshot}},
     )
     day = WorkoutDay(
@@ -367,13 +368,19 @@ def test_coach_review_detail_includes_safe_athlete_summary(
     assert recommendation["difference_summary"] == []
 
 
+@pytest.mark.parametrize(
+    ("source_generation_method", "generation_source"),
+    [("ai", "ai"), ("deterministic_domain", "internal_engine")],
+)
 def test_member_history_keeps_generated_and_coach_approved_versions(
     client: TestClient,
     db: Session,
+    source_generation_method: str,
+    generation_source: str,
 ) -> None:
     member_id = _register(client, f"history-member-{uuid4()}@example.com")
     assert client.post("/api/v1/profile", headers=ORIGIN, json=PROFILE).status_code == 201
-    source = _plan(db, member_id)
+    source = _plan(db, member_id, generation_method=source_generation_method)
     review = ensure_pending_review(db, source)
     review.status = "approved"
     approved = WorkoutPlan(
@@ -402,3 +409,8 @@ def test_member_history_keeps_generated_and_coach_approved_versions(
     states = {item["id"]: item["coach_review"]["state"] for item in response.json()}
     assert states[str(source.id)] == "initial_generated"
     assert states[str(approved.id)] == "coach_approved"
+
+    response = client.get(f"/api/v1/workout-plans/{approved.id}")
+
+    assert response.status_code == 200
+    assert response.json()["generation_source"] == generation_source

@@ -73,6 +73,8 @@ def _plan(
     db: Session,
     user_id: UUID,
     status: WorkoutPlanStatus = WorkoutPlanStatus.ACTIVE,
+    *,
+    generation_method: str = "ai",
 ) -> WorkoutPlan:
     plan = WorkoutPlan(
         user_id=user_id,
@@ -84,7 +86,7 @@ def _plan(
         prompt_version="v1",
         generation_policy_version="v1",
         candidate_set_hash="b" * 64,
-        generation_method="ai",
+        generation_method=generation_method,
     )
     db.add(plan)
     db.commit()
@@ -203,6 +205,25 @@ def test_active_workout_plan_reports_backend_staleness(client: TestClient, db: S
     assert response.status_code == 200
     assert response.json()["plan_duration_weeks"] == 4
     assert response.json()["is_stale"] is True
+
+
+@pytest.mark.parametrize(
+    ("generation_method", "generation_source"),
+    [("deterministic_domain", "internal_engine"), ("ai", "ai")],
+)
+def test_workout_plan_response_exposes_normalized_generation_source(
+    client: TestClient,
+    db: Session,
+    generation_method: str,
+    generation_source: str,
+) -> None:
+    user_id = _register_and_complete_profile(client, f"generation-source-{uuid4()}@example.com")
+    plan = _plan(db, user_id, generation_method=generation_method)
+
+    response = client.get(f"/api/v1/workout-plans/{plan.id}")
+
+    assert response.status_code == 200
+    assert response.json()["generation_source"] == generation_source
 
 
 def test_active_workout_plan_returns_only_the_active_version(
