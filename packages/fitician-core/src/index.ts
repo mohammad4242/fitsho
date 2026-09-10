@@ -88,6 +88,12 @@ export type {
   MobileAuthTokens,
   RefreshTokenStorage,
 } from "./auth";
+export {
+  clampNutritionProgress,
+  nutritionProgressRatio,
+  nutritionProgressTone,
+} from "./nutrition-progress";
+export type { NutritionProgressTone } from "./nutrition-progress";
 export { ApiError } from "./transport";
 export type {
   ApiErrorObject,
