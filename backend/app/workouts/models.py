@@ -136,6 +136,7 @@ class WorkoutPlan(Base):
     )
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     days: Mapped[list[WorkoutDay]] = relationship(
         back_populates="workout_plan",

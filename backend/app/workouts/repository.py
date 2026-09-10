@@ -15,6 +15,7 @@ def get_active_plan(db: Session, user_id: UUID) -> WorkoutPlan | None:
         .where(
             WorkoutPlan.user_id == user_id,
             WorkoutPlan.status == WorkoutPlanStatus.ACTIVE,
+            WorkoutPlan.deleted_at.is_(None),
         )
         .options(
             selectinload(WorkoutPlan.days)
@@ -138,7 +139,11 @@ def get_plan_for_user(
 ) -> WorkoutPlan | None:
     return db.scalar(
         select(WorkoutPlan)
-        .where(WorkoutPlan.id == plan_id, WorkoutPlan.user_id == user_id)
+        .where(
+            WorkoutPlan.id == plan_id,
+            WorkoutPlan.user_id == user_id,
+            WorkoutPlan.deleted_at.is_(None),
+        )
         .options(
             selectinload(WorkoutPlan.days)
             .selectinload(WorkoutDay.exercises)
@@ -149,11 +154,31 @@ def get_plan_for_user(
     )
 
 
+def get_plan_for_deletion(
+    db: Session,
+    *,
+    plan_id: UUID,
+    user_id: UUID,
+) -> WorkoutPlan | None:
+    return db.scalar(
+        select(WorkoutPlan)
+        .where(
+            WorkoutPlan.id == plan_id,
+            WorkoutPlan.user_id == user_id,
+            WorkoutPlan.deleted_at.is_(None),
+        )
+        .with_for_update()
+    )
+
+
 def list_plans_for_user(db: Session, user_id: UUID) -> list[WorkoutPlan]:
     return list(
         db.scalars(
             select(WorkoutPlan)
-            .where(WorkoutPlan.user_id == user_id)
+            .where(
+                WorkoutPlan.user_id == user_id,
+                WorkoutPlan.deleted_at.is_(None),
+            )
             .options(
                 selectinload(WorkoutPlan.source_review),
                 selectinload(WorkoutPlan.approval_review),

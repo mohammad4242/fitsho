@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -17,6 +18,7 @@ from app.exercises.schemas import ExerciseSummary
 from app.profile.models import UserProfile
 from app.workout_reviews.enums import WorkoutReviewStatus
 from app.workouts.dependencies import WorkoutGenerationServiceDependency
+from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
 from app.workouts.pdf import render_workout_plan_pdf
 from app.workouts.program_engine.session_targets import (
@@ -28,7 +30,11 @@ from app.workouts.program_engine.supplemental_policy import (
     exercise_count_breakdown,
     is_core_or_supplemental_exercise,
 )
-from app.workouts.repository import get_plan_for_user, list_plans_for_user
+from app.workouts.repository import (
+    get_plan_for_deletion,
+    get_plan_for_user,
+    list_plans_for_user,
+)
 from app.workouts.schemas import (
     ProgramGenerationOverrides,
     WorkoutDayResponse,
@@ -169,6 +175,28 @@ def read_plan_history(
     ]
 
 
+@router.delete(
+    "/{plan_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def delete_plan(
+    plan_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> None:
+    plan = get_plan_for_deletion(db, plan_id=plan_id, user_id=user.id)
+    if plan is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout plan not found")
+    if plan.status not in {WorkoutPlanStatus.SUPERSEDED, WorkoutPlanStatus.FAILED}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This workout plan version cannot be deleted",
+        )
+    plan.deleted_at = datetime.now(UTC)
+    db.commit()
+
+
 @router.get(
     "/{plan_id}/pdf",
     response_class=Response,
@@ -232,9 +260,7 @@ def to_plan_response(
                     WorkoutPlanExerciseResponse(
                         id=item.id,
                         order_index=item.order_index,
-                        section=(
-                            "core" if is_core_or_supplemental_exercise(item) else "main"
-                        ),
+                        section=("core" if is_core_or_supplemental_exercise(item) else "main"),
                         sets=item.sets,
                         prescription_mode=item.prescription_mode,
                         reps_min=item.reps_min,

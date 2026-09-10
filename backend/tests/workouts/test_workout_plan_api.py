@@ -23,6 +23,11 @@ from app.exercises.models import (
     ExerciseSecondaryMuscle,
 )
 from app.exercises.taxonomy import FOCUSES_BY_MUSCLE
+from app.workout_cycles.enums import (
+    WorkoutCycleWeeklyCheckInDifficulty,
+    WorkoutCycleWeeklyCheckInRecovery,
+)
+from app.workout_cycles.models import WorkoutCycle, WorkoutCycleWeeklyCheckIn
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise, WorkoutPlanGeneration
 from app.workouts.schemas import ProgramGenerationOverrides
@@ -321,6 +326,97 @@ def test_workout_plan_pdf_is_scoped_to_its_owner(client: TestClient, db: Session
     _register_and_complete_profile(client, "pdf-other@example.com")
 
     assert client.get(f"/api/v1/workout-plans/{plan.id}/pdf").status_code == 404
+
+
+def test_member_can_soft_delete_a_superseded_plan_and_preserve_cycle_history(
+    client: TestClient, db: Session
+) -> None:
+    user_id = _register_and_complete_profile(client, "delete-superseded@example.com")
+    plan = _plan(db, user_id, status=WorkoutPlanStatus.SUPERSEDED)
+    cycle = WorkoutCycle(user_id=user_id, workout_plan_id=plan.id, duration_weeks=4)
+    check_in = WorkoutCycleWeeklyCheckIn(
+        user_id=user_id,
+        cycle=cycle,
+        week_number=1,
+        sessions_completed=2,
+        perceived_difficulty=WorkoutCycleWeeklyCheckInDifficulty.APPROPRIATE,
+        recovery_rating=WorkoutCycleWeeklyCheckInRecovery.GOOD,
+        has_pain_or_limitation=False,
+        note_optional="Historical progress",
+    )
+    db.add_all([cycle, check_in])
+    db.commit()
+
+    response = client.delete(f"/api/v1/workout-plans/{plan.id}", headers=ORIGIN)
+
+    assert response.status_code == 204
+    stored_plan = db.get(WorkoutPlan, plan.id)
+    assert stored_plan is not None
+    assert stored_plan.deleted_at is not None
+    assert db.get(WorkoutCycle, cycle.id) is not None
+    assert db.get(WorkoutCycleWeeklyCheckIn, check_in.id) is not None
+    assert all(
+        item["id"] != str(plan.id) for item in client.get("/api/v1/workout-plans/history").json()
+    )
+    assert client.get(f"/api/v1/workout-plans/{plan.id}").status_code == 404
+    assert client.get(f"/api/v1/workout-plans/{plan.id}/pdf").status_code == 404
+
+
+def test_member_can_soft_delete_a_failed_plan(client: TestClient, db: Session) -> None:
+    user_id = _register_and_complete_profile(client, "delete-failed@example.com")
+    plan = _plan(db, user_id, status=WorkoutPlanStatus.FAILED)
+
+    response = client.delete(f"/api/v1/workout-plans/{plan.id}", headers=ORIGIN)
+
+    assert response.status_code == 204
+    assert db.get(WorkoutPlan, plan.id).deleted_at is not None
+
+
+@pytest.mark.parametrize(
+    "plan_status",
+    [
+        WorkoutPlanStatus.ACTIVE,
+        WorkoutPlanStatus.PENDING_REVIEW,
+        WorkoutPlanStatus.GENERATING,
+    ],
+)
+def test_member_cannot_delete_a_non_historical_plan_status(
+    client: TestClient, db: Session, plan_status: WorkoutPlanStatus
+) -> None:
+    user_id = _register_and_complete_profile(client, f"delete-{plan_status.value}@example.com")
+    plan = _plan(db, user_id, status=plan_status)
+    original_deleted_at = getattr(plan, "deleted_at", None)
+
+    response = client.delete(f"/api/v1/workout-plans/{plan.id}", headers=ORIGIN)
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "This workout plan version cannot be deleted"}
+    assert db.get(WorkoutPlan, plan.id).deleted_at == original_deleted_at
+
+
+def test_member_cannot_delete_another_users_plan(client: TestClient, db: Session) -> None:
+    owner_id = _register_and_complete_profile(client, "delete-owner@example.com")
+    plan = _plan(db, owner_id, status=WorkoutPlanStatus.SUPERSEDED)
+    assert client.post("/api/v1/auth/logout", headers=ORIGIN).status_code == 204
+    _register_and_complete_profile(client, "delete-other@example.com")
+
+    response = client.delete(f"/api/v1/workout-plans/{plan.id}", headers=ORIGIN)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Workout plan not found"}
+    assert db.get(WorkoutPlan, plan.id).deleted_at is None
+
+
+def test_deleting_a_plan_twice_returns_not_found(client: TestClient, db: Session) -> None:
+    user_id = _register_and_complete_profile(client, "delete-twice@example.com")
+    plan = _plan(db, user_id, status=WorkoutPlanStatus.SUPERSEDED)
+
+    first = client.delete(f"/api/v1/workout-plans/{plan.id}", headers=ORIGIN)
+    second = client.delete(f"/api/v1/workout-plans/{plan.id}", headers=ORIGIN)
+
+    assert first.status_code == 204
+    assert second.status_code == 404
+    assert second.json() == {"detail": "Workout plan not found"}
 
 
 def test_workout_plan_returns_active_curated_alternatives_read_only(
