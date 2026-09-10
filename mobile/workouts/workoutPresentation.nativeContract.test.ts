@@ -21,6 +21,9 @@ it("uses the web-like workout page hierarchy without cinematic overview componen
   expect(source).toContain("زمان جلسه");
   expect(source).toContain("CoachReviewBanner");
   expect(source).toContain("reviewBanner");
+  expect(source).toContain("function PlanOverview");
+  expect(source).toContain('testID={`workout-plan-overview-${plan.id}`}');
+  expect(source).toContain('testID={`workout-plan-view-${plan.id}`}');
   expect(source).toContain("GenerationMethodSelector");
   expect(source).toContain("SegmentedControl");
   expect(source).toContain("چه کسی برنامه‌ات را بنویسد؟");
@@ -54,14 +57,29 @@ it("uses the web-like workout page hierarchy without cinematic overview componen
   const hierarchy = [
     '<View testID="workout-plan-controls"',
     "<GenerationMethodSelector",
-    "styles.pageHeader",
-    "<PlanContextStrip",
-    "<CoachReviewBanner",
+    "<PlanOverview",
     "<PlanView",
+    "<WorkoutPlanTools",
+    "<WorkoutHistory",
   ];
   const positions = hierarchy.map((marker) => renderBlock.indexOf(marker));
   expect(positions.every((position) => position >= 0)).toBe(true);
   expect(positions).toEqual([...positions].sort((left, right) => left - right));
+  expect(renderBlock.match(/<PlanView/g)).toHaveLength(1);
+  expect(renderBlock).toContain("plan={displayedPlan}");
+  expect(renderBlock).not.toContain("pendingPlanSection");
+
+  const overviewStart = source.indexOf("function PlanOverview");
+  const overviewEnd = source.indexOf("function PlanContextStrip", overviewStart);
+  const overview = source.slice(overviewStart, overviewEnd);
+  const overviewHierarchy = [
+    "styles.pageHeader",
+    "<PlanContextStrip",
+    "<CoachReviewBanner",
+  ];
+  const overviewPositions = overviewHierarchy.map((marker) => overview.indexOf(marker));
+  expect(overviewPositions.every((position) => position >= 0)).toBe(true);
+  expect(overviewPositions).toEqual([...overviewPositions].sort((left, right) => left - right));
 
   const planViewStart = source.indexOf("function PlanView");
   const planViewEnd = source.indexOf("function ", planViewStart + "function PlanView".length);

@@ -83,6 +83,7 @@ export function WorkoutPlansScreen() {
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
   const [deletionError, setDeletionError] = useState<string | null>(null);
   const [hiddenDeletedPlanIds, setHiddenDeletedPlanIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [generatedForegroundPlan, setGeneratedForegroundPlan] = useState<WorkoutPlan | null>(null);
 
   useEffect(() => {
     setSelectedPlanId(planTargetId ?? null);
@@ -125,9 +126,12 @@ export function WorkoutPlansScreen() {
   const activePlan = viewData(activeState);
   const pendingPlan = pendingPlanId === null ? undefined : viewData(pendingState);
   const selectedPlan = selectedPlanId === null ? undefined : viewData(selectedState);
-  const displayedPlan = selectedPlanId === null ? activePlan : selectedPlan;
-  const contextPlan = displayedPlan ?? pendingPlan;
-  const isViewingHistorical = selectedPlanId !== null && selectedPlanId !== activePlan?.id;
+  const loadedCurrentPlan = pendingPlanId !== null ? pendingPlan : activePlan;
+  const currentPlan = generatedForegroundPlan
+    ?? loadedCurrentPlan;
+  const currentPlanId = currentPlan?.id ?? pendingPlanId;
+  const displayedPlan = selectedPlanId === null ? currentPlan : selectedPlan;
+  const isViewingHistorical = selectedPlanId !== null && selectedPlanId !== currentPlanId;
   const profileGenerationMethod = profileQuery.data?.workout_generation_method;
   const generationMethodMutation = useMutation({
     mutationFn: (method: WorkoutGenerationMethod) => profileApi.updateProfile({ workout_generation_method: method }),
@@ -141,10 +145,19 @@ export function WorkoutPlansScreen() {
     onSuccess: async (result) => {
       setGenerationError(null);
       setSelectedPlanId(null);
+      setGeneratedForegroundPlan(result.plan);
+      queryClient.setQueryData(workoutKeys.plan(result.plan.id), result.plan);
       if (result.plan.status === "active") {
         queryClient.setQueryData(workoutKeys.plan("active"), result.plan);
+      } else {
+        queryClient.setQueryData(workoutKeys.plan("active"), null);
+        queryClient.setQueryData(workoutKeys.plan("pending"), result.plan);
       }
-      await Promise.all([activeQuery.refetch(), historyQuery.refetch()]);
+      await Promise.all([
+        activeQuery.refetch(),
+        historyQuery.refetch(),
+        pendingPlanId === null ? Promise.resolve() : pendingQuery.refetch(),
+      ]);
     },
   });
   const deletion = useMutation({
@@ -176,11 +189,22 @@ export function WorkoutPlansScreen() {
     }
   }, [generationMethodMutation.isPending, profileGenerationMethod]);
 
-  const loading = activeState.status === "loading"
-    || (activePlan === undefined && historyState.status === "loading");
-  const activeLoadError = activeState.status === "error" && activePlan === undefined;
-  const activeOffline = activeState.status === "offline" && activePlan === undefined;
+  useEffect(() => {
+    if (generatedForegroundPlan !== null && loadedCurrentPlan?.id === generatedForegroundPlan.id) {
+      setGeneratedForegroundPlan(null);
+    }
+  }, [generatedForegroundPlan, loadedCurrentPlan?.id]);
+
   const pendingLoading = pendingPlanId !== null && pendingState.status === "loading";
+  const loading = activeState.status === "loading"
+    || (activePlan === undefined && historyState.status === "loading")
+    || (selectedPlanId === null && pendingLoading && generatedForegroundPlan === null);
+  const activeLoadError = activeState.status === "error"
+    && activePlan === undefined
+    && currentPlan === undefined;
+  const activeOffline = activeState.status === "offline"
+    && activePlan === undefined
+    && currentPlan === undefined;
   const canUpdateDisplayedPlan = selectedPlanId === null
     && !loading
     && !activeLoadError
@@ -202,7 +226,7 @@ export function WorkoutPlansScreen() {
 
   function selectHistoryVersion(version: WorkoutPlanVersionSummary) {
     setReplacementRequest(null);
-    if (version.id === activePlan?.id) {
+    if (version.id === currentPlanId) {
       setSelectedPlanId(null);
       return;
     }
@@ -273,22 +297,19 @@ export function WorkoutPlansScreen() {
         ) : null}
       </View>
 
-      <View style={styles.pageHeader}>
-        <View style={styles.pageHeaderCopy}>
-          <Text accessibilityRole="header" style={styles.pageTitle}>برنامه تمرینی من</Text>
+      {displayedPlan !== undefined && displayedPlan !== null ? (
+        <PlanOverview historical={isViewingHistorical} plan={displayedPlan} />
+      ) : (
+        <View style={styles.pageHeader}>
+          <View style={styles.pageHeaderCopy}>
+            <Text accessibilityRole="header" style={styles.pageTitle}>برنامه تمرینی من</Text>
+          </View>
+          <View accessibilityLabel={`${formatPersianNumber(profileQuery.data?.plan_duration_weeks ?? 4, { maximumFractionDigits: 0 })} هفته`} style={styles.durationBadge}>
+            <Text style={styles.durationValue}>{formatPersianNumber(profileQuery.data?.plan_duration_weeks ?? 4, { maximumFractionDigits: 0 })}</Text>
+            <Text style={styles.durationLabel}>هفته</Text>
+          </View>
         </View>
-        <View accessibilityLabel={`${formatPersianNumber(contextPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4, { maximumFractionDigits: 0 })} هفته`} style={styles.durationBadge}>
-          <Text style={styles.durationValue}>{formatPersianNumber(contextPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4, { maximumFractionDigits: 0 })}</Text>
-          <Text style={styles.durationLabel}>هفته</Text>
-        </View>
-      </View>
-
-      {contextPlan ? (
-        <>
-          <PlanContextStrip historical={isViewingHistorical} plan={contextPlan} />
-          <CoachReviewBanner historical={isViewingHistorical} plan={contextPlan} />
-        </>
-      ) : null}
+      )}
 
       {connectivityStatus === "offline" && displayedPlan !== undefined ? (
         <PlanInlineNotice message="اتصال اینترنت برقرار نیست؛ آخرین برنامهٔ ذخیره‌شده نمایش داده می‌شود." variant="offline" />
@@ -325,18 +346,7 @@ export function WorkoutPlansScreen() {
         />
       ) : null}
 
-      {!loading && !activeLoadError && !activeOffline && pendingPlan !== undefined && pendingPlan.id !== displayedPlan?.id ? (
-        <View style={styles.pendingPlanSection}>
-          {contextPlan?.id !== pendingPlan.id ? <CoachReviewBanner historical={false} plan={pendingPlan} /> : null}
-          <PlanView
-            historical={false}
-            plan={pendingPlan}
-            pending
-          />
-        </View>
-      ) : null}
-
-      {pendingPlanId !== null && pendingPlan === undefined && !pendingLoading ? (
+      {pendingPlanId !== null && pendingPlan === undefined && !pendingLoading && selectedPlanId === null ? (
         <Notice
           actionLabel="تلاش دوباره"
           message="یک برنامه در انتظار تأیید مربی است؛ جزئیات آن فعلاً در دسترس نیست."
@@ -345,7 +355,7 @@ export function WorkoutPlansScreen() {
         />
       ) : null}
 
-      {!loading && !activeLoadError && !activeOffline && activePlan === null && pendingPlan === undefined && pendingPlanId === null ? (
+      {!loading && !activeLoadError && !activeOffline && currentPlan === null && pendingPlanId === null ? (
         <EmptyState
           actionLabel={generation.isPending ? "در حال ساخت برنامه" : "ساخت برنامه تمرینی"}
           onAction={startGeneration}
@@ -374,20 +384,20 @@ export function WorkoutPlansScreen() {
         />
       ) : null}
 
-      {!loading && !activeLoadError && !activeOffline && ((displayedPlan !== undefined && displayedPlan !== null) || pendingPlan !== undefined) ? (
+      {!loading && !activeLoadError && !activeOffline && displayedPlan !== undefined && displayedPlan !== null ? (
         <WorkoutPlanTools
           api={api}
-          awaitingCoachApproval={activePlan === null && pendingPlan !== undefined}
+          awaitingCoachApproval={displayedPlan.status === "pending_review"}
           connectivityStatus={connectivityStatus}
           cycleApi={cycleApi}
-          fallbackDurationWeeks={pendingPlan?.plan_duration_weeks ?? displayedPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4}
+          fallbackDurationWeeks={displayedPlan.plan_duration_weeks}
           pdfStore={pdfStore}
-          plan={displayedPlan?.status === "pending_review" ? activePlan ?? null : displayedPlan ?? null}
+          plan={displayedPlan}
         />
       ) : null}
 
       <WorkoutHistory
-        activePlanId={activePlan?.id ?? null}
+        currentPlanId={currentPlanId}
         deletionError={deletionError}
         deletingPlanId={deletingPlanId}
         history={history}
@@ -395,9 +405,39 @@ export function WorkoutPlansScreen() {
         onDelete={confirmDelete}
         onRetry={() => void historyQuery.refetch()}
         onSelect={selectHistoryVersion}
+        isViewingHistorical={isViewingHistorical}
+        onReturnToCurrent={() => {
+          setReplacementRequest(null);
+          setSelectedPlanId(null);
+        }}
         selectedPlanId={selectedPlanId}
       />
     </Screen>
+  );
+}
+
+function PlanOverview({
+  historical,
+  plan,
+}: {
+  readonly historical: boolean;
+  readonly plan: WorkoutPlan;
+}) {
+  return (
+    <View style={styles.planOverview} testID={`workout-plan-overview-${plan.id}`}>
+      <View style={styles.pageHeader}>
+        <View style={styles.pageHeaderCopy}>
+          <Text accessibilityRole="header" style={styles.pageTitle}>برنامه تمرینی من</Text>
+        </View>
+        <View accessibilityLabel={`${formatPersianNumber(plan.plan_duration_weeks, { maximumFractionDigits: 0 })} هفته`} style={styles.durationBadge}>
+          <Text style={styles.durationValue}>{formatPersianNumber(plan.plan_duration_weeks, { maximumFractionDigits: 0 })}</Text>
+          <Text style={styles.durationLabel}>هفته</Text>
+        </View>
+      </View>
+      <PlanContextStrip historical={historical} plan={plan} />
+      <CoachReviewBanner historical={historical} plan={plan} />
+      {historical ? <Text style={styles.readOnlyNotice}>این نسخه فقط برای مشاهده است.</Text> : null}
+    </View>
   );
 }
 
@@ -486,7 +526,12 @@ function CoachReviewBanner({
       </View>
     );
   }
-  return null;
+  return (
+    <View accessibilityRole="text" style={[styles.reviewBanner, styles.reviewBannerApproved]}>
+      <Text style={[styles.reviewIndicator, styles.reviewIndicatorApproved]}>✓</Text>
+      <Text style={styles.reviewText}>برنامه آماده اجراست</Text>
+    </View>
+  );
 }
 
 type PlanInlineNoticeVariant = "danger" | "info" | "offline" | "warning";
@@ -555,7 +600,7 @@ function PlanView({
   const visibleWarnings = getUserVisibleWorkoutWarnings(plan.warnings);
 
   return (
-    <View style={styles.planSection}>
+    <View style={styles.planSection} testID={`workout-plan-view-${plan.id}`}>
       {plan.status === "failed" ? <PlanInlineNotice message="این نسخه با خطا ساخته شده و قابل اجرا نیست." variant="danger" /> : null}
       {!executable && plan.status === "active" && !historical && !pending && plan.coach_review?.state !== "pending_coach_review" ? (
         <PlanInlineNotice message="این برنامه هنوز برای اجرا آزاد نشده است." variant="warning" />
@@ -1062,27 +1107,33 @@ function ReadOnlyAlternativeList({
 }
 
 function WorkoutHistory({
-  activePlanId,
+  currentPlanId,
   deletionError,
   deletingPlanId,
   history,
   historyState,
   onDelete,
   onRetry,
+  onReturnToCurrent,
   onSelect,
+  isViewingHistorical,
   selectedPlanId,
 }: {
-  readonly activePlanId: string | null;
+  readonly currentPlanId: string | null;
   readonly deletionError: string | null;
   readonly deletingPlanId: string | null;
   readonly history: readonly WorkoutPlanVersionSummary[];
   readonly historyState: MobileViewState<WorkoutPlanVersionSummary[]>;
   readonly onDelete: (version: WorkoutPlanVersionSummary) => void;
   readonly onRetry: () => void;
+  readonly onReturnToCurrent: () => void;
   readonly onSelect: (version: WorkoutPlanVersionSummary) => void;
+  readonly isViewingHistorical: boolean;
   readonly selectedPlanId: string | null;
 }) {
-  const versions = history.filter((version) => version.status !== "pending_review");
+  const versions = history.filter(
+    (version) => version.status !== "pending_review" && version.id !== currentPlanId,
+  );
   if (historyState.status === "loading") return <Skeleton height={120} />;
   if (historyState.status === "error" && history.length === 0) {
     return <Notice actionLabel="تلاش دوباره" message="تاریخچهٔ برنامه دریافت نشد." onAction={onRetry} variant="danger" />;
@@ -1090,11 +1141,18 @@ function WorkoutHistory({
   if (historyState.status === "offline" && history.length === 0) {
     return <Notice message="تاریخچهٔ برنامه در حالت آفلاین در دسترس نیست." variant="offline" />;
   }
-  if (versions.length === 0) return null;
+  if (versions.length === 0 && !isViewingHistorical) return null;
 
   return (
     <View style={styles.historySection}>
-      <Text style={styles.sectionTitle}>تاریخچهٔ برنامه‌ها</Text>
+      <View style={styles.historyHeader}>
+        <Text style={styles.sectionTitle}>تاریخچهٔ برنامه‌ها</Text>
+        {isViewingHistorical ? (
+          <Pressable accessibilityRole="button" onPress={onReturnToCurrent} style={styles.returnCurrentButton}>
+            <Text style={styles.returnCurrentText}>بازگشت به برنامه فعلی</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {historyState.status === "offline" ? <Notice message="فهرست تاریخچه تازه‌سازی نشده است." variant="offline" /> : null}
       {deletionError !== null ? <Notice message={deletionError} variant="danger" /> : null}
       {versions.map((version) => (
@@ -1102,7 +1160,7 @@ function WorkoutHistory({
           <Card
             onPress={() => onSelect(version)}
             style={styles.historyCard}
-            variant={selectedPlanId === version.id || activePlanId === version.id ? "raised" : "interactive"}
+            variant={selectedPlanId === version.id ? "raised" : "interactive"}
           >
             <View style={styles.historyRow}>
               <View style={styles.historyCopy}>
@@ -1373,12 +1431,8 @@ const styles = StyleSheet.create({
     textAlign: "auto",
     writingDirection: "rtl",
   },
-  pendingPlanSection: {
-    borderTopColor: fiticianTokens.colors.line,
-    borderTopWidth: 1,
-    gap: fiticianTokens.spacing[3],
-    marginTop: fiticianTokens.spacing[2],
-    paddingTop: fiticianTokens.spacing[2],
+  planOverview: {
+    gap: fiticianTokens.spacing[2],
   },
   planSection: {
     gap: fiticianTokens.spacing[3],
@@ -1455,6 +1509,13 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 20,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  readOnlyNotice: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "auto",
     writingDirection: "rtl",
   },
@@ -1814,9 +1875,29 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
+  historyHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[2],
+    justifyContent: "space-between",
+  },
   historySection: {
     gap: fiticianTokens.spacing[3],
     marginTop: fiticianTokens.spacing[5],
+  },
+  returnCurrentButton: {
+    borderColor: fiticianTokens.colors.aqua,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  returnCurrentText: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "center",
+    writingDirection: "rtl",
   },
   historyState: {
     color: fiticianTokens.colors.aqua,

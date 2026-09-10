@@ -75,6 +75,7 @@ const mockSetQueryData = jest.fn();
 const mockDeletePlan = jest.fn<() => Promise<void>>();
 let mockActivePlan: WorkoutPlan | null = null;
 let mockPlanById: WorkoutPlan | null = null;
+let mockPlansById: Record<string, WorkoutPlan> = {};
 let mockHistory: WorkoutPlanVersionSummary[] = [];
 let mockCycle: unknown = null;
 let mockCompletionFeedback: unknown = null;
@@ -97,6 +98,7 @@ function queryResult<T>(data: T) {
     isFetching: false,
     isPending: false,
     isStale: false,
+    refetch: jest.fn<() => Promise<unknown>>().mockResolvedValue(undefined),
   } as never;
 }
 
@@ -124,6 +126,7 @@ beforeEach(() => {
   mockLanguageForDirection.mockReturnValue("fa");
   mockActivePlan = null;
   mockPlanById = null;
+  mockPlansById = {};
   mockHistory = [];
   mockCycle = null;
   mockCompletionFeedback = null;
@@ -170,7 +173,7 @@ beforeEach(() => {
     if (key[1] === "weekly-check-in") return queryResult(null);
     if (key[1] === "completion-feedback") return queryResult(mockCompletionFeedback);
     if (key[1] === "plan" && key[2] === "active") return queryResult(mockActivePlan);
-    if (key[1] === "plan") return queryResult(mockPlanById);
+    if (key[1] === "plan") return queryResult(mockPlansById[String(key[2])] ?? mockPlanById);
     return queryResult(null);
   });
   mockUseMutation.mockImplementation(((options: unknown) => {
@@ -326,7 +329,7 @@ test("shows locked feedback compactly and expands the dynamic duration explanati
   expect(screen.getByText("پس از اتمام دوره ۶ هفته‌ای، این فرم برای هدفمندتر شدن برنامه بعدی فعال می‌شود. لطفاً فرم را کامل و با دقت پر کنید.")).toBeTruthy();
 });
 
-test("keeps feedback discoverable for a pending-only plan and does not invent a PDF id", () => {
+test("keeps feedback and the real pending-plan PDF available for a pending-only plan", async () => {
   const plan = makePlan("pending_review", [], "pending-plan");
   mockHistory = [makeHistoryVersion(plan.id)];
   mockPlanById = plan;
@@ -335,11 +338,66 @@ test("keeps feedback discoverable for a pending-only plan and does not invent a 
 
   const tools = screen.getByTestId("workout-plan-tools");
   const pdf = within(tools).getByRole("button", { name: "دانلود PDF" });
-  expect(pdf.props.accessibilityState).toMatchObject({ disabled: true });
+  expect(pdf.props.accessibilityState).toMatchObject({ disabled: false });
   const trigger = within(tools).getByRole("button", { name: "بازخورد پایان دوره" });
   fireEvent.press(trigger);
   expect(screen.getByText("این برنامه هنوز به تأیید مربی نرسیده است. پس از تأیید مربی و اتمام دوره ۴ هفته‌ای، این فرم برای هدفمندتر شدن برنامه بعدی فعال می‌شود. لطفاً فرم را کامل و با دقت پر کنید.")).toBeTruthy();
-  expect(mockDownloadPdf).not.toHaveBeenCalled();
+  fireEvent.press(pdf);
+  await waitFor(() => expect(mockDownloadPdf).toHaveBeenCalledWith(plan.id));
+});
+
+test("renders one pending foreground plan and swaps it for the selected archive", () => {
+  const pendingExercise = makeExercise("pending-exercise", "حرکت جدید", "New movement");
+  const archivedExercise = makeExercise("archived-exercise", "حرکت قدیمی", "Old movement");
+  const pending = makePlan(
+    "pending_review",
+    [makePlanExercise("pending-row", pendingExercise, [])],
+    "pending-plan",
+  );
+  pending.generation_source = "ai";
+  const archived = makePlan(
+    "superseded",
+    [makePlanExercise("archived-row", archivedExercise, [])],
+    "archived-plan",
+  );
+  mockHistory = [makeHistoryVersion(pending.id), makeHistoryVersion(archived.id, "superseded")];
+  mockPlansById = { [pending.id]: pending, [archived.id]: archived };
+
+  renderWorkoutPlans();
+
+  expect(screen.getAllByText("برنامه تمرینی من")).toHaveLength(1);
+  expect(screen.getByTestId("workout-plan-overview-pending-plan")).toBeTruthy();
+  expect(screen.getByTestId("workout-plan-view-pending-plan")).toBeTruthy();
+  expect(screen.getByLabelText("۴ هفته")).toBeTruthy();
+  expect(screen.getByText("در انتظار تایید مربی")).toBeTruthy();
+  expect(within(screen.getByLabelText("خلاصه برنامه")).getByText("هوش مصنوعی")).toBeTruthy();
+  expect(screen.getByText("حرکت جدید")).toBeTruthy();
+  expect(screen.queryByText("حرکت قدیمی")).toBeNull();
+  expect(screen.getAllByTestId(/workout-plan-view-/)).toHaveLength(1);
+
+  fireEvent.press(screen.getByRole("button", { name: "نسخهٔ اولیه" }));
+
+  expect(screen.getByTestId("workout-plan-overview-archived-plan")).toBeTruthy();
+  expect(screen.getByTestId("workout-plan-view-archived-plan")).toBeTruthy();
+  expect(screen.getByText("غیرفعال")).toBeTruthy();
+  expect(screen.getByText("در حال مشاهده نسخه قبلی")).toBeTruthy();
+  expect(screen.getByText("حرکت قدیمی")).toBeTruthy();
+  expect(screen.queryByText("حرکت جدید")).toBeNull();
+  expect(screen.getAllByTestId(/workout-plan-view-/)).toHaveLength(1);
+});
+
+test("renders a complete pending-only plan when the active endpoint is empty", () => {
+  const pending = makePlan("pending_review", [], "pending-only-plan");
+  mockHistory = [makeHistoryVersion(pending.id)];
+  mockPlansById = { [pending.id]: pending };
+
+  renderWorkoutPlans();
+
+  expect(screen.getByTestId("workout-plan-overview-pending-only-plan")).toBeTruthy();
+  expect(screen.getByTestId("workout-plan-view-pending-only-plan")).toBeTruthy();
+  expect(screen.getByText("برنامه تمرینی من")).toBeTruthy();
+  expect(screen.getByText("در انتظار تایید مربی")).toBeTruthy();
+  expect(screen.queryByText("هنوز برنامهٔ فعالی نداری")).toBeNull();
 });
 
 test("exposes the existing completion feedback form when the cycle is due", () => {
@@ -483,6 +541,40 @@ test("keeps the update action enabled when a pending review version exists", () 
   fireEvent.press(updateButton);
 
   expect(mockMutate).toHaveBeenCalledTimes(1);
+});
+
+test("shows the generated pending replacement immediately instead of the old active plan", async () => {
+  const oldExercise = makeExercise("old-exercise", "حرکت قبلی", "Old movement");
+  const newExercise = makeExercise("new-exercise", "حرکت جدید", "New movement");
+  const oldPlan = makePlan("active", [makePlanExercise("old-row", oldExercise, [])], "active-plan");
+  const newPlan = makePlan("pending_review", [makePlanExercise("new-row", newExercise, [])], "pending-plan");
+  mockActivePlan = oldPlan;
+  mockHistory = [makeHistoryVersion(oldPlan.id, "active")];
+  mockPlansById = { [newPlan.id]: newPlan };
+  const generate = jest.fn().mockImplementation(async () => {
+    mockActivePlan = null;
+    mockHistory = [makeHistoryVersion(newPlan.id), makeHistoryVersion(oldPlan.id, "superseded")];
+    return { plan: newPlan, reused: false };
+  });
+  mockCreateWorkoutPlanApi.mockReturnValue({
+    deletePlan: mockDeletePlan,
+    downloadPdf: mockDownloadPdf,
+    generate,
+    get: jest.fn(),
+    getActive: resolved(null),
+    getHistory: resolved(mockHistory),
+  } as never);
+  executeMutation = true;
+
+  renderWorkoutPlans();
+  fireEvent.press(screen.getByRole("button", { name: "به‌روزرسانی برنامه" }));
+
+  expect(mockMutate).toHaveBeenCalledTimes(1);
+  expect(generate).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(screen.getByTestId("workout-plan-overview-pending-plan")).toBeTruthy());
+  expect(screen.queryByText("حرکت قبلی")).toBeNull();
+  expect(screen.getByText("حرکت جدید")).toBeTruthy();
+  expect(screen.getAllByTestId(/workout-plan-view-/)).toHaveLength(1);
 });
 
 test("starts the existing replacement workflow from an executable exercise action", async () => {
@@ -640,7 +732,7 @@ test("deleting the selected historical version returns to the active plan", asyn
   });
   renderWorkoutPlans();
 
-  fireEvent.press(screen.getAllByRole("button", { name: /نسخهٔ اولیه|نسخهٔ تأییدشده/ })[1]);
+  fireEvent.press(screen.getAllByRole("button", { name: /نسخهٔ اولیه|نسخهٔ تأییدشده/ })[0]);
   fireEvent.press(screen.getByRole("button", { name: "حذف نسخه قدیمی برنامه" }));
 
   await waitFor(() => expect(mockDeletePlan).toHaveBeenCalledWith("superseded-plan"));
