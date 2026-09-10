@@ -22,6 +22,7 @@ export type AuthenticatedWorkoutDownload = (
 ) => Promise<BinaryDownload>;
 
 export interface WorkoutPlanApi {
+  deletePlan(planId: string): Promise<void>;
   downloadPdf(planId: string): Promise<BinaryDownload>;
   generate(overrides?: ProgramGenerationOverrides | null): Promise<WorkoutPlanGeneration>;
   get(planId: string): Promise<WorkoutPlan>;
@@ -40,6 +41,13 @@ export function createWorkoutPlanApi(
   download: AuthenticatedWorkoutDownload,
 ): WorkoutPlanApi {
   return {
+    deletePlan(planId) {
+      return request<void>({
+        method: "DELETE",
+        path: `${workoutPlansPath}/${encodeURIComponent(planId)}`,
+      });
+    },
+
     async downloadPdf(planId) {
       return download({
         method: "GET",

@@ -97,6 +97,23 @@ it("serializes generation overrides only when supplied", async () => {
   ]);
 });
 
+it("deletes an old workout plan through the authenticated transport", async () => {
+  const requests: TransportRequest[] = [];
+  const api = createWorkoutPlanApi(
+    async <TResponse>(request: TransportRequest): Promise<TResponse> => {
+      requests.push(request);
+      return undefined as TResponse;
+    },
+    async () => binaryDownload(),
+  );
+
+  await expect(api.deletePlan("plan/id")).resolves.toBeUndefined();
+
+  expect(requests).toEqual([
+    { method: "DELETE", path: "/api/v1/workout-plans/plan%2Fid" },
+  ]);
+});
+
 it("treats only an active-plan 404 as an empty active plan", async () => {
   const api = createWorkoutPlanApi(
     async <TResponse>(request: TransportRequest): Promise<TResponse> => {

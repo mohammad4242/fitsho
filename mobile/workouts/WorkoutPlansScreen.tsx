@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { WorkoutGenerationMethod } from "@fitician/core/profile";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useEffect, useMemo, useState } from "react";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
@@ -72,6 +72,9 @@ export function WorkoutPlansScreen() {
   const [replacementRequest, setReplacementRequest] = useState<WorkoutReplacementRequest | null>(null);
   const [generationMethod, setGenerationMethod] = useState<WorkoutGenerationMethod>("fitsho_coach");
   const [generationMethodError, setGenerationMethodError] = useState<string | null>(null);
+  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
+  const [deletionError, setDeletionError] = useState<string | null>(null);
+  const [hiddenDeletedPlanIds, setHiddenDeletedPlanIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     setSelectedPlanId(planTargetId ?? null);
@@ -89,7 +92,7 @@ export function WorkoutPlansScreen() {
     queryFn: profileApi.getProfile,
     queryKey: profileKeys.current(),
   });
-  const history = historyQuery.data ?? [];
+  const history = (historyQuery.data ?? []).filter((version) => !hiddenDeletedPlanIds.has(version.id));
   const pendingPlanId = findPendingWorkoutPlanId(history);
   const pendingQuery = useQuery({
     enabled: pendingPlanId !== null,
@@ -136,6 +139,28 @@ export function WorkoutPlansScreen() {
       await Promise.all([activeQuery.refetch(), historyQuery.refetch()]);
     },
   });
+  const deletion = useMutation({
+    mutationFn: (planId: string) => api.deletePlan(planId),
+    mutationKey: ["workout-plan-deletion"],
+    onError: () => {
+      setDeletionError("حذف نسخه قدیمی برنامه انجام نشد؛ دوباره تلاش کن.");
+    },
+    onSuccess: async (_result, planId) => {
+      setDeletionError(null);
+      setHiddenDeletedPlanIds((current) => new Set(current).add(planId));
+      if (selectedPlanId === planId) setSelectedPlanId(null);
+      queryClient.setQueryData<WorkoutPlanVersionSummary[]>(
+        workoutKeys.plans(),
+        (current) => current?.filter((version) => version.id !== planId),
+      );
+      queryClient.removeQueries({ exact: true, queryKey: workoutKeys.plan(planId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: workoutKeys.plans() }),
+        queryClient.invalidateQueries({ queryKey: workoutKeys.plan("active") }),
+      ]);
+    },
+    onSettled: () => setDeletingPlanId(null),
+  });
 
   useEffect(() => {
     if (!generationMethodMutation.isPending) {
@@ -166,6 +191,26 @@ export function WorkoutPlansScreen() {
       return;
     }
     setSelectedPlanId(version.id);
+  }
+
+  function confirmDelete(version: WorkoutPlanVersionSummary) {
+    if (!isDeletableWorkoutPlanVersion(version) || deletingPlanId !== null) return;
+    Alert.alert(
+      "حذف نسخه قدیمی",
+      "این نسخه از تاریخچه برنامه‌های تمرینی شما حذف شود؟",
+      [
+        { text: "انصراف", style: "cancel" },
+        {
+          text: "حذف",
+          style: "destructive",
+          onPress: () => {
+            setDeletionError(null);
+            setDeletingPlanId(version.id);
+            deletion.mutate(version.id);
+          },
+        },
+      ],
+    );
   }
 
   function startReplacement(exerciseId: string) {
@@ -309,8 +354,11 @@ export function WorkoutPlansScreen() {
 
       <WorkoutHistory
         activePlanId={activePlan?.id ?? null}
+        deletionError={deletionError}
+        deletingPlanId={deletingPlanId}
         history={history}
         historyState={historyState}
+        onDelete={confirmDelete}
         onRetry={() => void historyQuery.refetch()}
         onSelect={selectHistoryVersion}
         selectedPlanId={selectedPlanId}
@@ -913,15 +961,21 @@ function ReadOnlyAlternativeList({
 
 function WorkoutHistory({
   activePlanId,
+  deletionError,
+  deletingPlanId,
   history,
   historyState,
+  onDelete,
   onRetry,
   onSelect,
   selectedPlanId,
 }: {
   readonly activePlanId: string | null;
+  readonly deletionError: string | null;
+  readonly deletingPlanId: string | null;
   readonly history: readonly WorkoutPlanVersionSummary[];
   readonly historyState: MobileViewState<WorkoutPlanVersionSummary[]>;
+  readonly onDelete: (version: WorkoutPlanVersionSummary) => void;
   readonly onRetry: () => void;
   readonly onSelect: (version: WorkoutPlanVersionSummary) => void;
   readonly selectedPlanId: string | null;
@@ -940,21 +994,35 @@ function WorkoutHistory({
     <View style={styles.historySection}>
       <Text style={styles.sectionTitle}>تاریخچهٔ برنامه‌ها</Text>
       {historyState.status === "offline" ? <Notice message="فهرست تاریخچه تازه‌سازی نشده است." variant="offline" /> : null}
+      {deletionError !== null ? <Notice message={deletionError} variant="danger" /> : null}
       {versions.map((version) => (
-        <Card
-          key={version.id}
-          onPress={() => onSelect(version)}
-          style={styles.historyCard}
-          variant={selectedPlanId === version.id || activePlanId === version.id ? "raised" : "interactive"}
-        >
-          <View style={styles.historyRow}>
-            <View style={styles.historyCopy}>
-              <Text style={styles.historyTitle}>{historyLabel(version)}</Text>
-              <Text style={styles.historyDate}>{formatDate(version.created_at)}</Text>
+        <View key={version.id} style={styles.historyItem}>
+          <Card
+            onPress={() => onSelect(version)}
+            style={styles.historyCard}
+            variant={selectedPlanId === version.id || activePlanId === version.id ? "raised" : "interactive"}
+          >
+            <View style={styles.historyRow}>
+              <View style={styles.historyCopy}>
+                <Text style={styles.historyTitle}>{historyLabel(version)}</Text>
+                <Text style={styles.historyDate}>{formatDate(version.created_at)}</Text>
+              </View>
+              <Text style={styles.historyState}>{version.is_active ? "فعال" : "آرشیو"}</Text>
             </View>
-            <Text style={styles.historyState}>{version.is_active ? "فعال" : "آرشیو"}</Text>
-          </View>
-        </Card>
+          </Card>
+          {isDeletableWorkoutPlanVersion(version) ? (
+            <Pressable
+              accessibilityLabel="حذف نسخه قدیمی برنامه"
+              accessibilityRole="button"
+              accessibilityState={{ busy: deletingPlanId === version.id, disabled: deletingPlanId === version.id }}
+              disabled={deletingPlanId === version.id}
+              onPress={() => onDelete(version)}
+              style={({ pressed }) => [styles.historyDeleteButton, pressed && styles.mediaPressed]}
+            >
+              <AppIcon color={fiticianTokens.colors.danger} name="delete" size={fiticianTokens.iconSize.sm} />
+            </Pressable>
+          ) : null}
+        </View>
       ))}
     </View>
   );
@@ -981,6 +1049,10 @@ function historyLabel(version: WorkoutPlanVersionSummary): string {
   if (version.status === "failed") return "نسخهٔ ناموفق";
   if (version.status === "active") return "نسخهٔ فعال";
   return "نسخهٔ اولیه";
+}
+
+function isDeletableWorkoutPlanVersion(version: WorkoutPlanVersionSummary): boolean {
+  return version.status === "superseded" || version.status === "failed";
 }
 
 function formatDate(value: string): string {
@@ -1604,6 +1676,21 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   historyCard: {
+    gap: fiticianTokens.spacing[2],
+    flex: 1,
+  },
+  historyDeleteButton: {
+    alignItems: "center",
+    borderColor: fiticianTokens.colors.danger,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[3],
+  },
+  historyItem: {
+    alignItems: "stretch",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   historyCopy: {

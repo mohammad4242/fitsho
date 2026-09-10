@@ -1,4 +1,8 @@
-import { nutritionProgressRatio, nutritionProgressTone, type NutritionProgressTone } from "@fitician/core";
+import {
+  nutritionProgressTone,
+  nutritionTargetToExpenditureRatio,
+  type NutritionProgressTone,
+} from "@fitician/core";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
@@ -113,10 +117,10 @@ export function DashboardPage() {
   );
   const actual = hasActual ? trackedTotals : null;
   const hasNutritionTarget = nutritionTarget.energy_kcal !== null;
-  const nutritionProgress = nutritionProgressRatio(actual?.energy_kcal, nutritionTarget.energy_kcal);
+  const nutritionProgress = nutritionTargetToExpenditureRatio(nutritionTarget.energy_kcal, tdeeTarget);
   const nutritionTone = nutritionProgressTone(nutritionProgress);
-  const aboveTargetCalories = actual !== null && nutritionTarget.energy_kcal !== null
-    ? Math.max(0, actual.energy_kcal - nutritionTarget.energy_kcal)
+  const aboveExpenditureCalories = nutritionTarget.energy_kcal !== null && tdeeTarget !== null
+    ? Math.max(0, nutritionTarget.energy_kcal - tdeeTarget)
     : 0;
   const format = (value: number) => Math.round(value).toLocaleString(locale);
   const displayName = profile?.display_name ?? (english ? "there" : "دوست");
@@ -175,18 +179,18 @@ export function DashboardPage() {
               {hasNutritionTarget ? <>
                 <div className="command-card__calories">
                   <div className="command-card__calorie-values">
-                    <div><strong>{format(actual?.energy_kcal ?? nutritionTarget.energy_kcal ?? 0)}</strong><span>{actual ? `${english ? "of" : "از"} ${format(nutritionTarget.energy_kcal ?? 0)} kcal` : english ? "daily target" : "هدف روزانه"}</span></div>
+                    <div><strong>{format(nutritionTarget.energy_kcal ?? 0)}</strong><span>{english ? "daily target" : "هدف روزانه"}</span></div>
                     {tdeeTarget !== null && <div><strong>{format(tdeeTarget)}</strong><span>{english ? "Estimated daily expenditure" : "مصرف تقریبی روزانه"}</span></div>}
                   </div>
                   <ProgressRing
                     animateOnMount
                     color={nutritionRingColors[nutritionTone]}
-                    value={actual?.energy_kcal ?? 0}
-                    max={nutritionTarget.energy_kcal ?? 0}
+                    value={nutritionTarget.energy_kcal ?? 0}
+                    max={tdeeTarget ?? 0}
                     label={english ? "Today's calorie progress" : "پیشرفت کالری امروز"}
                   />
                 </div>
-                {aboveTargetCalories > 0 && <p className="command-card__overage">{english ? `${format(aboveTargetCalories)} kcal above daily target` : `${format(aboveTargetCalories)} کیلوکالری بیشتر از هدف روزانه`}</p>}
+                {aboveExpenditureCalories > 0 && <p className="command-card__overage">{english ? `${format(aboveExpenditureCalories)} kcal above estimated daily expenditure` : `${format(aboveExpenditureCalories)} کیلوکالری بالاتر از مصرف تقریبی روزانه`}</p>}
                 <div className="fitsho-metric-strip">
                   <span><strong>{formatMetric(actual?.protein_g ?? nutritionTarget.protein_g, format)}</strong><small>{english ? "Protein" : "پروتئین"}</small></span>
                   <span><strong>{formatMetric(actual?.carbohydrate_g ?? nutritionTarget.carbohydrate_g, format)}</strong><small>{english ? "Carbs" : "کربوهیدرات"}</small></span>
