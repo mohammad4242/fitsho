@@ -626,12 +626,12 @@ function DiscoveryStage({
   return (
     <View style={styles.discoveryStage}>
       <View style={styles.discoveryStageHeading}>
-        <View style={styles.stageNumber}>
-          <Text style={styles.stageNumberText}>{stage}</Text>
-        </View>
         <View style={styles.stageCopy}>
           <Text style={styles.sectionTitle}>{title}</Text>
           {description ? <Text style={styles.stageDescription}>{description}</Text> : null}
+        </View>
+        <View style={styles.stageNumber}>
+          <Text style={styles.stageNumberText}>{stage}</Text>
         </View>
       </View>
       {children}
@@ -917,7 +917,7 @@ const exerciseTypeOptions: readonly ExerciseType[] = [
 
 const styles = StyleSheet.create({
   categoryOption: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
@@ -965,14 +965,14 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.aqua,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[1],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingStart: fiticianTokens.spacing[3],
     paddingEnd: fiticianTokens.spacing[2],
   },
   activeFilterRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[1],
   },
@@ -1018,7 +1018,7 @@ const styles = StyleSheet.create({
     top: 0,
   },
   chip: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.pill,
@@ -1054,7 +1054,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.aqua,
   },
   choiceRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[2],
@@ -1097,7 +1097,7 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -1123,7 +1123,7 @@ const styles = StyleSheet.create({
     shadowRadius: fiticianTokens.shadows.soft.radius,
   },
   discoveryPanelFooter: {
-    alignItems: "flex-end",
+    alignItems: "flex-start",
     borderTopColor: fiticianTokens.colors.line,
     borderTopWidth: 1,
     paddingTop: fiticianTokens.spacing[3],
@@ -1149,7 +1149,7 @@ const styles = StyleSheet.create({
   },
   discoveryStageHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   focusOption: {
@@ -1192,12 +1192,12 @@ const styles = StyleSheet.create({
   },
   quickFilterRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
   regionOption: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
@@ -1223,7 +1223,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.canvas,
   },
   regionOptionRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   regionOptionSecondary: {
@@ -1265,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   pagination: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "space-between",
     marginTop: fiticianTokens.spacing[2],
@@ -1311,7 +1311,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   stageCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
@@ -1350,7 +1350,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   wrappedOptionRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },

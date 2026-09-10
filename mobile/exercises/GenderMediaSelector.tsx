@@ -100,6 +100,6 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.aqua,
   },
   rtl: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
   },
 });

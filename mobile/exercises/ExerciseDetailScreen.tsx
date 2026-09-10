@@ -436,8 +436,17 @@ function InstructionList({
     >
       {items.length > 0 ? items.map((item, index) => (
         <View key={`${index}-${item}`} style={[styles.instructionRow, isEnglish && styles.instructionRowEnglish]}>
-          <Text style={[styles.instructionNumber, isEnglish && styles.instructionNumberEnglish]}>{index + 1}</Text>
-          <Text style={[styles.instructionText, isEnglish && styles.instructionTextEnglish]}>{item}</Text>
+          {isEnglish ? (
+            <>
+              <Text style={[styles.instructionNumber, styles.instructionNumberEnglish]}>{index + 1}</Text>
+              <Text style={[styles.instructionText, styles.instructionTextEnglish]}>{item}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.instructionText}>{item}</Text>
+              <Text style={styles.instructionNumber}>{index + 1}</Text>
+            </>
+          )}
         </View>
       )) : <Text style={[styles.mutedText, isEnglish && styles.mutedTextEnglish]}>{isEnglish ? detailCopy.en.noInformation : detailCopy.fa.noInformation}</Text>}
     </DisclosureCard>
@@ -454,8 +463,8 @@ function InfoRow({ label, language, value }: { readonly label: string; readonly 
         </>
       ) : (
         <>
-          <Text style={styles.infoValue}>{value}</Text>
           <Text style={styles.infoLabel}>{label}</Text>
+          <Text style={styles.infoValue}>{value}</Text>
         </>
       )}
     </View>
@@ -504,7 +513,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: fiticianTokens.spacing[3],
   },
   breadcrumbCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
     minWidth: 0,
@@ -539,7 +548,7 @@ const styles = StyleSheet.create({
   },
   breadcrumbRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
@@ -573,7 +582,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
   },
@@ -611,7 +620,7 @@ const styles = StyleSheet.create({
   },
   instructionRow: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   instructionRowEnglish: {

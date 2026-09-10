@@ -68,3 +68,17 @@ it("matches the web media aspect ratio while keeping native media controls", asy
   expect(source).toContain("nativeControls");
   expect(source).toContain("MEDIA_SWIPE_THRESHOLD");
 });
+
+it("keeps exercise catalogue and detail rows on native RTL ordering", async () => {
+  const catalogSource = await readFile(new URL("./ExerciseCatalogScreen.tsx", import.meta.url), "utf8");
+  const detailSource = await readFile(new URL("./ExerciseDetailScreen.tsx", import.meta.url), "utf8");
+  const genderSource = await readFile(new URL("./GenderMediaSelector.tsx", import.meta.url), "utf8");
+
+  expect(catalogSource).not.toContain('flexDirection: "row-reverse"');
+  expect(catalogSource).not.toContain('alignItems: "flex-end"');
+  expect(detailSource).not.toContain('flexDirection: "row-reverse"');
+  expect(detailSource).not.toContain('alignItems: "flex-end"');
+  expect(genderSource).not.toContain('flexDirection: "row-reverse"');
+  expect(detailSource).toContain('direction={language === "en" ? "ltr" : "rtl"}');
+  expect(detailSource).toContain('language === "en" ? (');
+});
