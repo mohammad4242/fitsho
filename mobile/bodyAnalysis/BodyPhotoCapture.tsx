@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Camera,
   useCameraDevice,
@@ -12,7 +12,6 @@ import {
   StyleSheet,
   Text,
   View,
-  type ImageSourcePropType,
 } from "react-native";
 import type { BodyPhotoSide, BodyPhotoView } from "@fitician/core/body-photos";
 import type { Sex } from "@fitician/core/profile";
@@ -26,19 +25,20 @@ import {
   GHOST_SCALE_STEP,
   stepGhostScale,
 } from "@fitician/core/body-ghost-scale";
+import { GHOST_EDITOR_DEFAULT_TRANSFORM } from "@fitician/core/body-ghost-editor";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
-import { resolveGhostOverlayVariant } from "./ghostOverlay";
 import {
   BODY_PHOTO_COUNTDOWN_SECONDS,
   advanceBodyPhotoCountdown,
   bodyPhotoCaptureErrorMessage,
   bodyPhotoMimeTypeForAsset,
-  bodyPhotoPrivacyProcessingErrorMessage,
+  bodyPhotoUploadErrorMessage,
   filePathToUri,
   type BodyPhotoCapturedAsset,
 } from "./cameraCapture";
-import { encodeBodyPhotoWithPrivacyCrop } from "./bodyPhotoEncoder";
+import type { BodyPhotoEncoderSource } from "./bodyPhotoEncoder";
 import { bodyPhotoCopy } from "./bodyAnalysisCopy";
+import { NativeGhostPhotoEditor } from "./NativeGhostPhotoEditor";
 
 export interface BodyPhotoCaptureProps {
   readonly completedViews?: readonly BodyPhotoView[];
@@ -69,15 +69,14 @@ export function BodyPhotoCapture({
   const { canRequestPermission, hasPermission, requestPermission } = useCameraPermission();
   const [captureMode, setCaptureMode] = useState<"camera" | "library">(initialCaptureMode);
   const [cameraPosition, setCameraPosition] = useState<CameraPosition>("front");
-  const [captured, setCaptured] = useState<BodyPhotoCapturedAsset | null>(null);
+  const [source, setSource] = useState<BodyPhotoEncoderSource | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [ghostScale, setGhostScale] = useState(initialGhostScale);
   const [sideProfile, setSideProfile] = useState(initialSideProfile);
   const [previewReady, setPreviewReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
-  const ghostVariant = resolveGhostOverlayVariant(sex);
+  const sourceRef = useRef<BodyPhotoEncoderSource | null>(null);
   const device = useCameraDevice(cameraPosition);
   const photoOutput = usePhotoOutput({
     containerFormat: "jpeg",
@@ -85,6 +84,17 @@ export function BodyPhotoCapture({
     qualityPrioritization: "quality",
     targetResolution: { height: 1920, width: 1280 },
   });
+
+  useEffect(() => {
+    sourceRef.current = source;
+  }, [source]);
+
+  useEffect(() => {
+    return () => {
+      const current = sourceRef.current;
+      if (current?.source === "camera") deleteLocalFile(current.uri);
+    };
+  }, []);
 
   useEffect(() => {
     setPreviewReady(false);
@@ -99,11 +109,11 @@ export function BodyPhotoCapture({
   }, [countdown]);
 
   const capturePhoto = useCallback(async () => {
-    if (!previewReady || busy || captured !== null) return;
+    if (!previewReady || busy || source !== null) return;
     setBusy(true);
     setCameraError(null);
     let rawUri: string | null = null;
-    let encodedUri: string | null = null;
+    let retainedSource = false;
     try {
       const photoFile = await photoOutput.capturePhotoToFile(
         { enableShutterSound: true, flashMode: "off" },
@@ -111,24 +121,20 @@ export function BodyPhotoCapture({
       );
       rawUri = filePathToUri(photoFile.filePath);
       const { height, width } = await readImageDimensions(rawUri);
-      const encoded = await encodeBodyPhotoWithPrivacyCrop({
-        height,
-        source: "camera",
-        uri: rawUri,
-        width,
-      }, { ghostScale, ghostVariant, sideProfile, view });
-      encodedUri = encoded.uri;
-      setCaptured(encoded);
+      const nextSource = { height, source: "camera" as const, uri: rawUri, width };
+      sourceRef.current = nextSource;
+      setSource(nextSource);
+      retainedSource = true;
       setPreviewReady(false);
     } catch (error) {
-      setCameraError(rawUri === null
-        ? bodyPhotoCaptureErrorMessage(error)
-        : bodyPhotoPrivacyProcessingErrorMessage());
+      setCameraError(bodyPhotoCaptureErrorMessage(error));
     } finally {
-      if (rawUri !== null && rawUri !== encodedUri) deleteLocalFile(rawUri);
+      if (rawUri !== null && !retainedSource) {
+        deleteLocalFile(rawUri);
+      }
       setBusy(false);
     }
-  }, [busy, captured, ghostScale, ghostVariant, photoOutput, previewReady, sideProfile, view]);
+  }, [busy, photoOutput, previewReady, source]);
 
   useEffect(() => {
     if (countdown !== 0) return;
@@ -158,9 +164,9 @@ export function BodyPhotoCapture({
   }
 
   async function chooseFromLibrary() {
-    if (busy || captured !== null) return;
+    if (busy || source !== null) return;
     setBusy(true);
-    setConfirmError(null);
+    setCameraError(null);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: false,
@@ -174,46 +180,38 @@ export function BodyPhotoCapture({
       const mimeType = bodyPhotoMimeTypeForAsset(asset.mimeType, asset.uri);
       if (mimeType === null) throw new Error("Unsupported photo format");
       if (asset.width <= 0 || asset.height <= 0) throw new Error("Invalid photo dimensions");
-      const encoded = await encodeBodyPhotoWithPrivacyCrop({
+      setSource({
         height: asset.height,
         source: "library",
         uri: asset.uri,
         width: asset.width,
-      }, { ghostScale, ghostVariant, sideProfile, view });
-      setCaptured(encoded);
+      });
     } catch (error) {
-      setConfirmError(error instanceof Error && error.message === "No photo selected"
+      setCameraError(error instanceof Error && error.message === "No photo selected"
         ? bodyPhotoCaptureErrorMessage(error)
-        : bodyPhotoPrivacyProcessingErrorMessage());
+        : "این عکس قابل استفاده نیست. عکس دیگری انتخاب کن.");
     } finally {
       setBusy(false);
     }
   }
 
-  function discardCaptured() {
-    if (captured !== null) deleteLocalFile(captured.uri);
-    setCaptured(null);
-    setConfirmError(null);
+  function discardSource() {
+    if (source?.source === "camera") deleteLocalFile(source.uri);
+    setSource(null);
     setCameraError(null);
     setPreviewReady(false);
   }
 
-  async function confirmCaptured() {
-    if (captured === null || busy) return;
-    setBusy(true);
-    setConfirmError(null);
-    try {
-      await onCaptured(captured);
-    } catch {
-      setConfirmError("ثبت این تصویر انجام نشد. دوباره تلاش کن.");
-    } finally {
-      setBusy(false);
-    }
+  async function handlePrepared(asset: BodyPhotoCapturedAsset) {
+    await onCaptured(asset);
+    if (source?.source === "camera") deleteLocalFile(source.uri);
+    setSource(null);
+    setPreviewReady(false);
   }
 
   function closeCapture() {
     setCountdown(null);
-    discardCaptured();
+    discardSource();
     onCancel();
   }
 
@@ -224,8 +222,8 @@ export function BodyPhotoCapture({
         setCountdown(null);
         return true;
       }
-      if (captured !== null) {
-        discardCaptured();
+      if (source !== null) {
+        discardSource();
         return true;
       }
       onCancel();
@@ -260,7 +258,7 @@ export function BodyPhotoCapture({
     <Camera
       device={device}
       enableNativeTapToFocusGesture
-      isActive={captureMode === "camera" && captured === null}
+      isActive={captureMode === "camera" && source === null}
       mirrorMode="off"
       onError={(error) => setCameraError(bodyPhotoCaptureErrorMessage(error))}
       onPreviewStarted={() => setPreviewReady(true)}
@@ -295,13 +293,13 @@ export function BodyPhotoCapture({
           <Text style={styles.controlLabel}>جهت عکاسی نیمرخ</Text>
           <View style={styles.inlineButtons}>
             <Button
-              disabled={captured !== null || busy}
+              disabled={source !== null || busy}
               label={bodyPhotoCopy.sideProfile.right}
               onPress={() => updateSideProfile("right")}
               variant={sideProfile === "right" ? "primary" : "secondary"}
             />
             <Button
-              disabled={captured !== null || busy}
+              disabled={source !== null || busy}
               label={bodyPhotoCopy.sideProfile.left}
               onPress={() => updateSideProfile("left")}
               variant={sideProfile === "left" ? "primary" : "secondary"}
@@ -310,10 +308,10 @@ export function BodyPhotoCapture({
         </View>
       ) : null}
 
-      {captureMode === "library" ? <HeadlessPhotoGuide /> : null}
-      <View accessibilityLabel="مرحله ثبت عکس" style={styles.stage}>
-        {captured === null ? (
-          captureMode === "camera" ? cameraContent : (
+      {captureMode === "library" && source === null ? <HeadlessPhotoGuide /> : null}
+      {source === null ? (
+        <View accessibilityLabel="مرحله ثبت عکس" style={styles.stage}>
+          {captureMode === "camera" ? cameraContent : (
             <View style={styles.libraryCaptureDeck}>
               <View style={styles.libraryGuideBadge}>
                 <AppIcon color={fiticianTokens.colors.aqua} name="target" size={20} />
@@ -326,7 +324,7 @@ export function BodyPhotoCapture({
                   label={bodyPhotoCopy.useCamera}
                   onPress={() => {
                     setCaptureMode("camera");
-                    setConfirmError(null);
+                    setCameraError(null);
                   }}
                   variant="secondary"
                 />
@@ -337,24 +335,33 @@ export function BodyPhotoCapture({
                 />
               </View>
             </View>
-          )
-        ) : (
-          <Image
-            accessibilityLabel={`پیش‌نمایش ${viewLabel(view)}`}
-            resizeMode="contain"
-            source={{ uri: captured.uri } as ImageSourcePropType}
-            style={styles.capturedImage}
-          />
-        )}
-        <GhostOverlayGuide ghostScale={ghostScale} sideProfile={sideProfile} sex={sex} view={view} />
-        {countdown !== null && captured === null ? (
-          <View accessibilityLiveRegion="polite" style={styles.countdown}>
-            <Text style={styles.countdownText}>{countdown}</Text>
-          </View>
-        ) : null}
-      </View>
+          )}
+          <GhostOverlayGuide ghostScale={ghostScale} sideProfile={sideProfile} sex={sex} view={view} />
+          {countdown !== null ? (
+            <View accessibilityLiveRegion="polite" style={styles.countdown}>
+              <Text style={styles.countdownText}>{countdown}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <NativeGhostPhotoEditor
+          ghostScale={ghostScale}
+          onCancel={discardSource}
+          onGhostScaleChange={updateGhostScale}
+          onPrepared={handlePrepared}
+          onPreparedError={bodyPhotoUploadErrorMessage}
+          sex={sex}
+          sideProfile={sideProfile}
+          source={{
+            ...source,
+            transform: GHOST_EDITOR_DEFAULT_TRANSFORM,
+            view,
+          }}
+          view={view}
+        />
+      )}
 
-      {captured === null ? (
+      {source === null ? (
         <>
           <View style={styles.scaleControls}>
             <Text style={styles.controlLabel}>اندازه راهنما</Text>
@@ -397,25 +404,9 @@ export function BodyPhotoCapture({
           ) : null}
           <Text style={styles.liveStatus}>راهنمای زنده موقتاً غیرفعال است؛ ثبت عکس همچنان ممکن است.</Text>
         </>
-      ) : (
-        <View style={styles.confirmActions}>
-          <Button
-            disabled={busy}
-            label={replaceView(bodyPhotoCopy.retake, viewLabel(view))}
-            onPress={discardCaptured}
-            variant="secondary"
-          />
-          <Button
-            disabled={busy}
-            label={replaceView(bodyPhotoCopy.confirmUpload, viewLabel(view))}
-            loading={busy}
-            onPress={() => void confirmCaptured()}
-          />
-        </View>
-      )}
+      ) : null}
 
-      {confirmError !== null ? <Notice message={confirmError} variant="danger" /> : null}
-      <Button disabled={busy} label="بستن این مرحله" onPress={closeCapture} variant="ghost" />
+      {source === null ? <Button disabled={busy} label="بستن این مرحله" onPress={closeCapture} variant="ghost" /> : null}
     </View>
   );
 }
@@ -579,15 +570,6 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     textAlign: "auto",
     writingDirection: "rtl",
-  },
-  capturedImage: {
-    height: "100%",
-    width: "100%",
-  },
-  confirmActions: {
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[3],
-    justifyContent: "space-between",
   },
   container: {
     gap: fiticianTokens.spacing[3],
