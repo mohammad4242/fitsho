@@ -135,3 +135,37 @@ it("returns an empty nutrition state when neither plan nor estimate exists", () 
     progress: 0,
   });
 });
+
+it("keeps gain and loss nutrition progress target-relative and preserves over-target intake", () => {
+  const gainSummary = nutritionSummary(
+    {
+      days: [{ nutrient_totals: { energy_kcal: 3_000 }, plan_date: "2026-09-09" }],
+      physician_approved: true,
+    } as never,
+    null,
+    {
+      actual_totals: { energy_kcal: 1_800 },
+      check_in_status: null,
+      data_status: "sufficient",
+      entries: [],
+    } as never,
+    "2026-09-09",
+  );
+  const lossSummary = nutritionSummary(
+    {
+      days: [{ nutrient_totals: { energy_kcal: 1_800 }, plan_date: "2026-09-09" }],
+      physician_approved: true,
+    } as never,
+    null,
+    {
+      actual_totals: { energy_kcal: 2_000 },
+      check_in_status: null,
+      data_status: "sufficient",
+      entries: [],
+    } as never,
+    "2026-09-09",
+  );
+
+  expect(gainSummary.progress).toBeCloseTo(0.6);
+  expect(lossSummary.progress).toBeCloseTo(1.111111);
+});
