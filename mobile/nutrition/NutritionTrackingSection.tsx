@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { components, MultipartUploadRequest } from "@fitician/core";
 
@@ -10,7 +10,18 @@ import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { Button, Card, Dialog, EmptyState, Notice, PageHeading, Skeleton, TextField } from "../ui/components";
+import { RTL_LAYOUT, RTL_ROW, RTL_TEXT } from "../ui/rtl";
+import {
+  AppIcon,
+  Button,
+  Card,
+  Dialog,
+  DisclosureCard,
+  Notice,
+  PageHeading,
+  Skeleton,
+  TextField,
+} from "../ui/components";
 import { getMobileViewState, mobileRequestErrorMessage } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import { UploadCancellationError, UploadManager, type UploadHandle } from "../upload/uploadManager";
@@ -19,28 +30,25 @@ import {
   FOOD_PHOTO_PICKER_OPTIONS,
   nutritionMimeTypeForAsset,
 } from "./nutritionUpload";
-import {
-  createNutritionCatalogueApi,
-  type FoodCatalogueItem,
-} from "./nutritionCatalogueApi";
+import { createNutritionCatalogueApi, type FoodCatalogueItem } from "./nutritionCatalogueApi";
+import { NutritionAdherenceSection } from "./NutritionAdherenceSection";
 import {
   adherencePercentLabel,
-  checkInStatusLabel,
-  photoEstimatePresentation,
-  trackingDataStatusLabel,
   trackingSourceLabel,
+  photoEstimatePresentation,
 } from "./nutritionTrackingModel";
 import {
   createNutritionTrackingApi,
   type NutritionFoodPhotoEstimate,
 } from "./nutritionTrackingApi";
-import { createNutritionApi, type NutritionEstimate } from "./nutritionApi";
+import { createNutritionApi } from "./nutritionApi";
 import { formatNutritionNumber } from "./nutritionModel";
 
 type CheckInStatus = components["schemas"]["NutritionDailyCheckInStatus"];
 type TrackingEntry = components["schemas"]["NutritionTrackingEntryResponse"];
 type EntrySource = components["schemas"]["NutritionConsumptionSource"];
 type PhotoItem = components["schemas"]["NutritionFoodPhotoItemResponse"];
+type EntryMode = "manual" | "photo" | null;
 
 const checkInOptions: readonly CheckInStatus[] = [
   "on_plan",
@@ -100,12 +108,13 @@ export function NutritionTrackingSection() {
   const [selectedFoodId, setSelectedFoodId] = useState<string | null>(null);
   const [catalogueSearch, setCatalogueSearch] = useState("");
   const [catalogueGrams, setCatalogueGrams] = useState("100");
-  const [quickName, setQuickName] = useState("وعده تقریبی");
   const [quickCalories, setQuickCalories] = useState("");
-  const [quickProtein, setQuickProtein] = useState("");
   const [entryAmounts, setEntryAmounts] = useState<Record<string, string>>({});
   const [entryToDelete, setEntryToDelete] = useState<TrackingEntry | null>(null);
+  const [entryMode, setEntryMode] = useState<EntryMode>(null);
+  const [plannedCalories, setPlannedCalories] = useState<number | null>(null);
   const [photoConsent, setPhotoConsent] = useState(false);
+  const [photoPreviewUri, setPhotoPreviewUri] = useState<string | null>(null);
   const [photoEstimate, setPhotoEstimate] = useState<NutritionFoodPhotoEstimate | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoSuccess, setPhotoSuccess] = useState<string | null>(null);
@@ -132,12 +141,6 @@ export function NutritionTrackingSection() {
     photoUploading,
   );
 
-  const filteredCatalogueFoods = catalogueFoods.filter((food) => {
-    const normalizedSearch = catalogueSearch.trim().toLocaleLowerCase();
-    return normalizedSearch.length === 0
-      || food.name_fa.toLocaleLowerCase().includes(normalizedSearch)
-      || food.name_en.toLocaleLowerCase().includes(normalizedSearch);
-  });
   const selectedFood = catalogueFoods.find((food) => food.id === selectedFoodId) ?? null;
   const visibleEntries = daily?.entries.filter(
     (entry) => sourceFilter === "all" || entry.source === sourceFilter,
@@ -210,9 +213,8 @@ export function NutritionTrackingSection() {
 
   async function addQuickApproximation(): Promise<void> {
     const calories = numericValue(quickCalories);
-    const protein = quickProtein.trim().length === 0 ? null : numericValue(quickProtein);
-    if (quickName.trim().length === 0 || !Number.isFinite(calories) || calories <= 0 || (protein !== null && (!Number.isFinite(protein) || protein < 0))) {
-      setActionError("نام وعده و کالری معتبر وارد کن.");
+    if (!Number.isFinite(calories) || calories <= 0) {
+      setActionError("یک کالری معتبر وارد کن.");
       return;
     }
     setActionError(null);
@@ -220,12 +222,11 @@ export function NutritionTrackingSection() {
     try {
       await api.addQuickApproximation({
         calories,
-        display_name: quickName.trim(),
+        display_name: "وعده تقریبی",
         entry_date: entryDate,
-        protein_g: protein,
+        protein_g: null,
       });
       setQuickCalories("");
-      setQuickProtein("");
       await refreshDaily();
     } catch (error) {
       setActionError(nutritionTrackingError(error));
@@ -305,6 +306,7 @@ export function NutritionTrackingSection() {
       if (result.canceled) return;
       const selected = result.assets[0];
       if (selected === undefined) throw new Error("No food photo was selected");
+      setPhotoPreviewUri(selected.uri);
       const mimeType = nutritionMimeTypeForAsset(selected.mimeType, selected.uri);
       if (mimeType === null) throw new Error("Unsupported food-photo format");
       const bytes = new Uint8Array(await new File(selected.uri).arrayBuffer());
@@ -409,6 +411,10 @@ export function NutritionTrackingSection() {
     }
   }
 
+  function toggleEntryMode(mode: Exclude<EntryMode, null>): void {
+    setEntryMode((current) => current === mode ? null : mode);
+  }
+
   if (dailyState.status === "loading") return <Skeleton height={720} />;
   if (dailyState.status === "error" && daily === undefined) {
     return (
@@ -426,214 +432,181 @@ export function NutritionTrackingSection() {
   if (daily === undefined) return null;
 
   return (
-    <View style={styles.section}>
-      <PageHeading
-        eyebrow="امروز"
-        supportingText="مقدارهای ثبت‌شده با دقت ذخیره‌شده سرور محاسبه می‌شوند؛ اینجا فقط نمایش گرد شده است."
-        title="ثبت تغذیه"
-      />
-      {dailyState.status === "offline" || dailyState.status === "stale" ? (
-        <Notice message="آخرین ثبت ذخیره‌شده نمایش داده می‌شود؛ تغییرات جدید بعد از اتصال انجام می‌شوند." variant="offline" />
-      ) : null}
-      {estimateState.status === "offline" || estimateState.status === "stale" || estimate?.is_stale ? (
-        <Notice compact message="هدف‌های ذخیره‌شده نمایش داده می‌شوند؛ ممکن است با آخرین وضعیت پروفایل هماهنگ نباشند." variant="offline" />
-      ) : null}
-      {estimateState.status === "error" && estimate === null ? (
-        <Notice compact message="هدف برنامه دریافت نشد؛ ثبت‌های واقعی امروز همچنان در دسترس هستند." variant="warning" />
-      ) : null}
-      <Card style={styles.summaryCard}>
-        <View style={styles.summaryHeading}>
-          <Text style={styles.cardTitle}>مصرف واقعی امروز</Text>
-          <Text style={styles.dateText}>{entryDate}</Text>
-        </View>
-        <View style={styles.metricRow}>
-          <Metric
-            label="انرژی"
-            target={nutritionTargetLabel(estimate, ["goal_calories", "energy"], "کیلوکالری")}
-            value={displayNutrient(daily.actual_totals.energy_kcal ?? daily.actual_totals.calories)}
-            unit="kcal"
-          />
-          <Metric
-            label="پروتئین"
-            target={nutritionTargetLabel(estimate, ["protein", "protein_g"], "گرم")}
-            value={displayNutrient(daily.actual_totals.protein_g)}
-            unit="g"
-          />
-          <Metric label="ثبت‌ها" value={formatNutritionNumber(daily.entries.length)} unit="" />
-        </View>
-        <View style={styles.dataStatusRow}>
-          <Text style={styles.mutedText}>کیفیت داده</Text>
-          <Text style={styles.statusText}>{trackingDataStatusLabel(daily.data_status)}</Text>
-        </View>
-      </Card>
+    <View style={[styles.section, RTL_LAYOUT]}>
+      <PageHeading eyebrow="امروز" testID="nutrition-tracking-header" title="ثبت تغذیه" />
 
-      <FoodPhotoCard
-        actionBusy={photoActionBusy}
-        catalogueFoods={catalogueFoods}
-        consent={photoConsent}
-        error={photoError}
-        estimate={photoEstimate}
-        foodIds={photoFoodIds}
-        amounts={photoAmounts}
-        onAmountChange={(itemId, amount) => setPhotoAmounts((current) => ({ ...current, [itemId]: amount }))}
-        onChooseFood={(itemId, foodId) => setPhotoFoodIds((current) => ({ ...current, [itemId]: foodId }))}
-        onConfirm={() => void confirmPhoto()}
-        onConsentChange={setPhotoConsent}
-        onDeleteItem={(item) => void removePhotoItem(item)}
-        onPickCamera={() => void choosePhoto("camera")}
-        onPickGallery={() => void choosePhoto("gallery")}
-        onClear={() => void clearPhotoEstimate()}
-        onCorrectItem={(item) => void correctPhotoItem(item)}
-        uploading={photoUploading}
-      />
-
-      <Card style={styles.card}>
-        <Text style={styles.cardTitle}>ثبت وضعیت امروز</Text>
-        <Text style={styles.bodyText}>وضعیت روزت را ثبت کن تا شاخص پایبندی با داده واقعی محاسبه شود.</Text>
-        <View style={styles.choiceRow}>
-          {checkInOptions.map((status) => (
-            <Pressable
-              accessibilityLabel={checkInStatusLabel(status)}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: actionBusy, selected: checkInValue === status }}
-              disabled={actionBusy}
-              key={status}
-              onPress={() => void saveCheckIn(status)}
-              style={[styles.choice, checkInValue === status && styles.choiceSelected]}
-            >
-              <Text style={[styles.choiceText, checkInValue === status && styles.choiceTextSelected]}>{checkInStatusLabel(status)}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </Card>
-
-      {actionError !== null ? <Notice message={actionError} variant="danger" /> : null}
-      {photoSuccess !== null ? <Notice message={photoSuccess} variant="success" /> : null}
-
-      <Card style={styles.card}>
-        <View style={styles.sectionHeading}>
-          <View style={styles.headingCopy}>
-            <Text style={styles.cardTitle}>ثبت دستی وعده</Text>
-            <Text style={styles.bodyText}>غذای دقیق را از کاتالوگ انتخاب کن یا یک برآورد سریع وارد کن.</Text>
+      <View style={styles.entryHub} testID="nutrition-entry-hub">
+        <View style={styles.entryRoot}>
+          <View style={styles.entryRootIcon}>
+            <AppIcon name="nutrition" color={fiticianTokens.colors.canvas} size={fiticianTokens.iconSize.lg} />
+          </View>
+          <View style={styles.entryRootCopy}>
+            <Text style={styles.entryHubEyebrow}>روش ثبت را انتخاب کن</Text>
+            <Text style={styles.entryRootTitle}>ثبت تغذیه</Text>
+            <Text style={styles.entryRootSubtitle}>یک روش را برای ثبت وعده انتخاب کن</Text>
           </View>
         </View>
-        <TextField
-          accessibilityLabel="جستجوی ماده غذایی برای ثبت"
-          label="ماده غذایی"
-          onChangeText={setCatalogueSearch}
-          placeholder="جستجوی نام فارسی یا انگلیسی"
-          value={catalogueSearch}
-        />
-        {catalogueState.status === "offline" || catalogueState.status === "stale" ? (
-          <Notice message="فهرست مواد غذایی تازه‌سازی نشده است." variant="offline" />
-        ) : null}
-        {catalogueState.status === "error" ? (
-          <Notice actionLabel="تلاش دوباره" message="فهرست مواد غذایی دریافت نشد." onAction={() => void catalogueQuery.refetch()} variant="danger" />
-        ) : null}
-        <View style={styles.foodChoiceRow}>
-          {filteredCatalogueFoods.slice(0, 12).map((food) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: selectedFoodId === food.id }}
-              key={food.id}
-              onPress={() => setSelectedFoodId(food.id)}
-              style={[styles.foodChoice, selectedFoodId === food.id && styles.foodChoiceSelected]}
-            >
-              <Text style={[styles.foodChoiceText, selectedFoodId === food.id && styles.choiceTextSelected]}>{food.name_fa}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.entryBranchArea}>
+          <View pointerEvents="none" style={styles.entryBranchVertical} />
+          <View pointerEvents="none" style={styles.entryBranchHorizontal} />
+          <View pointerEvents="none" style={[styles.entryBranchStem, styles.entryBranchStemStart]} />
+          <View pointerEvents="none" style={[styles.entryBranchStem, styles.entryBranchStemEnd]} />
+          <View style={[styles.entryMethodRow, RTL_ROW]}>
+            <EntryMethodButton
+              icon="catalogue"
+              mode="manual"
+              onPress={() => toggleEntryMode("manual")}
+              selected={entryMode === "manual"}
+              subtitle="غذا را از فهرست انتخاب و مقدار را ثبت کن"
+              title="ثبت دستی"
+            />
+            <EntryMethodButton
+              icon="camera"
+              mode="photo"
+              onPress={() => toggleEntryMode("photo")}
+              selected={entryMode === "photo"}
+              subtitle="تخمین غذا از روی عکس"
+              title="عکس وعده"
+            />
+          </View>
         </View>
-        <View style={styles.inlineFields}>
-          <TextField
-            accessibilityLabel="مقدار به گرم"
-            keyboardType="decimal-pad"
-            label="مقدار به گرم"
-            onChangeText={setCatalogueGrams}
-            textDirection="ltr"
-            value={catalogueGrams}
-          />
-          <Button disabled={actionBusy || selectedFood === null} label="ثبت از کاتالوگ" onPress={() => void addCatalogueFood()} />
-        </View>
-        <View style={styles.divider} />
-        <TextField accessibilityLabel="نام وعده تقریبی" label="نام برآورد سریع" onChangeText={setQuickName} value={quickName} />
-        <View style={styles.inlineFields}>
-          <TextField
-            accessibilityLabel="کالری تقریبی"
-            keyboardType="decimal-pad"
-            label="کالری تقریبی"
-            onChangeText={setQuickCalories}
-            textDirection="ltr"
-            value={quickCalories}
-          />
-          <TextField
-            accessibilityLabel="پروتئین تقریبی"
-            keyboardType="decimal-pad"
-            label="پروتئین تقریبی"
-            onChangeText={setQuickProtein}
-            textDirection="ltr"
-            value={quickProtein}
-          />
-        </View>
-        <Button disabled={actionBusy} label="ثبت برآورد سریع" onPress={() => void addQuickApproximation()} variant="secondary" />
-      </Card>
+      </View>
 
-      {recentFoods.length > 0 ? (
-        <Card style={styles.card}>
-          <Text style={styles.cardTitle}>غذاهای اخیر</Text>
-          {recentState.status === "offline" || recentState.status === "stale" ? (
-            <Notice message="غذاهای اخیر از آخرین نسخه ذخیره‌شده نمایش داده می‌شوند." variant="offline" />
+      {entryMode === "manual" ? (
+        <ManualEntryPanel
+          actionBusy={actionBusy}
+          catalogueFoods={catalogueFoods}
+          catalogueSearch={catalogueSearch}
+          catalogueState={catalogueState.status}
+          grams={catalogueGrams}
+          onAddCatalogue={() => void addCatalogueFood()}
+          onAddQuick={() => void addQuickApproximation()}
+          onCatalogueSearchChange={setCatalogueSearch}
+          onFoodChange={setSelectedFoodId}
+          onGramsChange={setCatalogueGrams}
+          onQuickCaloriesChange={setQuickCalories}
+          onRecentFood={(foodId, grams) => void addRecentFood(foodId, grams)}
+          quickCalories={quickCalories}
+          recentFoods={recentFoods}
+          recentState={recentState.status}
+          selectedFoodId={selectedFoodId}
+        />
+      ) : null}
+
+      {entryMode === "photo" ? (
+        <FoodPhotoCard
+          actionBusy={photoActionBusy}
+          amounts={photoAmounts}
+          catalogueFoods={catalogueFoods}
+          consent={photoConsent}
+          estimate={photoEstimate}
+          foodIds={photoFoodIds}
+          onAmountChange={(itemId, amount) => setPhotoAmounts((current) => ({ ...current, [itemId]: amount }))}
+          onChooseFood={(itemId, foodId) => setPhotoFoodIds((current) => ({ ...current, [itemId]: foodId }))}
+          onClear={() => void clearPhotoEstimate()}
+          onConfirm={() => void confirmPhoto()}
+          onConsentChange={setPhotoConsent}
+          onDeleteItem={(item) => void removePhotoItem(item)}
+          onPickCamera={() => void choosePhoto("camera")}
+          onPickGallery={() => void choosePhoto("gallery")}
+          onCorrectItem={(item) => void correctPhotoItem(item)}
+          previewUri={photoPreviewUri}
+          uploading={photoUploading}
+        />
+      ) : null}
+
+      {(dailyState.status === "offline"
+        || dailyState.status === "stale"
+        || estimateState.status === "offline"
+        || estimateState.status === "stale"
+        || estimate?.is_stale
+        || (estimateState.status === "error" && estimate === null)
+        || (entryMode === "manual" && (catalogueState.status === "offline" || catalogueState.status === "stale" || catalogueState.status === "error"))
+        || actionError !== null
+        || photoError !== null
+        || photoSuccess !== null) ? (
+        <View style={styles.workflowStatus} testID="nutrition-workflow-status">
+          {dailyState.status === "offline" || dailyState.status === "stale" ? (
+            <Notice compact message="آخرین ثبت ذخیره‌شده نمایش داده می‌شود؛ تغییرات جدید بعد از اتصال انجام می‌شوند." variant="offline" />
           ) : null}
-          <View style={styles.recentRow}>
-            {recentFoods.slice(0, 8).map((food) => (
-              <Button
-                disabled={actionBusy}
-                key={food.food_id}
-                label={`${food.display_name} · ${displayNutrient(food.last_quantity_grams ?? 100)} g`}
-                onPress={() => void addRecentFood(food.food_id, food.last_quantity_grams)}
-                variant="ghost"
-              />
+          {estimateState.status === "offline" || estimateState.status === "stale" || estimate?.is_stale ? (
+            <Notice compact message="هدف‌های ذخیره‌شده نمایش داده می‌شوند؛ ممکن است با آخرین وضعیت پروفایل هماهنگ نباشند." variant="offline" />
+          ) : null}
+          {estimateState.status === "error" && estimate === null ? (
+            <Notice compact message="هدف برنامه دریافت نشد؛ ثبت‌های واقعی امروز همچنان در دسترس هستند." variant="warning" />
+          ) : null}
+          {entryMode === "manual" && (catalogueState.status === "offline" || catalogueState.status === "stale") ? (
+            <Notice compact message="فهرست مواد غذایی تازه‌سازی نشده است." variant="offline" />
+          ) : null}
+          {entryMode === "manual" && catalogueState.status === "error" ? (
+            <Notice actionLabel="تلاش دوباره" compact message="فهرست مواد غذایی دریافت نشد." onAction={() => void catalogueQuery.refetch()} variant="danger" />
+          ) : null}
+          {actionError !== null ? <Notice compact message={actionError} variant="danger" /> : null}
+          {photoError !== null ? <Notice compact message={photoError} variant="danger" /> : null}
+          {photoSuccess !== null ? <Notice compact message={photoSuccess} variant="success" /> : null}
+        </View>
+      ) : null}
+
+      <View aria-label="کالری ثبت‌شده" style={styles.dailyPanel} testID="nutrition-daily-panel">
+        <View style={styles.dailyCalories}>
+          <Text style={styles.dailyLabel}>کالری ثبت‌شده</Text>
+          <Text style={styles.dailyValue}>{displayNutrient(daily.actual_totals.energy_kcal ?? daily.actual_totals.calories)}</Text>
+          <Text style={styles.dailyPlanned}><Text style={styles.dailyPlannedStrong}>کالری برنامه</Text> · {displayNutrient(plannedCalories)} kcal</Text>
+        </View>
+        <View style={[styles.metricStrip, RTL_ROW]}>
+          <DailyMetric label="پروتئین" value={`${displayNutrient(daily.actual_totals.protein_g)} g`} />
+          <View style={styles.metricDivider} />
+          <DailyMetric label="ثبت امروز" value={formatNutritionNumber(daily.entries.length)} />
+          <View style={styles.metricDivider} />
+          <DailyMetric label="کیفیت داده" value={daily.data_status === "sufficient" ? "کافی" : "—"} />
+        </View>
+      </View>
+
+      {daily.entries.length > 0 ? (
+        <Card style={styles.entriesCard} testID="nutrition-today-entries">
+          <View style={styles.sectionHeading}>
+            <Text style={styles.sectionTitle}>ثبت‌های امروز</Text>
+            <Text style={styles.mutedText}>{formatNutritionNumber(visibleEntries.length)} مورد</Text>
+          </View>
+          <View style={[styles.filterRow, RTL_ROW]}>
+            {entrySourceOptions.map((source) => (
+              <Pressable
+                accessibilityLabel={source === "all" ? "همه" : trackingSourceLabel(source)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: sourceFilter === source }}
+                key={source}
+                onPress={() => setSourceFilter(source)}
+                style={[styles.filterButton, sourceFilter === source && styles.filterButtonSelected]}
+              >
+                <Text style={[styles.filterText, sourceFilter === source && styles.filterTextSelected]}>
+                  {source === "all" ? "همه" : trackingSourceLabel(source)}
+                </Text>
+              </Pressable>
             ))}
           </View>
+          {visibleEntries.length === 0 ? (
+            <View style={styles.filteredEmpty}>
+              <Text style={styles.entryTitle}>برای این فیلتر ثبتی نیست.</Text>
+            </View>
+          ) : (
+            <View style={styles.entryStack}>
+              {visibleEntries.map((entry) => (
+                <TrackingEntryCard
+                  actionBusy={actionBusy}
+                  amount={entryAmounts[entry.id] ?? String(entry.quantity_grams ?? "")}
+                  entry={entry}
+                  key={entry.id}
+                  onAmountChange={(amount) => setEntryAmounts((current) => ({ ...current, [entry.id]: amount }))}
+                  onDelete={() => setEntryToDelete(entry)}
+                  onEdit={() => void editEntry(entry)}
+                  onPlannedChange={(status) => void adjustPlannedMeal(entry, status)}
+                />
+              ))}
+            </View>
+          )}
         </Card>
       ) : null}
 
-      <Card style={styles.card}>
-        <View style={styles.sectionHeading}>
-          <Text style={styles.cardTitle}>ثبت‌های امروز</Text>
-          <Text style={styles.mutedText}>{formatNutritionNumber(visibleEntries.length)} مورد</Text>
-        </View>
-        <View style={styles.choiceRow}>
-          {entrySourceOptions.map((source) => (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: sourceFilter === source }}
-              key={source}
-              onPress={() => setSourceFilter(source)}
-              style={[styles.choice, sourceFilter === source && styles.choiceSelected]}
-            >
-              <Text style={[styles.choiceText, sourceFilter === source && styles.choiceTextSelected]}>{source === "all" ? "همه" : trackingSourceLabel(source)}</Text>
-            </Pressable>
-          ))}
-        </View>
-        {visibleEntries.length === 0 ? (
-          <EmptyState title="هنوز ثبتی برای این فیلتر نیست">ثبت دقیق، سریع یا از روی برنامه را از همین صفحه شروع کن.</EmptyState>
-        ) : (
-          <View style={styles.entryStack}>
-            {visibleEntries.map((entry) => (
-              <TrackingEntryCard
-                actionBusy={actionBusy}
-                amount={entryAmounts[entry.id] ?? String(entry.quantity_grams ?? "")}
-                entry={entry}
-                key={entry.id}
-                onAmountChange={(amount) => setEntryAmounts((current) => ({ ...current, [entry.id]: amount }))}
-                onDelete={() => setEntryToDelete(entry)}
-                onEdit={() => void editEntry(entry)}
-                onPlannedChange={(status) => void adjustPlannedMeal(entry, status)}
-              />
-            ))}
-          </View>
-        )}
-      </Card>
       <Dialog
         cancelLabel="انصراف"
         confirmLabel="حذف ثبت"
@@ -645,6 +618,273 @@ export function NutritionTrackingSection() {
         title="حذف ثبت تغذیه"
         visible={entryToDelete !== null}
       />
+
+      <View style={styles.adherenceSection} testID="nutrition-adherence">
+        <NutritionAdherenceSection embedded onTodayPlannedCaloriesChange={setPlannedCalories} />
+      </View>
+
+      <Card style={styles.checkinCard} testID="nutrition-checkin">
+        <View style={[styles.checkinHeading, RTL_ROW]}>
+          <View style={styles.headingCopy}>
+            <Text style={styles.checkinEyebrow}>آخرین مرحله امروز</Text>
+            <Text style={styles.checkinTitle}>وضعیت امروز را ثبت کن</Text>
+          </View>
+          <Text style={styles.optionalBadge}>اختیاری</Text>
+        </View>
+        <View style={[styles.checkinOptions, RTL_ROW]}>
+          {checkInOptions.map((status) => (
+            <Pressable
+              accessibilityLabel={checkInOptionLabel(status)}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: actionBusy, selected: checkInValue === status }}
+              disabled={actionBusy}
+              key={status}
+              onPress={() => void saveCheckIn(status)}
+              style={[styles.checkinOption, checkInValue === status && styles.checkinOptionSelected]}
+            >
+              <Text style={[styles.checkinOptionText, checkInValue === status && styles.checkinOptionTextSelected]}>
+                {checkInOptionLabel(status)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </Card>
+    </View>
+  );
+}
+
+function EntryMethodButton({
+  icon,
+  mode,
+  onPress,
+  selected,
+  subtitle,
+  title,
+}: {
+  readonly icon: "camera" | "catalogue";
+  readonly mode: Exclude<EntryMode, null>;
+  readonly onPress: () => void;
+  readonly selected: boolean;
+  readonly subtitle: string;
+  readonly title: string;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={title}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: selected, selected }}
+      accessible
+      onPress={onPress}
+      style={[styles.entryMethod, selected && styles.entryMethodSelected]}
+      testID={`nutrition-entry-method-${mode}`}
+    >
+      <View style={styles.entryMethodIcon}>
+        <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={fiticianTokens.iconSize.md} />
+      </View>
+      <View style={styles.entryMethodCopy}>
+        <Text style={styles.entryMethodTitle}>{title}</Text>
+        <Text style={styles.entryMethodSubtitle}>{subtitle}</Text>
+      </View>
+      <AppIcon color={fiticianTokens.colors.aqua} name={selected ? "chevronUp" : "chevronDown"} size={fiticianTokens.iconSize.sm} />
+    </Pressable>
+  );
+}
+
+function ManualEntryPanel({
+  actionBusy,
+  catalogueFoods,
+  catalogueSearch,
+  catalogueState,
+  grams,
+  onAddCatalogue,
+  onAddQuick,
+  onCatalogueSearchChange,
+  onFoodChange,
+  onGramsChange,
+  onQuickCaloriesChange,
+  onRecentFood,
+  quickCalories,
+  recentFoods,
+  recentState,
+  selectedFoodId,
+}: {
+  readonly actionBusy: boolean;
+  readonly catalogueFoods: readonly FoodCatalogueItem[];
+  readonly catalogueSearch: string;
+  readonly catalogueState: string;
+  readonly grams: string;
+  readonly onAddCatalogue: () => void;
+  readonly onAddQuick: () => void;
+  readonly onCatalogueSearchChange: (value: string) => void;
+  readonly onFoodChange: (foodId: string) => void;
+  readonly onGramsChange: (value: string) => void;
+  readonly onQuickCaloriesChange: (value: string) => void;
+  readonly onRecentFood: (foodId: string, grams: number | null) => void;
+  readonly quickCalories: string;
+  readonly recentFoods: readonly components["schemas"]["NutritionRecentFoodResponse"][];
+  readonly recentState: string;
+  readonly selectedFoodId: string | null;
+}) {
+  return (
+    <Card style={styles.entryPanel} testID="nutrition-manual-entry-panel">
+      <View style={styles.panelHeader}>
+        <Text style={styles.panelEyebrow}>ثبت دقیق یا سریع</Text>
+        <Text style={styles.panelTitle}>ثبت دستی غذا</Text>
+        <Text style={styles.panelDescription}>غذا را دقیق از کاتالوگ ثبت کن یا فقط یک برآورد سریع وارد کن.</Text>
+      </View>
+
+      {recentFoods.length > 0 ? (
+        <View style={styles.recentCard}>
+          <View style={[styles.recentHeading, RTL_ROW]}>
+            <View style={styles.recentIcon}>
+              <AppIcon color={fiticianTokens.colors.aqua} name="foodLog" size={fiticianTokens.iconSize.sm} />
+            </View>
+            <View style={styles.headingCopy}>
+              <Text style={styles.recentTitle}>غذاهای اخیر</Text>
+              <Text style={styles.recentSubtitle}>برای ثبت سریع، یکی را انتخاب کن</Text>
+            </View>
+          </View>
+          {recentState === "offline" || recentState === "stale" ? (
+            <Notice compact message="غذاهای اخیر از آخرین نسخه ذخیره‌شده نمایش داده می‌شوند." variant="offline" />
+          ) : null}
+          <View style={styles.recentActions}>
+            {recentFoods.map((food) => (
+              <Button
+                disabled={actionBusy}
+                key={food.food_id}
+                label={`${food.display_name} · ${formatNutritionNumber(food.last_quantity_grams ?? 100)} گرم`}
+                onPress={() => onRecentFood(food.food_id, food.last_quantity_grams)}
+                style={styles.recentButton}
+                variant="ghost"
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.formGroup}>
+        <Text style={styles.groupTitle}>ثبت دقیق از کاتالوگ</Text>
+        <FoodSelector
+          foods={catalogueFoods}
+          onSearchChange={onCatalogueSearchChange}
+          onSelect={onFoodChange}
+          searchable
+          search={catalogueSearch}
+          selectedFoodId={selectedFoodId}
+          testID="nutrition-catalogue-selector"
+        />
+        <TextField
+          accessibilityLabel="مقدار به گرم"
+          keyboardType="decimal-pad"
+          label="مقدار به گرم"
+          onChangeText={onGramsChange}
+          textDirection="ltr"
+          value={grams}
+        />
+        <Button disabled={actionBusy || selectedFoodId === null} label="ثبت از کاتالوگ" onPress={onAddCatalogue} />
+        {catalogueState === "loading" ? <Text style={styles.mutedText}>در حال دریافت فهرست غذا…</Text> : null}
+      </View>
+
+      <View style={[styles.formGroup, styles.quickGroup]}>
+        <Text style={styles.groupTitle}>ثبت تقریبی سریع</Text>
+        <TextField
+          accessibilityLabel="کالری تقریبی"
+          keyboardType="decimal-pad"
+          label="کالری تقریبی"
+          onChangeText={onQuickCaloriesChange}
+          textDirection="ltr"
+          value={quickCalories}
+        />
+        <Button disabled={actionBusy} label="ثبت تقریبی" onPress={onAddQuick} />
+      </View>
+    </Card>
+  );
+}
+
+function FoodSelector({
+  foods,
+  onSearchChange,
+  onSelect,
+  searchable = false,
+  search,
+  selectedFoodId,
+  testID,
+}: {
+  readonly foods: readonly FoodCatalogueItem[];
+  readonly onSearchChange?: (value: string) => void;
+  readonly onSelect: (foodId: string) => void;
+  readonly searchable?: boolean;
+  readonly search?: string;
+  readonly selectedFoodId: string | null;
+  readonly testID?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [localSearch, setLocalSearch] = useState("");
+  const query = search ?? localSearch;
+  const selectedFood = foods.find((food) => food.id === selectedFoodId) ?? null;
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const visibleFoods = foods
+    .filter((food) => normalizedQuery.length === 0
+      || food.name_fa.toLocaleLowerCase().includes(normalizedQuery)
+      || food.name_en.toLocaleLowerCase().includes(normalizedQuery))
+    .slice(0, 12);
+  const selectorLabel = selectedFood === null ? "انتخاب ماده غذایی" : `ماده غذایی: ${selectedFood.name_fa}`;
+
+  function changeSearch(value: string): void {
+    setLocalSearch(value);
+    onSearchChange?.(value);
+  }
+
+  function selectFood(foodId: string): void {
+    onSelect(foodId);
+    setOpen(false);
+    setLocalSearch("");
+    onSearchChange?.("");
+  }
+
+  return (
+    <View style={styles.selectorField}>
+      <Text style={styles.fieldLabel}>انتخاب ماده غذایی</Text>
+      <Pressable
+        accessibilityLabel={selectorLabel}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open, selected: selectedFood !== null }}
+        onPress={() => setOpen((current) => !current)}
+        style={styles.selectorButton}
+        testID={testID}
+      >
+        <Text style={[styles.selectorText, selectedFood === null && styles.selectorPlaceholder]}>
+          {selectedFood?.name_fa ?? "انتخاب کن…"}
+        </Text>
+        <AppIcon color={fiticianTokens.colors.aqua} name={open ? "chevronUp" : "chevronDown"} size={fiticianTokens.iconSize.sm} />
+      </Pressable>
+      {open ? (
+        <View style={styles.selectorOptions}>
+          {searchable ? (
+            <TextField
+              accessibilityLabel="جستجوی ماده غذایی"
+              label="جستجو"
+              onChangeText={changeSearch}
+              value={query}
+            />
+          ) : null}
+          {visibleFoods.length === 0 ? <Text style={styles.mutedText}>غذایی پیدا نشد.</Text> : null}
+          {visibleFoods.map((food) => (
+            <Pressable
+              accessibilityLabel={food.name_fa}
+              accessibilityRole="button"
+              accessibilityState={{ selected: selectedFoodId === food.id }}
+              key={food.id}
+              onPress={() => selectFood(food.id)}
+              style={[styles.selectorOption, selectedFoodId === food.id && styles.selectorOptionSelected]}
+            >
+              <Text style={[styles.selectorOptionText, selectedFoodId === food.id && styles.selectorOptionTextSelected]}>
+                {food.name_fa}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -654,7 +894,6 @@ function FoodPhotoCard({
   amounts,
   catalogueFoods,
   consent,
-  error,
   estimate,
   foodIds,
   onAmountChange,
@@ -666,13 +905,13 @@ function FoodPhotoCard({
   onPickCamera,
   onPickGallery,
   onCorrectItem,
+  previewUri,
   uploading,
 }: {
   readonly actionBusy: boolean;
   readonly amounts: Readonly<Record<string, string>>;
   readonly catalogueFoods: readonly FoodCatalogueItem[];
   readonly consent: boolean;
-  readonly error: string | null;
   readonly estimate: NutritionFoodPhotoEstimate | null;
   readonly foodIds: Readonly<Record<string, string>>;
   readonly onAmountChange: (itemId: string, value: string) => void;
@@ -684,83 +923,100 @@ function FoodPhotoCard({
   readonly onPickCamera: () => void;
   readonly onPickGallery: () => void;
   readonly onCorrectItem: (item: PhotoItem) => void;
+  readonly previewUri: string | null;
   readonly uploading: boolean;
 }) {
   const presentation = estimate === null ? null : photoEstimatePresentation(estimate);
+  const macroTotals = estimate?.macro_totals;
   return (
-    <Card style={styles.card}>
-      <View style={styles.sectionHeading}>
-        <View style={styles.headingCopy}>
-          <Text style={styles.cardTitle}>عکس وعده</Text>
-          <Text style={styles.bodyText}>تخمین از روی عکس غذا انجام می‌شود و تا تأیید تو ثبت نهایی نیست.</Text>
-        </View>
+    <Card style={styles.entryPanel} testID="nutrition-photo-entry-panel">
+      <View style={styles.panelHeader}>
+        <Text style={styles.panelEyebrow}>تخمین تصویری</Text>
+        <Text style={styles.panelTitle}>عکس وعده</Text>
       </View>
+
+      <View style={styles.photoStage}>
+        {previewUri === null ? (
+          <View style={styles.photoPlaceholder}>
+            <AppIcon color={fiticianTokens.colors.aqua} name="camera" size={fiticianTokens.iconSize.xl} />
+            <Text style={styles.photoPlaceholderText}>عکس غذا را انتخاب کن</Text>
+          </View>
+        ) : (
+          <Image
+            accessibilityLabel="پیش‌نمایش عکس وعده"
+            accessible
+            resizeMode="cover"
+            source={{ uri: previewUri }}
+            style={styles.photoPreview}
+            testID="nutrition-photo-preview"
+          />
+        )}
+        {uploading ? (
+          <View accessible accessibilityLabel="در حال تحلیل…" accessibilityRole="progressbar" style={styles.photoBusyOverlay}>
+            <Text style={styles.photoBusyText}>در حال تحلیل…</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <Text style={styles.photoDisclosure}>عکس فقط برای شناسایی تقریبی غذا از طریق سرویس هوش مصنوعی تنظیم‌شده پردازش می‌شود؛ اطلاعات حساب یا پزشکی همراه آن ارسال نمی‌شود.</Text>
       <Pressable
+        accessibilityLabel="با پردازش عکس توسط سرویس ثالث موافقم"
         accessibilityRole="checkbox"
         accessibilityState={{ checked: consent }}
+        accessible
         onPress={() => onConsentChange(!consent)}
-        style={styles.consentRow}
+        style={[styles.consentRow, RTL_ROW]}
       >
         <View style={[styles.checkbox, consent && styles.checkboxChecked]}>
           {consent ? <Text style={styles.checkboxMark}>✓</Text> : null}
         </View>
-        <Text style={styles.bodyText}>با پردازش عکس توسط سرویس ثالث موافقم.</Text>
+        <Text style={styles.consentText}>با پردازش عکس توسط سرویس ثالث موافقم</Text>
       </Pressable>
-      <View style={styles.photoActions}>
-        <Button disabled={uploading || !consent} label="انتخاب از گالری" onPress={onPickGallery} variant="secondary" />
-        <Button disabled={uploading || !consent} label="گرفتن عکس" onPress={onPickCamera} />
+
+      <View style={[styles.photoActions, RTL_ROW]}>
+        <PhotoSourceButton disabled={uploading || !consent} icon="camera" label="گرفتن عکس" onPress={onPickCamera} />
+        <PhotoSourceButton disabled={uploading || !consent} icon="foodLog" label="انتخاب از گالری" onPress={onPickGallery} />
       </View>
-      {uploading ? <Notice message="در حال بارگذاری و تحلیل عکس…" variant="info" /> : null}
-      {error !== null ? <Notice message={error} variant="danger" /> : null}
+
       {estimate !== null && presentation !== null ? (
-        <View style={styles.photoResult}>
-          <Notice message={presentation.message} title={presentation.title} variant="warning" />
-          <View style={styles.metricRow}>
-            <Metric label="انرژی تخمینی" value={displayNutrient(estimate.macro_totals.energy_kcal ?? estimate.macro_totals.calories)} unit="kcal" />
-            <Metric label="پروتئین" value={displayNutrient(estimate.macro_totals.protein_g)} unit="g" />
-            <Metric label="چربی" value={displayNutrient(estimate.macro_totals.fat_g)} unit="g" />
+        <View style={styles.photoResult} testID="nutrition-photo-result">
+          <View style={styles.photoSummary}>
+            <Text style={styles.photoCaloriesLabel}>کالری تخمینی</Text>
+            <Text style={styles.photoCaloriesValue}>{displayNutrient(macroTotals?.energy_kcal ?? macroTotals?.calories)} kcal</Text>
+            <Text style={styles.photoEstimateBadge}>تخمینی</Text>
+            <View style={[styles.photoMacroRow, RTL_ROW]}>
+              <PhotoMacro label="پروتئین" value={`${displayNutrient(macroTotals?.protein_g)} g`} />
+              <PhotoMacro label="کربوهیدرات" value={`${displayNutrient(macroTotals?.carbohydrate_g)} g`} />
+              <PhotoMacro label="چربی" value={`${displayNutrient(macroTotals?.fat_g)} g`} />
+            </View>
           </View>
           {!estimate.macro_totals_complete ? (
             <Notice message="برای تکمیل نتیجه، موارد نامشخص را اصلاح یا حذف کن." variant="warning" />
           ) : null}
-          <View style={styles.photoItems}>
-            {estimate.items.map((item) => (
-              <View key={item.item_id} style={styles.photoItem}>
-                <View style={styles.sectionHeading}>
-                  <Text style={styles.entryTitle}>{item.name_guess}</Text>
-                  <Text style={styles.mutedText}>{item.mapping_status === "resolved" ? "تطبیق‌یافته" : "نیازمند بررسی"}</Text>
-                </View>
-                <Text style={styles.bodyText}>اعتماد: {adherencePercentLabel(item.confidence)} · واحد: {item.unit}</Text>
-                {item.mapping_status === "unresolved" ? (
-                  <View style={styles.foodChoiceRow}>
-                    {catalogueFoods.slice(0, 8).map((food) => (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: foodIds[item.item_id] === food.id }}
-                        key={food.id}
-                        onPress={() => onChooseFood(item.item_id, food.id)}
-                        style={[styles.foodChoice, foodIds[item.item_id] === food.id && styles.foodChoiceSelected]}
-                      >
-                        <Text style={styles.foodChoiceText}>{food.name_fa}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
-                <TextField
-                  accessibilityLabel={`مقدار ${item.name_guess}`}
-                  keyboardType="decimal-pad"
-                  label="مقدار"
-                  onChangeText={(value) => onAmountChange(item.item_id, value)}
-                  textDirection="ltr"
-                  value={amounts[item.item_id] ?? String(item.estimated_amount)}
+          <DisclosureCard
+            defaultExpanded={false}
+            icon="foodLog"
+            style={styles.photoDetails}
+            summary="موارد شناسایی‌شده را بررسی کن"
+            title={`جزئیات تشخیص · ${estimate.items.length} مورد`}
+          >
+            <View style={styles.photoItems}>
+              {estimate.items.map((item) => (
+                <PhotoItemCard
+                  amounts={amounts}
+                  catalogueFoods={catalogueFoods}
+                  foodIds={foodIds}
+                  item={item}
+                  key={item.item_id}
+                  onAmountChange={onAmountChange}
+                  onChooseFood={onChooseFood}
+                  onDelete={onDeleteItem}
+                  onCorrect={onCorrectItem}
+                  actionBusy={actionBusy}
                 />
-                <View style={styles.photoItemActions}>
-                  <Button disabled={actionBusy} label="اعمال اصلاح" onPress={() => onCorrectItem(item)} variant="secondary" />
-                  <Button disabled={actionBusy} label="حذف مورد" onPress={() => onDeleteItem(item)} variant="danger" />
-                </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          </DisclosureCard>
           <Button
             disabled={actionBusy || !presentation.canConfirm || !estimate.macro_totals_complete}
             label="تأیید و ثبت در امروز"
@@ -770,6 +1026,96 @@ function FoodPhotoCard({
         </View>
       ) : null}
     </Card>
+  );
+}
+
+function PhotoSourceButton({
+  disabled,
+  icon,
+  label,
+  onPress,
+}: {
+  readonly disabled: boolean;
+  readonly icon: "camera" | "foodLog";
+  readonly label: string;
+  readonly onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      accessible
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.photoSourceButton, disabled && styles.photoSourceButtonDisabled]}
+    >
+      <AppIcon color={disabled ? fiticianTokens.colors.muted : fiticianTokens.colors.aqua} name={icon} size={fiticianTokens.iconSize.sm} />
+      <Text style={[styles.photoSourceText, disabled && styles.photoSourceTextDisabled]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function PhotoMacro({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <View style={styles.photoMacro}>
+      <Text style={styles.photoMacroLabel}>{label}</Text>
+      <Text style={styles.photoMacroValue}>{value}</Text>
+    </View>
+  );
+}
+
+function PhotoItemCard({
+  actionBusy,
+  amounts,
+  catalogueFoods,
+  foodIds,
+  item,
+  onAmountChange,
+  onChooseFood,
+  onDelete,
+  onCorrect,
+}: {
+  readonly actionBusy: boolean;
+  readonly amounts: Readonly<Record<string, string>>;
+  readonly catalogueFoods: readonly FoodCatalogueItem[];
+  readonly foodIds: Readonly<Record<string, string>>;
+  readonly item: PhotoItem;
+  readonly onAmountChange: (itemId: string, value: string) => void;
+  readonly onChooseFood: (itemId: string, foodId: string) => void;
+  readonly onDelete: (item: PhotoItem) => void;
+  readonly onCorrect: (item: PhotoItem) => void;
+}) {
+  return (
+    <View style={styles.photoItem}>
+      <View style={[styles.photoItemHeader, RTL_ROW]}>
+        <View style={styles.headingCopy}>
+          <Text style={styles.entryTitle}>{item.name_guess}</Text>
+          <Text style={styles.mutedText}>{item.mapping_status === "resolved" ? "تطبیق‌یافته" : "نیاز به بررسی"}</Text>
+        </View>
+        <Text style={styles.photoItemConfidence}>اعتماد: {adherencePercentLabel(item.confidence)}</Text>
+      </View>
+      {item.mapping_status === "unresolved" ? (
+        <FoodSelector
+          foods={catalogueFoods}
+          onSelect={(foodId) => onChooseFood(item.item_id, foodId)}
+          selectedFoodId={foodIds[item.item_id] ?? null}
+          testID={`nutrition-photo-food-selector-${item.item_id}`}
+        />
+      ) : null}
+      <TextField
+        accessibilityLabel={`مقدار ${item.name_guess}`}
+        keyboardType="decimal-pad"
+        label={`مقدار به ${item.unit === "g" ? "گرم" : item.unit}`}
+        onChangeText={(value) => onAmountChange(item.item_id, value)}
+        textDirection="ltr"
+        value={amounts[item.item_id] ?? String(item.estimated_amount)}
+      />
+      <View style={[styles.photoItemActions, RTL_ROW]}>
+        <Button disabled={actionBusy} label="اعمال اصلاح" onPress={() => onCorrect(item)} variant="secondary" />
+        <Button disabled={actionBusy} label="حذف مورد" onPress={() => onDelete(item)} variant="danger" />
+      </View>
+    </View>
   );
 }
 
@@ -792,14 +1138,14 @@ function TrackingEntryCard({
 }) {
   return (
     <View style={styles.entryCard}>
-      <View style={styles.sectionHeading}>
+      <View style={[styles.sectionHeading, RTL_ROW]}>
         <View style={styles.headingCopy}>
           <Text style={styles.entryTitle}>{entry.display_name}</Text>
           <Text style={styles.mutedText}>{trackingSourceLabel(entry.source)}</Text>
         </View>
         <Text style={styles.statusText}>{entry.user_confirmed ? "تأییدشده" : "تخمینی"}</Text>
       </View>
-      <View style={styles.entryMeta}>
+      <View style={[styles.entryMeta, RTL_ROW]}>
         {entry.quantity_grams !== null ? <Text style={styles.bodyText}>{displayNutrient(entry.quantity_grams)} گرم</Text> : null}
         <Text style={styles.bodyText}>{displayNutrient(entry.nutrients.energy_kcal ?? entry.nutrients.calories)} kcal</Text>
         <Text style={styles.bodyText}>{displayNutrient(entry.nutrients.protein_g)} g پروتئین</Text>
@@ -818,7 +1164,7 @@ function TrackingEntryCard({
         </View>
       ) : null}
       {entry.planned_meal_id !== null ? (
-        <View style={styles.photoItemActions}>
+        <View style={[styles.photoItemActions, RTL_ROW]}>
           <Button disabled={actionBusy} label="نصف مقدار" onPress={() => onPlannedChange("adjusted")} variant="secondary" />
           <Button disabled={actionBusy} label="نخوردم" onPress={() => onPlannedChange("skipped")} variant="ghost" />
         </View>
@@ -828,17 +1174,11 @@ function TrackingEntryCard({
   );
 }
 
-function Metric({ label, target, unit, value }: {
-  readonly label: string;
-  readonly target?: string;
-  readonly unit: string;
-  readonly value: string;
-}) {
+function DailyMetric({ label, value }: { readonly label: string; readonly value: string }) {
   return (
-    <View style={styles.metric}>
-      <Text style={styles.metricValue}>{value}{unit ? ` ${unit}` : ""}</Text>
-      <Text style={styles.mutedText}>{label}</Text>
-      {target !== undefined ? <Text style={styles.metricTarget}>هدف برنامه: {target}</Text> : null}
+    <View style={styles.dailyMetric}>
+      <Text style={styles.dailyMetricValue}>{value}</Text>
+      <Text style={styles.dailyMetricLabel}>{label}</Text>
     </View>
   );
 }
@@ -854,22 +1194,17 @@ function displayNutrient(value: number | null | undefined): string {
     : formatNutritionNumber(Math.round(value));
 }
 
-function nutritionTargetLabel(
-  estimate: NutritionEstimate | null,
-  codes: readonly string[],
-  fallbackUnit: string,
-): string | undefined {
-  if (estimate === null) return undefined;
-  const target = codes.map((code) => estimate.targets[code]).find((candidate) => candidate !== undefined);
-  if (target === undefined) return undefined;
-  const lower = target.minimum ?? target.preferred;
-  const upper = target.preferred_maximum ?? target.maximum;
-  const unit = fallbackUnit;
-  if (lower !== null && upper !== null && lower !== upper) {
-    return `${formatNutritionNumber(lower)}–${formatNutritionNumber(upper)} ${unit}`;
+function checkInOptionLabel(status: CheckInStatus): string {
+  switch (status) {
+    case "on_plan":
+      return "طبق برنامه";
+    case "mostly_on_plan":
+      return "تقریباً طبق برنامه";
+    case "off_plan":
+      return "خارج از برنامه";
+    case "not_recorded":
+      return "ثبت نمی‌کنم";
   }
-  const value = target.preferred ?? target.minimum ?? target.preferred_maximum ?? target.maximum;
-  return value === null ? "—" : `${formatNutritionNumber(value)} ${unit}`;
 }
 
 function numericValue(value: string): number {
@@ -908,34 +1243,24 @@ function useConnectivityStatus(): ConnectivityStatus {
 }
 
 const styles = StyleSheet.create({
+  adherenceSection: {
+    width: "100%",
+  },
   bodyText: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 23,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
-  card: {
-    gap: fiticianTokens.spacing[3],
-    marginTop: fiticianTokens.spacing[3],
-  },
-  cardTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h3,
-    lineHeight: 28,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
   checkbox: {
     alignItems: "center",
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
-    height: 24,
+    height: fiticianTokens.iconSize.md,
     justifyContent: "center",
-    width: 24,
+    width: fiticianTokens.iconSize.md,
   },
   checkboxChecked: {
     backgroundColor: fiticianTokens.colors.aqua,
@@ -948,57 +1273,164 @@ const styles = StyleSheet.create({
     textAlign: "center",
     writingDirection: "ltr",
   },
-  choice: {
+  consentRow: {
+    alignItems: "center",
+    gap: fiticianTokens.spacing[2],
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+  },
+  consentText: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+  },
+  checkinCard: {
+    backgroundColor: fiticianTokens.colors.surface,
+    gap: fiticianTokens.spacing[3],
+    marginTop: 0,
+  },
+  checkinEyebrow: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  checkinHeading: {
+    alignItems: "center",
+    gap: fiticianTokens.spacing[3],
+  },
+  checkinOption: {
+    alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.pill,
+    borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
+    flexBasis: "48%",
+    flexGrow: 1,
+    justifyContent: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: fiticianTokens.spacing[3],
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[2],
   },
-  choiceRow: {
-    flexDirection: "row",
+  checkinOptionSelected: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  checkinOptionText: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "center",
+  },
+  checkinOptionTextSelected: {
+    color: fiticianTokens.colors.aqua,
+  },
+  checkinOptions: {
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
-  choiceSelected: {
-    backgroundColor: fiticianTokens.colors.aqua,
-    borderColor: fiticianTokens.colors.aqua,
+  checkinTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 28,
   },
-  choiceText: {
-    color: fiticianTokens.colors.mist,
+  dailyCalories: {
+    gap: fiticianTokens.spacing[1],
+  },
+  dailyLabel: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
-  choiceTextSelected: {
-    color: fiticianTokens.colors.canvas,
-  },
-  consentRow: {
+  dailyMetric: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[3],
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
   },
-  dataStatusRow: {
-    borderTopColor: fiticianTokens.colors.line,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: fiticianTokens.spacing[3],
+  dailyMetricLabel: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    textAlign: "center",
   },
-  dateText: {
-    color: fiticianTokens.colors.aqua,
+  dailyMetricValue: {
+    color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
-    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
     writingDirection: "ltr",
   },
-  divider: {
-    borderTopColor: fiticianTokens.colors.line,
-    borderTopWidth: 1,
-    marginVertical: fiticianTokens.spacing[2],
+  dailyPanel: {
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[3],
+    padding: fiticianTokens.spacing[4],
+    width: "100%",
+  },
+  dailyPlanned: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+  },
+  dailyPlannedStrong: {
+    color: fiticianTokens.colors.ink,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+  },
+  dailyValue: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.metric,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 34,
+    writingDirection: "ltr",
+  },
+  entryBranchArea: {
+    marginTop: -fiticianTokens.spacing[3],
+    paddingTop: 28,
+    position: "relative",
+  },
+  entryBranchHorizontal: {
+    backgroundColor: fiticianTokens.colors.lineStrong,
+    height: 1,
+    left: "25%",
+    position: "absolute",
+    right: "25%",
+    top: 16,
+  },
+  entryBranchStem: {
+    backgroundColor: fiticianTokens.colors.lineStrong,
+    height: 12,
+    position: "absolute",
+    top: 16,
+    width: 1,
+  },
+  entryBranchStemEnd: {
+    right: "25%",
+  },
+  entryBranchStemStart: {
+    left: "25%",
+  },
+  entryBranchVertical: {
+    backgroundColor: fiticianTokens.colors.lineStrong,
+    height: 16,
+    left: "50%",
+    position: "absolute",
+    top: 0,
+    width: 1,
   },
   entryCard: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
@@ -1008,147 +1440,568 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     padding: fiticianTokens.spacing[3],
   },
-  entryMeta: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  entryHub: {
     gap: fiticianTokens.spacing[3],
-    justifyContent: "flex-start",
+    width: "100%",
+  },
+  entryHubEyebrow: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  entryMethod: {
+    ...RTL_ROW,
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.soft.elevation,
+    flex: 1,
+    gap: fiticianTokens.spacing[2],
+    minHeight: 98,
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[3],
+    shadowColor: fiticianTokens.shadows.soft.color,
+    shadowOffset: fiticianTokens.shadows.soft.offset,
+    shadowOpacity: fiticianTokens.shadows.soft.opacity,
+    shadowRadius: fiticianTokens.shadows.soft.radius,
+  },
+  entryMethodCopy: {
+    alignItems: "stretch",
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+  },
+  entryMethodIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  entryMethodRow: {
+    gap: fiticianTokens.spacing[2],
+    width: "100%",
+  },
+  entryMethodSelected: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.aqua,
+    shadowColor: fiticianTokens.colors.aqua,
+    shadowOpacity: fiticianTokens.shadows.glow.opacity,
+  },
+  entryMethodSubtitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    lineHeight: 16,
+  },
+  entryMethodTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  entryMeta: {
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+  },
+  entryPanel: {
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.lineStrong,
+    gap: fiticianTokens.spacing[3],
+    padding: fiticianTokens.spacing[3],
+    width: "100%",
+  },
+  entryRoot: {
+    ...RTL_ROW,
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.soft.elevation,
+    gap: fiticianTokens.spacing[3],
+    justifyContent: "center",
+    maxWidth: 368,
+    minHeight: 80,
+    paddingHorizontal: fiticianTokens.spacing[4],
+    paddingVertical: fiticianTokens.spacing[3],
+    shadowColor: fiticianTokens.shadows.soft.color,
+    shadowOffset: fiticianTokens.shadows.soft.offset,
+    shadowOpacity: fiticianTokens.shadows.soft.opacity,
+    shadowRadius: fiticianTokens.shadows.soft.radius,
+    width: "100%",
+  },
+  entryRootCopy: {
+    alignItems: "stretch",
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+  },
+  entryRootIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderRadius: fiticianTokens.radii.small,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  entryRootSubtitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+  },
+  entryRootTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 26,
   },
   entryStack: {
     gap: fiticianTokens.spacing[3],
   },
   entryTitle: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
+    fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
-  eyebrow: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    letterSpacing: 1,
-    textAlign: "right",
-    writingDirection: "ltr",
+  entriesCard: {
+    gap: fiticianTokens.spacing[3],
+    marginTop: 0,
+    width: "100%",
   },
-  foodChoice: {
+  fieldLabel: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.medium,
+  },
+  filterButton: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    maxWidth: "100%",
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    minHeight: 40,
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
   },
-  foodChoiceRow: {
-    flexDirection: "row",
+  filterButtonSelected: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+  },
+  filterRow: {
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
-  foodChoiceSelected: {
-    backgroundColor: fiticianTokens.colors.aqua,
-    borderColor: fiticianTokens.colors.aqua,
-  },
-  foodChoiceText: {
-    color: fiticianTokens.colors.mist,
+  filterText: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
+  },
+  filterTextSelected: {
+    color: fiticianTokens.colors.aqua,
+  },
+  filteredEmpty: {
+    alignItems: "center",
+    paddingVertical: fiticianTokens.spacing[4],
+  },
+  formGroup: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[3],
+    padding: fiticianTokens.spacing[3],
+  },
+  groupTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
   },
   headingCopy: {
     alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
+    minWidth: 0,
   },
   inlineFields: {
+    ...RTL_ROW,
     alignItems: "center",
-    flexDirection: "row",
+    flexWrap: "wrap",
     gap: fiticianTokens.spacing[3],
   },
-  metric: {
+  metricDivider: {
+    backgroundColor: fiticianTokens.colors.line,
+    height: "70%",
+    width: 1,
+  },
+  metricStrip: {
     alignItems: "stretch",
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-  },
-  metricRow: {
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[3],
-  },
-  metricValue: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
-    fontSize: fiticianTokens.typography.fontSize.lg,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
-    writingDirection: "ltr",
-  },
-  metricTarget: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+    gap: fiticianTokens.spacing[2],
+    paddingTop: fiticianTokens.spacing[3],
   },
   mutedText: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
+  },
+  optionalBadge: {
+    ...RTL_TEXT,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+  },
+  panelDescription: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+  },
+  panelEyebrow: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  panelHeader: {
+    gap: fiticianTokens.spacing[1],
+  },
+  panelTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 28,
   },
   photoActions: {
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[3],
+    gap: fiticianTokens.spacing[2],
+  },
+  photoBusyOverlay: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.scrim,
+    bottom: 0,
+    justifyContent: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  photoBusyText: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  photoCaloriesLabel: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+  },
+  photoCaloriesValue: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.metric,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    writingDirection: "ltr",
+  },
+  photoDetails: {
+    marginTop: 0,
+  },
+  photoDisclosure: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+  },
+  photoEstimateBadge: {
+    ...RTL_TEXT,
+    alignSelf: "flex-start",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderRadius: fiticianTokens.radii.pill,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
   },
   photoItem: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    gap: fiticianTokens.spacing[2],
+    gap: fiticianTokens.spacing[3],
     padding: fiticianTokens.spacing[3],
   },
   photoItemActions: {
-    flexDirection: "row",
+    gap: fiticianTokens.spacing[2],
+  },
+  photoItemConfidence: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+  },
+  photoItemHeader: {
+    alignItems: "flex-start",
     gap: fiticianTokens.spacing[2],
   },
   photoItems: {
     gap: fiticianTokens.spacing[3],
   },
+  photoMacro: {
+    backgroundColor: fiticianTokens.colors.surfaceHighlight,
+    borderRadius: fiticianTokens.radii.small,
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  photoMacroLabel: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    textAlign: "center",
+  },
+  photoMacroRow: {
+    gap: fiticianTokens.spacing[2],
+    marginTop: fiticianTokens.spacing[3],
+  },
+  photoMacroValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "ltr",
+  },
+  photoPlaceholder: {
+    alignItems: "center",
+    gap: fiticianTokens.spacing[2],
+    justifyContent: "center",
+  },
+  photoPlaceholderText: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+  },
+  photoPreview: {
+    height: "100%",
+    width: "100%",
+  },
   photoResult: {
     gap: fiticianTokens.spacing[3],
   },
+  photoSourceButton: {
+    ...RTL_ROW,
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    flex: 1,
+    gap: fiticianTokens.spacing[2],
+    justifyContent: "center",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    minWidth: 0,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  photoSourceButtonDisabled: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    opacity: 0.65,
+  },
+  photoSourceText: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+  },
+  photoSourceTextDisabled: {
+    color: fiticianTokens.colors.muted,
+  },
+  photoStage: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.canvas,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    height: 220,
+    justifyContent: "center",
+    overflow: "hidden",
+    position: "relative",
+    width: "100%",
+  },
+  photoSummary: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[1],
+    padding: fiticianTokens.spacing[3],
+  },
+  quickGroup: {
+    backgroundColor: fiticianTokens.colors.infoSurface,
+    borderColor: fiticianTokens.colors.lineStrong,
+  },
+  recentActions: {
+    gap: fiticianTokens.spacing[2],
+  },
+  recentButton: {
+    alignSelf: "stretch",
+    borderRadius: fiticianTokens.radii.small,
+  },
+  recentCard: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[3],
+    padding: fiticianTokens.spacing[3],
+  },
+  recentHeading: {
+    alignItems: "center",
+    gap: fiticianTokens.spacing[2],
+  },
+  recentIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderRadius: fiticianTokens.radii.small,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  recentSubtitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+  },
+  recentTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
   section: {
     gap: fiticianTokens.spacing[3],
+    paddingBottom: fiticianTokens.spacing[8],
+    width: "100%",
   },
   sectionHeading: {
+    ...RTL_ROW,
     alignItems: "flex-start",
-    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
+  sectionTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    lineHeight: 28,
+  },
+  selectorButton: {
+    ...RTL_ROW,
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.canvas,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    justifyContent: "space-between",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  selectorField: {
+    gap: fiticianTokens.spacing[2],
+  },
+  selectorOption: {
+    ...RTL_LAYOUT,
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  selectorOptionSelected: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  selectorOptionText: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+  },
+  selectorOptionTextSelected: {
+    color: fiticianTokens.colors.aqua,
+  },
+  selectorOptions: {
+    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[2],
+    padding: fiticianTokens.spacing[2],
+  },
+  selectorPlaceholder: {
+    color: fiticianTokens.colors.muted,
+  },
+  selectorText: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+  },
   statusText: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.success,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
-  summaryCard: {
-    gap: fiticianTokens.spacing[4],
-    marginTop: fiticianTokens.spacing[3],
-  },
-  summaryHeading: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  recentRow: {
-    alignItems: "stretch",
+  workflowStatus: {
     gap: fiticianTokens.spacing[2],
+    width: "100%",
   },
 });

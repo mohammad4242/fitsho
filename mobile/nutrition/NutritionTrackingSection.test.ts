@@ -32,11 +32,23 @@ it("keeps photo results estimated until a member confirms them", async () => {
   expect(source).toMatch(/confirmPhoto/);
 });
 
-it("keeps the daily target and photo entry ahead of lower-frequency entry tools", async () => {
+it("keeps the native page in the web-aligned tracking order", async () => {
   const source = await readFile(resolve(nutritionDirectory, "NutritionTrackingSection.tsx"), "utf8");
 
-  expect(source.indexOf("<PageHeading")).toBeGreaterThan(-1);
-  expect(source.indexOf("<Card style={styles.summaryCard}")).toBeLessThan(source.indexOf("<FoodPhotoCard"));
-  expect(source.indexOf("<FoodPhotoCard")).toBeLessThan(source.indexOf('ثبت وضعیت امروز'));
-  expect(source.indexOf('ثبت وضعیت امروز')).toBeLessThan(source.indexOf('ثبت دستی وعده'));
+  const pageHeading = source.indexOf("<PageHeading");
+  const entryHub = source.indexOf('testID="nutrition-entry-hub"');
+  const manualPanel = source.indexOf("<ManualEntryPanel");
+  const photoPanel = source.indexOf("<FoodPhotoCard");
+  const dailyPanel = source.indexOf('testID="nutrition-daily-panel"');
+  const entriesPanel = source.indexOf('testID="nutrition-today-entries"');
+  const adherencePanel = source.indexOf('testID="nutrition-adherence"');
+  const checkInPanel = source.indexOf('testID="nutrition-checkin"');
+
+  expect(pageHeading).toBeGreaterThan(-1);
+  expect(entryHub).toBeGreaterThan(pageHeading);
+  expect(entryHub).toBeLessThan(manualPanel);
+  expect(entryHub).toBeLessThan(photoPanel);
+  expect(dailyPanel).toBeLessThan(entriesPanel);
+  expect(entriesPanel).toBeLessThan(adherencePanel);
+  expect(adherencePanel).toBeLessThan(checkInPanel);
 });

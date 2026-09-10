@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
-import { Card, EmptyState, Notice, Skeleton, TextField } from "../ui/components";
+import { Card, DisclosureCard, EmptyState, Notice, Skeleton, TextField } from "../ui/components";
+import { RTL_LAYOUT, RTL_TEXT } from "../ui/rtl";
 import { getMobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
@@ -16,11 +17,20 @@ import {
 import {
   createNutritionTrackingApi,
   type NutritionDailyTracking,
+  type NutritionAdherence,
   type NutritionTrackingApi,
 } from "./nutritionTrackingApi";
 import { formatNutritionNumber } from "./nutritionModel";
 
-export function NutritionAdherenceSection() {
+export interface NutritionAdherenceSectionProps {
+  readonly embedded?: boolean;
+  readonly onTodayPlannedCaloriesChange?: (calories: number | null) => void;
+}
+
+export function NutritionAdherenceSection({
+  embedded = false,
+  onTodayPlannedCaloriesChange,
+}: NutritionAdherenceSectionProps = {}) {
   const auth = useMobileAuth();
   const connectivityStatus = useConnectivityStatus();
   const today = useMemo(todayIsoDate, []);
@@ -44,6 +54,55 @@ export function NutritionAdherenceSection() {
   const historyState = getMobileViewState(historyQuery, { connectivityStatus });
   const adherence = stateData(adherenceState);
   const history = stateData(historyState) ?? [];
+  const todayPlannedCalories = adherence?.days.find((day) => day.date === today)?.planned.energy_kcal ?? null;
+
+  useEffect(() => {
+    onTodayPlannedCaloriesChange?.(todayPlannedCalories);
+  }, [onTodayPlannedCaloriesChange, todayPlannedCalories]);
+
+  const body = !validRange ? (
+    <View style={styles.invalidBody}>
+      <Text style={styles.bodyText}>تاریخ شروع باید به شکل میلادی YYYY-MM-DD و پیش از امروز باشد.</Text>
+    </View>
+  ) : adherenceState.status === "loading" ? (
+    <Skeleton height={500} />
+  ) : adherenceState.status === "error" && adherence === undefined ? (
+    <Notice
+      actionLabel="تلاش دوباره"
+      message="روند پایبندی دریافت نشد."
+      onAction={() => void adherenceQuery.refetch()}
+      variant="danger"
+    />
+  ) : adherenceState.status === "offline" && adherence === undefined ? (
+    <Notice message="برای مشاهده روند پایبندی به اینترنت وصل شو." variant="offline" />
+  ) : adherence === undefined ? null : (
+    <AdherenceBody
+      adherence={adherence}
+      adherenceState={adherenceState.status}
+      history={history}
+      historyQuery={historyQuery}
+      historyState={historyState.status}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <DisclosureCard
+        defaultExpanded={false}
+        style={styles.embeddedCard}
+        title="روند پایبندی"
+        trailing={
+          <AdherenceDateInput
+            accessibilityLabel="شروع بازه پایبندی"
+            value={rangeStart}
+            onChangeText={setRangeStart}
+          />
+        }
+      >
+        {body}
+      </DisclosureCard>
+    );
+  }
 
   if (!validRange) {
     return (
@@ -91,7 +150,34 @@ export function NutritionAdherenceSection() {
           value={rangeStart}
         />
       </View>
-      {adherenceState.status === "offline" || adherenceState.status === "stale" ? (
+      <AdherenceBody
+        adherence={adherence}
+        adherenceState={adherenceState.status}
+        history={history}
+        historyQuery={historyQuery}
+        historyState={historyState.status}
+      />
+    </Card>
+  );
+}
+
+function AdherenceBody({
+  adherence,
+  adherenceState,
+  history,
+  historyQuery,
+  historyState,
+}: {
+  readonly adherence: NutritionAdherence;
+  readonly adherenceState: string;
+  readonly history: NutritionDailyTracking[];
+  readonly historyQuery: { refetch: () => Promise<unknown> };
+  readonly historyState: string;
+}) {
+  return (
+    <View style={styles.body}>
+      <Text style={styles.bodyText}>دقت ثبت، وضعیت وعده‌ها و فاصله مصرف واقعی از برنامه را در یک بازه ببین.</Text>
+      {adherenceState === "offline" || adherenceState === "stale" ? (
         <Notice message="آخرین روند ذخیره‌شده نمایش داده می‌شود." variant="offline" />
       ) : null}
       {adherence.days.length === 0 ? (
@@ -114,7 +200,7 @@ export function NutritionAdherenceSection() {
       ) : null}
       <View style={styles.historyBlock}>
         <Text style={styles.cardSubtitle}>تاریخچه ثبت‌ها</Text>
-        {historyState.status === "error" && history.length === 0 ? (
+        {historyState === "error" && history.length === 0 ? (
           <Notice actionLabel="تلاش دوباره" message="تاریخچه ثبت‌ها دریافت نشد." onAction={() => void historyQuery.refetch()} variant="danger" />
         ) : history.length === 0 ? (
           <Text style={styles.bodyText}>در این بازه ثبتی وجود ندارد.</Text>
@@ -124,7 +210,29 @@ export function NutritionAdherenceSection() {
           </View>
         )}
       </View>
-    </Card>
+    </View>
+  );
+}
+
+function AdherenceDateInput({
+  accessibilityLabel,
+  onChangeText,
+  value,
+}: {
+  readonly accessibilityLabel: string;
+  readonly onChangeText: (value: string) => void;
+  readonly value: string;
+}) {
+  return (
+    <View style={styles.embeddedDateField}>
+      <Text style={styles.embeddedDateLabel}>از تاریخ</Text>
+      <TextInput
+        accessibilityLabel={accessibilityLabel}
+        onChangeText={onChangeText}
+        style={styles.embeddedDateInput}
+        value={value}
+      />
+    </View>
   );
 }
 
@@ -212,32 +320,32 @@ function useConnectivityStatus(): ConnectivityStatus {
 }
 
 const styles = StyleSheet.create({
+  body: {
+    gap: fiticianTokens.spacing[3],
+  },
   bodyText: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 23,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
   card: {
     gap: fiticianTokens.spacing[3],
     marginTop: fiticianTokens.spacing[3],
   },
   cardSubtitle: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
   completeness: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
   dayCard: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
@@ -256,6 +364,43 @@ const styles = StyleSheet.create({
   dayStack: {
     gap: fiticianTokens.spacing[3],
   },
+  embeddedCard: {
+    marginTop: 0,
+  },
+  embeddedDateField: {
+    alignItems: "flex-end",
+    gap: fiticianTokens.spacing[1],
+    maxWidth: 124,
+    minWidth: 112,
+  },
+  embeddedDateInput: {
+    backgroundColor: fiticianTokens.colors.canvas,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    minHeight: 38,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+    textAlign: "left",
+    writingDirection: "ltr",
+    width: "100%",
+  },
+  embeddedDateLabel: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+  },
+  entryTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+  },
   heading: {
     gap: fiticianTokens.spacing[2],
   },
@@ -263,6 +408,7 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
+    minWidth: 0,
   },
   historyBlock: {
     borderTopColor: fiticianTokens.colors.lineStrong,
@@ -271,6 +417,7 @@ const styles = StyleSheet.create({
     paddingTop: fiticianTokens.spacing[4],
   },
   historyRow: {
+    ...RTL_LAYOUT,
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderColor: fiticianTokens.colors.line,
@@ -285,16 +432,19 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
   },
   historyCount: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
+  },
+  invalidBody: {
+    gap: fiticianTokens.spacing[3],
   },
   metricBlock: {
     gap: fiticianTokens.spacing[2],
   },
   metricLabelRow: {
+    ...RTL_LAYOUT,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
@@ -310,11 +460,10 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
   },
   mutedText: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
   progressFill: {
     backgroundColor: fiticianTokens.colors.aqua,
@@ -329,25 +478,17 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   sectionHeading: {
+    ...RTL_LAYOUT,
     alignItems: "flex-start",
     flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
   title: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 28,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
-  entryTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "auto",
-    writingDirection: "rtl",
   },
 });
