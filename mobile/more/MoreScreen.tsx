@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 22,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   profileTitle: {
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 28,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   screen: {

@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 28,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   hero: {
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h1,
     lineHeight: 40,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
 });

@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 24,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   container: {
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   image: {
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   stepTitle: {
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 22,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   steps: {
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 29,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   visual: {

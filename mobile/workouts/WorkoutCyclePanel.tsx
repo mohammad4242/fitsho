@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 23,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   choice: {
@@ -724,7 +724,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.mist,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   choiceTextSelected: {
@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   feedbackCard: {
@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.medium,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   formCard: {
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   sectionTitle: {
@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 28,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   successText: {
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 25,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   summaryCard: {
@@ -861,7 +861,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
 });

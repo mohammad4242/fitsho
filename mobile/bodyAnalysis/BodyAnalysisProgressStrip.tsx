@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 23,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   card: {
@@ -144,14 +144,14 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   changeLabel: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   changeMetric: {
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   container: {
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   singleCard: {

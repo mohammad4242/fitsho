@@ -49,7 +49,7 @@ test("shows only today's planned meal rows and the track-meal action", () => {
   expect(findAncestorStyle(screen.getByText("وعده‌های امروز"), "flexDirection")).toMatchObject({ flexDirection: "row" });
   expect(findAncestorStyle(screen.getByText("صبحانه"), "flexDirection")).toMatchObject({ flexDirection: "row" });
   expect(StyleSheet.flatten(screen.getByText("۱٬۰۰۰ کیلوکالری").props.style)).toMatchObject({
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   });
 

@@ -169,7 +169,7 @@ it("uses native RTL ordering for workout summaries and actions", async () => {
   expect(plansSource).toMatch(/<Screen contentWidth="reading"/);
   expect(cycleSource).toContain('writingDirection: "rtl"');
   expect(plansSource).toContain('name={expanded ? "chevronUp" : "chevronDown"}');
-  expect(plansSource).toContain('textAlign: "right"');
+  expect(plansSource).toContain('textAlign: "auto"');
 });
 
 it("shows alternatives independently of executability and keeps the web action order", async () => {

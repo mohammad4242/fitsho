@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   heading: {
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.lg,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 25,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
 });

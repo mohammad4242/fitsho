@@ -19,7 +19,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 26,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   accountMethod: {
@@ -90,7 +90,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 20,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   accountSecurityTitle: {
@@ -98,7 +98,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   accountTitle: {
@@ -106,7 +106,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: 34,
     lineHeight: 45,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   accountTopline: {
@@ -181,7 +181,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     flex: 1,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   bodyFields: {
@@ -222,7 +222,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 22,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   choiceCard: {
@@ -257,7 +257,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   choiceGrid: {
@@ -290,7 +290,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 24,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   content: {
@@ -337,7 +337,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   dateSelectorValue: {
@@ -353,7 +353,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 22,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   fieldStack: {
@@ -397,7 +397,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     padding: fiticianTokens.spacing[4],
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   progressBar: {
@@ -415,7 +415,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   progressStack: {
@@ -435,7 +435,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 24,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   questionForm: {
@@ -447,7 +447,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontSize: 34,
     lineHeight: 45,
     maxWidth: "94%",
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   stageLabel: {
@@ -456,7 +456,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   stageLabelActive: {
@@ -517,7 +517,7 @@ export const publicOnboardingStyles = StyleSheet.create({
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[2],
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   footer: {

@@ -17,7 +17,8 @@ jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("../auth/MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
 jest.mock("../ui/rtl", () => ({
   getRowDirectionStyle: (direction = "rtl") => ({ direction, flexDirection: "row" }),
-  getTextDirectionStyle: (direction = "rtl", textAlign = direction === "rtl" ? "right" : "left") => ({
+  getTextDirectionStyle: (direction = "rtl", textAlign = direction === "rtl" ? "auto" : "left") => ({
+    direction,
     textAlign,
     writingDirection: direction,
   }),

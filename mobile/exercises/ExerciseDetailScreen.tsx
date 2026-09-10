@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   breadcrumbCurrentEnglish: {
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   breadcrumbLabelEnglish: {
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   infoLabelEnglish: {
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     flex: 2,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   infoValueEnglish: {
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 27,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   instructionTextEnglish: {
@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   mutedTextEnglish: {

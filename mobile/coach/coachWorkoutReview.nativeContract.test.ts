@@ -27,7 +27,7 @@ it("keeps coach review layout logical for native RTL", async () => {
   const source = await readFile(new URL("./CoachWorkoutReviewScreen.tsx", import.meta.url), "utf8");
 
   expect(source).toMatch(/<Screen contentWidth="reading">/);
-  expect(source).toContain('textAlign: "right"');
+  expect(source).toContain('textAlign: "auto"');
   expect(source).toContain('writingDirection: "rtl"');
   expect(source).toMatch(
     /<View style=\{styles\.dayHeader\}>\s*<Text style=\{styles\.dayTitle\}>[\s\S]*?<Text style=\{styles\.dayNumber\}>/,

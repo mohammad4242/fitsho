@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 29,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
 });

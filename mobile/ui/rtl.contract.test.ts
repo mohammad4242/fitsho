@@ -31,12 +31,12 @@ it("defines one explicit native RTL layout contract", () => {
 });
 
 it("keeps Persian and technical text direction local to the value", () => {
-  expect(RTL_TEXT).toEqual({ textAlign: "right", writingDirection: "rtl" });
-  expect(RTL_CENTER_TEXT).toEqual({ textAlign: "center", writingDirection: "rtl" });
-  expect(LTR_TEXT).toEqual({ textAlign: "left", writingDirection: "ltr" });
-  expect(LTR_CENTER_TEXT).toEqual({ textAlign: "center", writingDirection: "ltr" });
-  expect(getTextDirectionStyle("rtl", "right")).toEqual(RTL_TEXT);
-  expect(getTextDirectionStyle("ltr", "left")).toEqual(LTR_TEXT);
+  expect(RTL_TEXT).toEqual({ direction: "rtl", textAlign: "auto", writingDirection: "rtl" });
+  expect(RTL_CENTER_TEXT).toEqual({ direction: "rtl", textAlign: "center", writingDirection: "rtl" });
+  expect(LTR_TEXT).toEqual({ direction: "ltr", textAlign: "left", writingDirection: "ltr" });
+  expect(LTR_CENTER_TEXT).toEqual({ direction: "ltr", textAlign: "center", writingDirection: "ltr" });
+  expect(getTextDirectionStyle("rtl")).toEqual(RTL_TEXT);
+  expect(getTextDirectionStyle("ltr")).toEqual(LTR_TEXT);
   expect(getTextDirectionStyle("rtl", "center")).toEqual(RTL_CENTER_TEXT);
 });
 

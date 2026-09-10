@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 25,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   dialog: {
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 20,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   eyebrow: {
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   header: {
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   metaValue: {
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 19,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   overlay: {
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 29,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
 });

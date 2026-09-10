@@ -1182,7 +1182,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   focusDayCard: {
@@ -1232,7 +1232,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 19,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   inlineNoticeWarning: {
@@ -1250,7 +1250,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 14,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   pageHeader: {
@@ -1270,7 +1270,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h2,
     lineHeight: 32,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   pendingPlanSection: {
@@ -1345,7 +1345,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   reviewText: {
@@ -1355,7 +1355,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 20,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   scheduleHeading: {
@@ -1379,7 +1379,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 28,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   updateButton: {
@@ -1412,7 +1412,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     lineHeight: 20,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   selectorError: {
@@ -1420,14 +1420,14 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   selectorHint: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   selectorTitle: {
@@ -1435,7 +1435,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   aiLabel: {
@@ -1443,7 +1443,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   bodyText: {
@@ -1451,7 +1451,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 27,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   dayCard: {
@@ -1499,14 +1499,14 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   dayNumber: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   dayTitle: {
@@ -1514,7 +1514,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: 17,
     lineHeight: 24,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   emptyBody: {
@@ -1546,7 +1546,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     textDecorationLine: "underline",
     writingDirection: "rtl",
   },
@@ -1586,7 +1586,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 20,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   exerciseRow: {
@@ -1619,7 +1619,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     textDecorationLine: "underline",
     writingDirection: "rtl",
   },
@@ -1633,7 +1633,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   readOnlyAlternativeReasonEnglish: {
@@ -1652,7 +1652,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 17,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   exerciseStatValue: {
@@ -1661,7 +1661,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   exerciseStatsRow: {
@@ -1676,7 +1676,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.lg,
     lineHeight: 26,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   historyCard: {
@@ -1705,7 +1705,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   historyRow: {
@@ -1722,7 +1722,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   historyTitle: {
@@ -1730,7 +1730,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   mediaPressed: {
@@ -1753,7 +1753,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   sectionTitle: {
@@ -1761,7 +1761,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 28,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   skeletonGroup: {

@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   title: {
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.lg,
     lineHeight: 27,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
 });

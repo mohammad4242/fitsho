@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 23,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   bodyImage: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 24,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   captureBadge: {
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 30,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   iconTile: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 11,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   indicatorCard: {
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   mediaFrame: {
@@ -426,14 +426,14 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 11,
     lineHeight: 18,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   metricNote: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 11,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   metricValue: {
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 23,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   viewTab: {

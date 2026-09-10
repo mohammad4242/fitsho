@@ -36,7 +36,7 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(publicSource).toMatch(/PublicNutritionOnboardingFlow/);
   expect(publicSource).toMatch(/PublicAccountStep/);
   const headerNote = publicSource.slice(publicSource.indexOf("headerNote:"), publicSource.indexOf("loadingScreen:"));
-  expect(headerNote).toContain('textAlign: "right"');
+  expect(headerNote).toContain('textAlign: "auto"');
   expect(headerNote).toContain('writingDirection: "rtl"');
   expect(publicSource).not.toMatch(/SharedProfileStage/);
   expect(publicSource).not.toMatch(/TrainingProfileStage/);
@@ -71,6 +71,6 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(publicAccountSource).toMatch(/verifyPhoneOtp/);
   expect(publicAccountSource).toMatch(/signInWithGoogle/);
   expect(source).toMatch(/<Screen/);
-  expect(source).toContain('textAlign: "right"');
+  expect(source).toContain('textAlign: "auto"');
   expect(source).toContain('writingDirection: "rtl"');
 });

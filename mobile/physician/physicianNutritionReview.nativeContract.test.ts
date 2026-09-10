@@ -35,7 +35,7 @@ it("keeps physician-facing technical codes behind Persian presentation labels", 
 
 it("keeps physician review layout logical for native RTL", () => {
   expect(source).toMatch(/<Screen contentWidth="reading">/);
-  expect(source).toContain('textAlign: "right"');
+  expect(source).toContain('textAlign: "auto"');
   expect(source).toContain('writingDirection: "rtl"');
   expect(source).toMatch(
     /<View style=\{styles\.orderHeader\}>\s*<View style=\{styles\.headerCopy\}>[\s\S]*?<Text style=\{styles\.status\}>/,

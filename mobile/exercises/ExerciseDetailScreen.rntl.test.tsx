@@ -28,7 +28,8 @@ jest.mock("../platform/connectivity", () => ({
 jest.mock("../ui/navigation/BackBehaviorProvider", () => ({ useAndroidBackHandler: jest.fn() }));
 jest.mock("../ui/rtl", () => ({
   getRowDirectionStyle: (direction = "rtl") => ({ direction, flexDirection: "row" }),
-  getTextDirectionStyle: (direction = "rtl", textAlign = direction === "rtl" ? "right" : "left") => ({
+  getTextDirectionStyle: (direction = "rtl", textAlign = direction === "rtl" ? "auto" : "left") => ({
+    direction,
     textAlign,
     writingDirection: direction,
   }),

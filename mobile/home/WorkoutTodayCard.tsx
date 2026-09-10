@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   factValue: {
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   layout: { flexDirection: "row", minHeight: 204 },
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 10,
     lineHeight: 17,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   statusDot: {
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h2,
     lineHeight: 31,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   topLine: {

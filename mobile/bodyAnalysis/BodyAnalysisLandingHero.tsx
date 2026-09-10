@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   container: {
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 19,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   featureTitle: {
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 22,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   features: {
@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 24,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   subtitle: {
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     lineHeight: 26,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   title: {

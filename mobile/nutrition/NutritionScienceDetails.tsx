@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 24,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   card: {
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[2],
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   linkWrap: {
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   metadataRow: {
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 10,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   micronutrientTitle: {
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   micronutrientValue: {
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   targetCard: {
@@ -259,14 +259,14 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 10,
     lineHeight: 16,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   targetTitle: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   targetValue: {

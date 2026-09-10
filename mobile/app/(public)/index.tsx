@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 28,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   bodyImage: {
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   calories: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     letterSpacing: 0.4,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   finalSection: {
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h1,
     lineHeight: 42,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   hotspotDot: {
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     lineHeight: 22,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   paperEyebrow: {
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     marginTop: fiticianTokens.spacing[3],
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   planPaper: {
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h2,
     lineHeight: 34,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   calloutValue: {
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   shoulderHotspot: {
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   storySection: {

@@ -146,7 +146,6 @@ function viewLabel(view: BodyPhotoView): string {
 const styles = StyleSheet.create({
   afterLabel: {
     right: 10,
-    textAlign: "right",
   },
   afterLayer: {
     bottom: 0,
@@ -181,7 +180,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   header: {
@@ -194,7 +193,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   notice: {
@@ -202,7 +201,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 19,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   photoLabel: {
@@ -218,7 +217,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.78)",
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 10,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   photoLabelTitle: {
@@ -226,14 +225,14 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   privateNotice: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   sliderFill: {
@@ -276,7 +275,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 28,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   unavailable: {

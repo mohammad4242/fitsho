@@ -7,7 +7,7 @@ export interface FiticianRtlConfiguration {
 
 export type MobileLanguage = "fa" | "en";
 export type FiticianDirection = "rtl" | "ltr";
-export type FiticianTextAlign = "right" | "left" | "center";
+export type FiticianTextAlign = "auto" | "left" | "center";
 
 export const FITICIAN_NATIVE_DIRECTION: FiticianDirection = "rtl";
 
@@ -25,24 +25,30 @@ export const RTL_ROW = {
 } as const satisfies Pick<ViewStyle, "direction" | "flexDirection">;
 
 export const RTL_TEXT = {
-  textAlign: "right",
+  // Native RTL resolves physical right as the opposite paragraph edge on Android.
+  // Natural alignment follows the local RTL direction and stays at logical start.
+  direction: "rtl",
+  textAlign: "auto",
   writingDirection: "rtl",
-} as const satisfies Pick<TextStyle, "textAlign" | "writingDirection">;
+} as const satisfies Pick<TextStyle, "direction" | "textAlign" | "writingDirection">;
 
 export const RTL_CENTER_TEXT = {
+  direction: "rtl",
   textAlign: "center",
   writingDirection: "rtl",
-} as const satisfies Pick<TextStyle, "textAlign" | "writingDirection">;
+} as const satisfies Pick<TextStyle, "direction" | "textAlign" | "writingDirection">;
 
 export const LTR_TEXT = {
+  direction: "ltr",
   textAlign: "left",
   writingDirection: "ltr",
-} as const satisfies Pick<TextStyle, "textAlign" | "writingDirection">;
+} as const satisfies Pick<TextStyle, "direction" | "textAlign" | "writingDirection">;
 
 export const LTR_CENTER_TEXT = {
+  direction: "ltr",
   textAlign: "center",
   writingDirection: "ltr",
-} as const satisfies Pick<TextStyle, "textAlign" | "writingDirection">;
+} as const satisfies Pick<TextStyle, "direction" | "textAlign" | "writingDirection">;
 
 export function getRowDirectionStyle(
   direction: FiticianDirection = FITICIAN_NATIVE_DIRECTION,
@@ -52,9 +58,9 @@ export function getRowDirectionStyle(
 
 export function getTextDirectionStyle(
   direction: FiticianDirection,
-  textAlign: FiticianTextAlign = direction === "rtl" ? "right" : "left",
-): Pick<TextStyle, "textAlign" | "writingDirection"> {
-  return { textAlign, writingDirection: direction };
+  textAlign: FiticianTextAlign = direction === "rtl" ? "auto" : "left",
+): Pick<TextStyle, "direction" | "textAlign" | "writingDirection"> {
+  return { direction, textAlign, writingDirection: direction };
 }
 
 export function logicalStart(direction: FiticianDirection = FITICIAN_NATIVE_DIRECTION) {

@@ -206,16 +206,16 @@ test("shows active role, approval, date context, and weekly plan content first",
   expect(screen.getAllByText("کربوهیدرات").length).toBeGreaterThanOrEqual(1);
 
   expect(StyleSheet.flatten(screen.getByText("نسخه PDF").props.style)).toMatchObject({
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   });
   expect(StyleSheet.flatten(screen.getByText("فایل برنامه در فضای امن دستگاه ذخیره می‌شود و پس از باز کردن دوباره اپ باقی می‌ماند.").props.style)).toMatchObject({
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   });
   expect(findAncestorStyle(screen.getByText("نسخه PDF"), "alignItems")).toMatchObject({ alignItems: "stretch" });
   expect(StyleSheet.flatten(screen.getByText("تاریخچه برنامه‌ها").props.style)).toMatchObject({
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   });
   expect(findAncestorStyle(screen.getByText("تاریخچه برنامه‌ها"), "alignItems")).toMatchObject({ alignItems: "stretch" });
@@ -232,11 +232,11 @@ test("keeps Persian plan and shopping copy stretched inside native RTL rows", ()
 
   fireEvent.press(screen.getByRole("button", { name: "لیست خرید" }));
   expect(StyleSheet.flatten(screen.getByText("لیست خرید").props.style)).toMatchObject({
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   });
   expect(StyleSheet.flatten(screen.getByText("مواد لازم برای این نسخه از برنامه").props.style)).toMatchObject({
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   });
   expect(findAncestorStyle(screen.getByText("عدس"), "alignItems")).toMatchObject({ alignItems: "stretch" });

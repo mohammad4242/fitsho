@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: 2,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   card: {
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 10,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   modeTextActive: {
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     flexShrink: 1,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   rateValue: {
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   safeBadge: {
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     minWidth: 150,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   titleGroup: {

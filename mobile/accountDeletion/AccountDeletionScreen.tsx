@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     lineHeight: 27,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   brand: {
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   pendingCard: { gap: fiticianTokens.spacing[3] },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
 });

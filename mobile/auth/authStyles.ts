@@ -8,7 +8,7 @@ export const authStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   brandRow: {
@@ -49,7 +49,7 @@ export const authStyles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.medium,
-    textAlign: "right",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   footer: {

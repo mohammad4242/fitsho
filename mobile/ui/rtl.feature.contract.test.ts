@@ -3,36 +3,36 @@ import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 
 type TextContract = {
-  readonly align: "center" | "left" | "right";
+  readonly align: "auto" | "center" | "left" | "right";
   readonly file: string;
   readonly style: string;
 };
 
 const contracts: readonly TextContract[] = [
-  { align: "right", file: "../accountDeletion/AccountDeletionScreen.tsx", style: "muted" },
+  { align: "auto", file: "../accountDeletion/AccountDeletionScreen.tsx", style: "muted" },
   { align: "center", file: "../bodyAnalysis/BodyAnalysisEmptyState.tsx", style: "stepNumber" },
   { align: "center", file: "../bodyAnalysis/BodyAnalysisMuscleSection.tsx", style: "summaryChipText" },
   { align: "center", file: "../bodyAnalysis/BodyAnalysisMuscleSection.tsx", style: "viewBadgeText" },
   { align: "center", file: "../bodyAnalysis/BodyAnalysisOverviewCard.tsx", style: "captureText" },
   { align: "center", file: "../bodyAnalysis/BodyAnalysisOverviewCard.tsx", style: "mediaTagText" },
   { align: "center", file: "../bodyAnalysis/BodyAnalysisOverviewCard.tsx", style: "viewTabText" },
-  { align: "right", file: "../bodyAnalysis/BodyAnalysisResultScreen.tsx", style: "status" },
+  { align: "auto", file: "../bodyAnalysis/BodyAnalysisResultScreen.tsx", style: "status" },
   { align: "center", file: "../exercises/ExerciseCatalogScreen.tsx", style: "contentBadge" },
   { align: "center", file: "../exercises/ExerciseCatalogScreen.tsx", style: "mediaDifficulty" },
   { align: "center", file: "../home/MemberHomeScreen.tsx", style: "avatarText" },
   { align: "center", file: "../home/WorkoutTodayCard.tsx", style: "statusText" },
   { align: "center", file: "../nutrition/NutritionDoctorSupervision.tsx", style: "itemTag" },
-  { align: "right", file: "../nutrition/NutritionSummaryCard.tsx", style: "breakdownText" },
-  { align: "right", file: "../nutrition/NutritionSummaryCard.tsx", style: "statusText" },
-  { align: "right", file: "../onboarding/OnboardingScreen.tsx", style: "progress" },
-  { align: "right", file: "../onboarding/OnboardingScreen.tsx", style: "questionProgress" },
+  { align: "auto", file: "../nutrition/NutritionSummaryCard.tsx", style: "breakdownText" },
+  { align: "auto", file: "../nutrition/NutritionSummaryCard.tsx", style: "statusText" },
+  { align: "auto", file: "../onboarding/OnboardingScreen.tsx", style: "progress" },
+  { align: "auto", file: "../onboarding/OnboardingScreen.tsx", style: "questionProgress" },
   { align: "center", file: "../physician/PhysicianNutritionReviewScreen.tsx", style: "memberAvatarText" },
   { align: "center", file: "../profile/ProfilePhotoControl.tsx", style: "avatarText" },
   { align: "center", file: "../profile/ProfilePhotoControl.tsx", style: "deleteText" },
   { align: "center", file: "../profile/ProfileScreen.tsx", style: "avatarText" },
   { align: "center", file: "../profile/ProfileScreen.tsx", style: "optionalBadge" },
-  { align: "right", file: "../workouts/WorkoutCyclePanel.tsx", style: "cycleStatus" },
-  { align: "right", file: "../workouts/WorkoutPlansScreen.tsx", style: "secondaryDayTitle" },
+  { align: "auto", file: "../workouts/WorkoutCyclePanel.tsx", style: "cycleStatus" },
+  { align: "auto", file: "../workouts/WorkoutPlansScreen.tsx", style: "secondaryDayTitle" },
   { align: "center", file: "../coach/CoachWorkoutReviewScreen.tsx", style: "avatarText" },
 ];
 
