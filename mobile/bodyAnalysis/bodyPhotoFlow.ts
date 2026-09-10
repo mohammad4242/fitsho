@@ -47,7 +47,7 @@ export function createBodyPhotoFlowDraft(
 ): BodyPhotoFlowDraft {
   const activeSession = sessionId !== null && session?.id === sessionId ? session : undefined;
   return {
-    capture_mode: "camera",
+    capture_mode: "library",
     current_view: activeSession === undefined
       ? "front"
       : firstMissingBodyPhotoView(activeSession),

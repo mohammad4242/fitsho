@@ -80,7 +80,7 @@ test("requires current measurements before starting a secure body-analysis sessi
   const continueButton = await screen.findByLabelText("ذخیره و ادامه");
   expect(continueButton.props.accessibilityState.disabled).toBe(true);
 
-  fireEvent(screen.getByLabelText("اندازه‌ها مربوط به امروز هستند"), "valueChange", true);
+  fireEvent(screen.getByLabelText("تأیید می‌کنم این اندازه‌ها برای همین جلسه عکس فعلی هستند"), "valueChange", true);
   expect(screen.getByLabelText("ذخیره و ادامه").props.accessibilityState.disabled).toBe(false);
 
   fireEvent.press(screen.getByLabelText("ذخیره و ادامه"));

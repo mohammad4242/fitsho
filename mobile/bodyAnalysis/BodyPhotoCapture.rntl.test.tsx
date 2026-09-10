@@ -43,7 +43,7 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-test("keeps the native camera primary while matching the web capture hierarchy", () => {
+test("matches the web upload-first capture hierarchy", () => {
   renderCapture();
 
   expect(screen.getByRole("header", { name: "عکس‌های استاندارد بدن را اضافه کن" })).toBeTruthy();
@@ -51,7 +51,11 @@ test("keeps the native camera primary while matching the web capture hierarchy",
   expect(screen.getByLabelText("مراحل ثبت عکس")).toBeTruthy();
   expect(screen.getByLabelText("نمای نیمرخ، مرحله فعلی")).toBeTruthy();
   expect(screen.getByLabelText("نمای روبه‌رو، انجام‌شده")).toBeTruthy();
-  expect(screen.getByRole("radio", { name: "دوربین" })).toBeTruthy();
-  expect(screen.getByRole("radio", { name: "انتخاب عکس" })).toBeTruthy();
-  expect(screen.getByText("دسترسی دوربین لازم است")).toBeTruthy();
+  expect(screen.getByLabelText("راهنمای کادر عکس Ghost")).toBeTruthy();
+  expect(screen.getAllByText("عکس را زیر راهنمای Ghost قرار بده").length).toBeGreaterThan(0);
+  expect(screen.getByRole("button", { name: "استفاده از دوربین راهنما" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "بارگذاری عکس نیمرخ" })).toBeTruthy();
+  expect(screen.queryByRole("radio", { name: "دوربین" })).toBeNull();
+  expect(screen.queryByRole("radio", { name: "انتخاب عکس" })).toBeNull();
+  expect(screen.queryByText("دسترسی دوربین لازم است")).toBeNull();
 });

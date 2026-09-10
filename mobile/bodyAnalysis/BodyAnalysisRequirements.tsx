@@ -12,6 +12,7 @@ import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createProfileApi } from "../profile/profileApi";
 import { normalizeOnboardingDigits } from "../onboarding/onboardingModel";
+import { bodyPhotoCopy, onboardingCopy } from "./bodyAnalysisCopy";
 import {
   type BodyAnalysisProfile,
   measurementErrorMessage,
@@ -46,14 +47,14 @@ export function BodyAnalysisRequirements({
       .then((loaded) => {
         if (!active) return;
         if (loaded === null) {
-          setError("اطلاعات پروفایل پیدا نشد.");
+          setError(bodyPhotoCopy.measurements.loadError);
           return;
         }
         setProfile(loaded);
         setValues(measurementValuesFromProfile(loaded));
       })
       .catch(() => {
-        if (active) setError("خواندن اندازه‌ها انجام نشد. دوباره تلاش کن.");
+        if (active) setError(bodyPhotoCopy.measurements.loadError);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -111,10 +112,10 @@ export function BodyAnalysisRequirements({
     return (
       <Screen scroll={false}>
         <View style={styles.errorState}>
-          <Text style={styles.eyebrow}>تحلیل بدن</Text>
-          <Text style={styles.title}>اندازه‌ها آماده نیستند</Text>
-          <Notice message={error ?? "اطلاعات اندازه‌ها در دسترس نیست."} variant="danger" />
-          <Button label="بازگشت" onPress={onCancel} variant="secondary" />
+          <Text style={styles.eyebrow}>{bodyPhotoCopy.measurements.eyebrow}</Text>
+          <Text style={styles.title}>{bodyPhotoCopy.measurements.title}</Text>
+          <Notice message={error ?? bodyPhotoCopy.measurements.loadError} variant="danger" />
+          <Button label={bodyPhotoCopy.measurements.back} onPress={onCancel} variant="secondary" />
         </View>
       </Screen>
     );
@@ -125,87 +126,105 @@ export function BodyAnalysisRequirements({
       <View style={styles.container}>
         <PageHeading
           compact
-          eyebrow="پیش از جلسه عکس"
-          supportingText="اندازه‌هایی را وارد کن که با وضعیت بدنت امروز مطابقت دارند. این مقادیر همراه همین جلسه عکس ذخیره می‌شوند."
-          title="اندازه‌های فعلی‌ات را تأیید کن"
+          eyebrow={bodyPhotoCopy.measurements.eyebrow}
+          supportingText={bodyPhotoCopy.measurements.body}
+          title={bodyPhotoCopy.measurements.title}
         />
 
         <MeasurementStatus confirmed={confirmed} />
 
-        <Card style={styles.panel}>
-          <View style={styles.panelHeading}>
-            <View style={styles.panelHeadingCopy}>
-              <Text style={styles.sectionTitle}>اندازه‌های پایه</Text>
-              <Text style={styles.body}>قد و وزن، نقطهٔ شروع این اسکن هستند.</Text>
+        <Card style={styles.measurementPanel}>
+          <Text style={styles.fieldsLegend}>{bodyPhotoCopy.measurements.fieldsLegend}</Text>
+          <View style={styles.measurementRail} />
+          <View style={styles.measurementGroup}>
+            <View style={styles.panelHeading}>
+              <View style={styles.panelHeadingCopy}>
+                <Text style={styles.sectionTitle}>{bodyPhotoCopy.measurements.essentialTitle}</Text>
+                <Text style={styles.body}>{bodyPhotoCopy.measurements.essentialBody}</Text>
+              </View>
+              <Text style={styles.stepBadge}>۰۱</Text>
             </View>
-            <Text style={styles.stepBadge}>۰۱</Text>
+            <View style={styles.measurementRow}>
+              <View style={styles.measurementField}>
+                <TextField
+                  accessibilityLabel={onboardingCopy.fields.height}
+                  error={measurementErrorMessage(errors.height_cm)}
+                  keyboardType="number-pad"
+                  label={onboardingCopy.fields.height}
+                  onChangeText={(value) => changeMeasurement("height_cm", value)}
+                  required
+                  value={values.height_cm}
+                />
+              </View>
+              <View style={styles.measurementField}>
+                <TextField
+                  accessibilityLabel={onboardingCopy.fields.weight}
+                  error={measurementErrorMessage(errors.current_weight_kg)}
+                  keyboardType="decimal-pad"
+                  label={onboardingCopy.fields.weight}
+                  onChangeText={(value) => changeMeasurement("current_weight_kg", value)}
+                  required
+                  value={values.current_weight_kg}
+                />
+              </View>
+            </View>
           </View>
-          <TextField
-            accessibilityLabel="قد به سانتی‌متر"
-            error={measurementErrorMessage(errors.height_cm)}
-            keyboardType="number-pad"
-            label="قد (سانتی‌متر)"
-            onChangeText={(value) => changeMeasurement("height_cm", value)}
-            required
-            value={values.height_cm}
-          />
-          <TextField
-            accessibilityLabel="وزن فعلی به کیلوگرم"
-            error={measurementErrorMessage(errors.current_weight_kg)}
-            keyboardType="decimal-pad"
-            label="وزن فعلی (کیلوگرم)"
-            onChangeText={(value) => changeMeasurement("current_weight_kg", value)}
-            required
-            value={values.current_weight_kg}
-          />
-        </Card>
 
-        <Card style={styles.panel}>
-          <View style={styles.panelHeading}>
-            <View style={styles.panelHeadingCopy}>
-              <Text style={styles.sectionTitle}>تناسبات بدن</Text>
-              <Text style={styles.body}>متر را بدون کشیدن، در پهن‌ترین بخش هر ناحیه قرار بده.</Text>
+          <View style={styles.measurementGroup}>
+            <View style={styles.panelHeading}>
+              <View style={styles.panelHeadingCopy}>
+                <Text style={styles.sectionTitle}>{bodyPhotoCopy.measurements.proportionsTitle}</Text>
+                <Text style={styles.body}>{bodyPhotoCopy.measurements.proportionsBody}</Text>
+              </View>
+              <Text style={styles.stepBadge}>۰۲</Text>
             </View>
-            <Text style={styles.stepBadge}>۰۲</Text>
+            <View style={styles.measurementRow}>
+              <View style={styles.measurementField}>
+                <TextField
+                  accessibilityLabel={bodyPhotoCopy.measurements.fields.shoulderCircumference}
+                  error={measurementErrorMessage(errors.shoulder_circumference_cm)}
+                  keyboardType="decimal-pad"
+                  label={bodyPhotoCopy.measurements.fields.shoulderCircumference}
+                  onChangeText={(value) => changeMeasurement("shoulder_circumference_cm", value)}
+                  required
+                  value={values.shoulder_circumference_cm}
+                />
+              </View>
+              <View style={styles.measurementField}>
+                <TextField
+                  accessibilityLabel={bodyPhotoCopy.measurements.fields.waistCircumference}
+                  error={measurementErrorMessage(errors.waist_circumference_cm)}
+                  keyboardType="decimal-pad"
+                  label={bodyPhotoCopy.measurements.fields.waistCircumference}
+                  onChangeText={(value) => changeMeasurement("waist_circumference_cm", value)}
+                  required
+                  value={values.waist_circumference_cm}
+                />
+              </View>
+              <View style={styles.measurementField}>
+                <TextField
+                  accessibilityLabel={bodyPhotoCopy.measurements.fields.hipCircumference}
+                  error={measurementErrorMessage(errors.hip_circumference_cm)}
+                  keyboardType="decimal-pad"
+                  label={bodyPhotoCopy.measurements.fields.hipCircumference}
+                  onChangeText={(value) => changeMeasurement("hip_circumference_cm", value)}
+                  required
+                  value={values.hip_circumference_cm}
+                />
+              </View>
+            </View>
           </View>
-          <TextField
-            accessibilityLabel="دور شانه به سانتی‌متر"
-            error={measurementErrorMessage(errors.shoulder_circumference_cm)}
-            keyboardType="decimal-pad"
-            label="دور شانه (سانتی‌متر)"
-            onChangeText={(value) => changeMeasurement("shoulder_circumference_cm", value)}
-            required
-            value={values.shoulder_circumference_cm}
-          />
-          <TextField
-            accessibilityLabel="دور کمر به سانتی‌متر"
-            error={measurementErrorMessage(errors.waist_circumference_cm)}
-            keyboardType="decimal-pad"
-            label="دور کمر (سانتی‌متر)"
-            onChangeText={(value) => changeMeasurement("waist_circumference_cm", value)}
-            required
-            value={values.waist_circumference_cm}
-          />
-          <TextField
-            accessibilityLabel="دور باسن به سانتی‌متر"
-            error={measurementErrorMessage(errors.hip_circumference_cm)}
-            keyboardType="decimal-pad"
-            label="دور باسن (سانتی‌متر)"
-            onChangeText={(value) => changeMeasurement("hip_circumference_cm", value)}
-            required
-            value={values.hip_circumference_cm}
-          />
         </Card>
 
         <Notice
-          message="متر را بدون کشیدن بیش از حد دور بدن قرار بده. تحلیل تا وقتی تأیید نکنی این مقادیر فعلی هستند شروع نمی‌شود."
+          message={bodyPhotoCopy.measurements.snapshotNote}
           variant="warning"
         />
 
         <Card style={styles.confirmation} variant={confirmed ? "interactive" : "default"}>
-          <Text style={styles.confirmationText}>تأیید می‌کنم این اندازه‌ها برای همین جلسه عکس فعلی هستند.</Text>
+          <Text style={styles.confirmationText}>{bodyPhotoCopy.measurements.confirmLabel}</Text>
           <Switch
-            accessibilityLabel="اندازه‌ها مربوط به امروز هستند"
+            accessibilityLabel={bodyPhotoCopy.measurements.confirmLabel}
             onValueChange={setConfirmed}
             thumbColor={confirmed ? fiticianTokens.colors.aqua : fiticianTokens.colors.muted}
             trackColor={{ false: fiticianTokens.colors.lineStrong, true: fiticianTokens.colors.teal }}
@@ -213,12 +232,12 @@ export function BodyAnalysisRequirements({
           />
         </Card>
 
-        {saveError ? <Notice message="ذخیره اندازه‌ها انجام نشد. دوباره تلاش کن." variant="danger" /> : null}
+        {saveError ? <Notice message={bodyPhotoCopy.measurements.saveError} variant="danger" /> : null}
         <View style={styles.actions}>
-          <Button disabled={busy} label="بازگشت" onPress={onCancel} variant="secondary" />
+          <Button disabled={busy} label={bodyPhotoCopy.measurements.back} onPress={onCancel} variant="secondary" />
           <Button
             disabled={!canContinue}
-            label={busy ? "در حال ذخیره…" : "ذخیره و ادامه"}
+            label={busy ? bodyPhotoCopy.measurements.saving : bodyPhotoCopy.measurements.continue}
             loading={busy}
             onPress={() => void confirmMeasurements()}
           />
@@ -240,9 +259,13 @@ function MeasurementStatus({ confirmed }: { readonly confirmed: boolean }) {
         </Text>
       </View>
       <View style={styles.statusCopy}>
-        <Text style={styles.statusTitle}>{confirmed ? "آمادهٔ ادامه" : "در انتظار تأیید"}</Text>
+        <Text style={styles.statusTitle}>
+          {confirmed ? bodyPhotoCopy.measurements.status.confirmed : bodyPhotoCopy.measurements.status.pending}
+        </Text>
         <Text style={styles.statusHint}>
-          {confirmed ? "این مقادیر همراه همین اسکن ذخیره می‌شوند." : "مقادیر امروزت را بررسی کن."}
+          {confirmed
+            ? bodyPhotoCopy.measurements.status.confirmedHint
+            : bodyPhotoCopy.measurements.status.pendingHint}
         </Text>
       </View>
     </Card>
@@ -300,6 +323,45 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[4],
     justifyContent: "center",
     minHeight: 420,
+  },
+  fieldsLegend: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    letterSpacing: 0.7,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  measurementField: {
+    flex: 1,
+    minWidth: 0,
+  },
+  measurementGroup: {
+    gap: fiticianTokens.spacing[3],
+    paddingStart: fiticianTokens.spacing[3],
+  },
+  measurementPanel: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.lineStrong,
+    gap: fiticianTokens.spacing[4],
+    overflow: "hidden",
+    padding: fiticianTokens.spacing[3],
+    position: "relative",
+  },
+  measurementRail: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    bottom: fiticianTokens.spacing[4],
+    left: fiticianTokens.spacing[3],
+    opacity: 0.55,
+    position: "absolute",
+    top: fiticianTokens.spacing[5],
+    width: 1,
+  },
+  measurementRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[2],
   },
   panel: {
     gap: fiticianTokens.spacing[3],
