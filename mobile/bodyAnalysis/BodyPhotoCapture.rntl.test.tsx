@@ -144,3 +144,16 @@ test("keeps the selected editor state and reports an upload failure separately",
   expect(screen.getByLabelText("ویرایشگر کادر عکس")).toBeTruthy();
   expect(onCaptured).toHaveBeenCalledWith(renderedAsset);
 });
+
+test("keeps editor gesture ownership while the photo is being dragged", async () => {
+  jest.mocked(launchImageLibraryAsync).mockResolvedValue({
+    canceled: false,
+    assets: [selectedLibraryAsset],
+  });
+
+  renderCapture();
+  fireEvent.press(screen.getByRole("button", { name: "بارگذاری عکس نیمرخ" }));
+  const editor = await screen.findByLabelText("ویرایشگر کادر عکس");
+
+  expect(editor.props.onResponderTerminationRequest?.()).toBe(false);
+});

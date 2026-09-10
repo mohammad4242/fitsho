@@ -74,7 +74,10 @@ export function BodyAnalysisHistoryScreen({ tabRoot = false }: BodyAnalysisHisto
   }
 
   function startNewSession() {
-    router.push("/member/body-analysis-capture");
+    router.push({
+      pathname: "/member/body-analysis-capture",
+      params: { fresh: "1" },
+    });
   }
 
   return (

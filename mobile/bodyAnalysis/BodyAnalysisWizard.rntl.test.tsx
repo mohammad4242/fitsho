@@ -1,13 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { createBodyPhotoFlowDraft, serializeBodyPhotoFlowDraft } from "./bodyPhotoFlow";
 
 import type { BodyAnalysis, BodyPhotoView } from "@fitician/core/body-photos";
 
 jest.mock("expo-file-system", () => ({ File: class {} }));
 jest.mock("expo-secure-store", () => ({
   deleteItemAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-  getItemAsync: jest.fn<() => Promise<null>>().mockResolvedValue(null),
+  getItemAsync: jest.fn<() => Promise<string | null>>().mockResolvedValue(null),
   setItemAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
@@ -49,6 +50,7 @@ jest.mock("./bodyPhotoApi", () => ({ createBodyPhotoApi: jest.fn() }));
 jest.mock("../profile/profileApi", () => ({ createProfileApi: jest.fn() }));
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
+import { getItemAsync } from "expo-secure-store";
 import { createProfileApi } from "../profile/profileApi";
 import { bodyPhotoCopy } from "./bodyAnalysisCopy";
 import { BodyAnalysisWizard } from "./BodyAnalysisWizard";
@@ -91,20 +93,33 @@ type UploadPhoto = (
     readonly width: number;
   },
 ) => Promise<typeof createdSession>;
+type GetSession = (sessionId: string) => Promise<typeof createdSession>;
 
 let createSession: jest.Mock<CreateSession>;
+let getSession: jest.Mock<GetSession>;
 let uploadPhoto: jest.Mock<UploadPhoto>;
 
-function renderWizard(onViewAnalysis?: (sessionId: string) => void) {
+function renderWizard(
+  onViewAnalysis?: (sessionId: string) => void,
+  sessionId?: string,
+  startFresh = false,
+) {
   return render(
     <SafeAreaProvider initialMetrics={{ frame: { height: 800, width: 400, x: 0, y: 0 }, insets: { bottom: 0, left: 0, right: 0, top: 0 } }}>
-      <BodyAnalysisWizard onExit={jest.fn()} onViewAnalysis={onViewAnalysis} />
+      <BodyAnalysisWizard
+        onExit={jest.fn()}
+        onViewAnalysis={onViewAnalysis}
+        sessionId={sessionId}
+        startFresh={startFresh}
+      />
     </SafeAreaProvider>,
   );
 }
 
 beforeEach(() => {
+  jest.mocked(getItemAsync).mockResolvedValue(null);
   createSession = jest.fn<CreateSession>().mockResolvedValue(createdSession);
+  getSession = jest.fn<GetSession>().mockResolvedValue(createdSession);
   uploadPhoto = jest.fn<UploadPhoto>().mockResolvedValue(createdSession);
   mockUseMobileAuth.mockReturnValue({
     download: jest.fn(),
@@ -112,7 +127,7 @@ beforeEach(() => {
     upload: jest.fn(),
     user: { id: "user-1" },
   } as never);
-  mockCreateBodyPhotoApi.mockReturnValue({ createSession, uploadPhoto } as never);
+  mockCreateBodyPhotoApi.mockReturnValue({ createSession, getSession, uploadPhoto } as never);
   mockCreateProfileApi.mockReturnValue({
     getProfile: jest.fn<() => Promise<typeof profile>>().mockResolvedValue(profile),
   } as never);
@@ -134,6 +149,26 @@ test("requires current measurements before starting a secure body-analysis sessi
   fireEvent.press(screen.getByLabelText("ذخیره و ادامه"));
 
   await waitFor(() => expect(createSession).toHaveBeenCalledWith("initial_plan"));
+});
+
+test("shows measurements before starting a fresh session when an old draft exists", async () => {
+  jest.mocked(getItemAsync).mockResolvedValue(
+    serializeBodyPhotoFlowDraft(createBodyPhotoFlowDraft("initial_plan", createdSession.id)),
+  );
+
+  renderWizard(undefined, undefined, true);
+
+  expect(await screen.findByRole("header", { name: "اندازه‌های فعلی‌ات را تأیید کن" })).toBeTruthy();
+  expect(getSession).not.toHaveBeenCalled();
+  expect(createSession).not.toHaveBeenCalled();
+});
+
+test("resumes an explicitly selected session at its first missing photo", async () => {
+  renderWizard(undefined, createdSession.id);
+
+  expect(await screen.findByLabelText("تأیید front")).toBeTruthy();
+  expect(getSession).toHaveBeenCalledWith(createdSession.id);
+  expect(createSession).not.toHaveBeenCalled();
 });
 
 test("uploads each confirmed view before advancing to the next web view", async () => {

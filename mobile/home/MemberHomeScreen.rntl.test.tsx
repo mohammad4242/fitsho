@@ -140,7 +140,10 @@ test("routes from the home dashboard to profile and feature destinations", () =>
 
   expect(mockPush.mock.calls).toEqual([
     ["/member/profile"],
-    ["/member/body-analysis-capture"],
+    [{
+      pathname: "/member/body-analysis-capture",
+      params: { fresh: "1" },
+    }],
     ["/member/nutrition-tracking"],
     ["/member/nutrition"],
     ["/member/workouts"],

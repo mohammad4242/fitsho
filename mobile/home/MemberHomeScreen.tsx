@@ -146,7 +146,10 @@ export function MemberHomeScreen() {
         <QuickActionCard
           icon="bodyAnalysis"
           image={homeBodyImage}
-          onPress={() => router.push("/member/body-analysis-capture")}
+          onPress={() => router.push({
+            pathname: "/member/body-analysis-capture",
+            params: { fresh: "1" },
+          })}
           subtitle="پیشرفت بدنت را بهتر بشناس"
           title="تحلیل بدن"
         />

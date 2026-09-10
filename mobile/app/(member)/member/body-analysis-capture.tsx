@@ -5,9 +5,14 @@ import { bodyPhotoPurposeFromParam } from "../../../bodyAnalysis/bodyPhotoWizard
 
 export default function MemberBodyAnalysisCaptureScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ purpose?: string | string[]; sessionId?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    fresh?: string | string[];
+    purpose?: string | string[];
+    sessionId?: string | string[];
+  }>();
   const sessionId = firstParam(params.sessionId);
   const purpose = bodyPhotoPurposeFromParam(firstParam(params.purpose));
+  const startFresh = firstParam(params.fresh) === "1";
 
   return (
     <BodyAnalysisWizard
@@ -15,6 +20,7 @@ export default function MemberBodyAnalysisCaptureScreen() {
       onViewAnalysis={(id) => router.push(`/member/body-analysis-result/${encodeURIComponent(id)}`)}
       purpose={purpose}
       sessionId={sessionId}
+      startFresh={startFresh}
     />
   );
 }

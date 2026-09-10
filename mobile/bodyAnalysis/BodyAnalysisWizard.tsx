@@ -40,6 +40,7 @@ export interface BodyAnalysisWizardProps {
   readonly onViewAnalysis?: (sessionId: string) => void;
   readonly purpose?: BodyPhotoPurpose;
   readonly sessionId?: string;
+  readonly startFresh?: boolean;
 }
 
 type WizardPhase =
@@ -69,6 +70,7 @@ export function BodyAnalysisWizard({
   onViewAnalysis,
   purpose = "initial_plan",
   sessionId,
+  startFresh = false,
 }: BodyAnalysisWizardProps) {
   const auth = useMobileAuth();
   const userId = auth.user?.id ?? null;
@@ -113,6 +115,7 @@ export function BodyAnalysisWizard({
       draftStore,
       purpose,
       requestedSessionId: sessionId,
+      startFresh,
       userId,
     }).then((loaded) => {
       if (!active) return;
@@ -135,7 +138,7 @@ export function BodyAnalysisWizard({
     return () => {
       active = false;
     };
-  }, [api, draftStore, purpose, sessionId, userId]);
+  }, [api, draftStore, purpose, sessionId, startFresh, userId]);
 
   useEffect(() => {
     if (userId === null) return undefined;
@@ -405,9 +408,12 @@ async function loadWizardState(options: {
   readonly draftStore: SecureBodyPhotoDraftStore;
   readonly purpose: BodyPhotoPurpose;
   readonly requestedSessionId?: string;
+  readonly startFresh: boolean;
   readonly userId: string;
 }): Promise<LoadedWizardState> {
-  const storedDraft = await options.draftStore.load(options.userId);
+  const storedDraft = options.startFresh
+    ? null
+    : await options.draftStore.load(options.userId);
   const requestedId = options.requestedSessionId?.trim() || storedDraft?.session_id || null;
   if (requestedId !== null) {
     try {

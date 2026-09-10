@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  Image,
+  Animated,
   PanResponder,
   StyleSheet,
   Text,
@@ -71,19 +71,37 @@ export function NativeGhostPhotoEditor({
   view,
 }: GhostPhotoEditorProps) {
   const [photoTransform, setPhotoTransform] = useState<GhostPhotoTransform>(GHOST_EDITOR_DEFAULT_TRANSFORM);
-  const [stageSize, setStageSize] = useState<GhostPhotoStageSize>({ height: 520, width: 320 });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const transformRef = useRef(photoTransform);
-  const stageSizeRef = useRef(stageSize);
+  const stageSizeRef = useRef<GhostPhotoStageSize>({ height: 520, width: 320 });
+  const animatedTranslateX = useRef(new Animated.Value(0)).current;
+  const animatedTranslateY = useRef(new Animated.Value(0)).current;
+  const animatedScale = useRef(new Animated.Value(1)).current;
+  const animatedRotation = useRef(new Animated.Value(0)).current;
   const dragRef = useRef<DragState | null>(null);
   const pinchRef = useRef<GhostPhotoPinchGesture | null>(null);
   const ghostVariant = resolveGhostOverlayVariant(sex);
 
   function updatePhotoTransform(update: (current: GhostPhotoTransform) => GhostPhotoTransform) {
     const next = clampGhostPhotoTransform(update(transformRef.current));
+    commitPhotoTransform(next);
+  }
+
+  function commitPhotoTransform(next: GhostPhotoTransform) {
     transformRef.current = next;
     setPhotoTransform(next);
+    updateAnimatedPhotoTransform(next, stageSizeRef.current);
+  }
+
+  function updateAnimatedPhotoTransform(
+    next: GhostPhotoTransform,
+    stage: GhostPhotoStageSize,
+  ) {
+    animatedTranslateX.setValue(next.translateX * stage.width);
+    animatedTranslateY.setValue(next.translateY * stage.height);
+    animatedScale.setValue(next.scale);
+    animatedRotation.setValue(next.rotation);
   }
 
   function handleStageLayout(event: LayoutChangeEvent) {
@@ -91,7 +109,7 @@ export function NativeGhostPhotoEditor({
     if (height <= 0 || width <= 0) return;
     const next = { height, width };
     stageSizeRef.current = next;
-    setStageSize(next);
+    updateAnimatedPhotoTransform(transformRef.current, next);
   }
 
   const panResponder = useMemo(() => PanResponder.create({
@@ -125,7 +143,7 @@ export function NativeGhostPhotoEditor({
         }
         const next = applyGhostPhotoPinchGesture(pinchRef.current, points[0], points[1]);
         transformRef.current = next;
-        setPhotoTransform(next);
+        updateAnimatedPhotoTransform(next, stageSizeRef.current);
         dragRef.current = null;
         return;
       }
@@ -137,17 +155,19 @@ export function NativeGhostPhotoEditor({
         stageSizeRef.current,
       );
       transformRef.current = next;
-      setPhotoTransform(next);
+      updateAnimatedPhotoTransform(next, stageSizeRef.current);
     },
     onPanResponderRelease: () => {
       dragRef.current = null;
       pinchRef.current = null;
+      commitPhotoTransform(transformRef.current);
     },
     onPanResponderTerminate: () => {
       dragRef.current = null;
       pinchRef.current = null;
+      commitPhotoTransform(transformRef.current);
     },
-    onPanResponderTerminationRequest: () => true,
+    onPanResponderTerminationRequest: () => false,
     onStartShouldSetPanResponder: () => true,
   }), [busy]);
 
@@ -179,6 +199,19 @@ export function NativeGhostPhotoEditor({
 
   const framingIsWithinTolerance = isGhostFramingWithinTolerance(photoTransform);
   const photoScale = photoTransform.scale;
+  const animatedPhotoStyle = {
+    transform: [
+      { translateX: animatedTranslateX },
+      { translateY: animatedTranslateY },
+      {
+        rotate: animatedRotation.interpolate({
+          inputRange: [-180, 0, 180],
+          outputRange: ["-180deg", "0deg", "180deg"],
+        }),
+      },
+      { scale: animatedScale },
+    ],
+  } as const;
 
   return (
     <View style={styles.container}>
@@ -194,11 +227,11 @@ export function NativeGhostPhotoEditor({
         style={styles.stage}
         {...panResponder.panHandlers}
       >
-        <Image
+        <Animated.Image
           accessibilityLabel={replaceView(bodyPhotoCopy.editor.imageAlt, viewLabel(view))}
           resizeMode="contain"
           source={{ uri: source.uri }}
-          style={[styles.photo, photoTransformStyle(photoTransform, stageSize)]}
+          style={[styles.photo, animatedPhotoStyle]}
         />
         <GhostOverlayGuide ghostScale={ghostScale} sideProfile={sideProfile} sex={sex} view={view} />
       </View>
@@ -285,21 +318,6 @@ function viewLabel(view: BodyPhotoView): string {
   if (view === "front") return "روبه‌رو";
   if (view === "side") return "نیمرخ";
   return "پشت";
-}
-
-function photoTransformStyle(
-  transform: GhostPhotoTransform,
-  stage: GhostPhotoStageSize,
-) {
-  const safe = clampGhostPhotoTransform(transform);
-  return {
-    transform: [
-      { translateX: safe.translateX * stage.width },
-      { translateY: safe.translateY * stage.height },
-      { rotate: `${safe.rotation}deg` },
-      { scale: safe.scale },
-    ],
-  } as const;
 }
 
 function readTwoTouchPoints(event: GestureResponderEvent): [GhostPhotoPoint, GhostPhotoPoint] | null {
