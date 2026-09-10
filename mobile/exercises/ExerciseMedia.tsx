@@ -1,4 +1,5 @@
 import type { components } from "@fitician/core";
+import { useIsFocused } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
@@ -26,6 +27,7 @@ export function ExerciseMedia({
   path,
   style,
 }: ExerciseMediaProps) {
+  const isFocused = useIsFocused();
   const runtime = getMobileRuntimeConfig();
   const source = { uri: resolveExerciseMediaUrl(path, runtime.apiBaseUrl) };
   const [failed, setFailed] = useState(false);
@@ -37,10 +39,11 @@ export function ExerciseMedia({
   }, [mediaType, path]);
 
   const renderable = isExerciseMediaRenderable(path, mediaType) && !failed;
+  const mediaMounted = renderable && (mediaType !== "video" || isFocused);
 
   return (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="image" style={[styles.frame, compact && styles.compactFrame, style]}>
-      {renderable ? (
+      {mediaMounted ? (
         mediaType === "video" ? (
           <Media
             accessibilityLabel={`ویدئوی حرکت ${name}`}
@@ -65,13 +68,13 @@ export function ExerciseMedia({
             style={[styles.media, compact && styles.compactMedia]}
           />
         )
-      ) : (
+      ) : renderable ? null : (
         <View style={styles.fallback}>
           <AppIcon color={fiticianTokens.colors.aqua} name="training" size={fiticianTokens.iconSize.xl} />
           <Text style={styles.fallbackText}>نمایش حرکت آماده نیست</Text>
         </View>
       )}
-      {renderable && loading ? (
+      {mediaMounted && loading ? (
         <View pointerEvents="none" style={styles.loadingOverlay}>
           <ActivityIndicator accessibilityLabel="در حال بارگذاری رسانه حرکت" color={fiticianTokens.colors.aqua} />
         </View>

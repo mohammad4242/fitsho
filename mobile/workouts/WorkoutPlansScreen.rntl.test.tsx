@@ -16,6 +16,7 @@ jest.mock("@tanstack/react-query", () => ({
 jest.mock("expo-router", () => ({
   useLocalSearchParams: jest.fn(),
   useRouter: jest.fn(),
+  useIsFocused: jest.fn(() => true),
 }));
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
