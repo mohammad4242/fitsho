@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaFrame } from "react-native-safe-area-context";
 
 import {
   createInitialOnboardingState,
@@ -47,6 +48,8 @@ const copy = {
 
 export function PublicOnboardingScreen() {
   const router = useRouter();
+  const { width } = useSafeAreaFrame();
+  const compactLayout = width <= 650;
   const store = useMemo(() => new SecurePublicOnboardingDraftStore(), []);
   const questionBackRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<OnboardingState | null>(null);
@@ -202,7 +205,7 @@ export function PublicOnboardingScreen() {
   const accountMode = state.step === "review" || state.step === "nutrition_preferences" ? state.mode : null;
   if (accountMode !== null) {
     return (
-      <Screen contentWidth="full" contentContainerStyle={styles.accountScreen}>
+      <Screen contentWidth="full" contentContainerStyle={styles.accountScreen} scroll={false}>
         {error ? <Notice message={error} variant="danger" /> : null}
         <PublicAccountStep
           mode={accountMode}
@@ -217,11 +220,15 @@ export function PublicOnboardingScreen() {
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <View style={styles.header}>
         <Text style={styles.brand}>فیتشو</Text>
-        <Text style={styles.headerNote}>{copy.header}</Text>
+        {compactLayout ? null : <Text style={styles.headerNote}>{copy.header}</Text>}
       </View>
       {error ? <Notice message={error} variant="danger" /> : null}
       {state.step === "product_mode" ? (
-        <ModeSelection busy={busy} onSelect={(mode) => run({ mode, type: "select_product_mode" })} />
+        <ModeSelection
+          busy={busy}
+          compactLayout={compactLayout}
+          onSelect={(mode) => run({ mode, type: "select_product_mode" })}
+        />
       ) : null}
       {state.step === "shared_profile" ? (
         <GuidedSharedProfileQuestions
@@ -266,7 +273,15 @@ export function PublicOnboardingScreen() {
   );
 }
 
-function ModeSelection({ busy, onSelect }: { readonly busy: boolean; readonly onSelect: (mode: ProductMode) => void }) {
+function ModeSelection({
+  busy,
+  compactLayout,
+  onSelect,
+}: {
+  readonly busy: boolean;
+  readonly compactLayout: boolean;
+  readonly onSelect: (mode: ProductMode) => void;
+}) {
   const modes = [
     ["training", copy.mode.training, "training"],
     ["nutrition", copy.mode.nutrition, "nutrition"],
@@ -284,9 +299,19 @@ function ModeSelection({ busy, onSelect }: { readonly busy: boolean; readonly on
             disabled={busy}
             key={mode}
             onPress={() => onSelect(mode)}
-            style={[styles.modeCard, mode === "both" && styles.modeCardRecommended]}
+            style={[
+              styles.modeCard,
+              compactLayout && styles.modeCardCompact,
+              mode === "both" && styles.modeCardRecommended,
+            ]}
           >
-            <View style={[styles.modeIcon, mode === "both" && styles.modeIconRecommended]}>
+            <View
+              style={[
+                styles.modeIcon,
+                compactLayout && styles.modeIconCompact,
+                mode === "both" && styles.modeIconRecommended,
+              ]}
+            >
               <AppIcon color={mode === "both" ? fiticianTokens.colors.canvas : fiticianTokens.colors.aqua} name={icon} size={24} />
             </View>
             <View style={styles.modeCopy}>
@@ -326,9 +351,13 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
+    borderBottomColor: fiticianTokens.colors.line,
+    borderBottomWidth: 1,
     flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
+    minHeight: 80,
+    paddingVertical: fiticianTokens.spacing[3],
     width: "100%",
   },
   headerNote: {
@@ -376,10 +405,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: fiticianTokens.spacing[3],
-    minHeight: 94,
+    minHeight: 116,
     paddingHorizontal: fiticianTokens.spacing[4],
     paddingVertical: fiticianTokens.spacing[3],
     width: "100%",
+  },
+  modeCardCompact: {
+    minHeight: 100,
   },
   modeCardRecommended: {
     backgroundColor: fiticianTokens.colors.aquaAtmosphere,
@@ -400,9 +432,13 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    height: 56,
+    height: 60,
     justifyContent: "center",
-    width: 56,
+    width: 60,
+  },
+  modeIconCompact: {
+    height: 52,
+    width: 52,
   },
   modeIconRecommended: {
     backgroundColor: fiticianTokens.colors.aqua,

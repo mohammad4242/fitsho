@@ -66,6 +66,11 @@ test("shows exactly one shared question at a time and keeps the Web five-step or
   fireEvent.press(screen.getByTestId("birth-month-option-5"));
   fireEvent.press(screen.getByTestId("birth-year"));
   fireEvent.press(screen.getByTestId("birth-year-option-1992"));
+
+  expect(
+    StyleSheet.flatten(screen.getByTestId("public-birth-date-grid").props.style),
+  ).toMatchObject({ flexDirection: "column" });
+
   fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
   expect(screen.getByRole("header", { name: "جنسیتت چیست؟" })).toBeTruthy();
   expect(screen.getAllByRole("radio")).toHaveLength(2);

@@ -383,6 +383,9 @@ export const publicOnboardingStyles = StyleSheet.create({
     flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
+  dateGridCompact: {
+    flexDirection: "column",
+  },
   dateSelector: {
     alignItems: "stretch",
     flex: 1,

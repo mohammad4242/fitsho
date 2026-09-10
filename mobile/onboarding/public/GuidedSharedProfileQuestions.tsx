@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { useSafeAreaFrame } from "react-native-safe-area-context";
 
 import type { ProfileFormValues } from "@fitician/core/profile";
 
@@ -138,6 +139,8 @@ export function GuidedSharedProfileQuestions({
   onRegisterBack,
   values,
 }: GuidedSharedProfileQuestionsProps) {
+  const { width } = useSafeAreaFrame();
+  const compactLayout = width <= 650;
   const [question, setQuestion] = useState(0);
   const [birthError, setBirthError] = useState<string | null>(null);
   const [showBodyConfirmation, setShowBodyConfirmation] = useState(false);
@@ -246,7 +249,10 @@ export function GuidedSharedProfileQuestions({
       {question === 1 ? (
         <View style={styles.fieldStack}>
           <Text style={styles.questionDescription}>روز، ماه و سال تولد را انتخاب کن.</Text>
-          <View style={styles.dateGrid}>
+          <View
+            style={[styles.dateGrid, compactLayout && styles.dateGridCompact]}
+            testID="public-birth-date-grid"
+          >
             <DatePartPicker
               label="روز"
               onChange={(value) => setBirthParts((current) => ({ ...current, day: value }))}
