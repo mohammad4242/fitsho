@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useSafeAreaFrame } from "react-native-safe-area-context";
 
 import { AppIcon } from "../../ui/components";
 import { fiticianDirectionalIconName } from "../../ui/icons";
@@ -40,13 +39,12 @@ export function PublicQuestionFrame({
   title,
   totalQuestions,
 }: PublicQuestionFrameProps) {
-  const { height } = useSafeAreaFrame();
   const percentage = `${Math.max(0, Math.min(100, ((question + 1) / totalQuestions) * 100))}%`;
 
   useEffect(() => onRegisterBack?.(onBack), [onBack, onRegisterBack]);
 
   return (
-    <View accessibilityLabel={stageLabel} style={[styles.question, { minHeight: Math.max(0, height - 160) }]} testID={testID}>
+    <View accessibilityLabel={stageLabel} style={styles.question} testID={testID}>
       <Pressable
         accessibilityLabel="بازگشت"
         accessibilityRole="button"

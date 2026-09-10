@@ -51,7 +51,7 @@ test("shows exactly one shared question at a time and keeps the Web five-step or
   renderWithSafeArea(<SharedHarness onComplete={onComplete} />);
 
   expect(StyleSheet.flatten(screen.getByTestId("public-shared-questions").props.style)).toMatchObject({
-    minHeight: 640,
+    minHeight: 560,
   });
   expect(screen.getByRole("header", { name: "دوست داری چه صدایت کنیم؟" })).toBeTruthy();
   expect(screen.getByText("مرحله 1 از 5")).toBeTruthy();
