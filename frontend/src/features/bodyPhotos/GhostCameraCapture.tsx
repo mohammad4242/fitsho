@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { GhostScaleControls } from "./GhostScaleControls";
+import { resolveGhostOverlayVariant } from "./ghostOverlayAssets";
 import { privacyCropSourceYForView } from "./ghostPhotoEditor";
 import {
   createMediaPipeLivePoseGuide,
@@ -57,6 +58,7 @@ export function GhostCameraCapture({
   livePoseGuideFactory = defaultLivePoseGuideFactory,
 }: GhostCameraCaptureProps) {
   const { t } = useTranslation();
+  const ghostVariant = resolveGhostOverlayVariant(sex);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -98,6 +100,7 @@ export function GhostCameraCapture({
       ghostScale,
       displaySize,
       { width: video.videoWidth, height: video.videoHeight },
+      ghostVariant,
     ));
     const outputHeight = video.videoHeight - sourceY;
     canvas.width = video.videoWidth;
@@ -139,7 +142,7 @@ export function GhostCameraCapture({
       setStreamReady(false);
       stopCurrentStream();
     }, "image/jpeg", 0.92);
-  }, [facingMode, ghostScale, onFallback, streamReady, view]);
+  }, [facingMode, ghostScale, ghostVariant, onFallback, streamReady, view]);
 
   useEffect(() => {
     const capability = detectCameraCapability();

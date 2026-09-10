@@ -59,11 +59,10 @@ describe("ghostGeometry", () => {
 
     const back = getGhostGeometry({ view: "back", ghostScale: 1.0 });
     expect(back.view).toBe("back");
-    expect(ghostPrivacyCutRatioForView("front")).toBeCloseTo(0.16);
-    expect(ghostPrivacyCutRatioForView("side")).toBeCloseTo(0.10);
-    expect(ghostPrivacyCutRatioForView("back")).toBeCloseTo(0.06);
-    // Back privacy line is higher (0.06 vs 0.16)
-    expect(back.privacyLine.anchor.y).toBeLessThan(front.privacyLine.anchor.y);
+    expect(ghostPrivacyCutRatioForView("front")).toBeCloseTo(0.08);
+    expect(ghostPrivacyCutRatioForView("side")).toBeCloseTo(0.08);
+    expect(ghostPrivacyCutRatioForView("back")).toBeCloseTo(0.08);
+    expect(back.privacyLine.anchor.y).toBeCloseTo(front.privacyLine.anchor.y);
 
     const sideRight = getGhostGeometry({ view: "side", sideProfile: "right", ghostScale: 1.0 });
     expect(sideRight.mirrored).toBe(false);
@@ -94,7 +93,7 @@ describe("ghostGeometry", () => {
   it("produces identical privacy line geometry to ghostPhotoEditor", () => {
     const frontLine = ghostPrivacyLineGeometry("front", 1.0, false);
     expect(frontLine.anchor.x).toBeCloseTo(0.5);
-    expect(frontLine.anchor.y).toBeCloseTo(0.16);
+    expect(frontLine.anchor.y).toBeCloseTo(0.08);
     expect(frontLine.start.x).toBeCloseTo(0.0);
     expect(frontLine.end.x).toBeCloseTo(1.0);
 

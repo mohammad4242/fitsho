@@ -27,6 +27,7 @@ import {
   stepGhostScale,
 } from "@fitician/core/body-ghost-scale";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
+import { resolveGhostOverlayVariant } from "./ghostOverlay";
 import {
   BODY_PHOTO_COUNTDOWN_SECONDS,
   advanceBodyPhotoCountdown,
@@ -76,6 +77,7 @@ export function BodyPhotoCapture({
   const [busy, setBusy] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const ghostVariant = resolveGhostOverlayVariant(sex);
   const device = useCameraDevice(cameraPosition);
   const photoOutput = usePhotoOutput({
     containerFormat: "jpeg",
@@ -114,7 +116,7 @@ export function BodyPhotoCapture({
         source: "camera",
         uri: rawUri,
         width,
-      }, { ghostScale, sideProfile, view });
+      }, { ghostScale, ghostVariant, sideProfile, view });
       encodedUri = encoded.uri;
       setCaptured(encoded);
       setPreviewReady(false);
@@ -126,7 +128,7 @@ export function BodyPhotoCapture({
       if (rawUri !== null && rawUri !== encodedUri) deleteLocalFile(rawUri);
       setBusy(false);
     }
-  }, [busy, captured, ghostScale, photoOutput, previewReady, sideProfile, view]);
+  }, [busy, captured, ghostScale, ghostVariant, photoOutput, previewReady, sideProfile, view]);
 
   useEffect(() => {
     if (countdown !== 0) return;
@@ -177,7 +179,7 @@ export function BodyPhotoCapture({
         source: "library",
         uri: asset.uri,
         width: asset.width,
-      }, { ghostScale, sideProfile, view });
+      }, { ghostScale, ghostVariant, sideProfile, view });
       setCaptured(encoded);
     } catch (error) {
       setConfirmError(error instanceof Error && error.message === "No photo selected"

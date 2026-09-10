@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { GhostOverlayVariant } from "@fitician/core/body-ghost";
 import type { Sex } from "../profile/types";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
 import { GhostScaleControls } from "./GhostScaleControls";
+import { resolveGhostOverlayVariant } from "./ghostOverlayAssets";
 import {
   PHOTO_SCALE_MAX,
   PHOTO_SCALE_MIN,
@@ -24,6 +26,7 @@ export type GhostPhotoRenderer = (
   transform: GhostTransform,
   view: BodyPhotoView,
   ghostScale: number,
+  variant?: GhostOverlayVariant,
 ) => Promise<File>;
 
 const defaultGhostPhotoRenderer: GhostPhotoRenderer = (
@@ -31,7 +34,8 @@ const defaultGhostPhotoRenderer: GhostPhotoRenderer = (
   transform,
   view,
   ghostScale,
-) => renderGhostPhoto(file, transform, view, ghostScale);
+  variant = "male",
+) => renderGhostPhoto(file, transform, view, ghostScale, undefined, variant);
 
 type GhostPhotoEditorProps = {
   file: File;
@@ -87,6 +91,7 @@ export function GhostPhotoEditor({
   const [ghostScale, setGhostScale] = useState(1);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ghostVariant = resolveGhostOverlayVariant(sex);
 
   useEffect(() => {
     const nextPreviewUrl = URL.createObjectURL(file);
@@ -165,7 +170,7 @@ export function GhostPhotoEditor({
     if (confirming) return;
     setConfirming(true);
     setError(null);
-    void renderPhoto(file, photoTransform, view, ghostScale)
+    void renderPhoto(file, photoTransform, view, ghostScale, ghostVariant)
       .then((editedFile) => onConfirm(editedFile, { ghostScale, sideProfile }))
       .catch(() => setError(t("bodyPhotos.editor.renderError")))
       .finally(() => setConfirming(false));

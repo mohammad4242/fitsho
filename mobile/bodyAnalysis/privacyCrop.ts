@@ -1,4 +1,5 @@
 import { clampGhostScale, ghostPrivacyLineGeometry } from "@fitician/core/body-ghost";
+import type { GhostOverlayVariant } from "@fitician/core/body-ghost";
 import {
   GHOST_EDITOR_OUTPUT,
   privacyCropSourceYForView,
@@ -9,6 +10,7 @@ import type { BodyPhotoSide, BodyPhotoView } from "@fitician/core/body-photos";
 
 export type BodyPhotoPrivacyCropPlan = {
   readonly displaySize: GhostDisplaySize;
+  readonly ghostVariant: GhostOverlayVariant;
   readonly outputHeight: number;
   readonly outputWidth: number;
   readonly sideProfile: BodyPhotoSide;
@@ -22,6 +24,7 @@ export type BodyPhotoPrivacyCropPlan = {
 export type BodyPhotoPrivacyCropInput = {
   readonly displaySize?: GhostDisplaySize;
   readonly ghostScale?: number;
+  readonly ghostVariant?: GhostOverlayVariant;
   readonly sideProfile?: BodyPhotoSide;
   readonly sourceSize: GhostDisplaySize;
   readonly view: BodyPhotoView;
@@ -31,13 +34,15 @@ export function bodyPhotoPrivacyLine(
   view: BodyPhotoView,
   ghostScale = 1,
   mirrored = false,
+  variant: GhostOverlayVariant = "male",
 ): GhostPrivacyLine {
-  return ghostPrivacyLineGeometry(view, clampGhostScale(ghostScale), mirrored);
+  return ghostPrivacyLineGeometry(view, clampGhostScale(ghostScale), mirrored, variant);
 }
 
 export function createBodyPhotoPrivacyCropPlan({
   displaySize = GHOST_EDITOR_OUTPUT,
   ghostScale = 1,
+  ghostVariant = "male",
   sideProfile = "right",
   sourceSize,
   view,
@@ -46,12 +51,13 @@ export function createBodyPhotoPrivacyCropPlan({
   assertPositiveSize(sourceSize, "source");
   const safeScale = clampGhostScale(ghostScale);
   const mirrored = view === "side" && sideProfile === "left";
-  const visibleLine = bodyPhotoPrivacyLine(view, safeScale, mirrored);
+  const visibleLine = bodyPhotoPrivacyLine(view, safeScale, mirrored, ghostVariant);
   const sourceCropY = Math.round(
-    privacyCropSourceYForView(view, safeScale, displaySize, sourceSize),
+    privacyCropSourceYForView(view, safeScale, displaySize, sourceSize, ghostVariant),
   );
   return {
     displaySize,
+    ghostVariant,
     outputHeight: Math.max(1, sourceSize.height - sourceCropY),
     outputWidth: sourceSize.width,
     sideProfile,

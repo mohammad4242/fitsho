@@ -191,6 +191,7 @@ it("returns the clean rendered file only after confirmation", async () => {
     GHOST_EDITOR_DEFAULT_TRANSFORM,
     "front",
     staticGhostScale,
+    "neutral",
   ));
   expect(onConfirm).toHaveBeenCalledWith(
     expect.objectContaining({ type: "image/jpeg" }),
@@ -216,6 +217,7 @@ it("passes the back view to the clean renderer", async () => {
     GHOST_EDITOR_DEFAULT_TRANSFORM,
     "back",
     staticGhostScale,
+    "neutral",
   ));
 });
 
@@ -230,6 +232,7 @@ it("passes the independent Ghost size to the crop renderer", async () => {
     GHOST_EDITOR_DEFAULT_TRANSFORM,
     "front",
     0.95,
+    "neutral",
   ));
 });
 

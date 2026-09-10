@@ -23,7 +23,7 @@ export function GhostOverlayGuide({
   const { t } = useTranslation();
   const variant = resolveGhostOverlayVariant(sex);
   const mirrored = view === "side" && sideProfile === "left";
-  const privacyLine = ghostPrivacyLineGeometry(view, ghostScale, mirrored);
+  const privacyLine = ghostPrivacyLineGeometry(view, ghostScale, mirrored, variant);
   return (
     <div
       className="ghost-overlay"

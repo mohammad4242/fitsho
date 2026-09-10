@@ -1,6 +1,7 @@
 import {
   ghostPrivacyLineGeometry,
 } from "./body-ghost.js";
+import type { GhostOverlayVariant } from "./body-ghost.js";
 import type { BodyPhotoView, GhostTransform } from "./body-photos.js";
 
 export { ghostPrivacyLineGeometry } from "./body-ghost.js";
@@ -98,8 +99,9 @@ export function privacyCropSourceYForView(
   ghostScale: number,
   displaySize: GhostDisplaySize,
   sourceSize: GhostDisplaySize,
+  variant: GhostOverlayVariant = "male",
 ): number {
-  const line = ghostPrivacyLineGeometry(view, ghostScale);
+  const line = ghostPrivacyLineGeometry(view, ghostScale, false, variant);
   const imageRect = containImageRect(displaySize, sourceSize);
   const displayY = line.anchor.y * displaySize.height;
   return clamp(
@@ -115,6 +117,7 @@ export function createGhostPhotoRenderPlan(
   transform: GhostPhotoTransform,
   view: BodyPhotoView = "front",
   ghostScale = 1,
+  variant: GhostOverlayVariant = "male",
 ): GhostPhotoRenderPlan {
   if (sourceWidth <= 0 || sourceHeight <= 0) {
     throw new Error("Ghost photo source dimensions must be positive");
@@ -125,13 +128,14 @@ export function createGhostPhotoRenderPlan(
   );
   const safeTransform = clampGhostPhotoTransform(transform);
   const privacyLineDisplayY = Math.round(
-    ghostPrivacyLineGeometry(view, ghostScale).anchor.y * GHOST_EDITOR_OUTPUT.height,
+    ghostPrivacyLineGeometry(view, ghostScale, false, variant).anchor.y * GHOST_EDITOR_OUTPUT.height,
   );
   const sourceCropY = Math.round(privacyCropSourceYForView(
     view,
     ghostScale,
     GHOST_EDITOR_OUTPUT,
     { width: sourceWidth, height: sourceHeight },
+    variant,
   ));
   const privacyCutPixels = privacyLineDisplayY;
   return {

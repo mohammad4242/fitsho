@@ -11,9 +11,9 @@ import { getGhostOverlayLayout } from "./ghostOverlay";
 const sourceSize = { height: 2400, width: 1600 };
 
 it.each([
-  ["front", 384],
-  ["side", 240],
-  ["back", 144],
+  ["front", 192],
+  ["side", 192],
+  ["back", 192],
 ] as const)("maps the visible %s line to the shared encoded crop", (view, expectedSourceY) => {
   const plan = createBodyPhotoPrivacyCropPlan({
     sourceSize,
@@ -55,6 +55,17 @@ it("keeps a mirrored side guide on the same horizontal crop boundary", () => {
   expect(left.sourceCropY).toBe(right.sourceCropY);
   expect(left.visibleLine.anchor.y).toBe(right.visibleLine.anchor.y);
   expect(left.visibleLine.anchor.x).toBe(right.visibleLine.anchor.x);
+});
+
+it("uses the selected Ghost variant neck line for the encoded crop", () => {
+  const plan = createBodyPhotoPrivacyCropPlan({
+    ghostVariant: "female",
+    sourceSize,
+    view: "front",
+  });
+
+  expect(plan.visibleLine.anchor.y).toBeCloseTo(0.045);
+  expect(plan.sourceCropY).toBe(108);
 });
 
 it("rejects invalid source dimensions before any crop can be encoded", () => {

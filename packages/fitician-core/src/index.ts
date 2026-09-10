@@ -25,6 +25,7 @@ export {
 export type {
   GhostPoint,
   GhostPrivacyLine,
+  GhostOverlayVariant,
   GhostViewGeometry,
   GhostZone,
 } from "./body-ghost";

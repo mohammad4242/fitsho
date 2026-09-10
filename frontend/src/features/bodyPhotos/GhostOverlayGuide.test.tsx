@@ -49,13 +49,13 @@ it("applies only a uniform centered scale to the fixed Ghost asset frame", () =>
   expect(frame).toHaveStyle({ transform: ghostGuideTransformStyle(0.95) });
 });
 
-it("places the back privacy line above the unchanged front line", () => {
+it("uses the selected female Ghost neck anchor for each view", () => {
   const back = render(<GhostOverlayGuide sex="female" view="back" />);
-  expect(back.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "6%" });
+  expect(back.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "5.5%" });
   back.unmount();
 
   const front = render(<GhostOverlayGuide sex="female" view="front" />);
-  expect(front.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "16%" });
+  expect(front.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "4.5%" });
 });
 
 it("renders the privacy line from the transformed Ghost neck anchor", () => {
@@ -67,7 +67,7 @@ it("renders the privacy line from the transformed Ghost neck anchor", () => {
     />,
   );
 
-  expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({ top: "16%" });
+  expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({ top: "4.5%" });
 });
 
 it("keeps the visible privacy line centered when the photo moves", () => {
@@ -95,7 +95,7 @@ it("keeps the privacy line attached when the Ghost is scaled", () => {
   );
 
   expect(container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
-    top: "22.8%",
+    top: "13.6%",
     left: "10%",
     width: "80%",
   });
@@ -104,13 +104,13 @@ it("keeps the privacy line attached when the Ghost is scaled", () => {
 it("places the side privacy cut line on the ghost neck and scales dynamically", () => {
   const defaultScale = render(<GhostOverlayGuide sex="female" view="side" ghostScale={1} />);
   expect(defaultScale.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
-    top: "10%",
+    top: "6%",
   });
   defaultScale.unmount();
 
   const scaledDown = render(<GhostOverlayGuide sex="female" view="side" ghostScale={0.8} />);
   expect(scaledDown.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
-    top: "18%",
+    top: "14.8%",
     left: "10%",
     width: "80%",
   });
@@ -118,7 +118,7 @@ it("places the side privacy cut line on the ghost neck and scales dynamically", 
 
   const scaledUp = render(<GhostOverlayGuide sex="female" view="side" ghostScale={1.15} />);
   expect(scaledUp.container.querySelector(".ghost-overlay__privacy-cut")).toHaveStyle({
-    top: "4%",
+    top: "-0.6%",
     left: "-7.5%",
     width: "115%",
   });
@@ -128,11 +128,11 @@ it.each(["male", "female"] as const)(
   "aligns side and back privacy cuts for the %s Ghost",
   (sex) => {
     const side = render(<GhostOverlayGuide sex={sex} view="side" />);
-    expect(side.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "10%" });
+    expect(side.getByLabelText(/privacy cut/i)).toHaveStyle({ top: sex === "female" ? "6%" : "8%" });
     side.unmount();
 
     const back = render(<GhostOverlayGuide sex={sex} view="back" />);
-    expect(back.getByLabelText(/privacy cut/i)).toHaveStyle({ top: "6%" });
+    expect(back.getByLabelText(/privacy cut/i)).toHaveStyle({ top: sex === "female" ? "5.5%" : "8%" });
   },
 );
 

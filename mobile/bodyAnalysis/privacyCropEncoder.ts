@@ -1,4 +1,5 @@
 import type { GhostDisplaySize } from "@fitician/core/body-ghost-editor";
+import type { GhostOverlayVariant } from "@fitician/core/body-ghost";
 import type { BodyPhotoSide, BodyPhotoView } from "@fitician/core/body-photos";
 
 import {
@@ -24,6 +25,7 @@ export type EncodedBodyPhoto = {
 export type BodyPhotoPrivacyCropRequest = {
   readonly displaySize?: GhostDisplaySize;
   readonly ghostScale?: number;
+  readonly ghostVariant?: GhostOverlayVariant;
   readonly sideProfile?: BodyPhotoSide;
   readonly sourceSize: GhostDisplaySize;
   readonly view: BodyPhotoView;

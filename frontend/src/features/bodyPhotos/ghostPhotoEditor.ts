@@ -3,6 +3,7 @@ import {
   clampGhostPhotoTransform,
   createGhostPhotoRenderPlan,
 } from "@fitician/core/body-ghost-editor";
+import type { GhostOverlayVariant } from "@fitician/core/body-ghost";
 import type { GhostPhotoTransform } from "@fitician/core/body-ghost-editor";
 import { GHOST_SCALE_MAX, GHOST_SCALE_MIN } from "./ghostScale";
 import type { BodyPhotoView } from "./types";
@@ -87,6 +88,7 @@ export function renderGhostPhoto(
   view?: BodyPhotoView,
   ghostScale?: number,
   runtime?: GhostPhotoCanvasRuntime,
+  variant?: GhostOverlayVariant,
 ): Promise<File>;
 
 export function renderGhostPhoto(
@@ -94,6 +96,7 @@ export function renderGhostPhoto(
   transform: GhostPhotoTransform,
   view: BodyPhotoView,
   runtime: GhostPhotoCanvasRuntime,
+  variant?: GhostOverlayVariant,
 ): Promise<File>;
 
 export async function renderGhostPhoto(
@@ -101,13 +104,26 @@ export async function renderGhostPhoto(
   transform: GhostPhotoTransform,
   view: BodyPhotoView = "front",
   ghostScaleOrRuntime: number | GhostPhotoCanvasRuntime = 1,
-  runtime: GhostPhotoCanvasRuntime = browserGhostPhotoCanvasRuntime,
+  runtimeOrVariant: GhostPhotoCanvasRuntime | GhostOverlayVariant = browserGhostPhotoCanvasRuntime,
+  variant = "male",
 ): Promise<File> {
   const ghostScale = typeof ghostScaleOrRuntime === "number" ? ghostScaleOrRuntime : 1;
-  const canvasRuntime = typeof ghostScaleOrRuntime === "number" ? runtime : ghostScaleOrRuntime;
+  const canvasRuntime = typeof ghostScaleOrRuntime === "number"
+    ? isGhostPhotoCanvasRuntime(runtimeOrVariant) ? runtimeOrVariant : browserGhostPhotoCanvasRuntime
+    : ghostScaleOrRuntime;
+  const resolvedVariant = typeof ghostScaleOrRuntime === "number"
+    ? variant
+    : isGhostOverlayVariant(runtimeOrVariant) ? runtimeOrVariant : "male";
   const image = await canvasRuntime.decode(file);
   try {
-    const plan = createGhostPhotoRenderPlan(image.width, image.height, transform, view, ghostScale);
+    const plan = createGhostPhotoRenderPlan(
+      image.width,
+      image.height,
+      transform,
+      view,
+      ghostScale,
+      resolvedVariant,
+    );
     const canvas = canvasRuntime.createCanvas(plan.canvasWidth, plan.canvasHeight);
     canvas.width = plan.canvasWidth;
     canvas.height = plan.canvasHeight;
@@ -178,6 +194,18 @@ const browserGhostPhotoCanvasRuntime: GhostPhotoCanvasRuntime = {
     });
   },
 };
+
+function isGhostOverlayVariant(value: unknown): value is GhostOverlayVariant {
+  return value === "male" || value === "female" || value === "neutral";
+}
+
+function isGhostPhotoCanvasRuntime(value: unknown): value is GhostPhotoCanvasRuntime {
+  return typeof value === "object"
+    && value !== null
+    && "decode" in value
+    && "createCanvas" in value
+    && "toJpeg" in value;
+}
 
 function decodeWithImageElement(file: File): Promise<DecodedGhostPhoto> {
   return new Promise((resolve, reject) => {

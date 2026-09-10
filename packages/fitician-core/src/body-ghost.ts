@@ -6,9 +6,27 @@ import type { BodyPhotoSide, BodyPhotoView } from "./body-photos.js";
 
 export { GHOST_SCALE_MAX, GHOST_SCALE_MIN } from "./body-ghost-scale.js";
 
-export const GHOST_PRIVACY_CUT_RATIO = 0.16;
-export const GHOST_SIDE_PRIVACY_CUT_RATIO = 0.10;
-export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.06;
+export const GHOST_PRIVACY_CUT_RATIO = 0.08;
+export const GHOST_SIDE_PRIVACY_CUT_RATIO = 0.08;
+export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.08;
+
+export type GhostOverlayVariant = "male" | "female" | "neutral";
+
+const GHOST_NECK_PRIVACY_CUT_RATIOS: Record<
+  Exclude<GhostOverlayVariant, "neutral">,
+  Record<BodyPhotoView, number>
+> = {
+  female: {
+    back: 0.055,
+    front: 0.045,
+    side: 0.06,
+  },
+  male: {
+    back: 0.08,
+    front: 0.08,
+    side: 0.08,
+  },
+};
 
 export type GhostPoint = {
   x: number;
@@ -31,6 +49,7 @@ export type GhostPrivacyLine = {
 export type GhostViewGeometry = {
   view: BodyPhotoView;
   sideProfile: BodyPhotoSide;
+  variant: GhostOverlayVariant;
   ghostScale: number;
   mirrored: boolean;
   centerX: number;
@@ -71,10 +90,12 @@ export function clampGhostScale(scale: number): number {
   return Math.min(GHOST_SCALE_MAX, Math.max(GHOST_SCALE_MIN, Number.isFinite(scale) ? scale : 1));
 }
 
-export function ghostPrivacyCutRatioForView(view: BodyPhotoView): number {
-  if (view === "back") return GHOST_BACK_PRIVACY_CUT_RATIO;
-  if (view === "side") return GHOST_SIDE_PRIVACY_CUT_RATIO;
-  return GHOST_PRIVACY_CUT_RATIO;
+export function ghostPrivacyCutRatioForView(
+  view: BodyPhotoView,
+  variant: GhostOverlayVariant = "male",
+): number {
+  const resolvedVariant = variant === "female" ? "female" : "male";
+  return GHOST_NECK_PRIVACY_CUT_RATIOS[resolvedVariant][view];
 }
 
 export function transformGhostPoint(
@@ -112,10 +133,11 @@ export function ghostPrivacyLineGeometry(
   view: BodyPhotoView,
   ghostScale = 1,
   mirrored = false,
+  variant: GhostOverlayVariant = "male",
 ): GhostPrivacyLine {
   const safeScale = clampGhostScale(ghostScale);
   const transformedAnchor = transformGhostPoint(
-    { x: 0.5, y: ghostPrivacyCutRatioForView(view) },
+    { x: 0.5, y: ghostPrivacyCutRatioForView(view, variant) },
     safeScale,
     false,
   );
@@ -185,9 +207,11 @@ export function getGhostGeometry(options: {
   view: BodyPhotoView;
   ghostScale?: number;
   sideProfile?: BodyPhotoSide;
+  variant?: GhostOverlayVariant;
 }): GhostViewGeometry {
   const { view } = options;
   const sideProfile: BodyPhotoSide = options.sideProfile ?? "right";
+  const variant: GhostOverlayVariant = options.variant ?? "male";
   const ghostScale = clampGhostScale(options.ghostScale ?? 1);
   const mirrored = view === "side" && sideProfile === "left";
 
@@ -212,7 +236,7 @@ export function getGhostGeometry(options: {
   };
 
   const bodyBounds = transformGhostZone(base.bodyBounds, ghostScale, mirrored);
-  const privacyLine = ghostPrivacyLineGeometry(view, ghostScale, mirrored);
+  const privacyLine = ghostPrivacyLineGeometry(view, ghostScale, mirrored, variant);
 
   const targetSpan = 0.75 * ghostScale;
   const expectedBodySpan = {
@@ -235,6 +259,7 @@ export function getGhostGeometry(options: {
   return {
     view,
     sideProfile,
+    variant,
     ghostScale,
     mirrored,
     centerX: 0.5,

@@ -24,7 +24,7 @@ export function GhostOverlayGuide({
   ghostScale = 1,
 }: GhostOverlayGuideProps) {
   const variant = resolveGhostOverlayVariant(sex);
-  const layout = getGhostOverlayLayout(view, ghostScale, sideProfile);
+  const layout = getGhostOverlayLayout(view, ghostScale, sideProfile, variant);
   const lineLeft = `${layout.privacyLine.start.x * 100}%` as DimensionValue;
   const lineWidth = `${(layout.privacyLine.end.x - layout.privacyLine.start.x) * 100}%` as DimensionValue;
 
