@@ -130,6 +130,7 @@ function ShoppingWarnings({ codes }: { readonly codes: readonly string[] }) {
 
 const styles = StyleSheet.create({
   card: {
+    alignItems: "stretch",
     marginTop: fiticianTokens.spacing[3],
   },
   english: {
@@ -150,6 +151,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     padding: fiticianTokens.spacing[3],
+    width: "100%",
   },
   itemAmount: {
     alignItems: "stretch",
@@ -177,6 +179,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   itemStack: {
+    alignItems: "stretch",
     gap: fiticianTokens.spacing[2],
   },
   price: {
@@ -207,6 +210,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingTop: fiticianTokens.spacing[3],
+    width: "100%",
   },
   totalValue: {
     color: fiticianTokens.colors.aqua,

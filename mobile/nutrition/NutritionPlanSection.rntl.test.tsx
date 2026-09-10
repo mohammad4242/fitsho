@@ -108,6 +108,13 @@ const idealPlan = {
   weekly_cost_irr: 12_000_000,
 };
 
+const historyVersion = {
+  created_at: "2026-09-06T00:00:00Z",
+  id: "history-1",
+  lifecycle_status: "active",
+  revision: 1,
+};
+
 function findAncestorStyle(node: ReactTestInstance, key: string): Record<string, unknown> {
   let current = node.parent;
   while (current !== null) {
@@ -175,7 +182,7 @@ beforeEach(() => {
       selected_plan_role: "budget",
       warning_codes: [],
     });
-    if (key[1] === "plans") return queryResult([]);
+    if (key[1] === "plans") return queryResult([historyVersion]);
     if (key[1] === "meal-feedback") return queryResult({ feedback: {} });
     if (key[1] === "shopping-list") return queryResult(shoppingList);
     return queryResult(undefined);
@@ -197,6 +204,21 @@ test("shows active role, approval, date context, and weekly plan content first",
   expect(screen.getByRole("radio", { name: "نسخه اقتصادی، برنامه فعال شما" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "نسخه ایده‌آل" })).toBeTruthy();
   expect(screen.getAllByText("کربوهیدرات").length).toBeGreaterThanOrEqual(1);
+
+  expect(StyleSheet.flatten(screen.getByText("نسخه PDF").props.style)).toMatchObject({
+    textAlign: "right",
+    writingDirection: "rtl",
+  });
+  expect(StyleSheet.flatten(screen.getByText("فایل برنامه در فضای امن دستگاه ذخیره می‌شود و پس از باز کردن دوباره اپ باقی می‌ماند.").props.style)).toMatchObject({
+    textAlign: "right",
+    writingDirection: "rtl",
+  });
+  expect(findAncestorStyle(screen.getByText("نسخه PDF"), "alignItems")).toMatchObject({ alignItems: "stretch" });
+  expect(StyleSheet.flatten(screen.getByText("تاریخچه برنامه‌ها").props.style)).toMatchObject({
+    textAlign: "right",
+    writingDirection: "rtl",
+  });
+  expect(findAncestorStyle(screen.getByText("تاریخچه برنامه‌ها"), "alignItems")).toMatchObject({ alignItems: "stretch" });
 });
 
 test("keeps Persian plan and shopping copy stretched inside native RTL rows", () => {
@@ -209,6 +231,14 @@ test("keeps Persian plan and shopping copy stretched inside native RTL rows", ()
   expect(findAncestorStyle(screen.getByText("برنامه غذایی هفتگی"), "alignItems")).toMatchObject({ alignItems: "stretch" });
 
   fireEvent.press(screen.getByRole("button", { name: "لیست خرید" }));
+  expect(StyleSheet.flatten(screen.getByText("لیست خرید").props.style)).toMatchObject({
+    textAlign: "right",
+    writingDirection: "rtl",
+  });
+  expect(StyleSheet.flatten(screen.getByText("مواد لازم برای این نسخه از برنامه").props.style)).toMatchObject({
+    textAlign: "right",
+    writingDirection: "rtl",
+  });
   expect(findAncestorStyle(screen.getByText("عدس"), "alignItems")).toMatchObject({ alignItems: "stretch" });
 
   expect(findAncestorStyle(screen.getByText("جمع هزینه مرجع تأییدشده"), "flexDirection")).toMatchObject({ flexDirection: "row" });

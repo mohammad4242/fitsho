@@ -1443,6 +1443,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
   },
   historySection: {
+    alignItems: "stretch",
     gap: fiticianTokens.spacing[2],
   },
   historyTitle: {
@@ -1555,6 +1556,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
   },
   pdfCard: {
+    alignItems: "stretch",
     gap: fiticianTokens.spacing[3],
   },
   planCard: {
@@ -1772,6 +1774,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   section: {
+    alignItems: "stretch",
     gap: fiticianTokens.spacing[3],
     marginBottom: fiticianTokens.spacing[3],
   },
