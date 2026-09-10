@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the web Dashboard and native Fitician Home nutrition rings animate from 0 to the tracked-calorie percentage, use the shared green/blue/red tone contract, and explain over-target intake.
+**Goal:** Make the web Dashboard and native Fitician Home nutrition rings animate from 0 to the target-to-TDEE percentage, use the shared green/blue/red tone contract, and explain gain targets above estimated expenditure.
 
-**Architecture:** Put the target-relative ratio, visual clamp, and exact tone boundaries in @fitician/core. Keep platform colors and rendering in each client: web ProgressRing receives an opt-in animation/color, while native Home passes a mapped color to its existing focus-animated MetricRing. No API or nutrition calculation changes.
+**Architecture:** Put the target-to-TDEE ratio, visual clamp, and exact tone boundaries in @fitician/core. Keep platform colors and rendering in each client: web ProgressRing receives an opt-in animation/color, while native Home passes a mapped color to its existing focus-animated MetricRing. No API or nutrition calculation changes.
 
 **Tech Stack:** TypeScript 6, React 19, Vite/Vitest, React Native/Expo SDK 57, Jest/RNTL, CSS conic gradients, react-native-svg, npm workspaces.
 
@@ -12,9 +12,9 @@
 
 ## Global Constraints
 
-- Use tracked energy_kcal / goal-specific daily target energy_kcal as the canonical ratio for both gain and loss members.
+- Use goal-specific daily target energy_kcal / estimated daily expenditure (TDEE) as the canonical ratio for both gain and loss members.
 - Use < 60% green, 60% <= progress < 90% blue, and >= 90% red; cap only the visual ring at 100%.
-- Show a localized above-target message when tracked intake exceeds the target; preserve the real consumed and target values.
+- Show a localized above-expenditure message when the target exceeds TDEE; show the target and TDEE values.
 - Animate only the Home nutrition ring; keep other web ProgressRing and native MetricRing consumers unchanged by default.
 - Preserve all existing API, storage, tracking, calculation, and unrelated worktree changes.
 - Before every commit, stage only the exact files named by that task.
@@ -27,7 +27,7 @@
 - Modify: packages/fitician-core/src/index.ts
 
 **Interfaces:**
-- Produces nutritionProgressRatio(consumedCalories, targetCalories): number, returning a non-negative unbounded ratio so over-target values remain detectable.
+- Produces nutritionTargetToExpenditureRatio(targetCalories, estimatedDailyExpenditureCalories): number, returning a non-negative unbounded ratio so gain targets remain detectable.
 - Produces clampNutritionProgress(progress): number, returning a finite value in [0, 1] for visual rendering.
 - Produces nutritionProgressTone(progress): NutritionProgressTone, where NutritionProgressTone is "green" | "blue" | "red".
 
@@ -40,20 +40,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   clampNutritionProgress,
-  nutritionProgressRatio,
+  nutritionTargetToExpenditureRatio,
   nutritionProgressTone,
 } from "./nutrition-progress";
 
-describe("nutritionProgressRatio", () => {
-  it("uses the same target-relative calculation for gain and loss targets", () => {
-    expect(nutritionProgressRatio(1_800, 3_000)).toBeCloseTo(0.6);
-    expect(nutritionProgressRatio(1_800, 1_800)).toBe(1);
+describe("nutritionTargetToExpenditureRatio", () => {
+  it("calculates the daily target against estimated expenditure", () => {
+    expect(nutritionTargetToExpenditureRatio(2_400, 3_000)).toBeCloseTo(0.8);
+    expect(nutritionTargetToExpenditureRatio(3_000, 2_400)).toBeCloseTo(1.25);
   });
 
-  it("preserves a ratio above the target and rejects invalid targets", () => {
-    expect(nutritionProgressRatio(2_000, 1_800)).toBeCloseTo(1.111111);
-    expect(nutritionProgressRatio(null, 2_000)).toBe(0);
-    expect(nutritionProgressRatio(500, 0)).toBe(0);
+  it("rejects missing, non-positive, and non-finite inputs", () => {
+    expect(nutritionTargetToExpenditureRatio(null, 2_000)).toBe(0);
+    expect(nutritionTargetToExpenditureRatio(2_000, null)).toBe(0);
+    expect(nutritionTargetToExpenditureRatio(500, 0)).toBe(0);
+    expect(nutritionTargetToExpenditureRatio(Number.NaN, 2_000)).toBe(0);
   });
 });
 
@@ -89,7 +90,7 @@ Expected: FAIL because the new module and exports do not exist yet.
 
 - [ ] **Step 3: Implement the smallest shared contract**
 
-Implement the three functions with finite-number checks. nutritionProgressRatio returns 0 for a missing/non-positive target or missing/negative consumption, otherwise returns consumed / target without an upper clamp. nutritionProgressTone compares the non-negative ratio to 0.6 and 0.9.
+Implement the three functions with finite-number checks. nutritionTargetToExpenditureRatio returns 0 for a missing/non-positive target or TDEE, otherwise returns target / TDEE without an upper clamp. nutritionProgressTone compares the non-negative ratio to 0.6 and 0.9.
 
 Export the runtime functions and NutritionProgressTone from packages/fitician-core/src/index.ts.
 
@@ -202,13 +203,13 @@ git push origin main
 - Modify: frontend/src/pages/dashboard.css
 
 **Interfaces:**
-- Consumes nutritionProgressRatio and nutritionProgressTone from @fitician/core.
+- Consumes nutritionTargetToExpenditureRatio and nutritionProgressTone from @fitician/core.
 - Maps green to var(--fitsho-success), blue to var(--fitsho-blue), and red to var(--fitsho-danger).
-- Keeps the existing target/actual rendering and adds an above-target paragraph only when actual energy exceeds the target.
+- Shows the target and TDEE metrics and adds an above-expenditure paragraph only when the target exceeds TDEE.
 
 - [ ] **Step 1: Write failing Dashboard tests**
 
-Add a test with a 2,000 kcal target and 1,200 tracked kcal that asserts the exact 60% boundary selects the blue CSS token and enables mount animation. Add an over-target test with 2,200 tracked kcal that asserts the real values remain visible, the ring is capped by its existing 100% display, the ring uses the red token, and the localized message ۲۰۰ کیلوکالری بیشتر از هدف روزانه is visible.
+Add a test with a 1,800 kcal target and 3,000 kcal TDEE that asserts the exact 60% boundary selects the blue CSS token and enables mount animation. Add a gain-target test with a 3,000 kcal target and 2,400 kcal TDEE that asserts the ring is capped by its existing 100% display, uses the red token, and shows the localized ۶۰۰ کیلوکالری بالاتر از مصرف تقریبی روزانه message regardless of tracked calories.
 
 Use the existing profile.productMode = "both", nutrition API mocks, and MemoryRouter setup; do not change the API mock contract.
 
@@ -222,7 +223,7 @@ Expected: FAIL because the Dashboard does not yet pass a nutrition tone/animatio
 
 - [ ] **Step 3: Implement Dashboard wiring and copy**
 
-Calculate the unbounded ratio from the actual tracked energy and target calories, derive the shared tone, pass the mapped CSS color and animateOnMount to the Home ProgressRing, and render the localized over-target message when the difference is positive. Leave the estimate/plan/tracking requests and all non-nutrition cards unchanged.
+Calculate the unbounded ratio from target calories and TDEE, derive the shared tone, pass the mapped CSS color and animateOnMount to the Home ProgressRing, and render the localized above-expenditure message when the target difference is positive. Leave the estimate/plan/tracking requests and all non-nutrition cards unchanged.
 
 Add a compact .command-card__overage style that remains readable in both RTL Persian and LTR English layouts and uses the existing danger/coral token only as the informational over-target emphasis.
 
@@ -251,15 +252,15 @@ git push origin main
 - Modify: mobile/home/homeCards.rntl.test.tsx
 
 **Interfaces:**
-- homeModel.nutritionSummary uses the shared unbounded nutritionProgressRatio, preserving over-target information while MetricRing clamps its visual arc.
+- homeModel.nutritionSummary uses the shared unbounded nutritionTargetToExpenditureRatio, preserving gain-target information while MetricRing clamps its visual arc.
 - NutritionSummaryCard maps the shared tone to fiticianTokens.colors.success, .blue, or .danger and keeps animateOnFocus with duration 900.
 - Existing MetricRing default color and animation behavior for non-Home consumers remain unchanged.
 
 - [ ] **Step 1: Write failing native/model tests**
 
-Add a homeModel.test.ts case asserting a 3,000 kcal gain target with 1,800 consumed returns 0.6, and a 1,800 kcal loss target with 2,000 consumed returns a ratio above 1.
+Add a homeModel.test.ts case asserting a 3,000 kcal gain target with a 2,400 kcal TDEE returns 1.25, and a 1,800 kcal loss target with a 2,400 kcal TDEE returns 0.75 regardless of tracked calories.
 
-Extend homeCards.rntl.test.tsx to assert the Home card's rendered progress circle receives the success color below 60%, the blue color at 60%, and the danger color at 90% or above. Add an over-target fixture and assert ۲۰۰ کالری بیشتر از هدف روزانه is rendered while the metric ring's accessibility value remains capped at now: 100.
+Extend homeCards.rntl.test.tsx to assert the Home card's rendered progress circle receives the success color below 60%, the blue color at 60%, and the danger color at 90% or above. Add a gain-target fixture and assert ۶۰۰ کالری بالاتر از مصرف تقریبی روزانه is rendered while the metric ring's accessibility value remains capped at now: 100.
 
 - [ ] **Step 2: Run the focused native/model tests and verify failure**
 
@@ -268,11 +269,11 @@ npm run test --workspace @fitician/mobile -- home/homeModel.test.ts
 npm run test:native --workspace @fitician/mobile -- home/homeCards.rntl.test.tsx
 ~~~
 
-Expected: the model test fails because the ratio is currently capped at 1, and the component assertions fail because the Home card always uses the default aqua color and has no over-target copy.
+Expected: the model test fails because the ratio is currently based on tracked intake, and the component assertions fail because the Home card always uses the default aqua color and has no above-expenditure copy.
 
 - [ ] **Step 3: Implement native Home wiring**
 
-Replace the local capped ratio calculation in homeModel.ts with nutritionProgressRatio. In NutritionSummaryCard.tsx, derive the shared tone, map it to the existing native tokens, pass color, keep animateOnFocus, and render the Persian over-target message only for a positive difference.
+Replace the local tracked-intake ratio calculation in homeModel.ts with nutritionTargetToExpenditureRatio. In NutritionSummaryCard.tsx, derive the shared tone, map it to the existing native tokens, pass color, keep animateOnFocus, and render the Persian above-expenditure message only for a positive target/TDEE difference.
 
 Do not edit the concurrently modified files under mobile/nutrition/; this task is limited to mobile/home/.
 

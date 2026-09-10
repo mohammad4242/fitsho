@@ -3,7 +3,7 @@
 ## Goal
 
 Make the nutrition card on the web Dashboard and native Fitician Home show the
-member's actual daily calorie intake relative to the goal-specific daily target.
+member's daily calorie target relative to estimated daily expenditure (TDEE).
 The ring starts visually at 0 when Home is entered, fills to the real percentage,
 and uses the requested green/blue/red progress tones.
 
@@ -20,17 +20,18 @@ and uses the requested green/blue/red progress tones.
 The canonical metric is:
 
 ```text
-daily calorie percentage = tracked energy_kcal / daily target energy_kcal * 100
+daily calorie percentage = daily target energy_kcal / estimated daily expenditure energy_kcal * 100
 ```
 
 The target already reflects the member's selected goal. The same formula therefore
-works for both weight-gain and weight-loss members:
+works for both weight-gain and weight-loss members, without using logged food:
 
-- A gain member with a 3,000 kcal target and 1,800 tracked kcal sees 60%.
-- A loss member with an 1,800 kcal target and 1,800 tracked kcal sees 100%.
-- Any member above the target sees a visually capped 100% red ring and a separate
-  localized message showing the calories above target. The actual consumed and
-  target values remain visible.
+- A gain member with a 3,000 kcal target and a 2,400 kcal TDEE has a 125% ratio,
+  a visually capped 100% red ring, and a message showing the target's 600 kcal
+  difference above estimated expenditure.
+- A loss member with an 1,800 kcal target and a 2,400 kcal TDEE sees 75%.
+- Logged calories do not change the ring or its percentage. The target and TDEE
+  remain visible as the two calorie metrics.
 
 Tone boundaries are deterministic:
 
@@ -42,8 +43,8 @@ The colors describe the fill level, not whether a gain or loss goal is medically
 successful. The ring is labeled as daily calorie progress so this interpretation
 is explicit.
 
-When no valid target or tracked calories are available, the existing empty/loading
-behavior remains unchanged and the ring resolves to 0 when a target is present.
+When no valid target or TDEE is available, the existing empty/loading behavior
+remains unchanged and the ring resolves to 0 when a target is present.
 
 ## Animation
 
@@ -64,15 +65,16 @@ behavior remains unchanged and the ring resolves to 0 when a target is present.
 cannot drift at the 60% and 90% boundaries. It returns a semantic tone only; each
 client maps that tone to its existing design tokens.
 
-The web Dashboard passes the calculated tracked value, target, selected tone, and
-mount-animation flag to `ProgressRing`. The native `homeModel` continues to derive
-the summary from the existing tracking and target responses; `NutritionSummaryCard`
-maps the summary progress to the shared tone and passes the matching native color to
-`MetricRing`.
+The web Dashboard passes the target as the ring value, TDEE as its maximum, the
+selected tone, and the mount-animation flag to `ProgressRing`. The native
+`homeModel` derives the target and TDEE from the existing plan and estimate
+responses; tracking remains available for macro/status details but cannot affect
+the calorie progress. `NutritionSummaryCard` maps the summary progress to the
+shared tone and passes the matching native color to `MetricRing`.
 
-Visual percentages are clamped to 0–100. Accessibility continues to expose the
-real value and target where the existing component already does so, while the
-over-target message makes a capped visual state understandable.
+Visual percentages are clamped to 0–100. Accessibility exposes the target as the
+real value and TDEE as the maximum, while the above-expenditure message makes a
+capped gain-target state understandable.
 
 ## Planned files
 
@@ -93,13 +95,13 @@ over-target message makes a capped visual state understandable.
 
 ## Acceptance criteria
 
-1. Both Home nutrition rings use the same tracked-to-target percentage for gain and
-   loss targets.
+1. Both Home nutrition rings use the same target-to-TDEE percentage for gain and
+   loss targets, independent of logged food.
 2. Each ring starts from 0 on Home entry and fills to the final visual percentage.
 3. Exact tone boundaries are covered by tests: 59.9% green, 60% blue, 89.9% blue,
    and 90% red.
-4. Over-target intake caps the ring at 100%, stays red, and exposes a localized
-   above-target message without hiding the real calorie values.
+4. A target above TDEE caps the ring at 100%, stays red, and exposes a localized
+   above-expenditure message while showing the target and TDEE values.
 5. Existing non-Home rings and nutrition API/storage/calculation behavior are
    unchanged.
 6. Focused core, web, and native tests pass, followed by web/mobile typechecks and
