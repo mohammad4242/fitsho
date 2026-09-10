@@ -132,6 +132,64 @@ it("shows planned versus actual tracking and saves photo corrections before conf
   await waitFor(() => expect(api.correctFoodPhotoItem).toHaveBeenCalledWith("estimate-1", "item-1", { estimated_amount: 150 }));
 });
 
+it("starts with both nutrition entry methods collapsed", async () => {
+  render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+  const manual = await screen.findByRole("button", { name: /Log manually/i });
+  const photo = screen.getByRole("button", { name: /Food photo/i });
+
+  expect(manual).toHaveAttribute("aria-expanded", "false");
+  expect(photo).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByText("Exact catalogue entry")).not.toBeInTheDocument();
+  expect(screen.queryByText("Choose a meal photo")).not.toBeInTheDocument();
+  expect(document.getElementById("nutrition-manual-entry-panel")).toBeNull();
+  expect(document.getElementById("nutrition-photo-entry-panel")).toBeNull();
+});
+
+it("keeps only the selected nutrition entry workflow open and toggles it closed", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+  const manual = await screen.findByRole("button", { name: /Log manually/i });
+  const photo = screen.getByRole("button", { name: /Food photo/i });
+
+  await user.click(manual);
+  expect(manual).toHaveAttribute("aria-expanded", "true");
+  expect(photo).toHaveAttribute("aria-expanded", "false");
+  expect(document.getElementById("nutrition-manual-entry-panel")).not.toBeNull();
+  expect(document.getElementById("nutrition-photo-entry-panel")).toBeNull();
+
+  await user.click(photo);
+  expect(manual).toHaveAttribute("aria-expanded", "false");
+  expect(photo).toHaveAttribute("aria-expanded", "true");
+  expect(document.getElementById("nutrition-manual-entry-panel")).toBeNull();
+  expect(document.getElementById("nutrition-photo-entry-panel")).not.toBeNull();
+
+  await user.click(photo);
+  expect(manual).toHaveAttribute("aria-expanded", "false");
+  expect(photo).toHaveAttribute("aria-expanded", "false");
+  expect(document.getElementById("nutrition-photo-entry-panel")).toBeNull();
+});
+
+it("places the entry hub before totals and the check-in after adherence", async () => {
+  const { container } = render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+  await screen.findByText("Logged calories");
+
+  const hub = container.querySelector(".nutrition-entry-hub");
+  const dailyPanel = container.querySelector(".nutrition-daily-panel");
+  const adherenceCard = container.querySelector(".nutrition-adherence-card");
+  const checkIn = container.querySelector(".nutrition-checkin");
+
+  expect(hub).not.toBeNull();
+  expect(dailyPanel).not.toBeNull();
+  expect(adherenceCard).not.toBeNull();
+  expect(checkIn).not.toBeNull();
+  if (hub && dailyPanel && adherenceCard && checkIn) {
+    expect(hub.compareDocumentPosition(dailyPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(adherenceCard.compareDocumentPosition(checkIn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }
+});
+
 it("keeps adherence rows collapsed while the date filter remains active", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
@@ -169,7 +227,7 @@ it("keeps exact catalogue and quick estimate submissions unchanged", async () =>
   vi.mocked(api.addQuickApproximation).mockResolvedValue({});
   render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
 
-  await user.click(await screen.findByText("Log food manually"));
+  await user.click(await screen.findByRole("button", { name: /Log manually/i }));
   const catalogueGroup = screen.getByRole("group", { name: "Exact catalogue entry" });
   await user.selectOptions(within(catalogueGroup).getByRole("combobox", { name: "Food" }), "food-2");
   const grams = within(catalogueGroup).getByRole("spinbutton", { name: "Amount in grams" });
@@ -497,6 +555,7 @@ describe("Food photo nutrition estimation redesigned flow", () => {
     );
 
     expect(await screen.findByText("Logged calories")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Food photo/i })).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("checkbox", { name: /third-party image processing/i }));
     const fileInput = screen.getByLabelText("Choose food photo");
     await waitFor(() => expect(fileInput).toBeEnabled());
