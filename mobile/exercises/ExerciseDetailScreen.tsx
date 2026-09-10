@@ -614,6 +614,7 @@ const styles = StyleSheet.create({
     minWidth: 24,
     padding: fiticianTokens.spacing[1],
     textAlign: "center",
+    writingDirection: "ltr",
   },
   instructionNumberEnglish: {
     writingDirection: "ltr",

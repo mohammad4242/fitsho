@@ -187,6 +187,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "ltr",
   },
   media: {
     height: "100%",

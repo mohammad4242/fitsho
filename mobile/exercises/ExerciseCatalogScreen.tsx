@@ -1284,6 +1284,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 24,
+    textAlign: "center",
+    writingDirection: "ltr",
   },
   resultCount: {
     color: fiticianTokens.colors.muted,

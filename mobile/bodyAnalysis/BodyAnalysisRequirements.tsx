@@ -428,6 +428,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    textAlign: "center",
+    writingDirection: "ltr",
   },
   statusMarkTextConfirmed: {
     color: fiticianTokens.colors.success,
@@ -456,6 +458,7 @@ const styles = StyleSheet.create({
     minWidth: 32,
     padding: fiticianTokens.spacing[2],
     textAlign: "center",
+    writingDirection: "ltr",
   },
   title: {
     color: fiticianTokens.colors.ink,

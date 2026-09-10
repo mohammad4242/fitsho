@@ -203,6 +203,8 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: 9,
+    textAlign: "center",
+    writingDirection: "ltr",
   },
   svg: {
     transform: [{ rotateZ: "0deg" }],
@@ -212,5 +214,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.lg,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    textAlign: "center",
+    writingDirection: "ltr",
   },
 });

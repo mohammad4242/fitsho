@@ -945,6 +945,8 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.canvas,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "ltr",
   },
   choice: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,

@@ -95,7 +95,7 @@ function NutritionEstimateSummaryCard({
             <View style={summaryStyles.targetCopy}>
               <Text style={summaryStyles.targetLabel}>کالری هدف</Text>
               {goalCalories === null ? (
-                <Text style={summaryStyles.calorieValue}>تعیین نشده</Text>
+                <Text style={summaryStyles.calorieValueUnavailable}>تعیین نشده</Text>
               ) : (
                 <NutritionAnimatedNumber style={summaryStyles.calorieValue} value={goalCalories} />
               )}
@@ -324,6 +324,16 @@ const summaryStyles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 44,
     textAlign: "right",
+    writingDirection: "ltr",
+  },
+  calorieValueUnavailable: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.display,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 44,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   confidence: {
     color: fiticianTokens.colors.aqua,
@@ -378,6 +388,7 @@ const summaryStyles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
+    writingDirection: "rtl",
   },
   section: {
     marginBottom: fiticianTokens.spacing[1],
@@ -408,6 +419,7 @@ const summaryStyles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.lg,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     textAlign: "right",
+    writingDirection: "ltr",
   },
   unit: {
     color: fiticianTokens.colors.muted,
@@ -502,6 +514,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.lg,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
+    writingDirection: "ltr",
   },
   progressActual: {
     color: fiticianTokens.colors.aqua,

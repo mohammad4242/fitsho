@@ -1327,6 +1327,7 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 19,
     textAlign: "center",
+    writingDirection: "ltr",
   },
   reviewIndicatorRejected: {
     alignItems: "center",
@@ -1337,6 +1338,7 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 19,
     textAlign: "center",
+    writingDirection: "ltr",
   },
   reviewNote: {
     color: fiticianTokens.colors.muted,

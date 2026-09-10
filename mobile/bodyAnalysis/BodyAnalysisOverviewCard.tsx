@@ -344,6 +344,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.lg,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    textAlign: "center",
+    writingDirection: "ltr",
   },
   indicatorSection: {
     gap: fiticianTokens.spacing[3],
@@ -440,6 +442,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.metric,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     textAlign: "right",
+    writingDirection: "ltr",
   },
   route: {
     color: fiticianTokens.colors.ink,

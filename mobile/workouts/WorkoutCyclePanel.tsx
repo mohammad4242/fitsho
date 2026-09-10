@@ -848,6 +848,7 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     lineHeight: 20,
     textAlign: "center",
+    writingDirection: "ltr",
   },
   summaryMetrics: {
     alignItems: "stretch",

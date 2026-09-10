@@ -226,5 +226,6 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.lg,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     textAlign: "center",
+    writingDirection: "ltr",
   },
 });

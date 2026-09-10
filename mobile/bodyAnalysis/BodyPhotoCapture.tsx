@@ -871,6 +871,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     minWidth: 54,
     textAlign: "center",
+    writingDirection: "ltr",
   },
   sideToggle: {
     gap: fiticianTokens.spacing[2],

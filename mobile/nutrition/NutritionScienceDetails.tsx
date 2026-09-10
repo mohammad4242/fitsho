@@ -187,6 +187,8 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "left",
+    writingDirection: "ltr",
   },
   micronutrientCard: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
@@ -224,6 +226,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
+    writingDirection: "ltr",
   },
   notes: {
     gap: fiticianTokens.spacing[2],
@@ -272,5 +275,6 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "right",
+    writingDirection: "ltr",
   },
 });

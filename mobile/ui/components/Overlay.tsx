@@ -147,6 +147,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: 28,
     lineHeight: 28,
+    textAlign: "center",
+    writingDirection: "ltr",
   },
   content: {
     gap: fiticianTokens.spacing[4],

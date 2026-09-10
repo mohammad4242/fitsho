@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 
 type TextContract = {
-  readonly align: "center" | "right";
+  readonly align: "center" | "left" | "right";
   readonly file: string;
   readonly style: string;
 };
@@ -34,6 +34,32 @@ const contracts: readonly TextContract[] = [
   { align: "right", file: "../workouts/WorkoutCyclePanel.tsx", style: "cycleStatus" },
   { align: "right", file: "../workouts/WorkoutPlansScreen.tsx", style: "secondaryDayTitle" },
   { align: "center", file: "../coach/CoachWorkoutReviewScreen.tsx", style: "avatarText" },
+];
+
+const technicalContracts: readonly TextContract[] = [
+  { align: "center", file: "../bodyAnalysis/BodyAnalysisOverviewCard.tsx", style: "indicatorScore" },
+  { align: "right", file: "../bodyAnalysis/BodyAnalysisOverviewCard.tsx", style: "metricValue" },
+  { align: "center", file: "../bodyAnalysis/BodyAnalysisRequirements.tsx", style: "statusMarkText" },
+  { align: "center", file: "../bodyAnalysis/BodyAnalysisRequirements.tsx", style: "stepBadge" },
+  { align: "center", file: "../bodyAnalysis/BodyPhotoCapture.tsx", style: "scaleValue" },
+  { align: "center", file: "../exercises/ExerciseCatalogScreen.tsx", style: "removeFilterGlyph" },
+  { align: "center", file: "../exercises/ExerciseDetailScreen.tsx", style: "instructionNumber" },
+  { align: "center", file: "../exercises/ExerciseMediaCarousel.tsx", style: "indicatorText" },
+  { align: "right", file: "../home/NutritionSummaryCard.tsx", style: "calorieValue" },
+  { align: "center", file: "../nutrition/NutritionDualMetricRing.tsx", style: "label" },
+  { align: "center", file: "../nutrition/NutritionDualMetricRing.tsx", style: "value" },
+  { align: "left", file: "../nutrition/NutritionScienceDetails.tsx", style: "metadataValue" },
+  { align: "right", file: "../nutrition/NutritionScienceDetails.tsx", style: "micronutrientValue" },
+  { align: "right", file: "../nutrition/NutritionScienceDetails.tsx", style: "targetValue" },
+  { align: "right", file: "../nutrition/NutritionSummaryCard.tsx", style: "calorieValue" },
+  { align: "right", file: "../nutrition/NutritionSummaryCard.tsx", style: "tdeeValue" },
+  { align: "right", file: "../nutrition/NutritionSummaryCard.tsx", style: "metricValue" },
+  { align: "center", file: "../nutrition/NutritionTrackingSection.tsx", style: "checkboxMark" },
+  { align: "center", file: "../ui/components/MetricRing.tsx", style: "value" },
+  { align: "center", file: "../ui/components/Overlay.tsx", style: "closeGlyph" },
+  { align: "center", file: "../workouts/WorkoutCyclePanel.tsx", style: "summaryMetricValueAqua" },
+  { align: "center", file: "../workouts/WorkoutPlansScreen.tsx", style: "reviewIndicatorApproved" },
+  { align: "center", file: "../workouts/WorkoutPlansScreen.tsx", style: "reviewIndicatorRejected" },
 ];
 
 function extractStyleBlock(source: string, styleName: string): string {
@@ -72,5 +98,14 @@ it("keeps normal Persian feature text explicitly aligned and directional", async
     const hasExplicitDirection = style.includes(sharedDirection)
       || (style.includes(`textAlign: "${contract.align}"`) && style.includes('writingDirection: "rtl"'));
     expect(hasExplicitDirection, `${contract.file} ${contract.style}`).toBe(true);
+  }
+});
+
+it("keeps technical and numeric values LTR without changing their RTL container", async () => {
+  for (const contract of technicalContracts) {
+    const source = await readFile(new URL(contract.file, import.meta.url), "utf8");
+    const style = extractStyleBlock(source, contract.style);
+    expect(style, `${contract.file} ${contract.style}`).toContain(`textAlign: "${contract.align}"`);
+    expect(style, `${contract.file} ${contract.style}`).toContain('writingDirection: "ltr"');
   }
 });
