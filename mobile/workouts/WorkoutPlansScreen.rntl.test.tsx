@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { afterEach, beforeEach, expect, jest, test } from "@jest/globals";
-import { Alert } from "react-native";
+import type { BinaryDownload } from "@fitician/core";
+import { Alert, Linking } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
+const mockPdfGet = jest.fn<() => Promise<StoredWorkoutPlanPdf | null>>();
+const mockPdfSave = jest.fn<() => Promise<StoredWorkoutPlanPdf>>();
+const mockDownloadPdf = jest.fn<() => Promise<BinaryDownload>>();
 
 jest.mock("@tanstack/react-query", () => ({
   useMutation: jest.fn(),
@@ -34,8 +39,8 @@ jest.mock("../profile/profileApi", () => ({ createProfileApi: jest.fn() }));
 jest.mock("./workoutApi", () => ({ createWorkoutPlanApi: jest.fn() }));
 jest.mock("./workoutPdfStore", () => ({
   ExpoWorkoutPlanPdfStore: jest.fn().mockImplementation(() => ({
-    get: jest.fn<() => Promise<null>>().mockResolvedValue(null),
-    save: jest.fn(),
+    get: mockPdfGet,
+    save: mockPdfSave,
   })),
 }));
 
@@ -47,10 +52,11 @@ import { languageForDirection } from "../ui/rtl";
 import { createProfileApi } from "../profile/profileApi";
 import type { WorkoutPlan, WorkoutPlanExercise, WorkoutPlanVersionSummary } from "./workoutApi";
 import { createWorkoutPlanApi } from "./workoutApi";
+import type { StoredWorkoutPlanPdf } from "./workoutPdfStore";
 import { WorkoutPlansScreen } from "./WorkoutPlansScreen";
 
 const mockPush = jest.fn();
-const mockRequest = jest.fn();
+const mockRequest = jest.fn<() => Promise<unknown>>();
 const mockDownload = jest.fn();
 const mockUseMutation = jest.mocked(useMutation);
 const mockUseQuery = jest.mocked(useQuery);
@@ -70,7 +76,9 @@ let mockActivePlan: WorkoutPlan | null = null;
 let mockPlanById: WorkoutPlan | null = null;
 let mockHistory: WorkoutPlanVersionSummary[] = [];
 let mockCycle: unknown = null;
+let mockCompletionFeedback: unknown = null;
 let mockProfileGenerationMethod: "fitsho_coach" | "ai" = "fitsho_coach";
+let executeMutation = false;
 
 type TestMutationOptions = {
   mutationFn?: (variables: unknown) => Promise<unknown>;
@@ -117,7 +125,13 @@ beforeEach(() => {
   mockPlanById = null;
   mockHistory = [];
   mockCycle = null;
+  mockCompletionFeedback = null;
   mockProfileGenerationMethod = "fitsho_coach";
+  executeMutation = false;
+  mockPdfGet.mockReset();
+  mockPdfGet.mockResolvedValue(null);
+  mockPdfSave.mockReset();
+  mockDownloadPdf.mockReset();
   mockMutate.mockClear();
   mockInvalidateQueries.mockClear();
   mockRemoveQueries.mockClear();
@@ -141,6 +155,7 @@ beforeEach(() => {
   } as never);
   mockCreateWorkoutPlanApi.mockReturnValue({
     deletePlan: mockDeletePlan,
+    downloadPdf: mockDownloadPdf,
     generate: jest.fn(),
     get: jest.fn(),
     getActive: resolved(null),
@@ -151,7 +166,8 @@ beforeEach(() => {
     if (key[0] === "profile") return queryResult({ workout_generation_method: mockProfileGenerationMethod });
     if (key[1] === "plans") return queryResult(mockHistory);
     if (key[1] === "current-cycle") return queryResult(mockCycle);
-    if (key[1] === "weekly-check-in" || key[1] === "completion-feedback") return queryResult(null);
+    if (key[1] === "weekly-check-in") return queryResult(null);
+    if (key[1] === "completion-feedback") return queryResult(mockCompletionFeedback);
     if (key[1] === "plan" && key[2] === "active") return queryResult(mockActivePlan);
     if (key[1] === "plan") return queryResult(mockPlanById);
     return queryResult(null);
@@ -170,7 +186,16 @@ beforeEach(() => {
         },
       };
     }
-    return { isPending: false, mutate: mockMutate };
+    return {
+      isPending: false,
+      mutate: (variables: unknown) => {
+        mockMutate(variables);
+        if (!executeMutation) return;
+        void Promise.resolve(mutationOptions.mutationFn?.(variables))
+          .then((data) => mutationOptions.onSuccess?.(data, variables))
+          .catch((error: unknown) => mutationOptions.onError?.(error, variables));
+      },
+    };
   }) as never);
 });
 
@@ -187,6 +212,207 @@ test("renders the web-parity workout hierarchy and shared generation control", (
   expect(screen.getByRole("radio", { name: "موتور داخلی" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "هوش مصنوعی" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "ساخت برنامه تمرینی" })).toBeTruthy();
+});
+
+test("renders one compact RTL tools row and routes Body Analysis to its history", () => {
+  mockActivePlan = makePlan("active", []);
+
+  renderWorkoutPlans();
+
+  const tools = screen.getByTestId("workout-plan-tools");
+  const row = within(tools).getByTestId("workout-plan-tools-row");
+  expect(within(tools).getByText("ابزارهای برنامه")).toBeTruthy();
+  expect(within(row).getByText("دانلود PDF")).toBeTruthy();
+  expect(within(row).getByText("بازخورد پایان دوره")).toBeTruthy();
+  expect(within(row).getByText("Body Analysis")).toBeTruthy();
+  expect(screen.queryByText("نسخهٔ PDF")).toBeNull();
+  expect(screen.queryByText("ذخیرهٔ PDF برای استفاده آفلاین")).toBeNull();
+  expect(screen.queryByRole("button", { name: "کتابخانه حرکات" })).toBeNull();
+
+  fireEvent.press(within(row).getByRole("button", { name: "Body Analysis" }));
+  expect(mockPush).toHaveBeenCalledWith("/member/body-analysis-history");
+});
+
+test("downloads, stores, and opens a workout PDF from the compact tool", async () => {
+  const plan = makePlan("active", []);
+  const download = {
+    bytes: Uint8Array.from([37, 80, 68, 70]),
+    contentType: "application/pdf",
+    filename: "plan.pdf",
+  };
+  const stored = { byteSize: 4, fileName: "plan.pdf", planId: plan.id, uri: "file:///plan.pdf" };
+  mockActivePlan = plan;
+  mockDownloadPdf.mockResolvedValue(download);
+  mockPdfSave.mockResolvedValue(stored);
+  const openUrl = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+
+  renderWorkoutPlans();
+  fireEvent.press(await screen.findByRole("button", { name: "دانلود PDF" }));
+
+  await waitFor(() => expect(mockDownloadPdf).toHaveBeenCalledWith(plan.id));
+  expect(mockPdfSave).toHaveBeenCalledWith(plan.id, download);
+  await waitFor(() => expect(openUrl).toHaveBeenCalledWith(stored.uri));
+});
+
+test("opens a valid stored workout PDF without downloading it again", async () => {
+  const plan = makePlan("active", []);
+  const stored = { byteSize: 4, fileName: "plan.pdf", planId: plan.id, uri: "file:///stored-plan.pdf" };
+  mockActivePlan = plan;
+  mockPdfGet.mockResolvedValue(stored);
+  const openUrl = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+
+  renderWorkoutPlans();
+  fireEvent.press(await screen.findByRole("button", { name: "دانلود PDF" }));
+
+  await waitFor(() => expect(openUrl).toHaveBeenCalledWith(stored.uri));
+  expect(mockDownloadPdf).not.toHaveBeenCalled();
+});
+
+test("keeps the compact PDF tool disabled while downloading and shows a retryable error", async () => {
+  const plan = makePlan("active", []);
+  let resolveDownload: ((value: BinaryDownload) => void) | undefined;
+  mockActivePlan = plan;
+  mockDownloadPdf.mockReturnValue(new Promise((resolve) => {
+    resolveDownload = resolve;
+  }));
+
+  renderWorkoutPlans();
+  const button = await screen.findByRole("button", { name: "دانلود PDF" });
+  fireEvent.press(button);
+
+  expect(button.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+  expect(screen.getByText("در حال آماده‌سازی PDF…")).toBeTruthy();
+  resolveDownload?.({
+    bytes: Uint8Array.from([37, 80, 68, 70]),
+    contentType: "application/pdf",
+    filename: "plan.pdf",
+  });
+
+  await waitFor(() => expect(button.props.accessibilityState).toMatchObject({ disabled: false }));
+
+  mockDownloadPdf.mockRejectedValue(new Error("PDF unavailable"));
+  fireEvent.press(button);
+  expect(await screen.findByText("دانلود PDF انجام نشد. دوباره تلاش کن.")).toBeTruthy();
+});
+
+test("shows locked feedback compactly and expands the dynamic duration explanation", () => {
+  const plan = { ...makePlan("active", []), plan_duration_weeks: 6 };
+  mockActivePlan = plan;
+  mockCycle = {
+    cycle_id: "cycle-1",
+    current_week: 3,
+    duration_weeks: 6,
+    started_at: "2026-09-01T00:00:00Z",
+    status: "active",
+    workout_plan_id: plan.id,
+  };
+  mockCompletionFeedback = {
+    cycle_id: "cycle-1",
+    current_week: 3,
+    duration_weeks: 6,
+    feedback: null,
+    feedback_id: null,
+    is_due: false,
+    status: "active",
+    submitted_at: null,
+  };
+
+  renderWorkoutPlans();
+
+  const trigger = screen.getByRole("button", { name: "بازخورد پایان دوره" });
+  expect(screen.queryByText(/این فرم بعد از پایان رسمی چرخه/)).toBeNull();
+  fireEvent.press(trigger);
+  expect(screen.getByText("پس از اتمام دوره ۶ هفته‌ای، این فرم برای هدفمندتر شدن برنامه بعدی فعال می‌شود. لطفاً فرم را کامل و با دقت پر کنید.")).toBeTruthy();
+});
+
+test("keeps feedback discoverable for a pending-only plan and does not invent a PDF id", () => {
+  const plan = makePlan("pending_review", [], "pending-plan");
+  mockHistory = [makeHistoryVersion(plan.id)];
+  mockPlanById = plan;
+
+  renderWorkoutPlans();
+
+  const tools = screen.getByTestId("workout-plan-tools");
+  const pdf = within(tools).getByRole("button", { name: "دانلود PDF" });
+  expect(pdf.props.accessibilityState).toMatchObject({ disabled: true });
+  const trigger = within(tools).getByRole("button", { name: "بازخورد پایان دوره" });
+  fireEvent.press(trigger);
+  expect(screen.getByText("این برنامه هنوز به تأیید مربی نرسیده است. پس از تأیید مربی و اتمام دوره ۴ هفته‌ای، این فرم برای هدفمندتر شدن برنامه بعدی فعال می‌شود. لطفاً فرم را کامل و با دقت پر کنید.")).toBeTruthy();
+  expect(mockDownloadPdf).not.toHaveBeenCalled();
+});
+
+test("exposes the existing completion feedback form when the cycle is due", () => {
+  const plan = makePlan("active", []);
+  mockActivePlan = plan;
+  mockCycle = {
+    cycle_id: "cycle-1",
+    current_week: 4,
+    duration_weeks: 4,
+    started_at: "2026-09-01T00:00:00Z",
+    status: "active",
+    workout_plan_id: plan.id,
+  };
+  mockCompletionFeedback = {
+    cycle_id: "cycle-1",
+    current_week: 4,
+    duration_weeks: 4,
+    feedback: null,
+    feedback_id: null,
+    is_due: true,
+    status: "active",
+    submitted_at: null,
+  };
+
+  renderWorkoutPlans();
+
+  expect(screen.getByText("شدت کلی تمرین‌ها")).toBeTruthy();
+  expect(screen.getByText("رضایت کلی")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "ثبت بازخورد" })).toBeTruthy();
+});
+
+test("submits due feedback through the existing saveCompletionFeedback API", async () => {
+  const plan = makePlan("active", []);
+  mockActivePlan = plan;
+  mockCycle = {
+    cycle_id: "cycle-1",
+    current_week: 4,
+    duration_weeks: 4,
+    started_at: "2026-09-01T00:00:00Z",
+    status: "active",
+    workout_plan_id: plan.id,
+  };
+  mockCompletionFeedback = {
+    cycle_id: "cycle-1",
+    current_week: 4,
+    duration_weeks: 4,
+    feedback: null,
+    feedback_id: null,
+    is_due: true,
+    status: "active",
+    submitted_at: null,
+  };
+  mockRequest.mockResolvedValue(mockCompletionFeedback);
+  executeMutation = true;
+
+  renderWorkoutPlans();
+  fireEvent.press(screen.getByRole("button", { name: "ثبت بازخورد" }));
+
+  await waitFor(() => expect(mockRequest).toHaveBeenCalledWith({
+    body: {
+      energy_progress: "unchanged",
+      endurance_progress: "unchanged",
+      muscle_progress: "unchanged",
+      note_optional: null,
+      overall_difficulty: "appropriate",
+      overall_recovery: "good",
+      overall_satisfaction: "neutral",
+      pain_or_limitation_feedback: null,
+      performance_changes: null,
+      strength_progress: "unchanged",
+    },
+    method: "PUT",
+    path: "/api/v1/workout-cycles/current/completion-feedback",
+  }));
 });
 
 test("renders the displayed plan's internal engine pre-plan source", () => {

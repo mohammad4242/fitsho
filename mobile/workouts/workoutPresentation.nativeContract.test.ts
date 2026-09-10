@@ -140,10 +140,52 @@ it("keeps cycle, check-in, replacement, and completion behavior secondary to the
   expect(summary).toContain("summaryCard");
   expect(source).toContain("WeeklyCheckInPanel");
   expect(source).toContain("ReplacementPanel");
-  expect(source).toContain("CompletionFeedbackPanel");
+  expect(source).toContain("useCompletionFeedbackController");
+  expect(source).toContain("CompletionFeedbackToolCell");
+  expect(source).toContain("CompletionFeedbackDetails");
+  expect(source).not.toMatch(/<CompletionFeedbackPanel\b/);
   expect(source).toContain("api.getWeeklyCheckIn");
   expect(source).toContain("api.recordReplacement");
   expect(source).toContain("api.getCompletionFeedback");
+});
+
+it("moves completion feedback into the reusable plan-tools controller", async () => {
+  const cycleSource = await readFile(new URL("./WorkoutCyclePanel.tsx", import.meta.url), "utf8");
+  const plansSource = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+
+  expect(cycleSource).toContain("useCompletionFeedbackController");
+  expect(cycleSource).toContain("CompletionFeedbackToolCell");
+  expect(cycleSource).toContain("CompletionFeedbackDetails");
+  expect(cycleSource).toContain("api.saveCompletionFeedback");
+  expect(cycleSource).not.toMatch(/<CompletionFeedbackPanel\b/);
+  expect(plansSource).not.toContain("<CompletionFeedbackPanel");
+  expect(plansSource).not.toContain("نسخهٔ PDF");
+  expect(plansSource).not.toContain("ذخیرهٔ PDF برای استفاده آفلاین");
+  expect(plansSource).not.toContain("کتابخانه حرکات");
+});
+
+it("keeps plan tools in explicit RTL source order before workout history", async () => {
+  const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+  const cycleSource = await readFile(new URL("./WorkoutCyclePanel.tsx", import.meta.url), "utf8");
+  const renderStart = source.indexOf("  return (", source.indexOf("export function WorkoutPlansScreen"));
+  const renderEnd = source.indexOf("\n  );\n}\n\nfunction PlanContextStrip", renderStart);
+  const renderBlock = source.slice(renderStart, renderEnd);
+  const toolsStart = source.indexOf("function WorkoutPlanTools");
+  const toolsEnd = source.indexOf("function ", toolsStart + "function WorkoutPlanTools".length);
+  const tools = source.slice(toolsStart, toolsEnd);
+
+  expect(renderBlock.indexOf("<WorkoutPlanTools")).toBeGreaterThanOrEqual(0);
+  expect(renderBlock.indexOf("<WorkoutPlanTools")).toBeLessThan(renderBlock.indexOf("<WorkoutHistory"));
+  expect(tools.indexOf("<WorkoutPdfTool")).toBeLessThan(tools.indexOf("<CompletionFeedbackToolCell"));
+  expect(tools.indexOf("<CompletionFeedbackToolCell")).toBeLessThan(tools.indexOf("Body Analysis"));
+  expect(tools).toContain('direction: "rtl"');
+  expect(tools).toContain('flexDirection: "row"');
+  expect(tools).toContain("borderRightWidth");
+  expect(tools).toContain('router.push("/member/body-analysis-history")');
+  expect(tools).toContain("دانلود PDF");
+  expect(tools).toContain("ابزارهای برنامه");
+  expect(source).toContain("دریافت نسخه فارسی برنامه");
+  expect(cycleSource).toContain("بازخورد پایان دوره");
 });
 
 it("keeps the four context cells viable at the required phone widths", async () => {

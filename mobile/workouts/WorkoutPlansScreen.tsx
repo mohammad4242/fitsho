@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { WorkoutGenerationMethod } from "@fitician/core/profile";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { profileKeys, workoutKeys } from "../data/queryKeys";
@@ -29,6 +29,7 @@ import {
   type WorkoutPlanExercise,
   type WorkoutPlanVersionSummary,
 } from "./workoutApi";
+import { createWorkoutCycleApi } from "./workoutCycleApi";
 import {
   classifyWorkoutGenerationError,
   findPendingWorkoutPlanId,
@@ -41,11 +42,17 @@ import {
   ExpoWorkoutPlanPdfStore,
   type StoredWorkoutPlanPdf,
 } from "./workoutPdfStore";
-import { WorkoutCyclePanel, type WorkoutReplacementRequest } from "./WorkoutCyclePanel";
+import {
+  CompletionFeedbackDetails,
+  CompletionFeedbackToolCell,
+  useCompletionFeedbackController,
+  WorkoutCyclePanel,
+  type WorkoutReplacementRequest,
+} from "./WorkoutCyclePanel";
 import type { WorkoutGenerationErrorKind } from "./workoutModel";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 
-type PdfStatus = "checking" | "downloading" | "error" | "idle" | "ready";
+type PdfStatus = "downloading" | "error" | "idle" | "ready";
 
 const generationErrorMessages: Record<WorkoutGenerationErrorKind, string> = {
   cooldown: "ساخت برنامه به‌تازگی انجام شده است؛ کمی بعد دوباره تلاش کن.",
@@ -63,6 +70,7 @@ export function WorkoutPlansScreen() {
     () => createWorkoutPlanApi(auth.request, auth.download),
     [auth.download, auth.request],
   );
+  const cycleApi = useMemo(() => createWorkoutCycleApi(auth.request), [auth.request]);
   const profileApi = useMemo(() => createProfileApi(auth.request), [auth.request]);
   const pdfStore = useMemo(() => new ExpoWorkoutPlanPdfStore(), []);
   const planTargetId = firstParam(params.planId);
@@ -301,10 +309,8 @@ export function WorkoutPlansScreen() {
 
       {!loading && !activeLoadError && !activeOffline && displayedPlan !== undefined && displayedPlan !== null ? (
         <PlanView
-          api={api}
           historical={isViewingHistorical}
           onStartReplacement={startReplacement}
-          pdfStore={pdfStore}
           plan={displayedPlan}
           pending={displayedPlan.status === "pending_review"}
         />
@@ -323,9 +329,7 @@ export function WorkoutPlansScreen() {
         <View style={styles.pendingPlanSection}>
           {contextPlan?.id !== pendingPlan.id ? <CoachReviewBanner historical={false} plan={pendingPlan} /> : null}
           <PlanView
-            api={api}
             historical={false}
-            pdfStore={pdfStore}
             plan={pendingPlan}
             pending
           />
@@ -367,6 +371,18 @@ export function WorkoutPlansScreen() {
           message="نسخهٔ انتخاب‌شده دریافت نشد."
           onAction={() => void selectedQuery.refetch()}
           variant="danger"
+        />
+      ) : null}
+
+      {!loading && !activeLoadError && !activeOffline && ((displayedPlan !== undefined && displayedPlan !== null) || pendingPlan !== undefined) ? (
+        <WorkoutPlanTools
+          api={api}
+          awaitingCoachApproval={activePlan === null && pendingPlan !== undefined}
+          connectivityStatus={connectivityStatus}
+          cycleApi={cycleApi}
+          fallbackDurationWeeks={pendingPlan?.plan_duration_weeks ?? displayedPlan?.plan_duration_weeks ?? profileQuery.data?.plan_duration_weeks ?? 4}
+          pdfStore={pdfStore}
+          plan={displayedPlan?.status === "pending_review" ? activePlan ?? null : displayedPlan ?? null}
         />
       ) : null}
 
@@ -523,63 +539,20 @@ function GenerationMethodSelector({
 }
 
 function PlanView({
-  api,
   historical,
   onStartReplacement,
-  pdfStore,
   plan,
   pending,
 }: {
-  readonly api: ReturnType<typeof createWorkoutPlanApi>;
   readonly historical: boolean;
   readonly onStartReplacement?: (exerciseId: string) => void;
-  readonly pdfStore: ExpoWorkoutPlanPdfStore;
   readonly plan: WorkoutPlan;
   readonly pending: boolean;
 }) {
   const router = useRouter();
   const [expandedDay, setExpandedDay] = useState<number | null>(plan.days[0]?.day_number ?? null);
-  const [pdfStatus, setPdfStatus] = useState<PdfStatus>("checking");
-  const [storedPdf, setStoredPdf] = useState<StoredWorkoutPlanPdf | null>(null);
   const executable = isWorkoutPlanExecutable(plan, historical);
   const visibleWarnings = getUserVisibleWorkoutWarnings(plan.warnings);
-
-  useEffect(() => {
-    let active = true;
-    setPdfStatus("checking");
-    setStoredPdf(null);
-    void pdfStore.get(plan.id).then((stored) => {
-      if (!active) return;
-      setStoredPdf(stored);
-      setPdfStatus(stored === null ? "idle" : "ready");
-    }).catch(() => {
-      if (active) setPdfStatus("idle");
-    });
-    return () => {
-      active = false;
-    };
-  }, [pdfStore, plan.id]);
-
-  async function downloadPdf() {
-    setPdfStatus("downloading");
-    try {
-      const downloaded = await api.downloadPdf(plan.id);
-      const stored = await pdfStore.save(plan.id, downloaded);
-      setStoredPdf(stored);
-      setPdfStatus("ready");
-    } catch {
-      setPdfStatus("error");
-    }
-  }
-
-  async function openPdf() {
-    if (storedPdf === null) return;
-    try {
-      await Linking.openURL(storedPdf.uri);
-    } catch {
-      setPdfStatus("error");
-    }
-  }
 
   return (
     <View style={styles.planSection}>
@@ -627,37 +600,155 @@ function PlanView({
       {plan.body_analysis_provenance?.provisional === true ? (
         <PlanInlineNotice message="این برنامه از یافته‌های موقت تحلیل بدن استفاده کرده که هنوز به تأیید هر دو متخصص نرسیده است." variant="warning" />
       ) : null}
-
-      <Card style={styles.pdfCard}>
-        <Text style={styles.sectionTitle}>نسخهٔ PDF</Text>
-        <Text style={styles.bodyText}>فایل PDF در فضای پایدار برنامه ذخیره می‌شود و بعد از باز کردن دوبارهٔ اپ هم باقی می‌ماند.</Text>
-        {pdfStatus === "checking" ? <Skeleton height={52} /> : null}
-        {pdfStatus !== "checking" && storedPdf === null ? (
-          <Button
-            disabled={pdfStatus === "downloading"}
-            label="ذخیرهٔ PDF برای استفاده آفلاین"
-            loading={pdfStatus === "downloading"}
-            onPress={() => void downloadPdf()}
-            variant="secondary"
-          />
-        ) : null}
-        {storedPdf !== null ? (
-          <View style={styles.pdfActions}>
-            <Button label="باز کردن PDF" onPress={() => void openPdf()} />
-            <Button label="دریافت دوباره" onPress={() => void downloadPdf()} variant="ghost" />
-          </View>
-        ) : null}
-        {pdfStatus === "error" ? (
-          <Notice message="دریافت یا باز کردن PDF انجام نشد؛ دوباره تلاش کن." variant="danger" />
-        ) : null}
-      </Card>
-      <Button
-        label="کتابخانه حرکات"
-        onPress={() => router.push("/member/exercises")}
-        style={styles.libraryButton}
-        variant="ghost"
-      />
     </View>
+  );
+}
+
+function WorkoutPlanTools({
+  api,
+  awaitingCoachApproval,
+  connectivityStatus,
+  cycleApi,
+  fallbackDurationWeeks,
+  pdfStore,
+  plan,
+}: {
+  readonly api: ReturnType<typeof createWorkoutPlanApi>;
+  readonly awaitingCoachApproval: boolean;
+  readonly connectivityStatus: ConnectivityStatus;
+  readonly cycleApi: ReturnType<typeof createWorkoutCycleApi>;
+  readonly fallbackDurationWeeks: number;
+  readonly pdfStore: ExpoWorkoutPlanPdfStore;
+  readonly plan: WorkoutPlan | null;
+}) {
+  const router = useRouter();
+  const [pdfError, setPdfError] = useState(false);
+  const feedbackController = useCompletionFeedbackController({
+    api: cycleApi,
+    awaitingCoachApproval,
+    connectivityStatus,
+    fallbackDurationWeeks,
+    planId: plan?.id ?? null,
+  });
+  const toolsRowDirection = { direction: "rtl" as const, flexDirection: "row" as const };
+  const toolDividerStyle = {
+    borderRightColor: fiticianTokens.colors.line,
+    borderRightWidth: 1,
+  } as const;
+
+  return (
+    <View style={styles.toolsSection} testID="workout-plan-tools">
+      <Text style={styles.toolsHeading}>ابزارهای برنامه</Text>
+      <View style={styles.toolsContainer}>
+        <View style={[styles.toolsRow, toolsRowDirection]} testID="workout-plan-tools-row">
+          <WorkoutPdfTool
+            api={api}
+            onErrorChange={setPdfError}
+            pdfStore={pdfStore}
+            plan={plan}
+          />
+          <CompletionFeedbackToolCell controller={feedbackController} />
+          <Pressable
+            accessibilityLabel="Body Analysis"
+            accessibilityRole="button"
+            onPress={() => router.push("/member/body-analysis-history")}
+            style={({ pressed }) => [styles.toolsCell, toolDividerStyle, pressed && styles.toolPressed]}
+            testID="workout-plan-body-analysis-tool"
+          >
+            <AppIcon color={fiticianTokens.colors.aqua} name="progress" size={fiticianTokens.iconSize.md} />
+            <Text style={styles.toolTitleEnglish}>Body Analysis</Text>
+          </Pressable>
+        </View>
+        <CompletionFeedbackDetails controller={feedbackController} />
+      </View>
+      {pdfError ? (
+        <Notice compact message="دانلود PDF انجام نشد. دوباره تلاش کن." variant="danger" />
+      ) : null}
+    </View>
+  );
+}
+
+function WorkoutPdfTool({
+  api,
+  onErrorChange,
+  pdfStore,
+  plan,
+}: {
+  readonly api: ReturnType<typeof createWorkoutPlanApi>;
+  readonly onErrorChange: (hasError: boolean) => void;
+  readonly pdfStore: ExpoWorkoutPlanPdfStore;
+  readonly plan: WorkoutPlan | null;
+}) {
+  const planId = plan?.id ?? null;
+  const [pdfStatus, setPdfStatus] = useState<PdfStatus>("idle");
+  const [storedPdf, setStoredPdf] = useState<StoredWorkoutPlanPdf | null>(null);
+  const storageCheck = useRef<Promise<StoredWorkoutPlanPdf | null> | null>(null);
+  const requestVersion = useRef(0);
+
+  useEffect(() => {
+    const version = requestVersion.current + 1;
+    requestVersion.current = version;
+    setStoredPdf(null);
+    onErrorChange(false);
+    if (planId === null) {
+      storageCheck.current = null;
+      setPdfStatus("idle");
+      return;
+    }
+
+    storageCheck.current = pdfStore.get(planId).catch(() => null);
+  }, [onErrorChange, pdfStore, planId]);
+
+  async function openPdf(uri: string, version: number) {
+    if (requestVersion.current !== version) return;
+    await Linking.openURL(uri);
+    onErrorChange(false);
+    setPdfStatus("ready");
+  }
+
+  async function handlePress() {
+    if (planId === null || pdfStatus === "downloading") return;
+    const version = requestVersion.current;
+    onErrorChange(false);
+    setPdfStatus("downloading");
+    try {
+      const checkedPdf = storedPdf ?? (storageCheck.current === null ? null : await storageCheck.current);
+      if (requestVersion.current !== version || planId !== plan?.id) return;
+      if (checkedPdf !== null) {
+        setStoredPdf(checkedPdf);
+        await openPdf(checkedPdf.uri, version);
+        return;
+      }
+
+      const downloaded = await api.downloadPdf(planId);
+      const stored = await pdfStore.save(planId, downloaded);
+      if (requestVersion.current !== version || planId !== plan?.id) return;
+      setStoredPdf(stored);
+      await openPdf(stored.uri, version);
+    } catch {
+      if (requestVersion.current !== version) return;
+      setPdfStatus("error");
+      onErrorChange(true);
+    }
+  }
+
+  const downloading = pdfStatus === "downloading";
+  return (
+    <Pressable
+      accessibilityLabel="دانلود PDF"
+      accessibilityRole="button"
+      accessibilityState={{ busy: downloading, disabled: planId === null || downloading }}
+      disabled={planId === null || downloading}
+      onPress={() => void handlePress()}
+      style={({ pressed }) => [styles.toolsCell, pressed && styles.toolPressed]}
+      testID="workout-plan-pdf-tool"
+    >
+      <AppIcon color={fiticianTokens.colors.aqua} name="document" size={fiticianTokens.iconSize.md} />
+      <Text style={styles.toolTitle}>دانلود PDF</Text>
+      <Text numberOfLines={2} style={styles.toolSubtitle}>
+        {downloading ? "در حال آماده‌سازی PDF…" : "دریافت نسخه فارسی برنامه"}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -1248,12 +1339,6 @@ const styles = StyleSheet.create({
   inlineNoticeWarning: {
     borderRightColor: fiticianTokens.colors.amber,
   },
-  libraryButton: {
-    alignSelf: "flex-start",
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
   nextSessionLabel: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -1751,13 +1836,6 @@ const styles = StyleSheet.create({
     opacity: 0.78,
     transform: [{ scale: fiticianTokens.motion.pressedScale }],
   },
-  pdfActions: {
-    gap: fiticianTokens.spacing[2],
-  },
-  pdfCard: {
-    gap: fiticianTokens.spacing[3],
-    marginTop: fiticianTokens.spacing[4],
-  },
   screen: {
     gap: fiticianTokens.spacing[3],
     paddingBottom: fiticianTokens.spacing[7],
@@ -1780,5 +1858,69 @@ const styles = StyleSheet.create({
   },
   skeletonGroup: {
     gap: fiticianTokens.spacing[3],
+  },
+  toolPressed: {
+    opacity: 0.78,
+  },
+  toolSubtitle: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  toolTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 16,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  toolTitleEnglish: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 16,
+    textAlign: "center",
+    writingDirection: "ltr",
+  },
+  toolsCell: {
+    alignItems: "center",
+    flex: 1,
+    gap: 2,
+    justifyContent: "center",
+    minHeight: 80,
+    minWidth: 0,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  toolsContainer: {
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    overflow: "hidden",
+    width: "100%",
+  },
+  toolsHeading: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  toolsRow: {
+    minHeight: 80,
+    width: "100%",
+  },
+  toolsSection: {
+    gap: fiticianTokens.spacing[1],
+    marginTop: fiticianTokens.spacing[2],
+    width: "100%",
   },
 });

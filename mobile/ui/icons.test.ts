@@ -13,6 +13,9 @@ it("keeps member navigation on a stable, renderable icon set", () => {
     "nutrition",
     "profile",
     "more",
+    "feedback",
+    "lock",
+    "progress",
     "genderMale",
     "genderFemale",
     "arrowLeft",
@@ -23,6 +26,9 @@ it("keeps member navigation on a stable, renderable icon set", () => {
   expect(fiticianIconName("nutrition")).toBe("silverware-fork-knife");
   expect(fiticianIconName("profile")).toBe("account-circle-outline");
   expect(fiticianIconName("more")).toBe("dots-horizontal");
+  expect(fiticianIconName("feedback")).toBe("message-check-outline");
+  expect(fiticianIconName("lock")).toBe("lock-outline");
+  expect(fiticianIconName("progress")).toBe("chart-line");
   expect(fiticianIconName("genderMale")).toBe("gender-male");
   expect(fiticianIconName("genderFemale")).toBe("gender-female");
 });

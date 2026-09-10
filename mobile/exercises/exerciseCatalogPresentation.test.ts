@@ -25,8 +25,8 @@ it("keeps the web card ratio and native touch target for secondary filters", asy
   expect(source).toContain("minHeight: fiticianTokens.layout.minimumTouchTarget");
 });
 
-it("exposes the library from the workout header", async () => {
-  const source = await readFile(new URL("../workouts/WorkoutPlansScreen.tsx", import.meta.url), "utf8");
-  expect(source).toContain('label="کتابخانه حرکات"');
-  expect(source).toContain('router.push("/member/exercises")');
+it("keeps the exercise library discoverable outside workout plan tools", async () => {
+  const source = await readFile(new URL("../more/MoreScreen.tsx", import.meta.url), "utf8");
+  expect(source).toContain('title: "کتابخانه حرکات"');
+  expect(source).toContain('path: "/member/exercises"');
 });

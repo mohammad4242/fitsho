@@ -6,18 +6,21 @@ import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { workoutKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import {
+  AppIcon,
   Button,
   Card,
   Notice,
   Skeleton,
   TextField,
 } from "../ui/components";
+import { formatPersianNumber } from "../ui/locale";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import type { WorkoutPlan } from "./workoutApi";
 import {
   createWorkoutCycleApi,
   type WorkoutCycleApi,
+  type WorkoutCycleCompletionFeedback,
   type WorkoutCycleCurrent,
 } from "./workoutCycleApi";
 import {
@@ -156,11 +159,6 @@ export function WorkoutCyclePanel({
           />
         </>
       ) : null}
-      <CompletionFeedbackPanel
-        api={api}
-        connectivityStatus={connectivityStatus}
-        cycle={cycle}
-      />
     </View>
   );
 }
@@ -477,74 +475,112 @@ function ReplacementPanel({
   );
 }
 
-function CompletionFeedbackPanel({
+export type CompletionFeedbackControllerState =
+  | "completed"
+  | "draft"
+  | "error"
+  | "hidden"
+  | "loading"
+  | "offline";
+
+export type CompletionFeedbackController = {
+  readonly awaitingCoachApproval: boolean;
+  readonly context: WorkoutCycleCompletionFeedback | null;
+  readonly currentWeek: number | null;
+  readonly durationWeeks: number;
+  readonly error: string | null;
+  readonly form: CompletionFeedbackForm;
+  readonly lockedInfoOpen: boolean;
+  readonly offline: boolean;
+  readonly saving: boolean;
+  readonly state: CompletionFeedbackControllerState;
+  readonly retry: () => void;
+  readonly submit: () => void;
+  readonly toggleLockedInfo: () => void;
+  readonly updateForm: <TField extends keyof CompletionFeedbackForm>(
+    field: TField,
+    value: CompletionFeedbackForm[TField],
+  ) => void;
+};
+
+export function useCompletionFeedbackController({
   api,
+  awaitingCoachApproval = false,
   connectivityStatus,
-  cycle,
+  fallbackDurationWeeks,
+  planId,
 }: {
   readonly api: WorkoutCycleApi;
+  readonly awaitingCoachApproval?: boolean;
   readonly connectivityStatus: ConnectivityStatus;
-  readonly cycle: WorkoutCycleCurrent;
-}) {
+  readonly fallbackDurationWeeks: number;
+  readonly planId: string | null;
+}): CompletionFeedbackController {
   const queryClient = useQueryClient();
-  const queryKey = workoutKeys.completionFeedback(cycle.cycle_id);
-  const query = useQuery({ queryFn: api.getCompletionFeedback, queryKey });
-  const state = getMobileViewState(query, { connectivityStatus });
-  const context = viewData(state);
+  const cycleQuery = useQuery({
+    enabled: planId !== null && !awaitingCoachApproval,
+    queryFn: api.getCurrent,
+    queryKey: workoutKeys.currentCycle(),
+  });
+  const cycleState = getMobileViewState(cycleQuery, { connectivityStatus });
+  const queriedCycle = viewData(cycleState);
+  const cycle = queriedCycle !== undefined
+    && queriedCycle !== null
+    && planId !== null
+    && queriedCycle.workout_plan_id === planId
+    ? queriedCycle
+    : null;
+  const feedbackKey = workoutKeys.completionFeedback(cycle?.cycle_id ?? "unavailable");
+  const feedbackQuery = useQuery({
+    enabled: cycle !== null && !awaitingCoachApproval,
+    queryFn: api.getCompletionFeedback,
+    queryKey: feedbackKey,
+  });
+  const feedbackState = getMobileViewState(feedbackQuery, { connectivityStatus });
+  const queriedContext = cycle === null ? undefined : viewData(feedbackState);
+  const context = queriedContext ?? null;
   const [form, setForm] = useState<CompletionFeedbackForm>(emptyCompletionFeedbackForm);
   const [error, setError] = useState<string | null>(null);
+  const [lockedInfoOpen, setLockedInfoOpen] = useState(false);
   const save = useMutation({
     mutationFn: api.saveCompletionFeedback,
     onError: () => setError("بازخورد پایان چرخه ثبت نشد؛ دوباره تلاش کن."),
     onSuccess: (saved) => {
-      queryClient.setQueryData(queryKey, saved);
+      queryClient.setQueryData(feedbackKey, saved);
       setError(null);
     },
   });
 
   useEffect(() => {
-    if (context !== undefined) {
-      setForm(completionFeedbackFormFromResponse(context?.feedback ?? null));
+    if (queriedContext !== undefined) {
+      setForm(completionFeedbackFormFromResponse(queriedContext?.feedback ?? null));
     }
-  }, [context]);
+  }, [queriedContext]);
 
-  if (state.status === "loading") return <Skeleton height={200} />;
-  if (state.status === "error" && context === undefined) {
-    return (
-      <Notice
-        actionLabel="تلاش دوباره"
-        message="وضعیت بازخورد پایان چرخه دریافت نشد."
-        onAction={() => void query.refetch()}
-        variant="danger"
-      />
-    );
-  }
-  if (state.status === "offline" && context === undefined) {
-    return <Notice message="برای دریافت بازخورد پایان چرخه به اینترنت وصل شو." variant="offline" />;
-  }
-  if (context === undefined || context === null) return null;
-  if (context.feedback !== null) {
-    return (
-      <Card style={styles.feedbackCard}>
-        <Text style={styles.sectionTitle}>بازخورد پایان چرخه</Text>
-        <Text style={styles.successText}>بازخورد این چرخه ثبت شده است.</Text>
-        <Text style={styles.bodyText}>
-          شدت: {difficultyLabel(context.feedback.overall_difficulty ?? "appropriate")} · ریکاوری: {recoveryLabel(context.feedback.overall_recovery ?? "good")}
-        </Text>
-      </Card>
-    );
-  }
-  if (!context.is_due) {
-    return (
-      <Card style={styles.feedbackCard}>
-        <Text style={styles.sectionTitle}>بازخورد پایان چرخه</Text>
-        <Text style={styles.bodyText}>این فرم بعد از پایان رسمی چرخهٔ {context.duration_weeks} هفته‌ای باز می‌شود.</Text>
-        <Text style={styles.weekBadge}>هفتهٔ فعلی: {context.current_week}</Text>
-      </Card>
-    );
-  }
+  const state: CompletionFeedbackControllerState = awaitingCoachApproval
+    ? "hidden"
+    : cycle === null && queriedCycle === undefined
+      ? cycleState.status === "offline" ? "offline" : cycleState.status === "error" ? "error" : "loading"
+      : cycle !== null && queriedContext === undefined
+        ? feedbackState.status === "offline" ? "offline" : feedbackState.status === "error" ? "error" : "loading"
+        : context?.feedback !== null && context?.feedback !== undefined
+          ? "completed"
+          : context?.is_due === true
+            ? "draft"
+            : "hidden";
 
+  const durationWeeks = context?.duration_weeks ?? cycle?.duration_weeks ?? fallbackDurationWeeks;
+  const currentWeek = context?.current_week ?? cycle?.current_week ?? null;
   const offline = connectivityStatus === "offline";
+
+  function retry() {
+    if (cycle !== null) {
+      void feedbackQuery.refetch();
+      return;
+    }
+    void cycleQuery.refetch();
+  }
+
   function submit() {
     if (offline) {
       setError("ثبت بازخورد بدون اینترنت انجام نمی‌شود.");
@@ -554,85 +590,199 @@ function CompletionFeedbackPanel({
     save.mutate(toCompletionFeedbackInput(form));
   }
 
+  function updateForm<TField extends keyof CompletionFeedbackForm>(
+    field: TField,
+    value: CompletionFeedbackForm[TField],
+  ) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  return {
+    awaitingCoachApproval,
+    context,
+    currentWeek,
+    durationWeeks,
+    error,
+    form,
+    lockedInfoOpen,
+    offline,
+    retry,
+    saving: save.isPending,
+    state,
+    submit,
+    toggleLockedInfo: () => setLockedInfoOpen((open) => !open),
+    updateForm,
+  };
+}
+
+export function CompletionFeedbackToolCell({
+  controller,
+}: {
+  readonly controller: CompletionFeedbackController;
+}) {
+  const locked = controller.state === "hidden";
   return (
-    <Card style={styles.formCard}>
+    <Pressable
+      accessibilityLabel="بازخورد پایان دوره"
+      accessibilityRole="button"
+      accessibilityState={{ expanded: locked ? controller.lockedInfoOpen : undefined }}
+      onPress={locked ? controller.toggleLockedInfo : undefined}
+      style={({ pressed }) => [styles.toolsCell, styles.toolsCellDivided, pressed && styles.toolPressed]}
+      testID="workout-plan-feedback-tool"
+    >
+      <View style={styles.feedbackIconFrame}>
+        <AppIcon color={fiticianTokens.colors.aqua} name="feedback" size={fiticianTokens.iconSize.md} />
+        {locked ? (
+          <View style={styles.lockBadge} testID="workout-plan-feedback-lock">
+            <AppIcon color={fiticianTokens.colors.ink} name="lock" size={11} />
+          </View>
+        ) : null}
+      </View>
+      <Text style={styles.toolEyebrow}>پایان دوره</Text>
+      <Text numberOfLines={2} style={styles.toolTitle}>بازخورد پایان دوره</Text>
+    </Pressable>
+  );
+}
+
+export function CompletionFeedbackDetails({
+  controller,
+}: {
+  readonly controller: CompletionFeedbackController;
+}) {
+  if (controller.state === "hidden") {
+    if (!controller.lockedInfoOpen) return null;
+    const weeks = formatPersianNumber(controller.durationWeeks, { maximumFractionDigits: 0 });
+    const message = controller.awaitingCoachApproval
+      ? `این برنامه هنوز به تأیید مربی نرسیده است. پس از تأیید مربی و اتمام دوره ${weeks} هفته‌ای، این فرم برای هدفمندتر شدن برنامه بعدی فعال می‌شود. لطفاً فرم را کامل و با دقت پر کنید.`
+      : `پس از اتمام دوره ${weeks} هفته‌ای، این فرم برای هدفمندتر شدن برنامه بعدی فعال می‌شود. لطفاً فرم را کامل و با دقت پر کنید.`;
+    return (
+      <View style={styles.feedbackDetails}>
+        <Text style={styles.lockedFeedbackText}>{message}</Text>
+      </View>
+    );
+  }
+
+  if (controller.state === "loading") {
+    return (
+      <View style={styles.feedbackDetails}>
+        <Skeleton height={64} />
+      </View>
+    );
+  }
+  if (controller.state === "error") {
+    return (
+      <View style={styles.feedbackDetails}>
+        <Notice
+          actionLabel="تلاش دوباره"
+          message="وضعیت بازخورد پایان چرخه دریافت نشد."
+          onAction={controller.retry}
+          variant="danger"
+        />
+      </View>
+    );
+  }
+  if (controller.state === "offline") {
+    return (
+      <View style={styles.feedbackDetails}>
+        <Notice message="برای دریافت بازخورد پایان چرخه به اینترنت وصل شو." variant="offline" />
+      </View>
+    );
+  }
+  if (controller.state === "completed" && controller.context?.feedback !== null && controller.context?.feedback !== undefined) {
+    return (
+      <View style={styles.feedbackDetails}>
+        <Text style={styles.sectionTitle}>بازخورد پایان چرخه</Text>
+        <Text style={styles.successText}>بازخورد این چرخه ثبت شده است.</Text>
+        <Text style={styles.bodyText}>
+          شدت: {difficultyLabel(controller.context.feedback.overall_difficulty ?? "appropriate")} · ریکاوری: {recoveryLabel(controller.context.feedback.overall_recovery ?? "good")}
+        </Text>
+      </View>
+    );
+  }
+
+  const offline = controller.offline;
+  const context = controller.context;
+  if (context === null || context === undefined || controller.state !== "draft") return null;
+
+  return (
+    <View style={[styles.feedbackDetails, styles.formCard]}>
       <View style={styles.formHeading}>
         <View style={styles.summaryCopy}>
           <Text style={styles.sectionEyebrow}>پایان چرخه</Text>
           <Text style={styles.sectionTitle}>بازخورد کلی</Text>
         </View>
-        <Text style={styles.weekBadge}>هفته {context.current_week}</Text>
+        <Text style={styles.weekBadge}>هفته {controller.currentWeek ?? context.current_week}</Text>
       </View>
       <ChoiceGroup
         label="شدت کلی تمرین‌ها"
         options={difficultyChoices}
-        selected={form.overallDifficulty}
-        onSelect={(value) => setForm((current) => ({ ...current, overallDifficulty: value as CompletionFeedbackForm["overallDifficulty"] }))}
+        selected={controller.form.overallDifficulty}
+        onSelect={(value) => controller.updateForm("overallDifficulty", value as CompletionFeedbackForm["overallDifficulty"])}
       />
       <ChoiceGroup
         label="ریکاوری کلی"
         options={recoveryChoices}
-        selected={form.overallRecovery}
-        onSelect={(value) => setForm((current) => ({ ...current, overallRecovery: value as CompletionFeedbackForm["overallRecovery"] }))}
+        selected={controller.form.overallRecovery}
+        onSelect={(value) => controller.updateForm("overallRecovery", value as CompletionFeedbackForm["overallRecovery"])}
       />
       <ChoiceGroup
         label="رضایت کلی"
         options={satisfactionChoices}
-        selected={form.overallSatisfaction}
-        onSelect={(value) => setForm((current) => ({ ...current, overallSatisfaction: value as CompletionFeedbackForm["overallSatisfaction"] }))}
+        selected={controller.form.overallSatisfaction}
+        onSelect={(value) => controller.updateForm("overallSatisfaction", value as CompletionFeedbackForm["overallSatisfaction"])}
       />
       <ChoiceGroup
         label="پیشرفت قدرت"
         options={progressChoices}
-        selected={form.strengthProgress}
-        onSelect={(value) => setForm((current) => ({ ...current, strengthProgress: value as CompletionFeedbackForm["strengthProgress"] }))}
+        selected={controller.form.strengthProgress}
+        onSelect={(value) => controller.updateForm("strengthProgress", value as CompletionFeedbackForm["strengthProgress"])}
       />
       <ChoiceGroup
         label="پیشرفت عضله"
         options={progressChoices}
-        selected={form.muscleProgress}
-        onSelect={(value) => setForm((current) => ({ ...current, muscleProgress: value as CompletionFeedbackForm["muscleProgress"] }))}
+        selected={controller.form.muscleProgress}
+        onSelect={(value) => controller.updateForm("muscleProgress", value as CompletionFeedbackForm["muscleProgress"])}
       />
       <ChoiceGroup
         label="پیشرفت استقامت"
         options={progressChoices}
-        selected={form.enduranceProgress}
-        onSelect={(value) => setForm((current) => ({ ...current, enduranceProgress: value as CompletionFeedbackForm["enduranceProgress"] }))}
+        selected={controller.form.enduranceProgress}
+        onSelect={(value) => controller.updateForm("enduranceProgress", value as CompletionFeedbackForm["enduranceProgress"])}
       />
       <ChoiceGroup
         label="پیشرفت انرژی"
         options={progressChoices}
-        selected={form.energyProgress}
-        onSelect={(value) => setForm((current) => ({ ...current, energyProgress: value as CompletionFeedbackForm["energyProgress"] }))}
+        selected={controller.form.energyProgress}
+        onSelect={(value) => controller.updateForm("energyProgress", value as CompletionFeedbackForm["energyProgress"])}
       />
       <TextField
         label="تغییرات عملکرد"
         maxLength={4000}
         multiline
         numberOfLines={3}
-        onChangeText={(performanceChanges) => setForm((current) => ({ ...current, performanceChanges }))}
-        value={form.performanceChanges}
+        onChangeText={(performanceChanges) => controller.updateForm("performanceChanges", performanceChanges)}
+        value={controller.form.performanceChanges}
       />
       <TextField
         label="درد یا محدودیت"
         maxLength={4000}
         multiline
         numberOfLines={3}
-        onChangeText={(painFeedback) => setForm((current) => ({ ...current, painFeedback }))}
-        value={form.painFeedback}
+        onChangeText={(painFeedback) => controller.updateForm("painFeedback", painFeedback)}
+        value={controller.form.painFeedback}
       />
       <TextField
         label="یادداشت پایانی"
         maxLength={4000}
         multiline
         numberOfLines={3}
-        onChangeText={(note) => setForm((current) => ({ ...current, note }))}
-        value={form.note}
+        onChangeText={(note) => controller.updateForm("note", note)}
+        value={controller.form.note}
       />
-      {error !== null ? <Notice message={error} variant="danger" /> : null}
+      {controller.error !== null ? <Notice message={controller.error} variant="danger" /> : null}
       {offline ? <Notice message="برای ثبت بازخورد به اینترنت وصل شو." variant="offline" /> : null}
-      <Button disabled={offline} label="ثبت بازخورد" loading={save.isPending} onPress={submit} />
-    </Card>
+      <Button disabled={offline} label="ثبت بازخورد" loading={controller.saving} onPress={controller.submit} />
+    </View>
   );
 }
 
@@ -739,8 +889,83 @@ const styles = StyleSheet.create({
     textAlign: "auto",
     writingDirection: "rtl",
   },
+  feedbackDetails: {
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+    gap: fiticianTokens.spacing[3],
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[3],
+  },
   feedbackCard: {
     gap: fiticianTokens.spacing[3],
+  },
+  feedbackIconFrame: {
+    alignItems: "center",
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: "center",
+    position: "relative",
+    width: 34,
+  },
+  lockedFeedbackText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  lockBadge: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    bottom: -5,
+    height: 17,
+    justifyContent: "center",
+    position: "absolute",
+    right: -6,
+    width: 17,
+  },
+  toolEyebrow: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  toolPressed: {
+    opacity: 0.78,
+  },
+  toolTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 16,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  toolsCell: {
+    alignItems: "center",
+    flex: 1,
+    gap: 2,
+    justifyContent: "center",
+    minHeight: 80,
+    minWidth: 0,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  toolsCellDivided: {
+    borderRightColor: fiticianTokens.colors.line,
+    borderRightWidth: 1,
+  },
+  formCard: {
+    gap: fiticianTokens.spacing[4],
   },
   fieldLabel: {
     color: fiticianTokens.colors.ink,
@@ -749,9 +974,6 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.medium,
     textAlign: "auto",
     writingDirection: "rtl",
-  },
-  formCard: {
-    gap: fiticianTokens.spacing[4],
   },
   formGroup: {
     gap: fiticianTokens.spacing[2],
