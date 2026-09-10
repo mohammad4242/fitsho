@@ -437,11 +437,28 @@ def test_importer_stores_media_at_verified_content_addressed_exercise_paths(
     db: Session,
     test_settings: Settings,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from app.exercises import free_exercise_db_import
     from app.exercises.free_exercise_db_import import FreeExerciseDbImporter
+    from app.exercises.media_storage import StoredExercisePoster
 
     source_root = tmp_path / "source"
     write_source(source_root, source_record())
+    poster_calls: list[str] = []
+    monkeypatch.setattr(
+        free_exercise_db_import,
+        "ensure_exercise_video_poster",
+        lambda media_path, **_kwargs: (
+            poster_calls.append(media_path),
+            StoredExercisePoster(
+                public_path=media_path.removesuffix(".mp4") + ".poster.webp",
+                absolute_path=tmp_path / "existing-poster.webp",
+                created=False,
+            ),
+        )[1],
+        raising=False,
+    )
 
     report = FreeExerciseDbImporter(
         db,
@@ -462,6 +479,7 @@ def test_importer_stores_media_at_verified_content_addressed_exercise_paths(
     assert (
         test_settings.media_root / "exercises" / namespace / f"media-{digest}.mp4"
     ).read_bytes() == MP4_BYTES
+    assert poster_calls == [f"/media/exercises/{namespace}/media-{digest}.mp4"] * 2
 
 
 def test_importer_rejects_mismatching_existing_media_without_overwrite(

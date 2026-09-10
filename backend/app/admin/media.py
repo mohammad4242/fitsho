@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import tempfile
@@ -13,8 +14,11 @@ from app.config import Settings
 from app.exercises.enums import MediaType
 from app.exercises.media_storage import (
     ExerciseMediaStorageError,
+    ensure_exercise_video_poster,
     publish_exercise_media,
 )
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_MEDIA: dict[str, tuple[str, MediaType]] = {
     ".gif": ("image/gif", MediaType.GIF),
@@ -194,6 +198,15 @@ def store_upload(
             )
         except ExerciseMediaStorageError as error:
             raise MediaValidationError(str(error)) from error
+        if media_type is MediaType.VIDEO:
+            try:
+                ensure_exercise_video_poster(published.public_path, settings=settings)
+            except ExerciseMediaStorageError:
+                logger.warning(
+                    "Exercise video stored without poster: %s",
+                    published.public_path,
+                    exc_info=True,
+                )
         temporary_path.unlink(missing_ok=True)
     except Exception:
         temporary_path.unlink(missing_ok=True)

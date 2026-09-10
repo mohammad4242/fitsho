@@ -12,6 +12,7 @@ from app.admin.media import _signature_extension
 from app.config import Settings
 from app.exercises.media_storage import (
     ExerciseMediaStorageError,
+    ensure_exercise_video_poster,
     publish_exercise_media,
 )
 from app.exercises.media_storage import (
@@ -299,6 +300,11 @@ def publish_owner_video(
             settings=settings,
             namespace=namespace,
             extension=".mp4",
+        )
+        ensure_exercise_video_poster(
+            stored.public_path,
+            settings=settings,
+            runner=runner,
         )
     except ExerciseMediaStorageError as error:
         raise OwnerVideoMediaError(str(error)) from error

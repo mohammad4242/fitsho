@@ -164,6 +164,13 @@ def test_valid_short_video_is_stored(
     expected_type: MediaType,
 ) -> None:
     monkeypatch.setattr("app.admin.media._probe_video_duration", lambda *_: 5.0)
+    generated_posters: list[str] = []
+    monkeypatch.setattr(
+        media,
+        "ensure_exercise_video_poster",
+        lambda media_path, **_kwargs: generated_posters.append(media_path),
+        raising=False,
+    )
 
     stored = store_upload(
         upload(filename, content, content_type), settings(tmp_path), "test-exercise"
@@ -171,6 +178,7 @@ def test_valid_short_video_is_stored(
 
     assert stored.media_type is expected_type
     assert stored.absolute_path.suffix == Path(filename).suffix
+    assert generated_posters == [stored.public_path]
 
 
 def test_video_upload_allows_up_to_64_mebibytes(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,7 +32,12 @@ from app.exercises.enums import (
 )
 from app.exercises.focus_classifier import classify_muscle_focus, refine_primary_muscle
 from app.exercises.free_exercise_db_translations import CURATED_TRANSLATIONS
-from app.exercises.media_storage import publish_exercise_media, sha256_file
+from app.exercises.media_storage import (
+    ExerciseMediaStorageError,
+    ensure_exercise_video_poster,
+    publish_exercise_media,
+    sha256_file,
+)
 from app.exercises.models import (
     Exercise,
     ExerciseCautionTagItem,
@@ -43,6 +49,8 @@ from app.exercises.models import (
 from app.exercises.prescription_metadata import prescription_metadata_for_identifier
 from app.exercises.programming_metadata import canonical_stability_demand_for_identifier
 from app.exercises.substitution_groups import curated_substitution_group
+
+logger = logging.getLogger(__name__)
 
 BODY_REGION_MAP: dict[str, BodyRegion] = {
     "back": BodyRegion.UPPER_BODY,
@@ -1140,6 +1148,20 @@ class FreeExerciseDbImporter:
             namespace=namespace,
             extension=expected_extension,
         )
+        if asset.media_type is MediaType.VIDEO:
+            try:
+                poster = ensure_exercise_video_poster(
+                    stored.public_path,
+                    settings=self._settings,
+                )
+                if poster.created:
+                    self._created_media.append(poster.absolute_path)
+            except ExerciseMediaStorageError:
+                logger.warning(
+                    "Could not generate exercise video poster for %s",
+                    stored.public_path,
+                    exc_info=True,
+                )
         if stored.created:
             self._created_media.append(stored.absolute_path)
         return stored.public_path, stored.absolute_path if stored.created else None

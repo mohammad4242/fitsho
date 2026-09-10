@@ -105,6 +105,7 @@ def test_publish_owner_video_uses_stable_media_path_and_reuses_valid_file(
     digest = hashlib.sha256(prepared.muted_path.read_bytes()).hexdigest()
     assert first.public_path == f"/media/exercises/{namespace}/media-{digest}.mp4"
     assert first.absolute_path.is_file()
+    assert first.absolute_path.with_suffix(".poster.webp").is_file()
     assert first.created is True
     assert second == first.__class__(
         public_path=first.public_path,
