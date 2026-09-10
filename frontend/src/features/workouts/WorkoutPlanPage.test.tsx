@@ -338,27 +338,67 @@ it("keeps the initial version visible while coach approval is pending", async ()
   expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
 });
 
-it("keeps the active plan usable while a newer plan awaits coach approval", async () => {
-  api.getActiveWorkoutPlan.mockResolvedValue(plan);
-  api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion]);
-  api.getWorkoutPlan.mockResolvedValue(pendingPlan);
+it("displays one pending foreground plan and replaces it with the selected archive", async () => {
+  const replacementPlan: WorkoutPlan = {
+    ...pendingPlan,
+    generation_source: "ai",
+    plan_duration_weeks: 6,
+    days: [
+      { ...pendingPlan.days[0]!, estimated_duration_minutes: 35 },
+      {
+        ...pendingPlan.days[0]!,
+        day_number: 2,
+        estimated_duration_minutes: 45,
+        title_en: "Second new day",
+        title_fa: "روز دوم جدید",
+        exercises: pendingPlan.days[0]!.exercises.map((item) => ({
+          ...item,
+          exercise: { ...item.exercise, name_fa: "لانج نسخه جدید", slug: "pending-lunge" },
+        })),
+      },
+    ],
+  };
+  const archivedVersion = {
+    ...pendingVersion,
+    id: plan.id,
+    status: "superseded" as const,
+    is_active: false,
+    coach_review: { ...pendingVersion.coach_review, state: "initial_generated" as const },
+  };
+  const archivedPlan: WorkoutPlan = { ...plan, status: "superseded" };
+  api.getActiveWorkoutPlan.mockResolvedValue(null);
+  api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion, archivedVersion]);
+  api.getWorkoutPlan.mockImplementation((id: string) => Promise.resolve(
+    id === replacementPlan.id ? replacementPlan : archivedPlan,
+  ));
+  const user = userEvent.setup();
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).toBeInTheDocument();
-  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
+  expect(await screen.findByLabelText("دوره 6 هفته‌ای")).toBeInTheDocument();
+  expect(screen.getAllByRole("heading", { name: "برنامه تمرینی من" })).toHaveLength(1);
+  expect(screen.getAllByRole("region", { name: "خلاصه برنامه" })).toHaveLength(1);
   expect(screen.getByText("اسکوات در انتظار تأیید")).toBeInTheDocument();
-  expect(screen.getByText("توضیح هوش مصنوعی نسخه جدید")).toBeVisible();
-  expect(screen.getByRole("heading", { name: "برنامه در انتظار تأیید" })).toBeInTheDocument();
-  const activeSchedule = screen.getByRole("list", { name: "روزهای تمرین تو" });
-  const pendingSchedule = screen.getByRole("list", { name: "برنامه در انتظار تأیید مربی" });
-  expect(activeSchedule).toBeInTheDocument();
-  expect(pendingSchedule).toBeInTheDocument();
-  expect(activeSchedule.compareDocumentPosition(pendingSchedule) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(api.getWorkoutPlan).toHaveBeenCalledWith(pendingVersion.id);
+  expect(screen.getByRole("region", { name: "خلاصه برنامه" })).toHaveTextContent("هوش مصنوعی");
+  expect(screen.getByText("۲ روز تمرین")).toBeInTheDocument();
+  expect(screen.getByText("۴۰ دقیقه برای هر جلسه")).toBeInTheDocument();
+  expect(screen.getAllByText("در انتظار تایید مربی")).toHaveLength(1);
+  expect(screen.getAllByRole("list", { name: "روزهای تمرین تو" })).toHaveLength(1);
+  expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /نسخه اولیه/ })).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: /نسخه اولیه/ }));
+
+  expect(await screen.findByText("پرس سینه دمبل")).toBeInTheDocument();
+  expect(screen.getAllByRole("heading", { name: "برنامه تمرینی من" })).toHaveLength(1);
+  expect(screen.getAllByRole("region", { name: "خلاصه برنامه" })).toHaveLength(1);
+  expect(screen.getByText("غیرفعال")).toBeInTheDocument();
+  expect(screen.getByText("در حال مشاهده نسخه قبلی")).toBeInTheDocument();
+  expect(screen.queryByText("اسکوات در انتظار تأیید")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "به‌روزرسانی برنامه" })).not.toBeInTheDocument();
 });
 
-it("shows the pending plan as executable when there is no active plan", async () => {
+it("shows the pending plan as the single read-only current plan when there is no active plan", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue(null);
   api.getWorkoutPlanHistory.mockResolvedValue([pendingVersion]);
   api.getWorkoutPlan.mockResolvedValue(pendingPlan);
@@ -366,13 +406,14 @@ it("shows the pending plan as executable when there is no active plan", async ()
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  expect(await screen.findByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).toBeInTheDocument();
+  expect(await screen.findByText("در انتظار تایید مربی")).toBeInTheDocument();
   expect(screen.getByText("اسکوات در انتظار تأیید")).toBeInTheDocument();
-  expect(screen.getByRole("list", { name: "برنامه در انتظار تأیید مربی" })).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "روزهای تمرین تو" })).toBeInTheDocument();
   const feedbackTrigger = await screen.findByRole("button", { name: "بازخورد پایان دوره" });
   expect(feedbackTrigger).toBeInTheDocument();
   await user.click(feedbackTrigger);
   expect(screen.getByText(/پس از تأیید مربی و اتمام دوره ۴ هفته‌ای/)).toBeVisible();
+  expect(screen.queryByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).not.toBeInTheDocument();
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "ساخت برنامه" })).not.toBeInTheDocument();
 });
@@ -393,8 +434,10 @@ it("renders the pending plan returned by generation with its review warning", as
 
   await user.click(await screen.findByRole("button", { name: "ساخت برنامه" }));
 
-  expect(await screen.findByText("این برنامه هنوز به تأیید مربی نرسیده است؛ فعلاً می‌توانی آن را اجرا کنی.")).toBeInTheDocument();
+  expect(await screen.findByText("در انتظار تایید مربی")).toBeInTheDocument();
   expect(screen.getByText("اسکوات در انتظار تأیید")).toBeInTheDocument();
+  expect(screen.getAllByRole("heading", { name: "برنامه تمرینی من" })).toHaveLength(1);
+  expect(screen.getAllByRole("list", { name: "روزهای تمرین تو" })).toHaveLength(1);
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
 });
 
@@ -472,7 +515,7 @@ it("shows deletion only for an archived version, never for the active version", 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
   expect(await screen.findByRole("button", { name: "حذف نسخه قدیمی برنامه" })).toBeInTheDocument();
-  expect(screen.getAllByRole("button", { name: /نسخه تأیید مربی/ })).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: /نسخه تأیید مربی/ })).not.toBeInTheDocument();
   expect(screen.getAllByRole("button", { name: "حذف نسخه قدیمی برنامه" })).toHaveLength(1);
 });
 
@@ -541,7 +584,7 @@ it("returns to the active plan when deleting the historical version currently di
   const user = userEvent.setup();
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
-  const historicalVersionButton = (await screen.findAllByRole("button", { name: /نسخه اولیه/ }))[1];
+  const historicalVersionButton = await screen.findByRole("button", { name: /نسخه اولیه/ });
   await user.click(historicalVersionButton);
   expect(await screen.findByText("در حال مشاهده نسخه قبلی")).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "حذف نسخه قدیمی برنامه" }));
@@ -774,7 +817,7 @@ it("renders the selected duration, exercise media, and exercise detail link", as
   const user = userEvent.setup();
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={6} /></MemoryRouter>);
 
-  expect(await screen.findByLabelText("دوره 6 هفته‌ای")).toBeInTheDocument();
+  expect(await screen.findByLabelText("دوره 4 هفته‌ای")).toBeInTheDocument();
   expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
   expect(screen.getAllByRole("img", { name: "نمایش حرکت پرس سینه دمبل" })[0]).toHaveAttribute(
     "src",
