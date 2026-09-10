@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import type { BodyProgressTimelineItem, BodyPhotoSessionState } from "@fitician/core/body-photos";
 
 import { AppIcon, Button } from "../ui/components";
+import { RTL_LAYOUT, RTL_ROW } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 
 export function BodyAnalysisDeleteDialog({
@@ -33,11 +34,11 @@ export function BodyAnalysisDeleteDialog({
       transparent
       visible
     >
-      <SafeAreaView style={styles.overlay}>
+      <SafeAreaView style={[styles.overlay, RTL_LAYOUT]}>
         <Pressable accessibilityRole="button" accessibilityLabel="بستن پنجره حذف" onPress={onClose} style={StyleSheet.absoluteFill} />
-        <View style={styles.dialog}>
+        <View style={[styles.dialog, RTL_LAYOUT]}>
           <View style={styles.rail} />
-          <View style={styles.header}>
+          <View style={[styles.header, RTL_ROW]}>
             <View style={styles.headerCopy}>
               <Text style={styles.eyebrow}>حذف از Body Analysis</Text>
               <Text accessibilityRole="header" style={styles.title}>{title}</Text>
@@ -51,7 +52,7 @@ export function BodyAnalysisDeleteDialog({
               ? "عکس‌های ذخیره‌شده و این جلسه بارگذاری برای همیشه حذف می‌شوند."
               : "عکس‌های ذخیره‌شده و این جلسه تحلیل برای همیشه حذف می‌شوند."}
           </Text>
-          <View style={styles.metaGrid}>
+          <View style={[styles.metaGrid, RTL_ROW]}>
             <View style={styles.metaCard}>
               <Text style={styles.metaLabel}>تاریخ جلسه</Text>
               <Text style={styles.metaValue}>{formatDate(item.session.created_at)}</Text>
@@ -62,7 +63,7 @@ export function BodyAnalysisDeleteDialog({
             </View>
           </View>
           {error !== undefined && error !== null ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-          <View style={styles.actions}>
+          <View style={[styles.actions, RTL_ROW]}>
             <Button
               disabled={busy}
               label={busy ? "در حال حذف…" : "حذف دائمی"}
@@ -100,7 +101,6 @@ function sessionStateLabel(state: BodyPhotoSessionState): string {
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     marginTop: fiticianTokens.spacing[4],
   },
@@ -144,12 +144,12 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   headerCopy: {
     flex: 1,
     gap: fiticianTokens.spacing[1],
+    minWidth: 0,
   },
   iconTile: {
     alignItems: "center",
@@ -171,7 +171,6 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[3],
   },
   metaGrid: {
-    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   metaLabel: {

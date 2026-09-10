@@ -34,3 +34,10 @@ it("keeps the Body Analysis product mark explicitly LTR", async () => {
   expect(source).toContain('textAlign: "left"');
   expect(source).toContain('writingDirection: "ltr"');
 });
+
+it("gives Body Analysis custom dialogs their own RTL roots", async () => {
+  const source = await readFile(new URL("./BodyAnalysisDeleteDialog.tsx", import.meta.url), "utf8");
+
+  expect(source).toContain("RTL_LAYOUT");
+  expect(source).toContain("RTL_ROW");
+});

@@ -170,6 +170,11 @@ it("wraps the router in the app-wide RTL boundary", async () => {
   expect(source).toContain("style={[styles.appRoot, RTL_LAYOUT]}");
 });
 
+it("keeps route-guard loading and error surfaces RTL outside Screen", async () => {
+  const source = await readFile(resolve(dirname(appRoot), "ui/navigation/RouteGuards.tsx"), "utf8");
+  expect(source).toContain("RTL_LAYOUT");
+});
+
 it("keeps account deletion available to any signed-in role without admin routes", async () => {
   await expect(readFile(resolve(appRoot, "(account)/account-deletion.tsx"), "utf8"))
     .resolves.toMatch(/AccountDeletionScreen/);

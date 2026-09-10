@@ -16,6 +16,7 @@ import { useMobileAuth } from "../../auth/MobileAuthProvider";
 import { mobileRouteSnapshotFromAuth } from "../../auth/authContext";
 import { loadSpecialistAccess, type SpecialistAccessSnapshot } from "../../auth/specialistAccess";
 import { Notice } from "../components";
+import { RTL_LAYOUT } from "../rtl";
 import { fiticianTokens } from "../tokens";
 import {
   decideMobileRoute,
@@ -176,7 +177,7 @@ function retryForResource(
 
 function RouteGuardLoading() {
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.loading}>
+    <SafeAreaView edges={["top", "bottom"]} style={[styles.loading, RTL_LAYOUT]}>
       <View accessibilityRole="progressbar">
         <ActivityIndicator accessibilityLabel="در حال بارگذاری" color={fiticianTokens.colors.aqua} />
       </View>
@@ -193,8 +194,8 @@ function RouteGuardError({
 }) {
   const profile = resource === "profile";
   return (
-    <SafeAreaView edges={["top", "bottom"]} style={styles.loading}>
-      <View style={styles.error}>
+    <SafeAreaView edges={["top", "bottom"]} style={[styles.loading, RTL_LAYOUT]}>
+      <View style={[styles.error, RTL_LAYOUT]}>
         <Notice
           actionLabel="دوباره تلاش کن"
           message={profile ? "اطلاعات پروفایل دریافت نشد." : "دسترسی این بخش بررسی نشد."}

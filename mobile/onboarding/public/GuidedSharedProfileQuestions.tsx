@@ -4,6 +4,7 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import type { ProfileFormValues } from "@fitician/core/profile";
 
 import { Button, AppIcon, TextField } from "../../ui/components";
+import { RTL_LAYOUT } from "../../ui/rtl";
 import { fiticianTokens } from "../../ui/tokens";
 import { PublicChoiceCard, PublicQuestionFrame } from "./PublicQuestionFrame";
 import { publicOnboardingStyles as styles } from "./publicOnboardingStyles";
@@ -102,10 +103,10 @@ function DatePartPicker({
         transparent
         visible={visible}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <View style={[styles.modalBackdrop, RTL_LAYOUT]}>
+          <View style={[styles.modalCard, RTL_LAYOUT]}>
             <Text style={styles.modalTitle}>{label}</Text>
-            <ScrollView>
+            <ScrollView contentContainerStyle={RTL_LAYOUT}>
               {options.map((option) => (
                 <Pressable
                   accessibilityLabel={faNumber(Number(option))}
