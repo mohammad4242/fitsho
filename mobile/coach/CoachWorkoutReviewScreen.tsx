@@ -376,8 +376,8 @@ function CoachReviewDetail({
         <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>پروندهٔ برنامه</Text>
           <View style={styles.memberIdentity}>
-            <MemberAvatar label={detail.member_display_name ?? "کاربر فیتیشین"} />
             <Text style={styles.detailTitle}>{detail.member_display_name ?? "کاربر فیتیشین"}</Text>
+            <MemberAvatar label={detail.member_display_name ?? "کاربر فیتیشین"} />
           </View>
         </View>
         <Text style={styles.status}>{coachReviewStatusLabel(detail.status)}</Text>
@@ -412,8 +412,8 @@ function CoachReviewDetail({
       {draft.days.map((day, dayIndex) => (
         <Card key={day.day_number} style={styles.dayCard}>
           <View style={styles.dayHeader}>
-            <Text style={styles.dayNumber}>{faNumber(day.day_number).padStart(2, "۰")}</Text>
             <Text style={styles.dayTitle}>روز {faNumber(day.day_number)}</Text>
+            <Text style={styles.dayNumber}>{faNumber(day.day_number).padStart(2, "۰")}</Text>
           </View>
           {day.exercises.map((exercise, exerciseIndex) => (
             <ReviewExerciseEditor
@@ -601,11 +601,11 @@ function ReviewExerciseEditor({
 function ReviewLeaseCard({ leaseExpiresAt }: { readonly leaseExpiresAt: string | null }) {
   return (
     <Card accessibilityLabel="زمان قفل بازبینی" style={styles.leaseCard} variant="hero">
-      <View style={styles.leaseIndicator} />
       <View style={styles.leaseCopy}>
         <Text style={styles.eyebrow}>قفل بازبینی تا</Text>
         <Text style={styles.leaseValue}>{reviewLeaseLabel(leaseExpiresAt)}</Text>
       </View>
+      <View style={styles.leaseIndicator} />
     </Card>
   );
 }
@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   dayCard: { gap: fiticianTokens.spacing[3] },
-  dayHeader: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[3] },
+  dayHeader: { alignItems: "center", flexDirection: "row", gap: fiticianTokens.spacing[3] },
   dayNumber: {
     color: fiticianTokens.colors.amber,
     fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
   },
   leaseCard: {
     alignItems: "stretch",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     minHeight: 72,
   },
@@ -866,7 +866,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "ltr",
   },
-  memberIdentity: { alignItems: "center", flexDirection: "row-reverse", gap: fiticianTokens.spacing[3] },
+  memberIdentity: { alignItems: "center", flexDirection: "row", gap: fiticianTokens.spacing[3] },
   memberName: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -908,7 +908,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  profileStrip: { flexDirection: "row-reverse", flexWrap: "wrap", gap: fiticianTokens.spacing[2] },
+  profileStrip: { flexDirection: "row", flexWrap: "wrap", gap: fiticianTokens.spacing[2] },
   queue: { gap: fiticianTokens.spacing[3] },
   queueItems: { gap: fiticianTokens.spacing[3] },
   queueMeta: {
@@ -963,7 +963,7 @@ const styles = StyleSheet.create({
   summaryCard: { gap: fiticianTokens.spacing[2] },
   templateSlug: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -990,6 +990,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
-  versionLabels: { flexDirection: "row-reverse", flexWrap: "wrap", gap: fiticianTokens.spacing[2] },
+  versionLabels: { flexDirection: "row", flexWrap: "wrap", gap: fiticianTokens.spacing[2] },
   workspace: { gap: fiticianTokens.spacing[6] },
 });

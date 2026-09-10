@@ -756,12 +756,12 @@ function PhysicianReviewDetail({
     <View style={styles.detailContent}>
       <View style={styles.detailHeader}>
         <View style={styles.caseIdentity}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>پروندهٔ تغذیه</Text>
+            <Text style={styles.detailTitle}>نسخه در حال بررسی {formatPersianNumber(plan.revision, { maximumFractionDigits: 0 })}</Text>
+          </View>
           <View accessibilityLabel={`تصویر ${memberName}`} style={styles.memberAvatar}>
             <Text style={styles.memberAvatarText}>{memberInitials(memberName)}</Text>
-          </View>
-          <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>پروندهٔ تغذیه</Text>
-            <Text style={styles.detailTitle}>نسخه در حال بررسی {formatPersianNumber(plan.revision, { maximumFractionDigits: 0 })}</Text>
           </View>
         </View>
         <Text style={[styles.status, readOnly && styles.approvedStatus]}>
@@ -1476,7 +1476,7 @@ const styles = StyleSheet.create({
   },
   contextCard: { gap: fiticianTokens.spacing[3] },
   contextGroup: { gap: fiticianTokens.spacing[1] },
-  caseIdentity: { alignItems: "center", flex: 1, flexDirection: "row-reverse", gap: fiticianTokens.spacing[3], minWidth: 0 },
+  caseIdentity: { alignItems: "center", flex: 1, flexDirection: "row", gap: fiticianTokens.spacing[3], minWidth: 0 },
   catalogueList: { gap: fiticianTokens.spacing[2] },
   contextLabel: {
     color: fiticianTokens.colors.aqua,
@@ -1573,8 +1573,8 @@ const styles = StyleSheet.create({
   },
   nutrientRow: { alignItems: "center", borderTopColor: fiticianTokens.colors.line, borderTopWidth: 1, flexDirection: "row", gap: fiticianTokens.spacing[2], paddingTop: fiticianTokens.spacing[2] },
   orderCard: { borderTopColor: fiticianTokens.colors.line, borderTopWidth: 1, gap: fiticianTokens.spacing[2], paddingTop: fiticianTokens.spacing[3] },
-  orderHeader: { alignItems: "flex-start", flexDirection: "row-reverse", gap: fiticianTokens.spacing[2], justifyContent: "space-between" },
-  quantityRow: { alignItems: "flex-end", flexDirection: "row", gap: fiticianTokens.spacing[2] },
+  orderHeader: { alignItems: "flex-start", flexDirection: "row", gap: fiticianTokens.spacing[2], justifyContent: "space-between" },
+  quantityRow: { alignItems: "center", flexDirection: "row", gap: fiticianTokens.spacing[2] },
   queue: { gap: fiticianTokens.spacing[3] },
   queueItems: { gap: fiticianTokens.spacing[3] },
   queueMeta: {

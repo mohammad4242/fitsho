@@ -32,3 +32,14 @@ it("keeps physician-facing technical codes behind Persian presentation labels", 
   expect(source).not.toContain("status.replaceAll");
   expect(source).not.toContain("return error instanceof Error && error.message");
 });
+
+it("keeps physician review layout logical for native RTL", () => {
+  expect(source).not.toContain('flexDirection: "row-reverse"');
+  expect(source).not.toContain('alignItems: "flex-end"');
+  expect(source).toMatch(/caseIdentity: \{[^}]*flexDirection: "row"/);
+  expect(source).toMatch(/orderHeader: \{[^}]*flexDirection: "row"/);
+  expect(source).toMatch(/quantityRow: \{ alignItems: "center", flexDirection: "row"/);
+  expect(source).toMatch(
+    /<View style=\{styles\.orderHeader\}>\s*<View style=\{styles\.headerCopy\}>[\s\S]*?<Text style=\{styles\.status\}>/,
+  );
+});
