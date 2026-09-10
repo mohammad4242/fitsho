@@ -9,7 +9,7 @@ import { RTL_ROW } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import { getHomeHeroLayout } from "./homePresentation";
 
-export type WorkoutHomeState = "empty" | "error" | "loading" | "offline" | "ready" | "stale";
+export type WorkoutHomeState = "empty" | "error" | "loading" | "offline" | "pending" | "ready" | "stale";
 
 export interface WorkoutTodayCardProps {
   readonly day: WorkoutDay | null;
@@ -79,6 +79,7 @@ export function WorkoutTodayCard({ day, state }: WorkoutTodayCardProps) {
 }
 
 function stateLabel(state: WorkoutHomeState, hasDay: boolean): string {
+  if (state === "pending") return "در انتظار تأیید";
   if (state === "offline") return "آفلاین";
   if (state === "stale") return "ذخیره‌شده";
   if (state === "error") return "خطا";

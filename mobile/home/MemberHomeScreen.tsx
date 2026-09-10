@@ -11,6 +11,7 @@ import { createNutritionApi } from "../nutrition/nutritionApi";
 import { createNutritionPlanApi } from "../nutrition/nutritionPlanApi";
 import { createNutritionTrackingApi } from "../nutrition/nutritionTrackingApi";
 import { createWorkoutPlanApi } from "../workouts/workoutApi";
+import { findPendingWorkoutPlanId } from "../workouts/workoutModel";
 import { getMobileViewState, type MobileViewState } from "../ui/requestState";
 import { Notice, PageHeading } from "../ui/components";
 import { Screen } from "../ui/layout";
@@ -55,10 +56,23 @@ export function MemberHomeScreen() {
     queryFn: profileApi.getSharedProfile,
     queryKey: profileKeys.current(),
   });
-  const workoutQuery = useQuery({
+  const activeWorkoutQuery = useQuery({
     enabled: hasTraining,
     queryFn: workoutApi.getActive,
     queryKey: workoutKeys.plan("active"),
+  });
+  const shouldLoadWorkoutHistory = hasTraining && activeWorkoutQuery.data === null;
+  const workoutHistoryQuery = useQuery({
+    enabled: shouldLoadWorkoutHistory,
+    queryFn: workoutApi.getHistory,
+    queryKey: workoutKeys.plans(),
+  });
+  const pendingWorkoutPlanId = findPendingWorkoutPlanId(workoutHistoryQuery.data ?? []);
+  const shouldLoadPendingWorkout = activeWorkoutQuery.data === null && pendingWorkoutPlanId !== null;
+  const pendingWorkoutQuery = useQuery({
+    enabled: shouldLoadPendingWorkout,
+    queryFn: () => workoutApi.get(pendingWorkoutPlanId as string),
+    queryKey: workoutKeys.plan(pendingWorkoutPlanId ?? "pending"),
   });
   const nutritionPlanQuery = useQuery({
     enabled: hasNutrition,
@@ -76,7 +90,7 @@ export function MemberHomeScreen() {
     queryKey: nutritionKeys.tracking(today),
   });
 
-  const workoutViewState = getMobileViewState(workoutQuery, {
+  const activeWorkoutState = getMobileViewState(activeWorkoutQuery, {
     connectivityStatus,
     isEmpty: (data) => data === null,
   });
@@ -89,7 +103,12 @@ export function MemberHomeScreen() {
     isEmpty: (data) => data === null,
   });
   const trackingState = getMobileViewState(trackingQuery, { connectivityStatus });
-  const workoutPlan = viewData(workoutViewState);
+  const activeWorkoutPlan = viewData(activeWorkoutState);
+  const pendingWorkoutPlan = shouldLoadPendingWorkout
+    && pendingWorkoutQuery.data?.status === "pending_review"
+    ? pendingWorkoutQuery.data
+    : undefined;
+  const workoutPlan = activeWorkoutPlan ?? pendingWorkoutPlan;
   const nutritionPlan = viewData(nutritionPlanState);
   const nutritionEstimate = viewData(nutritionEstimateState);
   const tracking = viewData(trackingState);
@@ -101,7 +120,23 @@ export function MemberHomeScreen() {
   const nutritionHasError = [nutritionPlanState, nutritionEstimateState, trackingState]
     .some((state) => state.status === "error");
   const summary = nutritionSummary(nutritionPlan, nutritionEstimate, tracking, today);
-  const workoutState = resolveWorkoutState(workoutViewState);
+  const waitingForPendingWorkout = activeWorkoutState.status === "empty" && (
+    workoutHistoryQuery.isPending
+    || (pendingWorkoutPlanId !== null && pendingWorkoutQuery.isPending)
+  );
+  const pendingWorkoutFailed = activeWorkoutState.status === "empty"
+    && pendingWorkoutPlan === undefined
+    && (
+      workoutHistoryQuery.isError
+      || (pendingWorkoutPlanId !== null && pendingWorkoutQuery.isError)
+    );
+  const workoutState: WorkoutHomeState = pendingWorkoutPlan !== undefined
+    ? "pending"
+    : waitingForPendingWorkout
+      ? "loading"
+      : pendingWorkoutFailed
+        ? "error"
+        : resolveWorkoutState(activeWorkoutState);
   const displayName = sharedProfileQuery.data?.display_name?.trim()
     || snapshot.session.user?.email?.split("@", 1)[0]
     || "دوست";

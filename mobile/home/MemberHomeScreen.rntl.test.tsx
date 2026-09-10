@@ -6,6 +6,13 @@ jest.mock("@tanstack/react-query", () => ({ useQuery: jest.fn() }));
 jest.mock("expo-router", () => ({ useRouter: jest.fn() }));
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
+jest.mock("../exercises/ExerciseMedia", () => ({
+  ExerciseMedia: (props: Record<string, unknown>) => {
+    const ReactRuntime = require("react") as typeof import("react");
+    const ReactNative = require("react-native") as typeof import("react-native");
+    return ReactRuntime.createElement(ReactNative.View, props);
+  },
+}));
 jest.mock("../auth/MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
 jest.mock("../ui/navigation/RouteGuards", () => ({ useMobileRouteSnapshot: jest.fn() }));
 jest.mock("../platform/connectivity", () => ({
@@ -114,7 +121,11 @@ beforeEach(() => {
   } as never));
   mockUseRouter.mockReturnValue({ push: mockPush } as never);
   mockCreateProfileApi.mockReturnValue({ getSharedProfile: resolved({ display_name: "مریم" }) } as never);
-  mockCreateWorkoutApi.mockReturnValue({ getActive: resolved(null) } as never);
+  mockCreateWorkoutApi.mockReturnValue({
+    get: resolved(null),
+    getActive: resolved(null),
+    getHistory: resolved([]),
+  } as never);
   mockCreateNutritionApi.mockReturnValue({ getCurrentEstimate: resolved(null) } as never);
   mockCreateNutritionPlanApi.mockReturnValue({ getLatest: resolved(nutritionPlan) } as never);
   mockCreateNutritionTrackingApi.mockReturnValue({ getDailyTracking: resolved(dailyTracking) } as never);
@@ -157,4 +168,48 @@ test("hides nutrition dashboard content when the member selects training only", 
   expect(screen.getByRole("button", { name: "تحلیل بدن" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "ثبت غذا" })).toBeNull();
   expect(screen.queryByRole("button", { name: "نمایش جزئیات تغذیه" })).toBeNull();
+});
+
+test("previews a pending workout when no active plan exists", () => {
+  const pendingPlan = {
+    days: [{
+      day_number: 1,
+      estimated_duration_minutes: 52,
+      exercises: [{
+        exercise: {
+          media_path: "/media/exercises/pull-up.mp4",
+          media_type: "video",
+          name_en: "Close-grip pull-up",
+          name_fa: "بارفیکس دست جمع",
+        },
+      }],
+      title_en: "Upper body",
+      title_fa: "زیربغل + سینه + سرشانه",
+    }],
+    id: "pending-plan",
+    status: "pending_review",
+  };
+  mockUseQuery.mockImplementation(({ queryKey }) => {
+    const key = queryKey as readonly unknown[];
+    if (key[0] === "profile") return queryResult({ display_name: "مریم" });
+    if (key[0] === "workouts" && key[1] === "plan" && key[2] === "active") {
+      return queryResult(null);
+    }
+    if (key[0] === "workouts" && key[1] === "plans") {
+      return queryResult([{ id: "pending-plan", status: "pending_review" }]);
+    }
+    if (key[0] === "workouts" && key[1] === "plan" && key[2] === "pending-plan") {
+      return queryResult(pendingPlan);
+    }
+    if (key[0] === "nutrition" && key[1] === "plan") return queryResult(nutritionPlan);
+    if (key[0] === "nutrition" && key[1] === "estimate") return queryResult(null);
+    return queryResult(dailyTracking);
+  });
+
+  renderHome();
+
+  expect(screen.getByText("زیربغل + سینه + سرشانه")).toBeTruthy();
+  expect(screen.getByLabelText("رسانه تمرین بارفیکس دست جمع")).toBeTruthy();
+  expect(screen.getByText("در انتظار تأیید")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "مشاهده برنامه" })).toBeTruthy();
 });
