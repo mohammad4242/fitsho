@@ -82,3 +82,9 @@ it("keeps exercise catalogue and detail rows on native RTL ordering", async () =
   expect(detailSource).toContain('direction={language === "en" ? "ltr" : "rtl"}');
   expect(detailSource).toContain('language === "en" ? (');
 });
+
+it("keeps active catalogue filters in explicit RTL horizontal flow", async () => {
+  const source = await readFile(new URL("./ExerciseCatalogScreen.tsx", import.meta.url), "utf8");
+
+  expect(source).toContain('contentContainerStyle={[styles.activeFilterRow, RTL_ROW]}');
+});

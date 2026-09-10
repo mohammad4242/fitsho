@@ -7,6 +7,7 @@ import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import { Button, Card, Dialog, DisclosureCard, EmptyState, Notice, Sheet, Skeleton } from "../ui/components";
 import { getMobileViewState, mobileRequestErrorMessage, type MobileViewState } from "../ui/requestState";
+import { RTL_ROW } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import { canGenerateNutritionEstimate, formatNutritionNumber } from "./nutritionModel";
 import {
@@ -1086,7 +1087,11 @@ function DaySelector({
   readonly selectedDayIndex: number;
 }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.daySelector}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={[styles.daySelector, RTL_ROW]}
+    >
       {days.map((day, index) => (
         <Pressable
           accessibilityRole="tab"

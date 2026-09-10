@@ -40,6 +40,7 @@ import {
   TextField,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
+import { RTL_ROW } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import {
   createExerciseApi,
@@ -390,7 +391,7 @@ export function ExerciseCatalogScreen() {
         <View style={styles.activeFilters}>
           <Text accessibilityRole="header" style={styles.filterLabel}>فیلترهای فعال</Text>
           <ScrollView
-            contentContainerStyle={styles.activeFilterRow}
+            contentContainerStyle={[styles.activeFilterRow, RTL_ROW]}
             horizontal
             showsHorizontalScrollIndicator={false}
           >

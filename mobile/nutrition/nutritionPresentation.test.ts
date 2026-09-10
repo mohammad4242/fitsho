@@ -54,3 +54,9 @@ it("passes contract images to native thumbnails for catalogues, meals, and repla
   expect(plan).toContain("imageUrl={option.image_url}");
   expect(plan).toContain("<DisclosureCard");
 });
+
+it("keeps the nutrition day selector in explicit RTL horizontal flow", async () => {
+  const source = await readFile(new URL("./NutritionPlanSection.tsx", import.meta.url), "utf8");
+
+  expect(source).toContain('contentContainerStyle={[styles.daySelector, RTL_ROW]}');
+});
