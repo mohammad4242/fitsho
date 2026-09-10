@@ -136,11 +136,11 @@ function AdherenceDayCard({
   return (
     <View style={styles.dayCard}>
       <View style={styles.sectionHeading}>
-        <Text style={styles.dayDate}>{day.date}</Text>
         <View style={styles.headingCopy}>
           <Text style={styles.entryTitle}>{checkInStatusLabel(day.check_in_status)}</Text>
           <Text style={styles.mutedText}>{trackingDataStatusLabel(day.status)}</Text>
         </View>
+        <Text style={styles.dayDate}>{day.date}</Text>
       </View>
       {day.status === "insufficient_data" ? (
         <Notice message="برای این روز داده کافی برای محاسبه پایبندی وجود ندارد." variant="warning" />
@@ -161,8 +161,8 @@ function AdherenceMetric({ label, value }: { readonly label: string; readonly va
   return (
     <View style={styles.metricBlock}>
       <View style={styles.metricLabelRow}>
-        <Text style={styles.metricValue}>{adherencePercentLabel(value)}</Text>
         <Text style={styles.bodyText}>{label}</Text>
+        <Text style={styles.metricValue}>{adherencePercentLabel(value)}</Text>
       </View>
       <View accessibilityLabel={`${label}: ${adherencePercentLabel(value)}`} style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${numeric ?? 0}%` }]} />
@@ -174,11 +174,11 @@ function AdherenceMetric({ label, value }: { readonly label: string; readonly va
 function HistoryRow({ day }: { readonly day: NutritionDailyTracking }) {
   return (
     <View style={styles.historyRow}>
-      <Text style={styles.historyCount}>{formatNutritionNumber(day.entries.length)} مورد</Text>
       <View style={styles.headingCopy}>
         <Text style={styles.entryTitle}>{day.entry_date}</Text>
         <Text style={styles.mutedText}>{checkInStatusLabel(day.check_in_status)}</Text>
       </View>
+      <Text style={styles.historyCount}>{formatNutritionNumber(day.entries.length)} مورد</Text>
     </View>
   );
 }
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
   },
   headingCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     padding: fiticianTokens.spacing[3],
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   metricBlock: {
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   },
   metricLabelRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   metricValue: {
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },

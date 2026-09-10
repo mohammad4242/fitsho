@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     minHeight: 72,
     paddingHorizontal: fiticianTokens.spacing[3],
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   },
   itemTitleRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },

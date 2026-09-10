@@ -481,8 +481,8 @@ function LabRequestsCard({
           {requests.map((request) => (
             <View key={request.id} style={styles.itemCard}>
               <View style={styles.rowBetween}>
-                <Text style={styles.statusText}>{labRequestStatusLabel(request.status)}</Text>
                 <Text style={styles.itemTitle}>{request.requested_tests.join("، ")}</Text>
+                <Text style={styles.statusText}>{labRequestStatusLabel(request.status)}</Text>
               </View>
               {request.user_visible_reason ? <Text style={styles.bodyText}>{request.user_visible_reason}</Text> : null}
             </View>
@@ -520,8 +520,8 @@ function LabDocumentsCard({
   return (
     <Card style={styles.card}>
       <View style={styles.rowBetween}>
-        <Text style={styles.count}>{formatNutritionNumber(documents.length)} فایل</Text>
         <Text style={styles.cardTitle}>پرونده‌های آزمایش</Text>
+        <Text style={styles.count}>{formatNutritionNumber(documents.length)} فایل</Text>
       </View>
       {state.status === "offline" || state.status === "stale" ? <Notice message="آخرین فهرست پرونده‌ها نمایش داده می‌شود." variant="offline" /> : null}
       {error !== null ? <Notice message={error} variant="danger" /> : null}
@@ -532,11 +532,11 @@ function LabDocumentsCard({
           {documents.map((document) => (
             <View key={document.id} style={styles.itemCard}>
               <View style={styles.rowBetween}>
-                <Text style={styles.statusText}>{labReviewStatusLabel(document.review_status)}</Text>
                 <View style={styles.headingCopy}>
                   <Text style={styles.itemTitle}>{document.original_filename}</Text>
                   <Text style={styles.mutedText}>{document.content_type} · {formatBytes(document.byte_size)}</Text>
                 </View>
+                <Text style={styles.statusText}>{labReviewStatusLabel(document.review_status)}</Text>
               </View>
               <View style={styles.metaStack}>
                 <Text style={styles.mutedText}>تاریخ: {document.test_date ?? "ثبت نشده"}</Text>
@@ -614,8 +614,8 @@ function SupplementOrdersCard({
             return (
               <View key={order.id} style={styles.itemCard}>
                 <View style={styles.rowBetween}>
-                  <Text style={styles.statusText}>{supplementStatusLabel(order.status)}</Text>
                   <Text style={styles.itemTitle}>{order.name}</Text>
+                  <Text style={styles.statusText}>{supplementStatusLabel(order.status)}</Text>
                 </View>
                 <Text style={styles.bodyText}>
                   {order.dose_amount === null ? "—" : formatNutritionNumber(order.dose_amount)} {order.dose_unit ?? ""} · {order.frequency ?? "دفعات ثبت نشده"}
@@ -662,8 +662,8 @@ function ContributionRows({ values }: { readonly values: Readonly<Record<string,
     <View style={styles.contributionStack}>
       {rows.map(([code, value]) => (
         <View key={code} style={styles.contributionRow}>
-          <Text style={styles.summaryValue}>{value}</Text>
           <Text style={styles.summaryLabel}>{contributionLabels[code] ?? "سایر مواد مغذی"}</Text>
+          <Text style={styles.summaryValue}>{value}</Text>
         </View>
       ))}
     </View>
@@ -733,7 +733,7 @@ function useConnectivityStatus(): ConnectivityStatus {
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -774,7 +774,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     padding: fiticianTokens.spacing[3],
   },
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
   },
   headingCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
   },
   rowBetween: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   summaryLabel: {

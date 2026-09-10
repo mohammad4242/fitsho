@@ -79,8 +79,8 @@ export function NutritionScienceDetails({ estimate }: { readonly estimate: Nutri
 function ScienceLink({ label, onPress }: { readonly label: string; readonly onPress: () => void }) {
   return (
     <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={styles.linkWrap}>
-      <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
       <Text style={styles.linkText}>{label}</Text>
+      <AppIcon color={fiticianTokens.colors.aqua} name="arrowLeft" size={fiticianTokens.iconSize.sm} />
     </Pressable>
   );
 }
@@ -98,8 +98,8 @@ function TargetCard({ note, title, value }: { readonly note: string; readonly ti
 function MetadataRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <View style={styles.metadataRow}>
-      <Text style={styles.metadataValue}>{value}</Text>
       <Text style={styles.metadataLabel}>{label}</Text>
+      <Text style={styles.metadataValue}>{value}</Text>
     </View>
   );
 }
@@ -157,12 +157,12 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
     paddingHorizontal: fiticianTokens.spacing[2],
   },
   links: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   metadata: {
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   metadataRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   metadataValue: {
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[3],
   },
   micronutrientGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[3],
   },
   targetGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },

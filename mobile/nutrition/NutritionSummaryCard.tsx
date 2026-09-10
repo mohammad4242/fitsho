@@ -207,7 +207,6 @@ function LegacyNutritionSummaryCard({
       variant="hero"
     >
       <View style={styles.legacyHomeHeader}>
-        <MetricRing label="پیشرفت کالری امروز" progress={summary.progress} size={84} />
         <View style={styles.legacyHomeCopy}>
           <Text style={styles.cardEyebrow}>هدف کالری روزانه</Text>
           <Text style={styles.calorieValue}>
@@ -222,6 +221,7 @@ function LegacyNutritionSummaryCard({
             </Text>
           ) : null}
         </View>
+        <MetricRing label="پیشرفت کالری امروز" progress={summary.progress} size={84} />
       </View>
       {error ? <Notice compact message="داده‌های تغذیه کامل دریافت نشدند." variant="warning" /> : null}
       <View style={styles.legacyMacroRow}>
@@ -286,14 +286,14 @@ const summaryStyles = StyleSheet.create({
     color: fiticianTokens.colors.blue,
   },
   breakdownLegend: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
     marginTop: fiticianTokens.spacing[1],
   },
   breakdownItem: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[1],
   },
   breakdownText: {
@@ -328,7 +328,7 @@ const summaryStyles = StyleSheet.create({
     alignItems: "center",
     borderTopColor: fiticianTokens.colors.line,
     borderTopWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 42,
     paddingHorizontal: fiticianTokens.spacing[4],
@@ -336,14 +336,14 @@ const summaryStyles = StyleSheet.create({
   energyItem: {
     alignItems: "center",
     flex: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     minWidth: 0,
     padding: fiticianTokens.spacing[4],
   },
   macroCell: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
     minWidth: 0,
@@ -361,7 +361,7 @@ const summaryStyles = StyleSheet.create({
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
     borderTopColor: fiticianTokens.colors.line,
     borderTopWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
   },
   macroValue: {
     color: fiticianTokens.colors.ink,
@@ -377,7 +377,7 @@ const summaryStyles = StyleSheet.create({
     flexDirection: "column",
   },
   targetCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
     minWidth: 0,
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -448,11 +448,11 @@ const styles = StyleSheet.create({
   },
   legacyHomeHeader: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   legacyMacroRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   metric: {
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   metricGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   metricLabel: {
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   progressBlock: {
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
   },
   progressLabels: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   section: {
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],

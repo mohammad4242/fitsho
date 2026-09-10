@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
+import { StyleSheet } from "react-native";
 
 jest.mock("@tanstack/react-query", () => ({ useQueryClient: jest.fn(() => ({ invalidateQueries: jest.fn() })) }));
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
@@ -64,6 +65,7 @@ test("keeps the RTL title group intact before the opposite-side mode controls", 
   expect(titleGroup).not.toBeNull();
   if (titleGroup === undefined || titleGroup === null) throw new Error("Title group was not rendered");
 
-  expect(titleGroup.props.style).toMatchObject({ flexDirection: "row", flexWrap: "wrap" });
+  expect(StyleSheet.flatten(titleGroup.props.style)).toMatchObject({ flexDirection: "row", flexWrap: "wrap" });
+  expect(StyleSheet.flatten(titleGroup.props.style)).not.toMatchObject({ direction: "rtl" });
   expect(titleGroup.parent?.props.style).toMatchObject({ flexDirection: "row", flexWrap: "wrap" });
 });

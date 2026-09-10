@@ -462,8 +462,8 @@ export function NutritionTrackingSection() {
           <Metric label="ثبت‌ها" value={formatNutritionNumber(daily.entries.length)} unit="" />
         </View>
         <View style={styles.dataStatusRow}>
-          <Text style={styles.statusText}>{trackingDataStatusLabel(daily.data_status)}</Text>
           <Text style={styles.mutedText}>کیفیت داده</Text>
+          <Text style={styles.statusText}>{trackingDataStatusLabel(daily.data_status)}</Text>
         </View>
       </Card>
 
@@ -956,7 +956,7 @@ const styles = StyleSheet.create({
     paddingVertical: fiticianTokens.spacing[2],
   },
   choiceRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -976,14 +976,14 @@ const styles = StyleSheet.create({
   },
   consentRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
   },
   dataStatusRow: {
     borderTopColor: fiticianTokens.colors.line,
     borderTopWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     paddingTop: fiticianTokens.spacing[3],
   },
@@ -1007,7 +1007,7 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[3],
   },
   entryMeta: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[3],
     justifyContent: "flex-start",
@@ -1043,7 +1043,7 @@ const styles = StyleSheet.create({
     paddingVertical: fiticianTokens.spacing[2],
   },
   foodChoiceRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -1059,22 +1059,22 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   headingCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
   inlineFields: {
-    alignItems: "flex-end",
-    flexDirection: "row-reverse",
+    alignItems: "center",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   metric: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
   metricRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   metricValue: {
@@ -1100,7 +1100,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   photoActions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   photoItem: {
@@ -1111,7 +1111,7 @@ const styles = StyleSheet.create({
     padding: fiticianTokens.spacing[3],
   },
   photoItemActions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   photoItems: {
@@ -1125,7 +1125,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -1133,7 +1133,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.success,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   summaryCard: {
@@ -1142,7 +1142,7 @@ const styles = StyleSheet.create({
   },
   summaryHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   recentRow: {

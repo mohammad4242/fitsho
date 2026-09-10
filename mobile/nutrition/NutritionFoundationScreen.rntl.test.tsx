@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native";
+import type { ReactTestInstance } from "react-test-renderer";
 
 jest.mock("@tanstack/react-query", () => ({
   useMutation: jest.fn(() => ({ isPending: false, mutate: jest.fn() })),
@@ -43,6 +45,16 @@ const mockUseRouter = jest.mocked(useRouter);
 const mockUseMobileAuth = jest.mocked(useMobileAuth);
 const mockCreateNutritionApi = jest.mocked(createNutritionApi);
 
+function findAncestorStyle(node: ReactTestInstance, key: string): Record<string, unknown> {
+  let current = node.parent;
+  while (current !== null) {
+    const style = StyleSheet.flatten(current.props.style) as Record<string, unknown> | undefined;
+    if (style?.[key] !== undefined) return style;
+    current = current.parent;
+  }
+  throw new Error(`Ancestor style ${key} not found`);
+}
+
 beforeEach(() => {
   mockPush.mockClear();
   mockUseRouter.mockReturnValue({ push: mockPush } as never);
@@ -72,6 +84,8 @@ test("keeps only web-equivalent daily navigation actions above the nutrition sum
   expect(screen.getByRole("button", { name: "کاتالوگ" })).toBeTruthy();
   expect(screen.getByText("هنوز برآوردی ثبت نشده")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "برنامه غذایی" })).toBeNull();
+  expect(findAncestorStyle(screen.getByText("ثبت تغذیه"), "alignItems")).toMatchObject({ alignItems: "stretch" });
+  expect(findAncestorStyle(screen.getByText("ثبت تغذیه"), "flexDirection")).toMatchObject({ flexDirection: "row" });
 
   fireEvent.press(screen.getByRole("button", { name: "ثبت تغذیه" }));
   expect(mockPush).toHaveBeenCalledWith("/member/nutrition-tracking");

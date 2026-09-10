@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     minHeight: 58,
     paddingHorizontal: fiticianTokens.spacing[3],
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
   row: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     minHeight: 46,

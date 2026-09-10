@@ -244,7 +244,6 @@ function FoodCatalogueCard({ food, onPress }: { readonly food: FoodCatalogueItem
   return (
     <Card onPress={onPress} style={styles.catalogueCard} variant="interactive">
       <View style={styles.catalogueIdentity}>
-        <NutritionThumbnail imageUrl={food.image_url} name={food.name_fa} shape="circle" style={styles.catalogueThumbnail} />
         <View style={styles.cardHeading}>
           <View style={styles.cardCopy}>
             <Text style={styles.cardTitle}>{food.name_fa}</Text>
@@ -252,6 +251,7 @@ function FoodCatalogueCard({ food, onPress }: { readonly food: FoodCatalogueItem
           </View>
           <Text style={styles.category}>{foodCatalogueCategoryLabel(food.category)}</Text>
         </View>
+        <NutritionThumbnail imageUrl={food.image_url} name={food.name_fa} shape="circle" style={styles.catalogueThumbnail} />
       </View>
       <View style={styles.macroRow}>
         {foodCatalogueMacroRows(food).slice(0, 4).map((macro) => (
@@ -273,7 +273,6 @@ function MealCatalogueCard({ meal, onPress }: { readonly meal: MealCatalogueItem
   return (
     <Card onPress={onPress} style={styles.catalogueCard} variant="interactive">
       <View style={styles.catalogueIdentity}>
-        <NutritionThumbnail imageUrl={meal.image_url} name={meal.name_fa} style={styles.catalogueThumbnail} />
         <View style={styles.cardHeading}>
           <View style={styles.cardCopy}>
             <Text style={styles.cardTitle}>{meal.name_fa}</Text>
@@ -281,6 +280,7 @@ function MealCatalogueCard({ meal, onPress }: { readonly meal: MealCatalogueItem
           </View>
           <Text style={styles.category}>{mealCatalogueCategoryLabel(meal.category)}</Text>
         </View>
+        <NutritionThumbnail imageUrl={meal.image_url} name={meal.name_fa} style={styles.catalogueThumbnail} />
       </View>
       <Text style={styles.portionHint}>{formatPersianNumber(meal.items.length, { maximumFractionDigits: 0 })} ماده تأییدشده در این وعده</Text>
       {prepared ? <Notice message={prepared.message} title={prepared.title} variant="info" /> : null}
@@ -394,8 +394,8 @@ function Chip({ label, onPress, selected }: { readonly label: string; readonly o
 function SummaryRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <View style={styles.summaryRow}>
-      <Text style={styles.summaryValue}>{value}</Text>
       <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
     </View>
   );
 }
@@ -422,7 +422,7 @@ function useConnectivityStatus(): ConnectivityStatus {
 
 const styles = StyleSheet.create({
   cardCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   },
   cardHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   },
   catalogueIdentity: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   catalogueThumbnail: {
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   chip: {
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   chipRow: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     padding: fiticianTokens.spacing[3],
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   macroRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     padding: fiticianTokens.spacing[3],
   },
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
 });

@@ -200,7 +200,7 @@ function NutritionDailyTools({
         variant="hero"
       >
         <View style={styles.dailyToolCopy}>
-          <AppIcon color={fiticianTokens.colors.aqua} name="nutrition" size={fiticianTokens.iconSize.lg} />
+          <AppIcon color={fiticianTokens.colors.aqua} name="nutrition" size={fiticianTokens.iconSize.lg} style={styles.dailyToolIcon} />
           <Text style={styles.dailyToolTitle}>ثبت تغذیه</Text>
           <Text style={styles.dailyToolSubtitle}>دستی یا با عکس</Text>
         </View>
@@ -213,7 +213,7 @@ function NutritionDailyTools({
         variant="interactive"
       >
         <View style={styles.dailyToolCopy}>
-          <AppIcon color={fiticianTokens.colors.amber} name="foodLog" size={fiticianTokens.iconSize.lg} />
+          <AppIcon color={fiticianTokens.colors.amber} name="foodLog" size={fiticianTokens.iconSize.lg} style={styles.dailyToolIcon} />
           <Text style={styles.dailyToolTitle}>کاتالوگ</Text>
           <Text style={styles.dailyToolSubtitle}>مرجع مواد غذایی</Text>
         </View>
@@ -651,8 +651,8 @@ export function NutritionEstimateSection({
 function TargetRow({ row }: { readonly row: NutritionTargetRow }) {
   return (
     <View style={styles.targetRow}>
-      <Text style={styles.targetValue}>{targetValueLabel(row)}</Text>
       <Text style={styles.targetLabel}>{row.label}</Text>
+      <Text style={styles.targetValue}>{targetValueLabel(row)}</Text>
     </View>
   );
 }
@@ -722,8 +722,8 @@ function SafetyToggle({
 function SummaryRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <View style={styles.summaryRow}>
-      <Text style={styles.bodyText}>{value}</Text>
       <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.bodyText}>{value}</Text>
     </View>
   );
 }
@@ -791,19 +791,19 @@ const styles = StyleSheet.create({
   dailyToolCard: {
     alignItems: "center",
     flex: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     minHeight: 58,
     padding: fiticianTokens.spacing[3],
   },
   dailyToolCopy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
   dailyTools: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   dailyToolSubtitle: {
@@ -821,6 +821,9 @@ const styles = StyleSheet.create({
     textAlign: "right",
     writingDirection: "rtl",
   },
+  dailyToolIcon: {
+    alignSelf: "flex-start",
+  },
   estimateStateCard: {
     gap: fiticianTokens.spacing[3],
     marginBottom: fiticianTokens.spacing[1],
@@ -836,7 +839,7 @@ const styles = StyleSheet.create({
   },
   choiceRow: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -880,7 +883,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     alignItems: "flex-start",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -913,7 +916,7 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   targetGrid: {
@@ -932,7 +935,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.small,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     padding: fiticianTokens.spacing[3],
   },
@@ -954,7 +957,7 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
   },

@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { afterEach, beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native";
+import type { ReactTestInstance } from "react-test-renderer";
 
 jest.mock("@tanstack/react-query", () => ({ useQuery: jest.fn(), useQueryClient: jest.fn() }));
 jest.mock("expo-file-system", () => ({ File: class {} }));
@@ -102,6 +104,16 @@ type TrackingApiDouble = {
 
 let trackingApi: TrackingApiDouble;
 
+function findAncestorStyle(node: ReactTestInstance, key: string): Record<string, unknown> {
+  let current = node.parent;
+  while (current !== null) {
+    const style = StyleSheet.flatten(current.props.style) as Record<string, unknown> | undefined;
+    if (style?.[key] !== undefined) return style;
+    current = current.parent;
+  }
+  throw new Error(`Ancestor style ${key} not found`);
+}
+
 function queryResult<T>(data: T) {
   return {
     data,
@@ -159,6 +171,7 @@ test("shows the web-aligned heading and real nutrition targets before entry tool
   expect(screen.getByRole("header", { name: "ثبت تغذیه" })).toBeTruthy();
   expect(screen.getAllByText(/هدف برنامه/)).toHaveLength(2);
   expect(screen.getByText("عکس وعده")).toBeTruthy();
+  expect(findAncestorStyle(screen.getByText("مصرف واقعی امروز"), "flexDirection")).toMatchObject({ flexDirection: "row" });
 });
 
 afterEach(() => {

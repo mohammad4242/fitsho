@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StyleSheet } from "react-native";
+import type { ReactTestInstance } from "react-test-renderer";
 
 jest.mock("@tanstack/react-query", () => ({ useQuery: jest.fn() }));
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
@@ -82,6 +84,16 @@ function renderCatalogue(initialMode: "foods" | "meals") {
   );
 }
 
+function findAncestorStyle(node: ReactTestInstance, key: string): Record<string, unknown> {
+  let current = node.parent;
+  while (current !== null) {
+    const style = StyleSheet.flatten(current.props.style) as Record<string, unknown> | undefined;
+    if (style?.[key] !== undefined) return style;
+    current = current.parent;
+  }
+  throw new Error(`Ancestor style ${key} not found`);
+}
+
 beforeEach(() => {
   mockCreateCatalogueApi.mockReturnValue({
     getFoodCatalogue: jest.fn(),
@@ -121,4 +133,5 @@ test("dedicated food mode keeps search and category before phone-friendly cards"
   fireEvent.press(screen.getByText("عدس"));
 
   expect(screen.getByText("ماکروها در ۱۰۰ گرم")).toBeTruthy();
+  expect(findAncestorStyle(screen.getByText("عدس"), "flexDirection")).toMatchObject({ flexDirection: "row" });
 });

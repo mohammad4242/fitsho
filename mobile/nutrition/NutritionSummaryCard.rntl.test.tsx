@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
 import { useQuery } from "@tanstack/react-query";
+import { StyleSheet } from "react-native";
+import type { ReactTestInstance } from "react-test-renderer";
 
 jest.mock("@tanstack/react-query", () => ({
   useQuery: jest.fn(() => ({
@@ -22,6 +24,16 @@ import { NutritionSummaryCard } from "./NutritionSummaryCard";
 import type { NutritionEstimate } from "./nutritionApi";
 
 const mockUseQuery = jest.mocked(useQuery);
+
+function findAncestorStyle(node: ReactTestInstance, key: string): Record<string, unknown> {
+  let current = node.parent;
+  while (current !== null) {
+    const style = StyleSheet.flatten(current.props.style) as Record<string, unknown> | undefined;
+    if (style?.[key] !== undefined) return style;
+    current = current.parent;
+  }
+  throw new Error(`Ancestor style ${key} not found`);
+}
 
 const estimate = {
   confidence: "high",
@@ -59,6 +71,7 @@ test("renders target calorie and TDEE rings with the web macro strip", async () 
   expect(screen.getByText("پروتئین")).toBeTruthy();
   expect(screen.getByText("کربوهیدرات")).toBeTruthy();
   expect(screen.getByText("چربی")).toBeTruthy();
+  expect(findAncestorStyle(screen.getByText("کالری هدف"), "alignItems")).toMatchObject({ alignItems: "stretch" });
 });
 
 test("uses the web minimum-to-maximum fallback when a macro has no preferred target", () => {
