@@ -193,7 +193,12 @@ it("uploads binary parts without constructing an ArrayBuffer-backed Blob", async
     name: "body-front.jpg",
     type: "image/jpeg",
   });
-  expect((formData.parts[0]?.[1] as { uri?: string }).uri).toContain("file:///cache/");
-  expect(formData.parts[0]?.[1]).not.toHaveProperty("bytes");
+  const nativeValue = formData.parts[0]?.[1] as {
+    bytes?: () => Promise<Uint8Array>;
+    uri?: string;
+  };
+  expect(nativeValue.uri).toContain("file:///cache/");
+  expect(nativeValue.bytes).toBeTypeOf("function");
+  await expect(nativeValue.bytes!()).resolves.toEqual(Uint8Array.from([1, 2, 3]));
   expect(fileSystem.fileWrite).toHaveBeenCalledWith(Uint8Array.from([1, 2, 3]));
 });

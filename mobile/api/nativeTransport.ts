@@ -27,6 +27,7 @@ export interface NativeTransportOptions {
 }
 
 type NativeFileFormDataValue = {
+  readonly bytes: () => Promise<Uint8Array>;
   readonly name: string;
   readonly type: string;
   readonly uri: string;
@@ -139,6 +140,7 @@ function bytesToNativeFile(part: MultipartPart): {
   return {
     file,
     value: {
+      bytes: () => file.bytes(),
       name: part.filename ?? "upload.bin",
       type: part.contentType ?? "application/octet-stream",
       uri: file.uri,
