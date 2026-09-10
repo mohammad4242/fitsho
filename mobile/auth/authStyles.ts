@@ -3,52 +3,21 @@ import { StyleSheet } from "react-native";
 import { fiticianTokens } from "../ui/tokens";
 
 export const authStyles = StyleSheet.create({
-  accentRule: {
-    alignItems: "flex-start",
-    backgroundColor: fiticianTokens.colors.line,
-    height: 2,
-    overflow: "hidden",
-    width: "100%",
-  },
-  accentRuleFill: {
-    backgroundColor: fiticianTokens.colors.aqua,
-    height: "100%",
-    width: "24%",
-  },
   brand: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
-    fontSize: fiticianTokens.typography.fontSize.sm,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.h3,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    letterSpacing: 1.4,
-    textAlign: "left",
-    writingDirection: "ltr",
-  },
-  brandIcon: {
-    color: fiticianTokens.colors.aqua,
-  },
-  brandLockup: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[2],
-  },
-  brandMark: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    borderColor: fiticianTokens.colors.lineStrong,
-    borderRadius: fiticianTokens.radii.small,
-    borderWidth: 1,
-    height: 30,
-    justifyContent: "center",
-    width: 30,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   brandRow: {
     alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    width: "100%",
   },
   content: {
-    gap: fiticianTokens.spacing[4],
+    gap: fiticianTokens.spacing[5],
     width: "100%",
   },
   divider: {
@@ -65,6 +34,22 @@ export const authStyles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  fieldHeading: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+  },
+  fieldLabel: {
+    color: fiticianTokens.colors.ink,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.medium,
+    textAlign: "right",
     writingDirection: "rtl",
   },
   footer: {
@@ -82,22 +67,8 @@ export const authStyles = StyleSheet.create({
   formSection: {
     gap: fiticianTokens.spacing[4],
   },
-  fieldHeading: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-  },
-  fieldLabel: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.medium,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
   heading: {
-    marginTop: fiticianTokens.spacing[4],
+    marginTop: fiticianTokens.spacing[3],
   },
   inlineLink: {
     color: fiticianTokens.colors.aqua,
@@ -124,15 +95,8 @@ export const authStyles = StyleSheet.create({
   panel: {
     alignSelf: "center",
     gap: fiticianTokens.spacing[4],
-    maxWidth: 440,
+    maxWidth: 432,
     width: "100%",
-  },
-  productTag: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "right",
-    writingDirection: "rtl",
   },
   screen: {
     paddingBottom: fiticianTokens.spacing[7],

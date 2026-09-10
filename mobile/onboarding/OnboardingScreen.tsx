@@ -283,7 +283,13 @@ export function OnboardingScreen() {
             if (publicDraft.status === "valid") {
               const hydratedState = await hydratePublicOnboardingState(nextController, publicDraft.state);
               await publicDraftStore.clear();
-              if (active) setState(hydratedState);
+              if (active) {
+                setState(hydratedState);
+                if (hydratedState.mode === "training" && hydratedState.step === "complete") {
+                  await refreshProfileStatus();
+                  if (active) router.replace("/member");
+                }
+              }
             }
           } catch (handoffError) {
             if (active) setError(onboardingErrorMessage(handoffError));
@@ -300,7 +306,7 @@ export function OnboardingScreen() {
       active = false;
       if (opened !== null) void opened.database.closeAsync();
     };
-  }, [api, publicDraftStore, publicOnboardingSource, userId]);
+  }, [api, publicDraftStore, publicOnboardingSource, refreshProfileStatus, router, userId]);
 
   const run = useCallback(
     async (action: (activeController: NativeOnboardingController) => Promise<OnboardingState>) => {

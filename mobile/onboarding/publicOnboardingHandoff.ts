@@ -11,7 +11,15 @@ export async function hydratePublicOnboardingState(
     return current;
   }
 
-  if (draft.step !== "review" || draft.mode === null || draft.shared === null) {
+  if (
+    (draft.step !== "nutrition_preferences" && draft.step !== "review")
+    || draft.mode === null
+    || draft.shared === null
+  ) {
+    throw new Error("Public onboarding draft is incomplete");
+  }
+
+  if (draft.mode === "training" && draft.step !== "review") {
     throw new Error("Public onboarding draft is incomplete");
   }
 
@@ -21,8 +29,9 @@ export async function hydratePublicOnboardingState(
   if (draft.mode === "training") {
     if (draft.training === null) throw new Error("Public onboarding draft is incomplete");
     await controller.saveTrainingProfile(draft.training);
+    return controller.complete();
   } else {
-    if (draft.safety === null || draft.nutritionBasics === null || draft.nutrition === null) {
+    if (draft.safety === null || draft.nutritionBasics === null) {
       throw new Error("Public onboarding draft is incomplete");
     }
     const safety = await controller.saveNutritionSafety(draft.safety);
@@ -36,8 +45,12 @@ export async function hydratePublicOnboardingState(
       await controller.saveExerciseContext(draft.structuredExercise);
     }
     await controller.saveNutritionBasics(draft.nutritionBasics);
-    await controller.saveNutritionProfile(draft.nutrition);
+    if (draft.step === "review") {
+      if (draft.nutrition === null) throw new Error("Public onboarding draft is incomplete");
+      await controller.saveNutritionProfile(draft.nutrition);
+      return controller.complete();
+    }
   }
 
-  return controller.complete();
+  return controller.getState();
 }

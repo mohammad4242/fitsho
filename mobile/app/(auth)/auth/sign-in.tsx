@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -11,9 +11,14 @@ import { authErrorMessage } from "../../../auth/authError";
 import { authStyles } from "../../../auth/authStyles";
 import { useGoogleSignIn } from "../../../auth/GoogleSignIn";
 import { useMobileAuth } from "../../../auth/MobileAuthProvider";
-import { normalizePhoneNumber, validateEmail, validatePhoneNumber } from "../../../auth/validation";
+import { normalizePhoneNumber, validateEmail, validateOtpCode, validatePassword, validatePhoneNumber } from "../../../auth/validation";
 
 type SignInMode = "email" | "phone";
+type PhoneStep = "request" | "verify";
+
+function faNumber(value: number): string {
+  return new Intl.NumberFormat("fa-IR").format(value);
+}
 
 interface EmailSignInFormValues {
   email: string;
@@ -21,6 +26,7 @@ interface EmailSignInFormValues {
 }
 
 interface PhoneSignInFormValues {
+  code: string;
   phoneNumber: string;
 }
 
@@ -30,13 +36,19 @@ export default function SignInScreen() {
   const google = useGoogleSignIn();
   const params = useLocalSearchParams<{ reason?: string; source?: string }>();
   const [mode, setMode] = useState<SignInMode>("email");
+  const [phoneStep, setPhoneStep] = useState<PhoneStep>("request");
+  const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [googleBusy, setGoogleBusy] = useState(false);
-  const emailForm = useForm<EmailSignInFormValues>({
-    defaultValues: { email: "", password: "" },
-  });
-  const phoneForm = useForm<PhoneSignInFormValues>({ defaultValues: { phoneNumber: "" } });
+  const emailForm = useForm<EmailSignInFormValues>({ defaultValues: { email: "", password: "" } });
+  const phoneForm = useForm<PhoneSignInFormValues>({ defaultValues: { code: "", phoneNumber: "" } });
   const sessionExpired = params.reason === "session-expired" || auth.sessionExpired;
+
+  useEffect(() => {
+    if (countdown <= 0) return undefined;
+    const timer = setInterval(() => setCountdown((current) => Math.max(0, current - 1)), 1_000);
+    return () => clearInterval(timer);
+  }, [countdown]);
 
   const submitEmail = emailForm.handleSubmit(async (values) => {
     setError(null);
@@ -48,12 +60,28 @@ export default function SignInScreen() {
     }
   });
 
-  const submitPhone = phoneForm.handleSubmit(async ({ phoneNumber }) => {
+  const submitPhone = phoneForm.handleSubmit(async ({ code, phoneNumber }) => {
     setError(null);
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (phoneStep === "request") {
+      try {
+        const result = await auth.sendPhoneOtp(normalizedPhone);
+        phoneForm.setValue("phoneNumber", normalizedPhone, { shouldValidate: true });
+        setPhoneStep("verify");
+        setCountdown(result.retry_after_seconds);
+      } catch (submissionError) {
+        setError(authErrorMessage(submissionError, "otp"));
+      }
+      return;
+    }
+    const otpError = validateOtpCode(code);
+    if (otpError) {
+      setError(otpError);
+      return;
+    }
     try {
-      const normalizedPhone = normalizePhoneNumber(phoneNumber);
-      await auth.sendPhoneOtp(normalizedPhone);
-      router.push({ pathname: "/auth/phone-otp", params: { phoneNumber: normalizedPhone, ...publicOnboardingParams(params.source) } });
+      await auth.verifyPhoneOtp(normalizedPhone, normalizePhoneNumber(code));
+      router.replace(onboardingRoute(params.source));
     } catch (submissionError) {
       setError(authErrorMessage(submissionError, "otp"));
     }
@@ -70,6 +98,15 @@ export default function SignInScreen() {
     } finally {
       setGoogleBusy(false);
     }
+  };
+
+  const resendPhoneCode = () => {
+    const phoneNumber = normalizePhoneNumber(phoneForm.getValues("phoneNumber"));
+    if (countdown > 0 || validatePhoneNumber(phoneNumber)) return;
+    setError(null);
+    void auth.sendPhoneOtp(phoneNumber)
+      .then((result) => setCountdown(result.retry_after_seconds))
+      .catch((submissionError) => setError(authErrorMessage(submissionError, "otp")));
   };
 
   return (
@@ -94,6 +131,7 @@ export default function SignInScreen() {
           ]}
           selectedValue={mode}
         />
+
         {mode === "email" ? (
           <AuthFormSection>
             <Controller
@@ -117,17 +155,14 @@ export default function SignInScreen() {
             />
             <View style={authStyles.fieldHeading}>
               <Text style={authStyles.fieldLabel}>{authCopy.common.password}</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push({ pathname: "/auth/forgot-password", params: publicOnboardingParams(params.source) })}
-              >
+              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/auth/forgot-password", params: publicOnboardingParams(params.source) })}>
                 <Text style={authStyles.inlineLink}>{authCopy.login.forgotPassword}</Text>
               </Pressable>
             </View>
             <Controller
               control={emailForm.control}
               name="password"
-              rules={{ required: "رمز عبور را وارد کنید." }}
+              rules={{ required: "رمز عبور را وارد کنید.", validate: validatePassword }}
               render={({ field, fieldState }) => (
                 <TextField
                   accessibilityLabel={authCopy.common.password}
@@ -137,6 +172,7 @@ export default function SignInScreen() {
                   onBlur={field.onBlur}
                   onChangeText={field.onChange}
                   secureTextEntry
+                  maxLength={128}
                   textContentType="password"
                   value={field.value}
                 />
@@ -154,6 +190,7 @@ export default function SignInScreen() {
               render={({ field, fieldState }) => (
                 <TextField
                   autoComplete="tel"
+                  editable={phoneStep === "request"}
                   error={fieldState.error?.message}
                   keyboardType="phone-pad"
                   label={authCopy.common.phoneNumber}
@@ -166,26 +203,55 @@ export default function SignInScreen() {
                 />
               )}
             />
+            {phoneStep === "verify" ? (
+              <>
+                <Controller
+                  control={phoneForm.control}
+                  name="code"
+                  render={({ field, fieldState }) => (
+                    <TextField
+                      autoComplete="one-time-code"
+                      error={fieldState.error?.message}
+                      keyboardType="number-pad"
+                      label={authCopy.common.otpCode}
+                      maxLength={6}
+                      onBlur={field.onBlur}
+                      onChangeText={field.onChange}
+                      textDirection="ltr"
+                      value={field.value}
+                    />
+                  )}
+                />
+                <View style={authStyles.fieldHeading}>
+                  <Pressable accessibilityRole="button" disabled={countdown > 0 || auth.busy} onPress={resendPhoneCode}>
+                    <Text style={authStyles.inlineLink}>
+                      {countdown > 0 ? authCopy.login.resendCountdown.replace("{{seconds}}", faNumber(countdown)) : authCopy.login.resend}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
             {error ? <Notice message={error} variant="danger" /> : null}
-            <Button label={authCopy.login.sendOtp} loading={auth.busy} onPress={submitPhone} />
+            <Button
+              label={phoneStep === "request" ? authCopy.login.sendOtp : authCopy.login.verifyOtp}
+              loading={auth.busy}
+              onPress={submitPhone}
+            />
           </AuthFormSection>
         )}
-        {google.available ? (
-          <>
-            <View style={authStyles.divider}>
-              <View style={authStyles.dividerLine} />
-              <Text style={authStyles.dividerText}>{authCopy.login.or}</Text>
-              <View style={authStyles.dividerLine} />
-            </View>
-            <Button
-              disabled={!google.ready}
-              label="ادامه با گوگل"
-              loading={googleBusy}
-              onPress={() => void submitGoogle()}
-              variant="secondary"
-            />
-          </>
-        ) : null}
+
+        <View style={authStyles.divider}>
+          <View style={authStyles.dividerLine} />
+          <Text style={authStyles.dividerText}>{authCopy.login.or}</Text>
+          <View style={authStyles.dividerLine} />
+        </View>
+        <Button
+          disabled={google.available && !google.ready}
+          label="ادامه با گوگل"
+          loading={googleBusy}
+          onPress={() => void submitGoogle()}
+          variant="secondary"
+        />
         <View style={authStyles.footer}>
           <Text style={authStyles.footerText}>{authCopy.login.noAccount}</Text>
           <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/auth/register", params: publicOnboardingParams(params.source) })}>

@@ -1,8 +1,9 @@
 import { type ReactNode } from "react";
 import { Text, View } from "react-native";
 
-import { AppIcon, PageHeading } from "../ui/components";
+import { PageHeading } from "../ui/components";
 import { Screen } from "../ui/layout";
+import { authCopy } from "./copy";
 import { authStyles } from "./authStyles";
 
 export interface AuthScaffoldProps {
@@ -17,18 +18,10 @@ export function AuthScaffold({ children, eyebrow, subtitle, title }: AuthScaffol
     <Screen contentContainerStyle={authStyles.screen} contentWidth="reading">
       <View style={authStyles.panel} testID="auth-form-panel">
         <View style={authStyles.brandRow}>
-          <View style={authStyles.brandLockup}>
-            <View style={authStyles.brandMark}>
-              <AppIcon color={authStyles.brandIcon.color} name="shield" size={16} />
-            </View>
-            <Text style={authStyles.brand}>FITICIAN</Text>
-          </View>
-          <Text style={authStyles.productTag}>مربی شخصی دیجیتال</Text>
-        </View>
-        <View style={authStyles.accentRule}>
-          <View style={authStyles.accentRuleFill} />
+          <Text style={authStyles.brand}>{authCopy.common.brand}</Text>
         </View>
         <PageHeading
+          compact={false}
           eyebrow={eyebrow}
           style={authStyles.heading}
           supportingText={subtitle}

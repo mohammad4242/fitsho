@@ -2,7 +2,8 @@ import { expect, it, vi } from "vitest";
 
 import { createInitialOnboardingState, transitionOnboardingState, type OnboardingState } from "@fitician/core/onboarding";
 import type { ProfileInput, ProfileStatusResponse, SharedProfileInput } from "@fitician/core/profile";
-import type { SafetyDecision } from "@fitician/core/nutrition";
+import type { SafetyDecision, SafetyProfileInput } from "@fitician/core/nutrition";
+import type { NutritionBasicsDraft } from "@fitician/core/onboarding";
 
 import { NativeOnboardingController, type OnboardingControllerApi } from "./onboardingController";
 import { hydratePublicOnboardingState } from "./publicOnboardingHandoff";
@@ -47,6 +48,16 @@ const safeDecision: SafetyDecision = {
   created_at: "2026-09-07T00:00:00Z",
 };
 
+const nutritionBasics: NutritionBasicsDraft = {
+  daily_activity_level: "moderate",
+  individual_monthly_food_budget_irr: 50_000_000,
+  budget_style: "strict",
+  plan_style: "balanced",
+  allergies: [],
+  intolerances: [],
+  dietary_pattern: "omnivore",
+};
+
 function status(completion_state: ProfileStatusResponse["completion_state"], product_mode: ProfileStatusResponse["product_mode"] = null): ProfileStatusResponse {
   return { user_id: "user-1", product_mode, completion_state };
 }
@@ -73,7 +84,7 @@ function api(): OnboardingControllerApi {
     saveSafetyProfile: vi.fn().mockResolvedValue(safeDecision),
     saveSharedProfile: vi.fn().mockResolvedValue({}),
     saveStructuredExercise: vi.fn().mockResolvedValue({}),
-    selectProductMode: vi.fn().mockResolvedValue(status("shared_profile_incomplete", "training")),
+    selectProductMode: vi.fn().mockImplementation(async (mode: "training" | "nutrition" | "both") => status("shared_profile_incomplete", mode)),
   };
 }
 
@@ -88,6 +99,31 @@ function trainingReviewState(): OnboardingState {
   state = transitionOnboardingState(state, { mode: "training", type: "select_product_mode" });
   state = transitionOnboardingState(state, { profile: shared, type: "save_shared_profile" });
   return transitionOnboardingState(state, { profile: training, type: "save_training_profile" });
+}
+
+function nutritionPreferencesState(): OnboardingState {
+  let state = createInitialOnboardingState();
+  state = transitionOnboardingState(state, { mode: "nutrition", type: "select_product_mode" });
+  state = transitionOnboardingState(state, { profile: shared, type: "save_shared_profile" });
+  state = transitionOnboardingState(state, { safety: safeDecisionInput(), type: "save_nutrition_safety" });
+  state = transitionOnboardingState(state, { exercise: { trains: false }, type: "save_exercise_context" });
+  return transitionOnboardingState(state, { basics: nutritionBasics, type: "save_nutrition_basics" });
+}
+
+function safeDecisionInput(): SafetyProfileInput {
+  return {
+    conditions: [],
+    medications: [],
+    dangerous_food_reaction_history: false,
+    pregnant: false,
+    breastfeeding: false,
+    eating_disorder_diagnosed: false,
+    eating_disorder_active_symptoms: false,
+    emergency_or_danger_symptoms: false,
+    complex_medication_food_interaction: false,
+    physician_dietary_restrictions: null,
+    other_relevant_condition: null,
+  };
 }
 
 it("hydrates a public training draft through the same controller order", async () => {
@@ -118,6 +154,20 @@ it("does not overwrite a completed member when a public draft remains on the dev
   expect(result.step).toBe("complete");
   expect(activeApi.selectProductMode).not.toHaveBeenCalled();
   expect(activeApi.createProfile).not.toHaveBeenCalled();
+});
+
+it("hydrates a public nutrition draft to authenticated nutrition preferences", async () => {
+  const activeApi = api();
+  const controller = await initialized(activeApi);
+
+  const result = await hydratePublicOnboardingState(controller, nutritionPreferencesState());
+
+  expect(result.step).toBe("nutrition_preferences");
+  expect(activeApi.selectProductMode).toHaveBeenCalledWith("nutrition");
+  expect(activeApi.saveSharedProfile).toHaveBeenCalledWith(shared);
+  expect(activeApi.saveSafetyProfile).toHaveBeenCalledWith(safeDecisionInput());
+  expect(activeApi.saveNutritionProfile).not.toHaveBeenCalled();
+  expect(activeApi.createNutritionEstimate).not.toHaveBeenCalled();
 });
 
 it("rejects a public handoff before all required answers are present", async () => {

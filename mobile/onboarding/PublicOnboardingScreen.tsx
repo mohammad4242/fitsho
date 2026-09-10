@@ -1,64 +1,60 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { createInitialOnboardingState, transitionOnboardingState, type OnboardingEvent, type OnboardingState } from "@fitician/core/onboarding";
+import {
+  createInitialOnboardingState,
+  transitionOnboardingState,
+  type OnboardingEvent,
+  type OnboardingState,
+} from "@fitician/core/onboarding";
+import type { ProductMode, ProfileFormValues } from "@fitician/core/profile";
+import { validateStep } from "@fitician/core/profile-validation";
 
-import { PUBLIC_ONBOARDING_SOURCE } from "../auth/authRoute";
+import { onboardingRoute, PUBLIC_ONBOARDING_SOURCE } from "../auth/authRoute";
+import { AppIcon, Notice, StateSkeleton } from "../ui/components";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
-import { AppIcon, Button, Card, Notice, PageHeading, ProgressBar, StateSkeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { mobileRequestErrorMessage } from "../ui/requestState";
 import { fiticianTokens } from "../ui/tokens";
 import {
-  ExerciseStage,
-  ModeStage,
-  NutritionBasicsStage,
-  NutritionPreferencesStage,
-  nutritionBasicsFormValuesForState,
-  nutritionPreferencesFormValuesForState,
-  SafetyStage,
-  safetyFormValuesForState,
-  SharedProfileStage,
-  TrainingProfileStage,
-  exerciseFormValuesForState,
-} from "./OnboardingScreen";
-import { getOnboardingStageProgress } from "./onboardingQuestionFlow";
-import {
   emptyProfileFormValues,
   profileFormValuesForSharedProfile,
   profileFormValuesForTrainingProfile,
+  profileInputForOnboarding,
+  sharedProfileInputForFormValues,
 } from "./onboardingForms";
 import { SecurePublicOnboardingDraftStore } from "./publicOnboardingDraftStore";
+import { GuidedSharedProfileQuestions } from "./public/GuidedSharedProfileQuestions";
+import { GuidedTrainingQuestions } from "./public/GuidedTrainingQuestions";
+import { PublicAccountStep } from "./public/PublicAccountStep";
+import {
+  PublicNutritionOnboardingFlow,
+  type PublicNutritionAnswers,
+} from "./public/PublicNutritionOnboardingFlow";
 
-const publicOnboardingCopy = {
+const copy = {
   header: "اطلاعاتت تا زمان ساخت حساب فقط در همین تب نگه‌داری می‌شود.",
   mode: {
+    both: "تمرین و تغذیه",
     eyebrow: "شروع با مربی فیتشو",
-    labels: {
-      both: "تمرین و تغذیه",
-      nutrition: "برنامه تغذیه",
-      training: "برنامه تمرینی",
-    },
+    nutrition: "برنامه تغذیه",
+    recommended: "پیشنهاد فیتشو",
     title: "تو چه زمینه‌ای به کمک نیاز داری؟",
-  },
-  account: {
-    description: "پاسخ‌ها بعد از ورود امن به حساب فیتشو منتقل می‌شوند.",
-    edit: "بازگشت و ویرایش پاسخ‌ها",
-    eyebrow: "آخرین قدم",
-    securityBody: "پاسخ‌ها تا لحظه‌ی ساخت حساب در همین تب می‌مانند.",
-    securityTitle: "مسیر امن انتقال اطلاعات",
-    title: "حالا حسابت را بساز",
+    training: "برنامه تمرینی",
   },
 } as const;
 
 export function PublicOnboardingScreen() {
   const router = useRouter();
   const store = useMemo(() => new SecurePublicOnboardingDraftStore(), []);
+  const questionBackRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<OnboardingState | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sharedValues, setSharedValues] = useState(emptyProfileFormValues);
+  const [trainingValues, setTrainingValues] = useState(emptyProfileFormValues);
 
   useEffect(() => {
     let active = true;
@@ -68,10 +64,9 @@ export function PublicOnboardingScreen() {
         setState(result.status === "valid" ? result.state : createInitialOnboardingState());
       })
       .catch(() => {
-        if (active) {
-          setError("ذخیره مسیر شخصی‌سازی در دسترس نیست. دوباره تلاش کن.");
-          setState(createInitialOnboardingState());
-        }
+        if (!active) return;
+        setError("ذخیره مسیر شخصی‌سازی در دسترس نیست. دوباره تلاش کن.");
+        setState(createInitialOnboardingState());
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -80,6 +75,24 @@ export function PublicOnboardingScreen() {
       active = false;
     };
   }, [store]);
+
+  useEffect(() => {
+    if (state?.step === "shared_profile") {
+      setSharedValues(state.shared === null ? emptyProfileFormValues() : profileFormValuesForSharedProfile(state.shared));
+    }
+    if (state?.step === "training_profile") {
+      setTrainingValues(state.training === null
+        ? state.shared === null ? emptyProfileFormValues() : profileFormValuesForSharedProfile(state.shared)
+        : profileFormValuesForTrainingProfile(state.training));
+    }
+  }, [state]);
+
+  const registerQuestionBack = useCallback((handler: () => void) => {
+    questionBackRef.current = handler;
+    return () => {
+      if (questionBackRef.current === handler) questionBackRef.current = null;
+    };
+  }, []);
 
   const run = useCallback((event: OnboardingEvent) => {
     if (state === null || busy) return;
@@ -109,7 +122,72 @@ export function PublicOnboardingScreen() {
     return true;
   }, [busy, state, store]);
 
-  useAndroidBackHandler("wizard", goBack, state !== null && !loading);
+  const handleAndroidBack = useCallback((): boolean => {
+    if (questionBackRef.current !== null) {
+      questionBackRef.current();
+      return true;
+    }
+    return goBack();
+  }, [goBack]);
+
+  useAndroidBackHandler("wizard", handleAndroidBack, state !== null && !loading);
+
+  const saveShared = useCallback((values: ProfileFormValues) => {
+    const errors = {
+      ...validateStep(values, 1, new Date()),
+      ...validateStep(values, 2, new Date()),
+    };
+    if (Object.keys(errors).length > 0) {
+      setError("پاسخ‌های شخصی و بدنی را بررسی کن.");
+      return;
+    }
+    run({ profile: sharedProfileInputForFormValues(values), type: "save_shared_profile" });
+  }, [run]);
+
+  const saveTraining = useCallback((values: ProfileFormValues) => {
+    try {
+      run({ profile: profileInputForOnboarding(values, new Date()), type: "save_training_profile" });
+    } catch {
+      setError("پاسخ‌های تمرینی را کامل کن و دوباره تلاش کن.");
+    }
+  }, [run]);
+
+  const saveNutrition = useCallback((answers: PublicNutritionAnswers) => {
+    if (state === null || state.mode === null || (state.mode !== "nutrition" && state.mode !== "both") || busy) return;
+    setBusy(true);
+    setError(null);
+    void (async () => {
+      let next = transitionOnboardingState(state, { safety: answers.safety, type: "save_nutrition_safety" });
+      if (state.mode === "both") {
+        if (answers.training === undefined) throw new Error("Public onboarding draft is incomplete");
+        next = transitionOnboardingState(next, { profile: answers.training, type: "save_training_profile" });
+      } else {
+        if (answers.structuredExercise === undefined) throw new Error("Public onboarding draft is incomplete");
+        next = transitionOnboardingState(next, { exercise: answers.structuredExercise, type: "save_exercise_context" });
+      }
+      next = transitionOnboardingState(next, { basics: answers.nutritionBasics, type: "save_nutrition_basics" });
+      await store.save(next);
+      setState(next);
+    })()
+      .catch((nutritionError: unknown) => setError(publicOnboardingErrorMessage(nutritionError)))
+      .finally(() => setBusy(false));
+  }, [busy, state, store]);
+
+  const editAnswers = useCallback(() => {
+    if (state === null || busy || state.step === "shared_profile") return;
+    setBusy(true);
+    setError(null);
+    void (async () => {
+      let next = state;
+      while (next.step !== "shared_profile") {
+        next = transitionOnboardingState(next, { type: "back" });
+      }
+      await store.save(next);
+      setState(next);
+    })()
+      .catch((editError: unknown) => setError(publicOnboardingErrorMessage(editError)))
+      .finally(() => setBusy(false));
+  }, [busy, state, store]);
 
   if (loading || state === null) {
     return (
@@ -121,200 +199,132 @@ export function PublicOnboardingScreen() {
     );
   }
 
-  const progress = onboardingProgress(state);
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
-      <View style={styles.brandRow}>
-        <View style={styles.progressPill}>
-          <Text style={styles.progressText}>{progress}</Text>
-          <View style={styles.progressDot} />
-        </View>
-        <Text style={styles.brand}>FITICIAN</Text>
-      </View>
-      <View style={styles.publicHeaderNote} testID="public-onboarding-header-note">
-        <Text style={styles.publicHeaderNoteText}>{publicOnboardingCopy.header}</Text>
-        <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={fiticianTokens.iconSize.sm} />
-      </View>
-      <View style={styles.progressTrack}>
-        <ProgressBar label="پیشرفت مسیر شخصی‌سازی" progress={onboardingProgressValue(state)} />
+      <View style={styles.header}>
+        <Text style={styles.brand}>فیتشو</Text>
+        <Text style={styles.headerNote}>{copy.header}</Text>
       </View>
       {error ? <Notice message={error} variant="danger" /> : null}
       {state.step === "product_mode" ? (
-        <ModeStage
-          busy={busy}
-          copy={{
-            eyebrow: publicOnboardingCopy.mode.eyebrow,
-            labels: publicOnboardingCopy.mode.labels,
-            showDescriptions: false,
-            title: publicOnboardingCopy.mode.title,
-          }}
-          onSelect={(mode) => run({ mode, type: "select_product_mode" })}
-        />
+        <ModeSelection busy={busy} onSelect={(mode) => run({ mode, type: "select_product_mode" })} />
       ) : null}
       {state.step === "shared_profile" ? (
-        <SharedProfileStage
-          busy={busy}
-          initialValues={state.shared === null ? emptyProfileFormValues() : profileFormValuesForSharedProfile(state.shared)}
+        <GuidedSharedProfileQuestions
           onBack={goBack}
-          onSubmit={(profile) => run({ profile, type: "save_shared_profile" })}
+          onChange={(field, value) => setSharedValues((current) => ({ ...current, [field]: value }))}
+          onComplete={saveShared}
+          onRegisterBack={registerQuestionBack}
+          values={sharedValues}
         />
       ) : null}
-      {state.step === "nutrition_safety" ? (
-        <SafetyStage
-          blocked={false}
-          busy={busy}
-          initialValues={safetyFormValuesForState(state.safety)}
+      {state.step === "training_profile" && state.mode === "training" ? (
+        <GuidedTrainingQuestions
           onBack={goBack}
-          onSubmit={(safety) => run({ safety, type: "save_nutrition_safety" })}
+          onChange={(field, value) => setTrainingValues((current) => ({
+            ...current,
+            [field]: value,
+            ...(field === "training_location" && value === "gym" ? { home_training_setup: "" } : {}),
+          }))}
+          onComplete={saveTraining}
+          onRegisterBack={registerQuestionBack}
+          values={trainingValues}
         />
       ) : null}
-      {state.step === "training_profile" ? (
-        <TrainingProfileStage
-          busy={busy}
-          initialValues={state.training === null
-            ? state.shared === null ? emptyProfileFormValues() : profileFormValuesForSharedProfile(state.shared)
-            : profileFormValuesForTrainingProfile(state.training)}
+      {state.step === "nutrition_safety" && (state.mode === "nutrition" || state.mode === "both") ? (
+        <PublicNutritionOnboardingFlow
+          mode={state.mode}
           onBack={goBack}
-          onSubmit={(profile) => run({ profile, type: "save_training_profile" })}
+          onComplete={saveNutrition}
+          onRegisterBack={registerQuestionBack}
+          state={state}
         />
       ) : null}
-      {state.step === "exercise_context" ? (
-        <ExerciseStage
-          busy={busy}
-          initialValues={exerciseFormValuesForState(state.structuredExercise)}
-          onBack={goBack}
-          onSubmit={(exercise) => run({ exercise, type: "save_exercise_context" })}
+      {(state.step === "review" || state.step === "nutrition_preferences") && state.mode !== null ? (
+        <PublicAccountStep
+          mode={state.mode}
+          onAuthenticated={() => router.replace(onboardingRoute(PUBLIC_ONBOARDING_SOURCE))}
+          onEdit={editAnswers}
         />
       ) : null}
-      {state.step === "nutrition_basics" ? (
-        <NutritionBasicsStage
-          busy={busy}
-          initialValues={nutritionBasicsFormValuesForState(state.nutritionBasics)}
-          onBack={goBack}
-          onSubmit={(basics) => run({ basics, type: "save_nutrition_basics" })}
-        />
-      ) : null}
-      {state.step === "nutrition_preferences" ? (
-        <NutritionPreferencesStage
-          basics={state.nutritionBasics}
-          busy={busy}
-          initialValues={nutritionPreferencesFormValuesForState(state.nutrition)}
-          onBack={goBack}
-          onSubmit={(nutrition) => run({ profile: nutrition, type: "save_nutrition_profile" })}
-        />
-      ) : null}
-      {state.step === "review" ? <AccountHandoffStage onBack={goBack} onRegister={() => router.push({ pathname: "/auth/register", params: { source: PUBLIC_ONBOARDING_SOURCE } })} onSignIn={() => router.push({ pathname: "/auth/sign-in", params: { source: PUBLIC_ONBOARDING_SOURCE } })} /> : null}
       {state.step === "complete" ? <Notice message="این مسیر قبلاً تکمیل شده است." variant="success" /> : null}
     </Screen>
   );
 }
 
-function AccountHandoffStage({
-  onBack,
-  onRegister,
-  onSignIn,
-}: {
-  readonly onBack: () => boolean;
-  readonly onRegister: () => void;
-  readonly onSignIn: () => void;
-}) {
+function ModeSelection({ busy, onSelect }: { readonly busy: boolean; readonly onSelect: (mode: ProductMode) => void }) {
+  const modes = [
+    ["training", copy.mode.training, "training"],
+    ["nutrition", copy.mode.nutrition, "nutrition"],
+    ["both", copy.mode.both, "target"],
+  ] as const;
   return (
-    <View style={styles.stage}>
-      <PageHeading
-        compact={false}
-        eyebrow={publicOnboardingCopy.account.eyebrow}
-        supportingText={publicOnboardingCopy.account.description}
-        testID="public-onboarding-account-heading"
-        title={publicOnboardingCopy.account.title}
-      />
-      <Button label={publicOnboardingCopy.account.edit} onPress={onBack} variant="ghost" />
-      <Card variant="hero" style={styles.accountCard}>
-        <View style={styles.accountCopy}>
-          <Text style={styles.accountTitle}>{publicOnboardingCopy.account.securityTitle}</Text>
-          <Text style={styles.accountDescription}>{publicOnboardingCopy.account.securityBody}</Text>
-        </View>
-        <View style={styles.accountIcon}>
-          <AppIcon accessibilityLabel="امنیت" color={fiticianTokens.colors.aqua} name="shield" size={fiticianTokens.iconSize.lg} />
-        </View>
-      </Card>
-      <View style={styles.accountActions}>
-        <Button label="ساخت حساب و ذخیره پاسخ‌ها" onPress={onRegister} />
-        <Button label="ورود و ذخیره پاسخ‌ها" onPress={onSignIn} variant="secondary" />
+    <View style={styles.modeSelection} testID="public-mode-selection">
+      <Text style={styles.eyebrow}>{copy.mode.eyebrow}</Text>
+      <Text accessibilityRole="header" style={styles.modeTitle}>{copy.mode.title}</Text>
+      <View style={styles.modeCards}>
+        {modes.map(([mode, label, icon]) => (
+          <Pressable
+            accessibilityLabel={label}
+            accessibilityRole="button"
+            disabled={busy}
+            key={mode}
+            onPress={() => onSelect(mode)}
+            style={[styles.modeCard, mode === "both" && styles.modeCardRecommended]}
+          >
+            <View style={[styles.modeIcon, mode === "both" && styles.modeIconRecommended]}>
+              <AppIcon color={mode === "both" ? fiticianTokens.colors.canvas : fiticianTokens.colors.aqua} name={icon} size={24} />
+            </View>
+            <View style={styles.modeCopy}>
+              <Text style={styles.modeLabel}>{label}</Text>
+              {mode === "both" ? <Text style={styles.modeBadge}>{copy.mode.recommended}</Text> : null}
+            </View>
+          </Pressable>
+        ))}
       </View>
     </View>
   );
 }
 
-function onboardingProgress(state: OnboardingState): string {
-  const progress = getOnboardingStageProgress(state.mode, state.step);
-  if (progress.total === 0) return "شروع";
-  return `پاسخ‌های ثبت‌شده ${progress.completed} از ${progress.total}`;
-}
-
-function onboardingProgressValue(state: OnboardingState): number {
-  return getOnboardingStageProgress(state.mode, state.step).progress;
-}
-
 function publicOnboardingErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message !== "") {
-    if (error.message.includes("incomplete")) return "پاسخ‌ها را کامل کن و دوباره تلاش کن.";
+  if (error instanceof Error && error.message.includes("incomplete")) {
+    return "پاسخ‌ها را کامل کن و دوباره تلاش کن.";
   }
   return mobileRequestErrorMessage(error, "ذخیره پاسخ‌ها انجام نشد. دوباره تلاش کن.");
 }
 
 const styles = StyleSheet.create({
-  accountActions: {
-    gap: fiticianTokens.spacing[3],
-  },
-  accountCard: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[4],
-  },
-  accountCopy: {
-    flex: 1,
-    gap: fiticianTokens.spacing[2],
-  },
-  accountDescription: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
-    lineHeight: 22,
-    textAlign: "right",
-    writingDirection: "rtl",
-  },
-  accountIcon: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    borderColor: fiticianTokens.colors.lineStrong,
-    borderRadius: fiticianTokens.radii.pill,
-    borderWidth: 1,
-    height: 56,
-    justifyContent: "center",
-    width: 56,
-  },
-  accountTitle: {
+  brand: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    lineHeight: 24,
+    fontSize: fiticianTokens.typography.fontSize.h3,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     textAlign: "right",
     writingDirection: "rtl",
   },
-  brand: {
+  eyebrow: {
     color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    letterSpacing: 1.4,
-    writingDirection: "ltr",
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
-  brandRow: {
+  header: {
     alignItems: "center",
     flexDirection: "row",
+    gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     width: "100%",
+  },
+  headerNote: {
+    color: fiticianTokens.colors.muted,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+    textAlign: "left",
+    writingDirection: "rtl",
   },
   loadingScreen: {
     alignItems: "center",
@@ -331,52 +341,85 @@ const styles = StyleSheet.create({
     textAlign: "center",
     writingDirection: "rtl",
   },
-  progressDot: {
+  modeBadge: {
     backgroundColor: fiticianTokens.colors.aqua,
     borderRadius: fiticianTokens.radii.pill,
-    height: 6,
-    width: 6,
-  },
-  progressPill: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.pill,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[2],
-    paddingHorizontal: fiticianTokens.spacing[3],
-    paddingVertical: fiticianTokens.spacing[2],
-  },
-  progressText: {
-    color: fiticianTokens.colors.muted,
+    color: fiticianTokens.colors.canvas,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    overflow: "hidden",
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: 3,
+    textAlign: "right",
     writingDirection: "rtl",
   },
-  progressTrack: {
-    marginTop: -fiticianTokens.spacing[3],
-  },
-  publicHeaderNote: {
+  modeCard: {
     alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
     flexDirection: "row",
-    gap: fiticianTokens.spacing[2],
+    gap: fiticianTokens.spacing[3],
+    minHeight: 94,
+    paddingHorizontal: fiticianTokens.spacing[4],
+    paddingVertical: fiticianTokens.spacing[3],
     width: "100%",
   },
-  publicHeaderNoteText: {
-    color: fiticianTokens.colors.muted,
+  modeCardRecommended: {
+    backgroundColor: fiticianTokens.colors.aquaAtmosphere,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  modeCards: {
+    gap: fiticianTokens.spacing[3],
+    width: "100%",
+  },
+  modeCopy: {
+    alignItems: "flex-start",
     flex: 1,
+    gap: fiticianTokens.spacing[2],
+  },
+  modeIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    height: 56,
+    justifyContent: "center",
+    width: 56,
+  },
+  modeIconRecommended: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  modeLabel: {
+    color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    lineHeight: 20,
+    fontSize: fiticianTokens.typography.fontSize.lg,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  modeSelection: {
+    alignSelf: "center",
+    gap: fiticianTokens.spacing[4],
+    maxWidth: 520,
+    paddingBottom: fiticianTokens.spacing[7],
+    paddingTop: fiticianTokens.spacing[6],
+    width: "100%",
+  },
+  modeTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: 34,
+    lineHeight: 45,
     textAlign: "right",
     writingDirection: "rtl",
   },
   screen: {
-    gap: fiticianTokens.spacing[5],
+    gap: fiticianTokens.spacing[4],
     paddingBottom: fiticianTokens.spacing[7],
-  },
-  stage: {
-    gap: fiticianTokens.spacing[5],
   },
 });

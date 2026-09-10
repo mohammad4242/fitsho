@@ -46,10 +46,12 @@ beforeEach(() => {
 test("keeps the Web hero hierarchy in a concise native entry", () => {
   renderEntry();
 
-  expect(screen.getByText("بدن تو، نقطه شروع برنامه")).toBeTruthy();
   expect(screen.getByRole("header", { name: "هر بدن، برنامه خودش را می‌خواهد." })).toBeTruthy();
   expect(screen.getByText("تمرین و تغذیه‌ای متناسب با بدن، هدف و مسیر تو.")).toBeTruthy();
   expect(screen.getByRole("button", { name: "برنامه من را بساز" })).toBeTruthy();
+  expect(screen.getByRole("header", { name: "برنامه تمرینی، تحت نظر مربی" })).toBeTruthy();
+  expect(screen.getByRole("header", { name: "برنامه تغذیه، تحت نظر پزشک" })).toBeTruthy();
+  expect(screen.getByText("MEAL PHOTO ANALYSIS")).toBeTruthy();
   expect(screen.getByTestId("public-entry-process")).toBeTruthy();
   expect(screen.getByText("فیتشو چگونه برنامه تو را می‌سازد")).toBeTruthy();
   expect(screen.getByText("تو را می‌شناسیم")).toBeTruthy();
@@ -61,12 +63,10 @@ test("keeps native entry actions connected to public onboarding and auth", () =>
   renderEntry();
 
   fireEvent.press(screen.getByRole("button", { name: "برنامه من را بساز" }));
-  fireEvent.press(screen.getByRole("button", { name: "ورود به حساب" }));
-  fireEvent.press(screen.getByRole("button", { name: "ساخت حساب جدید" }));
+  fireEvent.press(screen.getByRole("button", { name: "ورود" }));
 
   expect(mockPush.mock.calls).toEqual([
     ["/public-onboarding"],
     ["/auth/sign-in"],
-    ["/auth/register"],
   ]);
 });

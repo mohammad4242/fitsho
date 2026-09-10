@@ -69,6 +69,10 @@ export default function RegisterScreen() {
               />
             )}
           />
+          <View style={authStyles.fieldHeading}>
+            <Text style={authStyles.fieldLabel}>{authCopy.common.password}</Text>
+            <Text style={authStyles.inlineLink}>{authCopy.register.passwordHint}</Text>
+          </View>
           <Controller
             control={control}
             name="password"
@@ -78,7 +82,8 @@ export default function RegisterScreen() {
                 autoCapitalize="none"
                 autoComplete="new-password"
                 error={fieldState.error?.message}
-                label={authCopy.common.password}
+                accessibilityLabel={authCopy.common.password}
+                maxLength={128}
                 onBlur={field.onBlur}
                 onChangeText={field.onChange}
                 secureTextEntry
@@ -100,6 +105,7 @@ export default function RegisterScreen() {
                 autoComplete="new-password"
                 error={fieldState.error?.message}
                 label={authCopy.register.confirmPassword}
+                maxLength={128}
                 onBlur={field.onBlur}
                 onChangeText={field.onChange}
                 secureTextEntry

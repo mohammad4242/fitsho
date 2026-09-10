@@ -18,7 +18,8 @@ export function validateEmail(value: string): string | undefined {
 }
 
 export function validatePassword(value: string): string | undefined {
-  return value.length >= 8 ? undefined : "رمز عبور باید حداقل ۸ نویسه باشد.";
+  if (value.length < 8) return "رمز عبور باید حداقل ۸ نویسه باشد.";
+  return value.length <= 128 ? undefined : "رمز عبور باید حداکثر ۱۲۸ نویسه باشد.";
 }
 
 export function validateConfirmation(value: string, original: string): string | undefined {
