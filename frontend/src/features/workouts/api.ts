@@ -49,6 +49,10 @@ export function getWorkoutPlan(planId: string): Promise<WorkoutPlan> {
   return request<WorkoutPlan>(`${workoutPlansPath}/${planId}`);
 }
 
+export function deleteWorkoutPlan(planId: string): Promise<void> {
+  return request<void>(`${workoutPlansPath}/${planId}`, { method: "DELETE" });
+}
+
 export function downloadWorkoutPlanPdf(planId: string): Promise<Blob> {
   return requestBlob(`${workoutPlansPath}/${planId}/pdf`);
 }

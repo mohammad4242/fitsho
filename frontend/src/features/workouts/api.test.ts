@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 import {
+  deleteWorkoutPlan,
   downloadWorkoutPlanPdf,
   generateWorkoutPlan,
   getActiveWorkoutPlan,
@@ -94,6 +95,17 @@ it("downloads a workout plan PDF through Fitsho", async () => {
   expect(fetch).toHaveBeenCalledWith(
     `/api/v1/workout-plans/${plan.id}/pdf`,
     expect.objectContaining({ credentials: "include" }),
+  );
+});
+
+it("deletes an old workout plan through the member endpoint", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
+
+  await expect(deleteWorkoutPlan(plan.id)).resolves.toBeUndefined();
+
+  expect(fetch).toHaveBeenCalledWith(
+    `/api/v1/workout-plans/${plan.id}`,
+    expect.objectContaining({ credentials: "include", method: "DELETE" }),
   );
 });
 

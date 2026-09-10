@@ -8,6 +8,7 @@ import { ApiError } from "../../shared/apiClient";
 import type { WorkoutPlan } from "./types";
 
 const api = vi.hoisted(() => ({
+  deleteWorkoutPlan: vi.fn(),
   getActiveWorkoutPlan: vi.fn(),
   getWorkoutPlanHistory: vi.fn(),
   getWorkoutPlan: vi.fn(),
@@ -142,6 +143,7 @@ const pendingPlan: WorkoutPlan = {
 };
 
 beforeEach(() => {
+  api.deleteWorkoutPlan.mockReset();
   api.getActiveWorkoutPlan.mockReset();
   api.getWorkoutPlanHistory.mockReset();
   api.getWorkoutPlan.mockReset();
@@ -155,6 +157,7 @@ beforeEach(() => {
   profileApi.getProfile.mockReset();
   profileApi.updateProfile.mockReset();
   api.getWorkoutPlanHistory.mockResolvedValue([]);
+  api.deleteWorkoutPlan.mockResolvedValue(undefined);
   api.generateWorkoutPlan.mockResolvedValue({ plan, reused: false });
   api.downloadWorkoutPlanPdf.mockResolvedValue(
     new Blob(["%PDF-test"], { type: "application/pdf" }),
@@ -431,6 +434,127 @@ it("lets the member inspect old and coach-approved immutable versions", async ()
   expect(api.getWorkoutPlan).toHaveBeenCalledWith(plan.id);
   expect(await screen.findByText("در حال مشاهده نسخه قبلی")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "به‌روزرسانی برنامه" })).not.toBeInTheDocument();
+});
+
+it("shows deletion only for an archived version, never for the active version", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.getWorkoutPlanHistory.mockResolvedValue([
+    {
+      id: plan.id,
+      status: "active",
+      created_at: plan.created_at,
+      activated_at: plan.activated_at,
+      is_active: true,
+      coach_review: { state: "coach_approved", coach_display_name: "مربی", coach_note: null, approved_at: plan.activated_at },
+    },
+    {
+      ...pendingVersion,
+      id: "018f0000-0000-7000-8000-000000000098",
+      status: "superseded",
+      is_active: false,
+      coach_review: { state: "initial_generated", coach_display_name: null, coach_note: null, approved_at: null },
+    },
+  ]);
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByRole("button", { name: "حذف نسخه قدیمی برنامه" })).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: /نسخه تأیید مربی/ })).toHaveLength(1);
+  expect(screen.getAllByRole("button", { name: "حذف نسخه قدیمی برنامه" })).toHaveLength(1);
+});
+
+it("does not delete an archived version when confirmation is cancelled", async () => {
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.getWorkoutPlanHistory.mockResolvedValue([
+    {
+      id: plan.id,
+      status: "active",
+      created_at: plan.created_at,
+      activated_at: plan.activated_at,
+      is_active: true,
+      coach_review: { state: "none", coach_display_name: null, coach_note: null, approved_at: null },
+    },
+    { ...pendingVersion, status: "superseded", coach_review: { ...pendingVersion.coach_review, state: "initial_generated" } },
+  ]);
+  vi.spyOn(window, "confirm").mockReturnValue(false);
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "حذف نسخه قدیمی برنامه" }));
+
+  expect(api.deleteWorkoutPlan).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "حذف نسخه قدیمی برنامه" })).toBeInTheDocument();
+});
+
+it("removes an archived version after successful deletion and refreshes member plans", async () => {
+  const archivedVersion = { ...pendingVersion, status: "superseded" as const, coach_review: { ...pendingVersion.coach_review, state: "initial_generated" as const } };
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.getWorkoutPlanHistory
+    .mockResolvedValueOnce([
+      {
+        id: plan.id,
+        status: "active",
+        created_at: plan.created_at,
+        activated_at: plan.activated_at,
+        is_active: true,
+        coach_review: { state: "none", coach_display_name: null, coach_note: null, approved_at: null },
+      },
+      archivedVersion,
+    ])
+    .mockResolvedValueOnce([{ id: plan.id, status: "active", created_at: plan.created_at, activated_at: plan.activated_at, is_active: true, coach_review: { state: "none", coach_display_name: null, coach_note: null, approved_at: null } }]);
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  await user.click(await screen.findByRole("button", { name: "حذف نسخه قدیمی برنامه" }));
+
+  await waitFor(() => expect(api.deleteWorkoutPlan).toHaveBeenCalledWith(archivedVersion.id));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "حذف نسخه قدیمی برنامه" })).not.toBeInTheDocument());
+  expect(api.getWorkoutPlanHistory).toHaveBeenCalledTimes(2);
+});
+
+it("returns to the active plan when deleting the historical version currently displayed", async () => {
+  const archivedVersion = { ...pendingVersion, id: "018f0000-0000-7000-8000-000000000098", status: "superseded" as const, coach_review: { ...pendingVersion.coach_review, state: "initial_generated" as const } };
+  const historicalPlan = { ...plan, id: archivedVersion.id, status: "superseded" as const };
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.getWorkoutPlanHistory
+    .mockResolvedValueOnce([
+      { id: plan.id, status: "active", created_at: plan.created_at, activated_at: plan.activated_at, is_active: true, coach_review: { state: "none", coach_display_name: null, coach_note: null, approved_at: null } },
+      archivedVersion,
+    ])
+    .mockResolvedValueOnce([{ id: plan.id, status: "active", created_at: plan.created_at, activated_at: plan.activated_at, is_active: true, coach_review: { state: "none", coach_display_name: null, coach_note: null, approved_at: null } }]);
+  api.getWorkoutPlan.mockResolvedValue(historicalPlan);
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const historicalVersionButton = (await screen.findAllByRole("button", { name: /نسخه اولیه/ }))[1];
+  await user.click(historicalVersionButton);
+  expect(await screen.findByText("در حال مشاهده نسخه قبلی")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "حذف نسخه قدیمی برنامه" }));
+
+  await waitFor(() => expect(api.deleteWorkoutPlan).toHaveBeenCalledWith(archivedVersion.id));
+  await waitFor(() => expect(screen.queryByText("در حال مشاهده نسخه قبلی")).not.toBeInTheDocument());
+  expect(screen.getByText("پرس سینه دمبل")).toBeInTheDocument();
+});
+
+it("keeps a failed deletion visible and exposes a retryable error", async () => {
+  const archivedVersion = { ...pendingVersion, status: "failed" as const, coach_review: { ...pendingVersion.coach_review, state: "initial_generated" as const } };
+  api.getActiveWorkoutPlan.mockResolvedValue(plan);
+  api.getWorkoutPlanHistory.mockResolvedValue([
+    { id: plan.id, status: "active", created_at: plan.created_at, activated_at: plan.activated_at, is_active: true, coach_review: { state: "none", coach_display_name: null, coach_note: null, approved_at: null } },
+    archivedVersion,
+  ]);
+  api.deleteWorkoutPlan.mockRejectedValue(new Error("delete failed"));
+  vi.spyOn(window, "confirm").mockReturnValue(true);
+  const user = userEvent.setup();
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  const deleteButton = await screen.findByRole("button", { name: "حذف نسخه قدیمی برنامه" });
+  await user.click(deleteButton);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("حذف نسخه قدیمی برنامه انجام نشد؛ دوباره تلاش کن.");
+  expect(screen.getByRole("button", { name: "حذف نسخه قدیمی برنامه" })).toBeEnabled();
 });
 
 it("shows the fixed start guide and a generate action when no plan exists", async () => {

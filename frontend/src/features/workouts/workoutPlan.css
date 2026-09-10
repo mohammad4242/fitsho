@@ -110,9 +110,13 @@
 .workout-generation-method__choices label:has(input:disabled) { cursor: wait; opacity: .65; }
 .workout-version-history { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .workout-version-history__list { display: flex; flex-wrap: wrap; gap: .35rem; }
-.workout-version-history button { display: grid; padding: .45rem .6rem; border: 1px solid var(--fitsho-line); border-radius: .55rem; color: var(--fitsho-ink); background: var(--fitsho-surface-raised); font: inherit; font-size: .68rem; text-align: start; }
-.workout-version-history button span { color: var(--fitsho-muted); }
-.workout-version-history button.workout-version-history__active { border-color: var(--fitsho-aqua); }
+.workout-version-history__item { display: flex; align-items: stretch; gap: .25rem; }
+.workout-version-history__select { display: grid; padding: .45rem .6rem; border: 1px solid var(--fitsho-line); border-radius: .55rem; color: var(--fitsho-ink); background: var(--fitsho-surface-raised); font: inherit; font-size: .68rem; text-align: start; cursor: pointer; }
+.workout-version-history__select span { color: var(--fitsho-muted); }
+.workout-version-history__select.workout-version-history__active { border-color: var(--fitsho-aqua); }
+.workout-version-history__delete { min-width: 2.35rem; display: grid; place-items: center; padding: .35rem .45rem; border: 1px solid rgb(255 108 116 / 45%); border-radius: .55rem; color: var(--fitsho-coral); background: rgb(255 108 116 / 6%); font: inherit; font-size: .62rem; font-weight: 850; cursor: pointer; }
+.workout-version-history__delete:hover, .workout-version-history__delete:focus-visible { border-color: var(--fitsho-coral); background: rgb(255 108 116 / 12%); }
+.workout-version-history__delete:disabled { cursor: wait; opacity: .55; }
 .workout-tools { margin-top: .65rem; }
 .workout-tools > h2 { margin: 0 0 .4rem; color: var(--fitsho-muted); font-size: .72rem; }
 .workout-quick-actions { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: .9rem; background: var(--fitsho-surface-subtle); }

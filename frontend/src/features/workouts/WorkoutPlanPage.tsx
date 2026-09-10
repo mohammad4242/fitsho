@@ -9,6 +9,7 @@ import type { WorkoutGenerationMethod } from "../profile/types";
 import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import {
   downloadWorkoutPlanPdf,
+  deleteWorkoutPlan,
   generateWorkoutPlan,
   getActiveWorkoutPlan,
   getWorkoutPlan,
@@ -36,6 +37,8 @@ type GenerationError =
   | "bodyweight_days"
   | "bodyweight_pull_up_bar"
   | "bodyweight_exercise";
+
+type DeleteVersionError = { versionId: string; message: string };
 
 const bodyweightGenerationErrors: Record<string, GenerationError> = {
   BODYWEIGHT_ONLY_LEVEL_NOT_SUPPORTED: "bodyweight_level",
@@ -71,6 +74,10 @@ function generationErrorMessageKey(error: GenerationError): string {
   return "workoutPlan.generateError";
 }
 
+function isDeletableVersion(version: WorkoutPlanVersionSummary): boolean {
+  return version.status === "superseded" || version.status === "failed";
+}
+
 async function loadMemberPlans() {
   const [currentPlan, versions] = await Promise.all([
     getActiveWorkoutPlan(),
@@ -90,6 +97,8 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [history, setHistory] = useState<WorkoutPlanVersionSummary[]>([]);
   const [selectingVersionId, setSelectingVersionId] = useState<string | null>(null);
+  const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
+  const [deleteVersionError, setDeleteVersionError] = useState<DeleteVersionError | null>(null);
   const [state, setState] = useState<PlanState>("loading");
   const [generating, setGenerating] = useState(false);
   const [reused, setReused] = useState(false);
@@ -181,6 +190,37 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
       .then(setPlan)
       .catch(() => undefined)
       .finally(() => setSelectingVersionId(null));
+  }
+
+  function deleteVersion(version: WorkoutPlanVersionSummary) {
+    if (!isDeletableVersion(version) || deletingVersionId !== null) return;
+    const confirmed = window.confirm(
+      `${l("این نسخه قدیمی برنامه تمرینی حذف شود؟", "Delete this old workout plan version?")}\n\n${l("این نسخه از تاریخچه برنامه‌های شما حذف می‌شود.", "This version will be removed from your workout plan history.")}`,
+    );
+    if (!confirmed) return;
+
+    const wasViewingDeletedVersion = plan?.id === version.id;
+    setDeletingVersionId(version.id);
+    setDeleteVersionError(null);
+    void deleteWorkoutPlan(version.id)
+      .then(async () => {
+        const { currentPlan, versions, pendingPlan: loadedPendingPlan } = await loadMemberPlans();
+        setPendingPlan(loadedPendingPlan);
+        setActivePlanId(currentPlan?.id ?? null);
+        setHistory(versions);
+        if (wasViewingDeletedVersion || currentPlan === null) setPlan(currentPlan);
+        setState(currentPlan === null ? "empty" : "ready");
+      })
+      .catch(() => {
+        setDeleteVersionError({
+          versionId: version.id,
+          message: l(
+            "حذف نسخه قدیمی برنامه انجام نشد؛ دوباره تلاش کن.",
+            "The old workout plan version could not be deleted. Please try again.",
+          ),
+        });
+      })
+      .finally(() => setDeletingVersionId(null));
   }
 
   function downloadPdf() {
@@ -392,9 +432,46 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                       : version.coach_review.state === "coach_rejected"
                         ? l("نسخه برگشت‌داده‌شده برای اصلاح", "Returned for correction")
                         : l("نسخه اولیه", "Initial version");
-                    return <button type="button" key={version.id} className={version.id === plan.id ? "workout-version-history__active" : undefined} disabled={selectingVersionId !== null} aria-label={`${label} — ${new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "medium" }).format(new Date(version.created_at))}`} onClick={() => selectVersion(version)}><strong>{label}</strong><span>{version.is_active ? l("فعال", "Active") : l("آرشیو", "Archived")}</span></button>;
+                    const canDelete = isDeletableVersion(version);
+                    return (
+                      <div className="workout-version-history__item" key={version.id}>
+                        <button
+                          type="button"
+                          className={`workout-version-history__select${version.id === plan.id ? " workout-version-history__active" : ""}`}
+                          disabled={selectingVersionId !== null}
+                          aria-label={`${label} — ${new Intl.DateTimeFormat(isEnglish ? "en" : "fa-IR", { dateStyle: "medium" }).format(new Date(version.created_at))}`}
+                          onClick={() => selectVersion(version)}
+                        >
+                          <strong>{label}</strong>
+                          <span>{version.is_active ? l("فعال", "Active") : l("آرشیو", "Archived")}</span>
+                        </button>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            className="workout-version-history__delete"
+                            aria-label={l("حذف نسخه قدیمی برنامه", "Delete old plan version")}
+                            disabled={deletingVersionId === version.id}
+                            aria-busy={deletingVersionId === version.id}
+                            onClick={() => deleteVersion(version)}
+                          >
+                            <span aria-hidden="true">{l("حذف", "Delete")}</span>
+                          </button>
+                        )}
+                      </div>
+                    );
                   })}
                 </div>
+                {deleteVersionError !== null && (
+                  <StatusPanel
+                    role="alert"
+                    message={deleteVersionError.message}
+                    action={l("تلاش دوباره", "Retry")}
+                    onAction={() => {
+                      const version = memberHistory.find((item) => item.id === deleteVersionError.versionId);
+                      if (version !== undefined) deleteVersion(version);
+                    }}
+                  />
+                )}
               </section>
             )}
           </div>
