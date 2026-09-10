@@ -195,7 +195,7 @@ it("keeps public onboarding native and connected to the account handoff", async 
   await expect(
     readFile(resolve(appRoot, "(public)/public-onboarding.tsx"), "utf8"),
   ).resolves.toMatch(/PublicOnboardingScreen/);
-  await expect(readFile(resolve(appRoot, "(public)/index.tsx"), "utf8"))
+  await expect(readFile(resolve(dirname(appRoot), "public/PublicLandingScreen.tsx"), "utf8"))
     .resolves.toContain("/public-onboarding");
   await expect(readFile(resolve(dirname(appRoot), "onboarding/PublicOnboardingScreen.tsx"), "utf8"))
     .resolves.toContain("PUBLIC_ONBOARDING_SOURCE");

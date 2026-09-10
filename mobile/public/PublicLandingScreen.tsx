@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
-  Animated,
   Image,
   Pressable,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   type ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
+import Animated, {
+  useAnimatedProps,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+  type SharedValue,
+} from "react-native-reanimated";
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -21,6 +26,13 @@ import { BrandMark, Button, Media } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { LTR_TEXT } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
+import {
+  cinematicMotion,
+  easedProgressBetween,
+  processStepMotion,
+  sectionProgress,
+  type CinematicMotion,
+} from "./landingScrollMotion";
 
 const landing = authCopy.landing;
 const landingBackground = "#020b0c";
@@ -28,13 +40,16 @@ const processStages = ["understand", "plan", "train", "adapt"] as const;
 const muscles = ["shoulders", "back"] as const;
 type Muscle = (typeof muscles)[number];
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
 export function PublicLandingScreen() {
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const scrollOffset = useSharedValue(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const viewportHeight = Math.max(1, height - insets.top - insets.bottom);
   const compactLayout = width <= 650;
@@ -46,9 +61,11 @@ export function PublicLandingScreen() {
   const wideLayout = width >= 900;
   const splitLayout = width > 650;
 
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setScrollOffset(event.nativeEvent.contentOffset.y);
-  }, []);
+  const handleScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollOffset.value = Math.max(0, event.contentOffset.y);
+    },
+  });
 
   const scrollTo = useCallback((offset: number) => {
     setMenuOpen(false);
@@ -56,11 +73,12 @@ export function PublicLandingScreen() {
   }, []);
 
   return (
-    <Screen contentContainerStyle={styles.screenContent} contentWidth="full" scroll={false}>
+    <Screen contentContainerStyle={styles.screenContent} contentWidth="full" keyboardAware={false} scroll={false}>
       <View style={styles.root}>
         <Animated.ScrollView
           contentContainerStyle={styles.scrollContent}
           onScroll={handleScroll}
+          overScrollMode="never"
           ref={scrollRef}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
@@ -228,7 +246,7 @@ function PublicCinematicStory({ compactLayout, onStart, reducedMotion, scrollOff
   readonly compactLayout: boolean;
   readonly onStart: () => void;
   readonly reducedMotion: boolean;
-  readonly scrollOffset: number;
+  readonly scrollOffset: SharedValue<number>;
   readonly sectionHeight: number;
   readonly sectionStart: number;
   readonly splitLayout: boolean;
@@ -236,31 +254,41 @@ function PublicCinematicStory({ compactLayout, onStart, reducedMotion, scrollOff
   readonly viewportWidth: number;
   readonly wideLayout: boolean;
 }) {
-  const storyProgress = reducedMotion ? 1 : sectionProgress(scrollOffset, sectionStart, sectionHeight, viewportHeight);
-  const stageTranslation = reducedMotion ? 0 : storyProgress * Math.max(0, sectionHeight - viewportHeight);
-  const heroProgress = reducedMotion ? 1 : 1 - progressBetween(storyProgress, 0.04, 0.16);
-  const cinemaProgress = reducedMotion ? 0 : progressBetween(storyProgress, 0.06, 0.58);
-  const trainingProgress = reducedMotion ? 1 : windowedProgress(storyProgress, 0.14, 0.21, 0.33, 0.44);
-  const trainingSeal = reducedMotion ? 1 : progressBetween(storyProgress, 0.23, 0.31);
-  const nutritionProgress = reducedMotion ? 1 : windowedProgress(storyProgress, 0.38, 0.46, 0.61, 0.72);
-  const nutritionSeal = reducedMotion ? 1 : progressBetween(storyProgress, 0.49, 0.57);
-  const mealProgress = reducedMotion ? 1 : progressBetween(storyProgress, 0.64, 0.72);
-  const mealScan = reducedMotion ? 1 : progressBetween(storyProgress, 0.73, 0.87);
-  const mealResult = reducedMotion ? 1 : progressBetween(storyProgress, 0.86, 0.94);
-  const videoProgress = reducedMotion ? 0 : 1 - progressBetween(storyProgress, 0.76, 1);
-  const stageStyles = reducedMotion
-    ? [styles.reducedCinematicStage]
-    : [styles.cinematicStage, { height: viewportHeight, transform: [{ translateY: stageTranslation }] }];
+  const storyProgress = useDerivedValue(() => (
+    reducedMotion ? 1 : sectionProgress(scrollOffset.value, sectionStart, sectionHeight, viewportHeight)
+  ));
+  const motion = useDerivedValue(() => cinematicMotion(storyProgress.value));
+  const stageAnimatedStyle = useAnimatedStyle(() => ({
+    height: viewportHeight,
+    transform: [{
+      translateY: reducedMotion
+        ? 0
+        : storyProgress.value * Math.max(0, sectionHeight - viewportHeight),
+    }],
+  }));
+  const shadeAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 0.36 + (reducedMotion ? 0 : motion.value.cinema) * 0.5,
+  }));
+  const fadeAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 1 - (reducedMotion ? 0 : motion.value.video),
+  }));
+  const heroAnimatedStyle = useAnimatedStyle(() => {
+    const progress = reducedMotion ? 1 : motion.value.hero;
+    return {
+      opacity: progress,
+      transform: [{ translateY: (1 - progress) * -24 }],
+    };
+  });
 
   return (
     <View accessibilityLabel={landing.story.label} style={[styles.cinematicSection, { height: sectionHeight }]} testID="public-entry-cinematic-story">
-      <Animated.View style={stageStyles}>
-        <PublicLandingFilm reducedMotion={reducedMotion} videoOpacity={0.08 + videoProgress * 0.92} videoScale={1.015 + cinemaProgress * 0.015} />
-        <View pointerEvents="none" style={[styles.cinematicShade, compactLayout && styles.cinematicShadeCompact, { opacity: 0.36 + cinemaProgress * 0.5 }]} />
-        <View pointerEvents="none" style={[styles.cinematicFade, { opacity: 1 - videoProgress }]} />
+      <Animated.View style={reducedMotion ? styles.reducedCinematicStage : [styles.cinematicStage, stageAnimatedStyle]}>
+        <PublicLandingFilm motion={motion} reducedMotion={reducedMotion} />
+        <Animated.View pointerEvents="none" style={[styles.cinematicShade, compactLayout && styles.cinematicShadeCompact, shadeAnimatedStyle]} />
+        <Animated.View pointerEvents="none" style={[styles.cinematicFade, fadeAnimatedStyle]} />
         <Animated.View
-          pointerEvents={reducedMotion || heroProgress > 0.08 ? "auto" : "none"}
-          style={[styles.cinematicScene, compactLayout && styles.cinematicSceneCompact, styles.heroScene, compactLayout && styles.heroSceneCompact, reducedMotion && styles.reducedScene, compactLayout && { paddingBottom: viewportHeight * 0.08 }, { opacity: reducedMotion ? 1 : heroProgress, transform: [{ translateY: reducedMotion ? 0 : (1 - heroProgress) * -24 }] }]}
+          pointerEvents="box-none"
+          style={[styles.cinematicScene, compactLayout && styles.cinematicSceneCompact, styles.heroScene, compactLayout && styles.heroSceneCompact, reducedMotion && styles.reducedScene, compactLayout && { paddingBottom: viewportHeight * 0.08 }, heroAnimatedStyle]}
         >
           <View style={styles.heroCopy}>
             <Text accessibilityRole="header" style={[styles.heroTitle, compactLayout && styles.heroTitleCompact]}>{landing.hero.title}</Text>
@@ -269,19 +297,23 @@ function PublicCinematicStory({ compactLayout, onStart, reducedMotion, scrollOff
           </View>
           {!reducedMotion ? <View pointerEvents="none" style={styles.scrollIndicator}><View style={styles.scrollIndicatorFill} /></View> : null}
         </Animated.View>
-        <SupervisionMoment compactLayout={compactLayout} label="training" progress={trainingProgress} reducedMotion={reducedMotion} sealProgress={trainingSeal} splitLayout={splitLayout} viewportWidth={viewportWidth} wideLayout={wideLayout} />
-        <SupervisionMoment compactLayout={compactLayout} label="nutrition" progress={nutritionProgress} reducedMotion={reducedMotion} sealProgress={nutritionSeal} splitLayout={splitLayout} viewportWidth={viewportWidth} wideLayout={wideLayout} />
-        <MealPhotoAnalysis compactLayout={compactLayout} mealProgress={mealProgress} mealResult={mealResult} mealScan={mealScan} reducedMotion={reducedMotion} splitLayout={splitLayout} viewportWidth={viewportWidth} />
+        <SupervisionMoment compactLayout={compactLayout} label="training" motion={motion} reducedMotion={reducedMotion} splitLayout={splitLayout} viewportWidth={viewportWidth} wideLayout={wideLayout} />
+        <SupervisionMoment compactLayout={compactLayout} label="nutrition" motion={motion} reducedMotion={reducedMotion} splitLayout={splitLayout} viewportWidth={viewportWidth} wideLayout={wideLayout} />
+        <MealPhotoAnalysis compactLayout={compactLayout} motion={motion} reducedMotion={reducedMotion} splitLayout={splitLayout} viewportWidth={viewportWidth} />
       </Animated.View>
     </View>
   );
 }
 
-function PublicLandingFilm({ reducedMotion, videoOpacity, videoScale }: { readonly reducedMotion: boolean; readonly videoOpacity: number; readonly videoScale: number }) {
+function PublicLandingFilm({ motion, reducedMotion }: { readonly motion: SharedValue<CinematicMotion>; readonly reducedMotion: boolean }) {
   const [failed, setFailed] = useState(false);
+  const mediaAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 0.08 + (reducedMotion ? 0 : motion.value.video) * 0.92,
+    transform: [{ scale: 1.015 + (reducedMotion ? 0 : motion.value.cinema) * 0.015 }],
+  }));
   return (
     <View pointerEvents="none" style={styles.filmLayer} testID="public-entry-film">
-      <Animated.View style={[styles.filmMediaLayer, { opacity: videoOpacity, transform: [{ scale: videoScale }] }]}>
+      <Animated.View style={[styles.filmMediaLayer, mediaAnimatedStyle]}>
         <Image accessible={false} resizeMode="cover" source={require("../assets/landing/landfilm-poster.webp")} style={styles.filmMedia} />
         {!reducedMotion && !failed ? (
           <Media autoplay kind="video" loop muted onError={() => setFailed(true)} source={require("../assets/landing/landfilm.mp4")} style={styles.filmMedia} />
@@ -291,25 +323,36 @@ function PublicLandingFilm({ reducedMotion, videoOpacity, videoScale }: { readon
   );
 }
 
-function SupervisionMoment({ compactLayout, label, progress, reducedMotion, sealProgress, splitLayout, viewportWidth, wideLayout }: { readonly compactLayout: boolean; readonly label: "training" | "nutrition"; readonly progress: number; readonly reducedMotion: boolean; readonly sealProgress: number; readonly splitLayout: boolean; readonly viewportWidth: number; readonly wideLayout: boolean }) {
+function SupervisionMoment({ compactLayout, label, motion, reducedMotion, splitLayout, viewportWidth, wideLayout }: { readonly compactLayout: boolean; readonly label: "training" | "nutrition"; readonly motion: SharedValue<CinematicMotion>; readonly reducedMotion: boolean; readonly splitLayout: boolean; readonly viewportWidth: number; readonly wideLayout: boolean }) {
   const title = label === "training" ? landing.supervision.training.title : landing.supervision.nutrition.title;
   const seal = label === "training" ? landing.supervision.training.seal : landing.supervision.nutrition.seal;
+  const sceneAnimatedStyle = useAnimatedStyle(() => {
+    const progress = reducedMotion
+      ? 1
+      : label === "training"
+        ? motion.value.training
+        : motion.value.nutrition;
+    return {
+      opacity: progress,
+      transform: [{ translateY: (1 - progress) * 32 }],
+    };
+  });
   return (
     <Animated.View
-      pointerEvents={reducedMotion || progress > 0.08 ? "auto" : "none"}
-      style={[styles.cinematicScene, compactLayout && styles.cinematicSceneCompact, styles.supervisionScene, splitLayout && styles.supervisionSceneWide, compactLayout && styles.supervisionSceneCompact, reducedMotion && styles.reducedScene, { opacity: reducedMotion ? 1 : progress, transform: [{ translateY: reducedMotion ? 0 : (1 - progress) * 32 }] }]}
+      pointerEvents="none"
+      style={[styles.cinematicScene, compactLayout && styles.cinematicSceneCompact, styles.supervisionScene, splitLayout && styles.supervisionSceneWide, compactLayout && styles.supervisionSceneCompact, reducedMotion && styles.reducedScene, sceneAnimatedStyle]}
       testID={`public-entry-supervision-${label}`}
     >
       <View style={[styles.sceneCopy, compactLayout && styles.sceneCopyCompact]}>
         <Text style={styles.sceneEyebrow}>{label.toUpperCase()}</Text>
         <Text accessibilityRole="header" style={[styles.sceneTitle, compactLayout && styles.sceneTitleCompact]}>{title}</Text>
       </View>
-      <PlanDocument compactLayout={compactLayout} label={label} seal={seal} sealProgress={sealProgress} viewportWidth={viewportWidth} wideLayout={wideLayout} />
+      <PlanDocument compactLayout={compactLayout} label={label} motion={motion} seal={seal} viewportWidth={viewportWidth} wideLayout={wideLayout} />
     </Animated.View>
   );
 }
 
-function PlanDocument({ compactLayout, label, seal, sealProgress, viewportWidth, wideLayout }: { readonly compactLayout: boolean; readonly label: "training" | "nutrition"; readonly seal: string; readonly sealProgress: number; readonly viewportWidth: number; readonly wideLayout: boolean }) {
+function PlanDocument({ compactLayout, label, motion, seal, viewportWidth, wideLayout }: { readonly compactLayout: boolean; readonly label: "training" | "nutrition"; readonly motion: SharedValue<CinematicMotion>; readonly seal: string; readonly viewportWidth: number; readonly wideLayout: boolean }) {
   return (
     <View style={[styles.planPaper, compactLayout && styles.planPaperCompact, label === "nutrition" && styles.planPaperNutrition, wideLayout && styles.planPaperWide, compactLayout && { width: Math.min(viewportWidth * 0.72, 272) }]} testID={`public-entry-plan-document-${label}`}>
       <View style={[styles.planHeader, compactLayout && styles.planHeaderCompact]}><View style={[styles.planAvatar, compactLayout && styles.planAvatarCompact]} /><View style={styles.planHeaderLine} /></View>
@@ -318,33 +361,64 @@ function PlanDocument({ compactLayout, label, seal, sealProgress, viewportWidth,
         <View style={[styles.planGroupTiles, compactLayout && styles.planGroupTilesCompact]}><View style={[styles.planTile, compactLayout && styles.planTileCompact]} /><View style={[styles.planTile, compactLayout && styles.planTileCompact]} /></View>
         <View style={[styles.planGroup, compactLayout && styles.planGroupCompact]}><View style={styles.planLineWide} /><View style={styles.planLineMedium} /><View style={styles.planLineShort} /></View>
       </View>
-      <VerificationSeal compactLayout={compactLayout} progress={sealProgress} text={seal} />
+      <VerificationSeal compactLayout={compactLayout} label={label} motion={motion} text={seal} />
     </View>
   );
 }
 
-function VerificationSeal({ compactLayout, progress, text }: { readonly compactLayout: boolean; readonly progress: number; readonly text: string }) {
+function VerificationSeal({ compactLayout, label, motion, text }: { readonly compactLayout: boolean; readonly label: "training" | "nutrition"; readonly motion: SharedValue<CinematicMotion>; readonly text: string }) {
   const size = compactLayout ? 76 : 92;
   const radius = compactLayout ? 31 : 38;
   const center = size / 2;
   const circumference = 2 * Math.PI * radius;
+  const ringAnimatedProps = useAnimatedProps(() => {
+    const progress = label === "training" ? motion.value.trainingSeal : motion.value.nutritionSeal;
+    return { strokeDashoffset: circumference * (1 - progress) };
+  });
+  const checkAnimatedProps = useAnimatedProps(() => {
+    const progress = label === "training" ? motion.value.trainingSeal : motion.value.nutritionSeal;
+    return { opacity: easedProgressBetween(progress, 0.72, 1) };
+  });
   return (
     <View style={[styles.verificationSeal, compactLayout && styles.verificationSealCompact]}>
       <Svg height={size} width={size}>
         <Circle cx={center} cy={center} fill="transparent" r={radius} stroke="rgba(102,200,159,0.16)" strokeWidth={2} />
-        <Circle cx={center} cy={center} fill="transparent" origin={`${center}, ${center}`} r={radius} rotation="-90" stroke={fiticianTokens.colors.success} strokeDasharray={`${circumference} ${circumference}`} strokeDashoffset={circumference * (1 - progress)} strokeLinecap="round" strokeWidth={2} />
-        <Path d={compactLayout ? "M23 38 33 48 54 27" : "M28 46 40 58 65 32"} fill="transparent" opacity={progressBetween(progress, 0.72, 1)} stroke={fiticianTokens.colors.success} strokeLinecap="round" strokeLinejoin="round" strokeWidth={compactLayout ? 5 : 6} />
+        <AnimatedCircle animatedProps={ringAnimatedProps} cx={center} cy={center} fill="transparent" origin={`${center}, ${center}`} r={radius} rotation="-90" stroke={fiticianTokens.colors.success} strokeDasharray={`${circumference} ${circumference}`} strokeLinecap="round" strokeWidth={2} />
+        <AnimatedPath animatedProps={checkAnimatedProps} d={compactLayout ? "M23 38 33 48 54 27" : "M28 46 40 58 65 32"} fill="transparent" stroke={fiticianTokens.colors.success} strokeLinecap="round" strokeLinejoin="round" strokeWidth={compactLayout ? 5 : 6} />
       </Svg>
       <Text style={styles.verificationSealText}>{text}</Text>
     </View>
   );
 }
 
-function MealPhotoAnalysis({ compactLayout, mealProgress, mealResult, mealScan, reducedMotion, splitLayout, viewportWidth }: { readonly compactLayout: boolean; readonly mealProgress: number; readonly mealResult: number; readonly mealScan: number; readonly reducedMotion: boolean; readonly splitLayout: boolean; readonly viewportWidth: number }) {
+function MealPhotoAnalysis({ compactLayout, motion, reducedMotion, splitLayout, viewportWidth }: { readonly compactLayout: boolean; readonly motion: SharedValue<CinematicMotion>; readonly reducedMotion: boolean; readonly splitLayout: boolean; readonly viewportWidth: number }) {
+  const frameWidth = compactLayout
+    ? Math.min(viewportWidth * 0.76, 288)
+    : Math.min(Math.max(0, viewportWidth - 40), 360);
+  const scanDistance = (frameWidth / (compactLayout ? 0.86 : 0.92)) * 0.84;
+  const mealScanProgress = useDerivedValue(() => motion.value.mealScan);
+  const sceneAnimatedStyle = useAnimatedStyle(() => {
+    const progress = reducedMotion ? 1 : motion.value.meal;
+    return {
+      opacity: progress,
+      transform: [{ translateY: (1 - progress) * 29 }],
+    };
+  });
+  const scanLineAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: easedProgressBetween(motion.value.mealScan, 0, 0.5),
+    transform: [{ translateY: motion.value.mealScan * scanDistance }],
+  }));
+  const resultAnimatedStyle = useAnimatedStyle(() => {
+    const progress = reducedMotion ? 1 : motion.value.mealResult;
+    return {
+      opacity: progress,
+      transform: [{ translateY: (1 - progress) * 13 }],
+    };
+  });
   return (
     <Animated.View
-      pointerEvents={reducedMotion || mealProgress > 0.08 ? "auto" : "none"}
-      style={[styles.cinematicScene, compactLayout && styles.cinematicSceneCompact, styles.mealScene, splitLayout && styles.mealSceneWide, compactLayout && styles.mealSceneCompact, reducedMotion && styles.reducedScene, { opacity: reducedMotion ? 1 : mealProgress, transform: [{ translateY: reducedMotion ? 0 : (1 - mealProgress) * 29 }] }]}
+      pointerEvents="none"
+      style={[styles.cinematicScene, compactLayout && styles.cinematicSceneCompact, styles.mealScene, splitLayout && styles.mealSceneWide, compactLayout && styles.mealSceneCompact, reducedMotion && styles.reducedScene, sceneAnimatedStyle]}
     >
       <View style={[styles.sceneCopy, compactLayout && styles.sceneCopyCompact]}>
         <Text style={styles.sceneEyebrow}>MEAL PHOTO ANALYSIS</Text>
@@ -354,10 +428,10 @@ function MealPhotoAnalysis({ compactLayout, mealProgress, mealResult, mealScan, 
       <View style={styles.mealVisual}>
         <View style={[styles.scanFrame, compactLayout && styles.scanFrameMealCompact, compactLayout && { width: Math.min(viewportWidth * 0.76, 288) }]} testID="public-entry-meal-scan">
           <Image accessibilityLabel={landing.meal.imageAlt} resizeMode="cover" source={require("../assets/landing/food.webp")} style={styles.scanImage} />
-          <ScanCorners progress={mealScan} />
-          <View style={[styles.scanLine, { opacity: progressBetween(mealScan, 0, 0.5), top: `${8 + mealScan * 84}%` }]} />
+          <ScanCorners progress={mealScanProgress} />
+          <Animated.View style={[styles.scanLine, scanLineAnimatedStyle]} />
         </View>
-        <View style={[styles.mealResult, compactLayout && styles.mealResultCompact, { opacity: reducedMotion ? 1 : mealResult, transform: [{ translateY: reducedMotion ? 0 : (1 - mealResult) * 13 }] }]}>
+        <Animated.View style={[styles.mealResult, compactLayout && styles.mealResultCompact, resultAnimatedStyle]}>
           <Text style={[styles.mealCalories, LTR_TEXT]}>{landing.meal.calories}</Text>
           <View style={styles.macroRow}>
             {(["protein", "carbs", "fat"] as const).map((macro) => (
@@ -367,102 +441,173 @@ function MealPhotoAnalysis({ compactLayout, mealProgress, mealResult, mealScan, 
               </View>
             ))}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Animated.View>
   );
 }
 
-function ScanCorners({ progress }: { readonly progress: number }) {
+function ScanCorners({ progress }: { readonly progress: SharedValue<number> }) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+  }));
   return (
     <>
-      <View style={[styles.scanCorner, styles.scanCornerOne, { opacity: progress }]} />
-      <View style={[styles.scanCorner, styles.scanCornerTwo, { opacity: progress }]} />
-      <View style={[styles.scanCorner, styles.scanCornerThree, { opacity: progress }]} />
-      <View style={[styles.scanCorner, styles.scanCornerFour, { opacity: progress }]} />
+      <Animated.View style={[styles.scanCorner, styles.scanCornerOne, animatedStyle]} />
+      <Animated.View style={[styles.scanCorner, styles.scanCornerTwo, animatedStyle]} />
+      <Animated.View style={[styles.scanCorner, styles.scanCornerThree, animatedStyle]} />
+      <Animated.View style={[styles.scanCorner, styles.scanCornerFour, animatedStyle]} />
     </>
   );
 }
 
-function PublicProcessStory({ compactLayout, reducedMotion, scrollOffset, sectionHeight, sectionStart, viewportHeight }: { readonly compactLayout: boolean; readonly reducedMotion: boolean; readonly scrollOffset: number; readonly sectionHeight: number; readonly sectionStart: number; readonly viewportHeight: number }) {
-  const processProgress = reducedMotion ? 1 : sectionProgress(scrollOffset, sectionStart, sectionHeight, viewportHeight);
-  const stageTranslation = reducedMotion ? 0 : processProgress * Math.max(0, sectionHeight - viewportHeight);
+function PublicProcessStory({ compactLayout, reducedMotion, scrollOffset, sectionHeight, sectionStart, viewportHeight }: { readonly compactLayout: boolean; readonly reducedMotion: boolean; readonly scrollOffset: SharedValue<number>; readonly sectionHeight: number; readonly sectionStart: number; readonly viewportHeight: number }) {
+  const processProgress = useDerivedValue(() => (
+    reducedMotion ? 1 : sectionProgress(scrollOffset.value, sectionStart, sectionHeight, viewportHeight)
+  ));
+  const stageAnimatedStyle = useAnimatedStyle(() => ({
+    height: viewportHeight,
+    transform: [{
+      translateY: processProgress.value * Math.max(0, sectionHeight - viewportHeight),
+    }],
+  }));
   return (
     <View accessibilityLabel={landing.progression.label} style={[styles.processSection, { height: sectionHeight }]} testID="public-entry-process">
-      <Animated.View style={[reducedMotion ? styles.reducedProcessStage : styles.processStage, compactLayout && styles.processStageCompact, !reducedMotion && { height: viewportHeight, transform: [{ translateY: stageTranslation }] }]}>
+      <Animated.View style={[reducedMotion ? styles.reducedProcessStage : styles.processStage, compactLayout && styles.processStageCompact, !reducedMotion && stageAnimatedStyle]}>
         <View style={styles.processHeader}>
           <Text style={styles.landingKicker}>{landing.process.eyebrow}</Text>
           <Text accessibilityRole="header" style={[styles.processTitle, compactLayout && styles.processTitleCompact]}>{landing.process.title}</Text>
         </View>
         <View style={[styles.processList, compactLayout && styles.processListCompact]}>
-          {processStages.map((stage, index) => {
-            const stepFill = reducedMotion ? 1 : progressBetween(processProgress, index * 0.25, index * 0.25 + 0.14);
-            const copyFill = reducedMotion ? 1 : progressBetween(processProgress, index * 0.25 + 0.14, index * 0.25 + 0.18);
-            const lineFill = index < processStages.length - 1 ? reducedMotion ? 1 : progressBetween(processProgress, index * 0.25 + 0.18, index * 0.25 + 0.25) : 0;
-            return (
-              <View key={stage} style={[styles.processStep, compactLayout && styles.processStepCompact]} testID={`public-entry-process-step-${stage}`}>
-                <ProgressRing compactLayout={compactLayout} fill={stepFill} number={String(index + 1).padStart(2, "0")} />
-                <View style={[styles.processStepCopy, compactLayout && styles.processStepCopyCompact, { opacity: 0.26 + copyFill * 0.74 }]}>
-                  <Text style={styles.processStepEyebrow}>{landing.progression[stage].title}</Text>
-                  <Text style={[styles.processStepTitle, compactLayout && styles.processStepTitleCompact]}>{landing.progression[stage].body}</Text>
-                </View>
-                {index < processStages.length - 1 ? <View pointerEvents="none" style={[styles.processConnectorTrack, compactLayout && styles.processConnectorTrackCompact]}><View style={[styles.processConnectorFill, { height: `${lineFill * 100}%` }]} /></View> : null}
-              </View>
-            );
-          })}
+          {processStages.map((stage, index) => (
+            <ProcessStep
+              compactLayout={compactLayout}
+              index={index}
+              key={stage}
+              progress={processProgress}
+              stage={stage}
+            />
+          ))}
         </View>
       </Animated.View>
     </View>
   );
 }
 
-function ProgressRing({ compactLayout, fill, number }: { readonly compactLayout: boolean; readonly fill: number; readonly number: string }) {
+function ProcessStep({ compactLayout, index, progress, stage }: { readonly compactLayout: boolean; readonly index: number; readonly progress: SharedValue<number>; readonly stage: (typeof processStages)[number] }) {
+  const motion = useDerivedValue(() => processStepMotion(progress.value, index));
+  const copyAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: 0.16 + motion.value.copy * 0.84,
+    transform: [{ translateY: (1 - motion.value.copy) * 7 }],
+  }));
+  const connectorAnimatedStyle = useAnimatedStyle(() => ({
+    height: `${motion.value.connector * 100}%` as `${number}%`,
+  }));
+  const ringProgress = useDerivedValue(() => motion.value.ring);
+  return (
+    <View style={[styles.processStep, compactLayout && styles.processStepCompact]} testID={`public-entry-process-step-${stage}`}>
+      <ProgressRing compactLayout={compactLayout} fill={ringProgress} number={String(index + 1).padStart(2, "0")} />
+      <Animated.View style={[styles.processStepCopy, compactLayout && styles.processStepCopyCompact, copyAnimatedStyle]}>
+        <Text style={styles.processStepEyebrow}>{landing.progression[stage].title}</Text>
+        <Text style={[styles.processStepTitle, compactLayout && styles.processStepTitleCompact]}>{landing.progression[stage].body}</Text>
+      </Animated.View>
+      {index < processStages.length - 1 ? (
+        <View pointerEvents="none" style={[styles.processConnectorTrack, compactLayout && styles.processConnectorTrackCompact]}>
+          <Animated.View style={[styles.processConnectorFill, connectorAnimatedStyle]} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ProgressRing({ compactLayout, fill, number }: { readonly compactLayout: boolean; readonly fill: SharedValue<number>; readonly number: string }) {
   const size = compactLayout ? 64 : 70;
   const center = size / 2;
   const radius = compactLayout ? 25 : 28;
   const circumference = 2 * Math.PI * radius;
+  const ringAnimatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - fill.value),
+  }));
   return (
     <View style={[styles.progressRing, compactLayout && styles.progressRingCompact]}>
       <Svg height={size} width={size}>
         <Circle cx={center} cy={center} fill="transparent" r={radius} stroke="rgba(232,244,241,0.14)" strokeWidth={2} />
-        <Circle cx={center} cy={center} fill="transparent" origin={`${center}, ${center}`} r={radius} rotation="-90" stroke={fiticianTokens.colors.aqua} strokeDasharray={`${circumference} ${circumference}`} strokeDashoffset={circumference * (1 - fill)} strokeLinecap="round" strokeWidth={2} />
+        <AnimatedCircle animatedProps={ringAnimatedProps} cx={center} cy={center} fill="transparent" origin={`${center}, ${center}`} r={radius} rotation="-90" stroke={fiticianTokens.colors.aqua} strokeDasharray={`${circumference} ${circumference}`} strokeLinecap="round" strokeWidth={2} />
       </Svg>
       <Text style={styles.progressRingNumber}>{number}</Text>
     </View>
   );
 }
 
-function PublicBodyIntelligence({ compactLayout, reducedMotion, scrollOffset, sectionHeight, sectionStart, viewportHeight, viewportWidth, wideLayout }: { readonly compactLayout: boolean; readonly reducedMotion: boolean; readonly scrollOffset: number; readonly sectionHeight: number; readonly sectionStart: number; readonly viewportHeight: number; readonly viewportWidth: number; readonly wideLayout: boolean }) {
-  const bodyProgress = reducedMotion ? 1 : sectionProgress(scrollOffset, sectionStart, sectionHeight, viewportHeight);
-  const stageTranslation = reducedMotion ? 0 : bodyProgress * Math.max(0, sectionHeight - viewportHeight);
-  const analysisProgress = reducedMotion ? 1 : progressBetween(bodyProgress, 0.08, 0.46);
-  const analysisExit = reducedMotion ? 0 : progressBetween(bodyProgress, 0.48, 0.66);
-  const bodyResult = reducedMotion ? 1 : progressBetween(bodyProgress, 0.58, 0.72);
-  const bodyDepth = reducedMotion ? 1 : progressBetween(bodyProgress, 0.58, 1);
-  const captureOpacity = analysisProgress * (1 - analysisExit);
+function PublicBodyIntelligence({ compactLayout, reducedMotion, scrollOffset, sectionHeight, sectionStart, viewportHeight, viewportWidth, wideLayout }: { readonly compactLayout: boolean; readonly reducedMotion: boolean; readonly scrollOffset: SharedValue<number>; readonly sectionHeight: number; readonly sectionStart: number; readonly viewportHeight: number; readonly viewportWidth: number; readonly wideLayout: boolean }) {
+  const bodyProgress = useDerivedValue(() => (
+    reducedMotion ? 1 : sectionProgress(scrollOffset.value, sectionStart, sectionHeight, viewportHeight)
+  ));
+  const analysisProgress = useDerivedValue(() => (
+    reducedMotion ? 1 : easedProgressBetween(bodyProgress.value, 0.08, 0.46)
+  ));
+  const analysisExit = useDerivedValue(() => (
+    reducedMotion ? 0 : easedProgressBetween(bodyProgress.value, 0.48, 0.66)
+  ));
+  const bodyResult = useDerivedValue(() => (
+    reducedMotion ? 1 : easedProgressBetween(bodyProgress.value, 0.58, 0.72)
+  ));
+  const bodyDepth = useDerivedValue(() => (
+    reducedMotion ? 1 : easedProgressBetween(bodyProgress.value, 0.58, 1)
+  ));
+  const frameWidth = compactLayout
+    ? Math.min(viewportWidth * 0.72, 272)
+    : Math.min(Math.max(0, viewportWidth - 40), 384);
+  const scanDistance = (frameWidth / 0.68) * 0.84;
+  const stageAnimatedStyle = useAnimatedStyle(() => ({
+    height: viewportHeight,
+    transform: [{
+      translateY: bodyProgress.value * Math.max(0, sectionHeight - viewportHeight),
+    }],
+  }));
+  const captureAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: analysisProgress.value * (1 - analysisExit.value),
+    transform: [
+      { translateY: analysisExit.value * -11.2 },
+      { scale: 1 - analysisExit.value * 0.025 },
+    ],
+  }));
+  const scanLineAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: easedProgressBetween(analysisProgress.value, 0, 0.5),
+    transform: [{ translateY: analysisProgress.value * scanDistance }],
+  }));
+  const mappingAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: analysisProgress.value,
+  }));
+  const interfaceAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: bodyResult.value,
+    transform: [{
+      translateY: (1 - bodyResult.value) * 12 + (bodyDepth.value - 0.5) * -5.6,
+    }],
+  }));
   const [activeMuscle, setActiveMuscle] = useState<Muscle>("shoulders");
   return (
     <View accessibilityLabel={landing.intelligence.title} style={[styles.bodySection, { height: sectionHeight }]} testID="public-entry-body-story">
-      <Animated.View style={[reducedMotion ? styles.reducedBodyStage : styles.bodyStage, compactLayout && styles.bodyStageCompact, !reducedMotion && { height: viewportHeight, transform: [{ translateY: stageTranslation }] }]}>
+      <Animated.View style={[reducedMotion ? styles.reducedBodyStage : styles.bodyStage, compactLayout && styles.bodyStageCompact, !reducedMotion && stageAnimatedStyle]}>
         <View style={[styles.bodyHeading, compactLayout && styles.bodyHeadingCompact]}>
           <Text style={styles.landingKicker}>{landing.intelligence.eyebrow}</Text>
           <Text accessibilityRole="header" style={[styles.bodyTitle, compactLayout && styles.bodyTitleCompact]}>{landing.intelligence.title}</Text>
           <Text style={[styles.bodyDescription, compactLayout && styles.bodyDescriptionCompact]}>{landing.intelligence.body}</Text>
         </View>
-        <Animated.View style={[styles.bodyCapture, compactLayout && styles.bodyCaptureCompact, wideLayout && styles.bodyCaptureWide, { opacity: captureOpacity, transform: [{ translateY: reducedMotion ? 0 : analysisExit * -11.2 }, { scale: reducedMotion ? 1 : 1 - analysisExit * 0.025 }] }]}>
+        <Animated.View style={[styles.bodyCapture, compactLayout && styles.bodyCaptureCompact, wideLayout && styles.bodyCaptureWide, captureAnimatedStyle]}>
           <View style={[styles.bodyScanFrame, compactLayout && styles.bodyScanFrameCompact, compactLayout && { width: Math.min(viewportWidth * 0.72, 272) }]}>
             <Image accessibilityLabel={landing.intelligence.analysisImageAlt} resizeMode="cover" source={require("../assets/landing/analyze.webp")} style={styles.bodyCaptureImage} />
             <ScanCorners progress={analysisProgress} />
-            <View style={[styles.scanLine, { opacity: progressBetween(analysisProgress, 0, 0.5), top: `${8 + analysisProgress * 84}%` }]} />
-            <View pointerEvents="none" style={[styles.bodyMapping, { opacity: analysisProgress }]}>
+            <Animated.View style={[styles.scanLine, scanLineAnimatedStyle]} />
+            <Animated.View pointerEvents="none" style={[styles.bodyMapping, mappingAnimatedStyle]}>
               <View style={[styles.bodyMappingDot, styles.bodyMappingOne]} />
               <View style={[styles.bodyMappingDot, styles.bodyMappingTwo]} />
               <View style={[styles.bodyMappingDot, styles.bodyMappingThree]} />
-            </View>
+            </Animated.View>
           </View>
           <Text style={styles.bodyCaptureLabel}>{landing.intelligence.scanning}</Text>
         </Animated.View>
-        <Animated.View style={[styles.bodyInterface, compactLayout && styles.bodyInterfaceCompact, wideLayout && styles.bodyInterfaceWide, { opacity: bodyResult, transform: [{ translateY: reducedMotion ? 0 : (1 - bodyResult) * 12 + (bodyDepth - 0.5) * -5.6 }] }]} testID="public-entry-body-analysis">
+        <Animated.View style={[styles.bodyInterface, compactLayout && styles.bodyInterfaceCompact, wideLayout && styles.bodyInterfaceWide, interfaceAnimatedStyle]} testID="public-entry-body-analysis">
           <Image accessibilityLabel={landing.intelligence.imageAlt} resizeMode="cover" source={require("../assets/landing/body.webp")} style={styles.bodyInterfaceImage} />
           <Svg pointerEvents="none" style={styles.bodyMuscles} viewBox="0 0 100 150">
             <Defs>
@@ -509,22 +654,6 @@ function useReducedMotion() {
     return () => subscription.remove();
   }, []);
   return reducedMotion;
-}
-
-function clamp(value: number) {
-  return Math.min(1, Math.max(0, value));
-}
-
-function progressBetween(value: number, start: number, end: number) {
-  return clamp((value - start) / Math.max(0.0001, end - start));
-}
-
-function windowedProgress(value: number, enterStart: number, enterEnd: number, exitStart: number, exitEnd: number) {
-  return Math.min(progressBetween(value, enterStart, enterEnd), 1 - progressBetween(value, exitStart, exitEnd));
-}
-
-function sectionProgress(offset: number, start: number, height: number, viewportHeight: number) {
-  return progressBetween(offset, start, start + Math.max(1, height - viewportHeight));
 }
 
 const styles = StyleSheet.create({
@@ -615,7 +744,7 @@ const styles = StyleSheet.create({
   scanCornerTwo: { borderRightWidth: 2, borderTopRightRadius: 10, borderTopWidth: 2, right: 16, top: 16 },
   scanCornerThree: { borderBottomLeftRadius: 10, borderBottomWidth: 2, borderLeftWidth: 2, bottom: 16, left: 16 },
   scanCornerFour: { borderBottomRightRadius: 10, borderBottomWidth: 2, borderRightWidth: 2, bottom: 16, right: 16 },
-  scanLine: { backgroundColor: fiticianTokens.colors.aqua, height: 1, left: "6%", position: "absolute", right: "6%", shadowColor: fiticianTokens.colors.aqua, shadowOpacity: 0.72, shadowRadius: 12, zIndex: 4 },
+  scanLine: { backgroundColor: fiticianTokens.colors.aqua, height: 1, left: "6%", position: "absolute", right: "6%", shadowColor: fiticianTokens.colors.aqua, shadowOpacity: 0.72, shadowRadius: 12, top: "8%", zIndex: 4 },
   mealResult: { backgroundColor: "rgba(4,18,17,0.96)", borderColor: "rgba(80,223,206,0.2)", borderRadius: 16, borderWidth: 1, bottom: -22, elevation: 5, padding: 16, position: "absolute", right: 0, shadowColor: "#000000", shadowOpacity: 0.36, shadowRadius: 18, width: "88%" },
   mealResultCompact: { bottom: -16, padding: 14 },
   mealCalories: { color: fiticianTokens.colors.mist, fontFamily: fiticianTokens.typography.fontFamily.displayEnglish, fontSize: 34, fontWeight: "700", textAlign: "left", writingDirection: "ltr" },

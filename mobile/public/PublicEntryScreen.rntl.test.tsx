@@ -7,6 +7,23 @@ import type { ReactTestInstance } from "react-test-renderer";
 jest.mock("expo-router", () => ({ useRouter: jest.fn() }));
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({ play: () => undefined }) }));
+jest.mock("react-native-reanimated", () => {
+  const ReactNative = require("react-native");
+  const immediate = (processor: () => unknown) => processor();
+  return {
+    __esModule: true,
+    default: {
+      ScrollView: ReactNative.ScrollView,
+      View: ReactNative.View,
+      createAnimatedComponent: (Component: unknown) => Component,
+    },
+    useAnimatedProps: immediate,
+    useAnimatedScrollHandler: () => jest.fn(),
+    useAnimatedStyle: immediate,
+    useDerivedValue: (processor: () => unknown) => ({ value: processor() }),
+    useSharedValue: (value: unknown) => ({ value }),
+  };
+});
 
 import { useRouter } from "expo-router";
 
