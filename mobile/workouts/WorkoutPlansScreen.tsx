@@ -237,7 +237,6 @@ export function WorkoutPlansScreen() {
       {!loading && !activeLoadError && !activeOffline && displayedPlan !== undefined && displayedPlan !== null ? (
         <PlanView
           api={api}
-          canGenerate={pendingPlanId === null && selectedPlanId === null}
           generationPending={generation.isPending}
           historical={isViewingHistorical}
           onStartReplacement={startReplacement}
@@ -453,7 +452,6 @@ function GenerationMethodSelector({
 
 function PlanView({
   api,
-  canGenerate,
   generationPending,
   historical,
   onStartReplacement,
@@ -463,7 +461,6 @@ function PlanView({
   pending,
 }: {
   readonly api: ReturnType<typeof createWorkoutPlanApi>;
-  readonly canGenerate?: boolean;
   readonly generationPending?: boolean;
   readonly historical: boolean;
   readonly onStartReplacement?: (exerciseId: string) => void;
@@ -532,7 +529,7 @@ function PlanView({
             </View>
             {onGenerate ? (
               <Button
-                disabled={!canGenerate || generationPending}
+                disabled={generationPending}
                 label="به‌روزرسانی برنامه"
                 loading={generationPending}
                 onPress={onGenerate}
@@ -1070,7 +1067,7 @@ const styles = StyleSheet.create({
   },
   daySummary: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 10,
     minWidth: 0,
   },
@@ -1520,7 +1517,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     minWidth: 0,
     paddingBottom: fiticianTokens.spacing[3],

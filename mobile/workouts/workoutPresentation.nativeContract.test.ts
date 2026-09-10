@@ -154,6 +154,17 @@ it("keeps each exercise as one roomy detail action", async () => {
   expect(row).not.toContain('label="راهنما"');
 });
 
+it("keeps workout media first in the existing RTL row containers", async () => {
+  const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+  const daySummary = source.slice(source.indexOf("daySummary:"), source.indexOf("durationBadge:"));
+  const exerciseRow = source.slice(source.indexOf("exerciseRow:"), source.indexOf("readOnlyAlternatives:"));
+
+  expect(daySummary).toContain('flexDirection: "row"');
+  expect(daySummary).not.toContain('flexDirection: "row-reverse"');
+  expect(exerciseRow).toContain('flexDirection: "row"');
+  expect(exerciseRow).not.toContain('flexDirection: "row-reverse"');
+});
+
 it("shows alternatives independently of executability and keeps the web action order", async () => {
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
   const row = source.slice(source.indexOf("function WorkoutExerciseRow"), source.indexOf("function WorkoutHistory"));

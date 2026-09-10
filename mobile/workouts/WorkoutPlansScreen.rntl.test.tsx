@@ -147,6 +147,22 @@ test("keeps generation choices as native touch actions", () => {
   });
 });
 
+test("keeps the update action enabled when a pending review version exists", () => {
+  const exercise = makeExercise("exercise-1", "شنا", "Push-up");
+  mockActivePlan = makePlan("active", [makePlanExercise("plan-exercise-1", exercise, [])]);
+  mockHistory = [makeHistoryVersion("pending-plan")];
+  mockPlanById = makePlan("pending_review", [makePlanExercise("plan-exercise-1", exercise, [])]);
+
+  renderWorkoutPlans();
+
+  const updateButton = screen.getByRole("button", { name: "به‌روزرسانی برنامه" });
+  expect(updateButton.props.accessibilityState).toMatchObject({ disabled: false });
+
+  fireEvent.press(updateButton);
+
+  expect(mockMutate).toHaveBeenCalledTimes(1);
+});
+
 test("starts the existing replacement workflow from an executable exercise action", async () => {
   const original = makeExercise("exercise-1", "شنا", "Push-up");
   const alternative = makeExercise("alternative-1", "پرس سینه دمبل", "Dumbbell Bench Press");
