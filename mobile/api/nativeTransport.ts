@@ -8,6 +8,7 @@ import {
   type MultipartUploadRequest,
   type TransportRequest,
 } from "@fitician/core";
+import { File, Paths } from "expo-file-system";
 import {
   CORRELATION_ID_HEADER,
   createCorrelationId,
@@ -24,6 +25,20 @@ export interface NativeTransportOptions {
   readonly logger?: MobileLogger;
   readonly trustedOrigin?: string | null;
 }
+
+type NativeFileFormDataValue = {
+  readonly bytes: () => Promise<Uint8Array>;
+  readonly name: string;
+  readonly type: string;
+  readonly uri: string;
+};
+
+type PreparedMultipartFormData = {
+  readonly formData: FormData;
+  readonly temporaryFiles: readonly File[];
+};
+
+let temporaryUploadSequence = 0;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -113,30 +128,49 @@ function responseFilename(response: Response): string | null {
   }
 }
 
-function bytesToBlob(part: MultipartPart): Blob {
-  const bytes = part.bytes as Uint8Array;
-  const buffer = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-  return new Blob([buffer], { type: part.contentType ?? "application/octet-stream" });
+function bytesToNativeFile(part: MultipartPart): {
+  readonly file: File;
+  readonly value: NativeFileFormDataValue;
+} {
+  const file = new File(
+    Paths.cache,
+    `fitician-upload-${Date.now()}-${temporaryUploadSequence++}.bin`,
+  );
+  file.write(part.bytes as Uint8Array);
+  return {
+    file,
+    value: {
+      bytes: () => file.bytes(),
+      name: part.filename ?? "upload.bin",
+      type: part.contentType ?? "application/octet-stream",
+      uri: file.uri,
+    },
+  };
 }
 
-function multipartFormData(parts: readonly MultipartPart[]): FormData {
+function multipartFormData(parts: readonly MultipartPart[]): PreparedMultipartFormData {
   const formData = new FormData();
+  const temporaryFiles: File[] = [];
   for (const part of parts) {
     if (part.bytes !== undefined) {
-      const blob = bytesToBlob(part);
-      if (part.filename !== undefined) {
-        formData.append(part.name, blob, part.filename);
-      } else {
-        formData.append(part.name, blob);
-      }
+      const prepared = bytesToNativeFile(part);
+      temporaryFiles.push(prepared.file);
+      formData.append(part.name, prepared.value as unknown as Blob);
     } else {
       formData.append(part.name, part.value ?? "");
     }
   }
-  return formData;
+  return { formData, temporaryFiles };
+}
+
+function cleanupTemporaryFiles(files: readonly File[]): void {
+  for (const file of files) {
+    try {
+      file.delete();
+    } catch {
+      // The cache may clean up an upload file before this request completes.
+    }
+  }
 }
 
 export function createNativeTransport(options: NativeTransportOptions): FiticianTransport {
@@ -198,16 +232,21 @@ export function createNativeTransport(options: NativeTransportOptions): Fitician
     },
 
     async upload<TResponse>(request: MultipartUploadRequest): Promise<TResponse> {
-      const response = await send(
-        request,
-        multipartFormData(request.parts),
-        "upload",
-        true,
-      );
-      if (response.status === 204) {
-        return undefined as TResponse;
+      const prepared = multipartFormData(request.parts);
+      try {
+        const response = await send(
+          request,
+          prepared.formData,
+          "upload",
+          true,
+        );
+        if (response.status === 204) {
+          return undefined as TResponse;
+        }
+        return (await response.json()) as TResponse;
+      } finally {
+        cleanupTemporaryFiles(prepared.temporaryFiles);
       }
-      return (await response.json()) as TResponse;
     },
   };
 }
