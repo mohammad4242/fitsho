@@ -21,6 +21,7 @@ function plan(overrides: Partial<WorkoutPlan> = {}): WorkoutPlan {
     created_at: "2026-09-07T00:00:00Z",
     days: [],
     engine_version: "test",
+    generation_source: null,
     id: "plan-1",
     is_stale: false,
     plan_duration_weeks: 4,
