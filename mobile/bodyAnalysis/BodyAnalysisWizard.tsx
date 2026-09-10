@@ -12,7 +12,7 @@ import type {
 import type { Sex } from "@fitician/core/profile";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
-import { Button, Card, Notice, Skeleton } from "../ui/components";
+import { Button, Card, Notice, PageHeading, Sheet, Skeleton } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { BodyAnalysisRequirements } from "./BodyAnalysisRequirements";
@@ -24,7 +24,8 @@ import {
 } from "./bodyPhotoFlow";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
 import { SecureBodyPhotoDraftStore } from "./bodyPhotoDraftStore";
-import { BodyPhotoCapture } from "./BodyPhotoCapture";
+import { BodyPhotoCapture, PhotoClothingGuide } from "./BodyPhotoCapture";
+import { bodyPhotoCopy } from "./bodyAnalysisCopy";
 import type { BodyPhotoCapturedAsset } from "./cameraCapture";
 import { createProfileApi } from "../profile/profileApi";
 import {
@@ -485,57 +486,89 @@ function CaptureReview({
   readonly modelTrainingConsent: boolean;
   readonly session: BodyPhotoSession | null;
 }) {
+  const [termsVisible, setTermsVisible] = useState(false);
+
   return (
     <Screen>
       <View style={styles.review}>
-        <Text style={styles.eyebrow}>سه نمای بدن آماده شد</Text>
-        <Text style={styles.title}>تصاویر را مرور کن</Text>
-        <Text style={styles.body}>
-          این مرحله فقط پیش‌نمایش محلی عکس‌هاست. هیچ تصویر خامی در نشست قابل بازیابی ذخیره نشده است.
-        </Text>
-        <View style={styles.reviewGrid}>
+        <View style={styles.reviewBeacon}>
+          <View style={styles.reviewBeaconDot} />
+          <Text style={styles.reviewBeaconText}>BIOMETRIC SCAN REVIEW</Text>
+        </View>
+        <PageHeading
+          compact
+          eyebrow={bodyPhotoCopy.eyebrow}
+          title={bodyPhotoCopy.reviewTitle}
+        />
+        <PhotoClothingGuide />
+        <View
+          accessibilityLabel={bodyPhotoCopy.summaryLabel}
+          accessible
+          style={styles.reviewGrid}
+        >
           {(["front", "side", "back"] as const).map((view) => {
             const asset = assets[view];
             const uploaded = session?.photos.some((photo) => photo.view === view) === true;
             return (
               <Card key={view} style={styles.reviewCard}>
-                {asset === undefined ? (
-                  <Text style={styles.body}>{uploaded
-                    ? `${viewLabel(view)} قبلاً در نشست امن ثبت شده است.`
-                    : `${viewLabel(view)} در این دستگاه ثبت نشد.`}</Text>
-                ) : (
-                  <Image
-                    accessibilityLabel={`پیش‌نمایش ${viewLabel(view)}`}
-                    source={{ uri: asset.uri }}
-                    style={styles.reviewImage}
-                  />
-                )}
-                <Button label={`ویرایش ${viewLabel(view)}`} onPress={() => onEdit(view)} variant="secondary" />
+                <View style={styles.reviewMedia}>
+                  {asset === undefined ? (
+                    <Text style={styles.body}>{uploaded
+                      ? `${viewLabel(view)} قبلاً در نشست امن ثبت شده است.`
+                      : `${viewLabel(view)} در این دستگاه ثبت نشد.`}</Text>
+                  ) : (
+                    <Image
+                      accessibilityLabel={replaceView(bodyPhotoCopy.previewAlt, viewLabel(view))}
+                      source={{ uri: asset.uri }}
+                      style={styles.reviewImage}
+                    />
+                  )}
+                  <View style={styles.reviewBadge}>
+                    <Text style={styles.reviewBadgeText}>✓</Text>
+                  </View>
+                </View>
+                <Button
+                  label={replaceView(bodyPhotoCopy.retake, viewLabel(view))}
+                  onPress={() => onEdit(view)}
+                  variant="secondary"
+                />
               </Card>
             );
           })}
         </View>
-        <Notice
-          message="ارسال، رضایت‌نامه و شروع تحلیل در مرحله امن پردازش تصویر انجام می‌شود."
-          variant="info"
-        />
         <ConsentToggle
-          label="با پردازش عملیاتی تصاویر برای تحلیل بدن موافقم."
+          label={bodyPhotoCopy.processingConsentBefore}
+          linkLabel={bodyPhotoCopy.processingTerms}
+          onLinkPress={() => setTermsVisible(true)}
           onValueChange={onOperationalConsentChange}
           value={operationalConsent}
         />
         <ConsentToggle
-          label="با استفاده از تصاویر برای بهبود مدل‌ها موافقم (اختیاری)."
+          label={bodyPhotoCopy.modelTraining}
           onValueChange={onModelTrainingConsentChange}
           value={modelTrainingConsent}
         />
+        <Text style={styles.bodyPhotoMuted}>{bodyPhotoCopy.modelTrainingHint}</Text>
         <Button
           disabled={!operationalConsent}
-          label="ارسال و شروع تحلیل"
+          label={bodyPhotoCopy.submit}
           onPress={onSubmit}
         />
         {error !== null ? <Notice message={error} variant="danger" /> : null}
-        <Button label="بستن" onPress={onExit} variant="ghost" />
+        <Button label={bodyPhotoCopy.close} onPress={onExit} variant="ghost" />
+        {termsVisible ? (
+          <Sheet
+            closeLabel={bodyPhotoCopy.close}
+            onClose={() => setTermsVisible(false)}
+            title={bodyPhotoCopy.termsTitle}
+            visible
+          >
+            <Text style={styles.body}>{bodyPhotoCopy.termsOptional}</Text>
+            <Text style={styles.body}>{bodyPhotoCopy.termsStorage}</Text>
+            <Text style={styles.body}>{bodyPhotoCopy.termsNoDiagnosis}</Text>
+            <Text style={styles.body}>{bodyPhotoCopy.termsTraining}</Text>
+          </Sheet>
+        ) : null}
       </View>
     </Screen>
   );
@@ -543,18 +576,31 @@ function CaptureReview({
 
 function ConsentToggle({
   label,
+  linkLabel,
+  onLinkPress,
   onValueChange,
   value,
 }: {
   readonly label: string;
+  readonly linkLabel?: string;
+  readonly onLinkPress?: () => void;
   readonly onValueChange: (value: boolean) => void;
   readonly value: boolean;
 }) {
   return (
     <View style={styles.consentRow}>
-      <Text style={styles.body}>{label}</Text>
+      <View style={styles.consentCopy}>
+        <Text style={styles.body}>
+          {label}{linkLabel !== undefined && onLinkPress !== undefined ? " " : ""}
+          {linkLabel !== undefined && onLinkPress !== undefined ? (
+            <Text accessibilityRole="link" onPress={onLinkPress} style={styles.termsLink}>
+              {linkLabel}
+            </Text>
+          ) : null}
+        </Text>
+      </View>
       <Switch
-        accessibilityLabel={label}
+        accessibilityLabel={linkLabel === undefined ? label : `${label} ${linkLabel}`}
         onValueChange={onValueChange}
         thumbColor={value ? fiticianTokens.colors.aqua : fiticianTokens.colors.muted}
         trackColor={{ false: fiticianTokens.colors.lineStrong, true: fiticianTokens.colors.surfaceInteractive }}
@@ -646,6 +692,10 @@ function viewLabel(view: BodyPhotoView): string {
   return "پشت";
 }
 
+function replaceView(template: string, view: string): string {
+  return template.replace("{{view}}", view);
+}
+
 function deleteCapturedAssets(
   assets: Partial<Record<BodyPhotoView, BodyPhotoCapturedAsset>>,
 ): void {
@@ -686,6 +736,9 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
+  consentCopy: {
+    flex: 1,
+  },
   errorState: {
     gap: fiticianTokens.spacing[4],
     justifyContent: "center",
@@ -708,8 +761,45 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     paddingBottom: fiticianTokens.spacing[6],
   },
+  reviewBadge: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.successSurface,
+    borderColor: fiticianTokens.colors.success,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    height: 28,
+    justifyContent: "center",
+    position: "absolute",
+    right: fiticianTokens.spacing[2],
+    top: fiticianTokens.spacing[2],
+    width: 28,
+  },
+  reviewBadgeText: {
+    color: fiticianTokens.colors.success,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
   reviewCard: {
     gap: fiticianTokens.spacing[3],
+  },
+  reviewBeacon: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[2],
+  },
+  reviewBeaconDot: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderRadius: fiticianTokens.radii.pill,
+    height: 7,
+    width: 7,
+  },
+  reviewBeaconText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    letterSpacing: 0.8,
   },
   reviewGrid: {
     gap: fiticianTokens.spacing[3],
@@ -719,6 +809,26 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.medium,
     height: 260,
     width: "100%",
+  },
+  reviewMedia: {
+    backgroundColor: fiticianTokens.colors.canvas,
+    borderRadius: fiticianTokens.radii.medium,
+    minHeight: 260,
+    overflow: "hidden",
+    position: "relative",
+  },
+  bodyPhotoMuted: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+    textAlign: "right",
+    writingDirection: "rtl",
+  },
+  termsLink: {
+    color: fiticianTokens.colors.aqua,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textDecorationLine: "underline",
   },
   statusState: {
     gap: fiticianTokens.spacing[4],

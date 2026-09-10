@@ -491,7 +491,7 @@ export function BodyPhotoCapture({
   );
 }
 
-function PhotoClothingGuide() {
+export function PhotoClothingGuide() {
   return (
     <View accessibilityLabel="لباس و پوشش مناسب" style={styles.clothingGuide}>
       <View style={styles.clothingHeader}>

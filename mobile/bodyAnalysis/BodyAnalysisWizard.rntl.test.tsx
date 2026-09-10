@@ -42,6 +42,7 @@ jest.mock("./BodyPhotoCapture", () => {
         })}
       />
     ),
+    PhotoClothingGuide: () => null,
   };
 });
 jest.mock("./bodyPhotoApi", () => ({ createBodyPhotoApi: jest.fn() }));
@@ -49,6 +50,7 @@ jest.mock("../profile/profileApi", () => ({ createProfileApi: jest.fn() }));
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { createProfileApi } from "../profile/profileApi";
+import { bodyPhotoCopy } from "./bodyAnalysisCopy";
 import { BodyAnalysisWizard } from "./BodyAnalysisWizard";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
 
@@ -162,5 +164,9 @@ test("uploads each confirmed view before advancing to the next web view", async 
 
   fireEvent.press(screen.getByLabelText("تأیید back"));
   await waitFor(() => expect(uploadedViews).toEqual(["front", "side", "back"]));
-  expect(await screen.findByText("تصاویر را مرور کن")).toBeTruthy();
+  expect(await screen.findByText(bodyPhotoCopy.reviewTitle)).toBeTruthy();
+  expect(screen.getByText(bodyPhotoCopy.processingTerms)).toBeTruthy();
+  expect(screen.getByText(bodyPhotoCopy.modelTraining)).toBeTruthy();
+  expect(screen.getByText(bodyPhotoCopy.modelTrainingHint)).toBeTruthy();
+  expect(screen.getByLabelText(bodyPhotoCopy.submit)).toBeTruthy();
 });
