@@ -63,6 +63,9 @@ it("creates private Android channels for activity, reminders, and health updates
     "fitician-health",
     expect.objectContaining({ name: "به‌روزرسانی‌های سلامت" }),
   );
+  for (const [, configuration] of mocks.setNotificationChannelAsync.mock.calls) {
+    expect(configuration).not.toHaveProperty("sound");
+  }
 });
 
 it("requests Android 13 notification permission once and classifies the result", async () => {
