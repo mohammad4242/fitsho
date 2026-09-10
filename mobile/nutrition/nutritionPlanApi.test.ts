@@ -35,6 +35,7 @@ it("uses authenticated member nutrition plan endpoints", async () => {
   await api.generate();
   await api.getHistory();
   await api.get("plan/id");
+  await api.partialRegenerate("plan/id", [0, 3]);
   await api.selectBundle("bundle/id", { selected_plan_role: "budget" });
   await api.downloadPdf("plan/id");
 
@@ -45,6 +46,11 @@ it("uses authenticated member nutrition plan endpoints", async () => {
     { method: "POST", path: "/api/v1/nutrition/plans" },
     { method: "GET", path: "/api/v1/nutrition/plans/history" },
     { method: "GET", path: "/api/v1/nutrition/plans/plan%2Fid" },
+    {
+      body: { day_indexes: [0, 3], expected_plan_revision_id: "plan/id" },
+      method: "POST",
+      path: "/api/v1/nutrition/plans/plan%2Fid/edits/partial-regenerate",
+    },
     {
       body: { selected_plan_role: "budget" },
       method: "POST",

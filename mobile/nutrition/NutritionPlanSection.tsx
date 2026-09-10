@@ -5,7 +5,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-na
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
-import { Button, Card, Dialog, DisclosureCard, EmptyState, Notice, Sheet, Skeleton } from "../ui/components";
+import { AppIcon, Button, Card, Dialog, DisclosureCard, EmptyState, Notice, Sheet, Skeleton } from "../ui/components";
 import { getMobileViewState, mobileRequestErrorMessage, type MobileViewState } from "../ui/requestState";
 import { RTL_ROW } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
@@ -35,7 +35,6 @@ import {
   canEditNutritionPlan,
   classifyNutritionGenerationOutcome,
   formatNutritionPlanMoney,
-  getNutritionPlanStatus,
   isNutritionPlanExecutable,
   preparedRecipePresentation,
   selectNutritionPlan,
@@ -195,11 +194,6 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
 
   return (
     <View style={styles.section}>
-      <View style={styles.sectionHeading}>
-        <Text style={styles.sectionTitle}>برنامه غذایی هفتگی</Text>
-        <Text style={styles.sectionHint}>نسخه فعال و تاریخچه برنامه‌ها</Text>
-      </View>
-
       {loading ? <Skeleton height={260} /> : null}
       {loadError && displayedPlan === undefined ? (
         <Notice
@@ -213,6 +207,16 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
       {offline && displayedPlan !== undefined ? (
         <Notice message="این برنامه از حافظه امن آفلاین خوانده شده است." variant="offline" />
       ) : null}
+      <BundleChoice
+        bundle={bundle}
+        disabled={!canGenerate || selectBundle.isPending}
+        onSelect={(role) => {
+          if (bundle?.bundle_id === null || bundle?.bundle_id === undefined) return;
+          setGenerationError(null);
+          selectBundle.mutate({ bundleId: bundle.bundle_id, role });
+        }}
+        selectedPlanId={activePlan?.id ?? null}
+      />
       {displayedPlan !== undefined && displayedPlan !== null ? (
         <NutritionPlanCard
           api={api}
@@ -223,6 +227,12 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
           pdfStore={pdfStore}
           plan={displayedPlan}
           safety={safety}
+          history={history}
+          historyState={historyState}
+          activePlanId={activePlan?.id ?? null}
+          onHistoryRetry={() => void historyQuery.refetch()}
+          onHistorySelect={selectHistoryVersion}
+          selectedPlanId={selectedPlanId}
         />
       ) : null}
 
@@ -251,25 +261,6 @@ export function NutritionPlanSection({ safety }: { readonly safety: SafetyDecisi
       />
       {!canGenerate && safety !== null ? <Notice message="ساخت برنامه تا تأیید ادامه مسیر ایمن انجام نمی‌شود." variant="warning" /> : null}
       {!canGenerate && safety === null ? <Notice message="ابتدا ارزیابی ایمنی تغذیه را کامل کن." variant="warning" /> : null}
-
-      <BundleChoice
-        bundle={bundle}
-        disabled={!canGenerate || selectBundle.isPending}
-        onSelect={(role) => {
-          if (bundle?.bundle_id === null || bundle?.bundle_id === undefined) return;
-          setGenerationError(null);
-          selectBundle.mutate({ bundleId: bundle.bundle_id, role });
-        }}
-        selectedPlanId={activePlan?.id ?? null}
-      />
-      <NutritionPlanHistory
-        activePlanId={activePlan?.id ?? null}
-        history={history}
-        onRetry={() => void historyQuery.refetch()}
-        onSelect={selectHistoryVersion}
-        selectedPlanId={selectedPlanId}
-        state={historyState}
-      />
     </View>
   );
 }
@@ -283,6 +274,12 @@ function NutritionPlanCard({
   pdfStore,
   plan,
   safety,
+  activePlanId,
+  history,
+  historyState,
+  onHistoryRetry,
+  onHistorySelect,
+  selectedPlanId,
 }: {
   readonly actionsApi: NutritionPlanActionsApi;
   readonly api: NutritionPlanApi;
@@ -292,6 +289,12 @@ function NutritionPlanCard({
   readonly pdfStore: ExpoNutritionPlanPdfStore;
   readonly plan: WeeklyPlan;
   readonly safety: SafetyDecision | null;
+  readonly activePlanId: string | null;
+  readonly history: readonly WeeklyPlanHistoryItem[];
+  readonly historyState: MobileViewState<WeeklyPlanHistoryItem[]>;
+  readonly onHistoryRetry: () => void;
+  readonly onHistorySelect: (version: WeeklyPlanHistoryItem) => void;
+  readonly selectedPlanId: string | null;
 }) {
   const queryClient = useQueryClient();
   const [currentPlan, setCurrentPlan] = useState(plan);
@@ -300,12 +303,11 @@ function NutritionPlanCard({
     queryFn: () => actionsApi.getFeedback(plan.id),
     queryKey: nutritionKeys.mealFeedback(plan.id),
   });
-  const status = getNutritionPlanStatus(currentPlan, historical);
   const executable = isNutritionPlanExecutable(currentPlan, historical);
   const editable = canEditNutritionPlan(currentPlan, historical, connectivityStatus === "offline")
     && safety?.can_continue_onboarding === true;
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
-  const selectedDay = currentPlan.days[selectedDayIndex] ?? currentPlan.days[0] ?? null;
+  const selectedDay = currentPlan.days.find((day) => day.day_index === selectedDayIndex) ?? currentPlan.days[0] ?? null;
 
   useEffect(() => {
     setCurrentPlan(plan);
@@ -318,67 +320,63 @@ function NutritionPlanCard({
 
   return (
     <View style={styles.planStack}>
-      <Card style={styles.planCard}>
-        <View style={styles.planHeading}>
-          <View style={styles.planCopy}>
-            <Text style={styles.eyebrow}>{planHeadingEyebrow(currentPlan, historical)}</Text>
-            <Text accessibilityRole="header" style={styles.planTitle}>{planTitle(currentPlan)}</Text>
-          </View>
-          <StatusBadge status={status} />
-        </View>
-        {historical ? <Notice message="این نسخه فقط برای مشاهده تاریخچه است و برنامه فعال تو نیست." variant="info" /> : null}
-        {!executable && !historical ? <PlanReviewNotice status={status} /> : null}
-        <View style={styles.statsGrid}>
-          <PlanStat label="هزینه هفتگی" value={formatNutritionPlanMoney(currentPlan.weekly_cost_irr)} />
-          <PlanStat label="بودجه هفتگی" value={formatNutritionPlanMoney(currentPlan.weekly_budget_irr)} />
-          <PlanStat label="تعداد روز" value={formatNutritionNumber(currentPlan.days.length)} />
-          <PlanStat label="نسخه" value={formatNutritionNumber(currentPlan.revision)} />
-        </View>
-        <View style={styles.planContext}>
-          <PlanContextItem label="نقش برنامه" value={planRoleLabel(currentPlan.plan_role)} />
-          <PlanContextItem label="وضعیت پزشک" value={planApprovalLabel(currentPlan)} />
-          <PlanContextItem label="شروع برنامه" value={formatPlanDate(currentPlan.start_date)} />
-        </View>
-        {currentPlan.physician_user_visible_notes ? (
-          <Notice message={currentPlan.physician_user_visible_notes} title="یادداشت پزشک" variant="info" />
-        ) : null}
-        {currentPlan.physician_change_summary.length > 0 ? (
-          <Notice message="پزشک در این نسخه تغییراتی ثبت کرده است؛ جزئیات در وضعیت همین برنامه اعمال شده‌اند." title="خلاصه تغییرات پزشک" variant="info" />
-        ) : null}
-        <PlanWarnings codes={currentPlan.warning_codes} />
-        <SummaryRow label="وضعیت بودجه" value={budgetStatusLabel(currentPlan.budget_status)} />
-      </Card>
+      <View style={styles.planHeading}>
+        <Text style={styles.eyebrow}>{planHeadingEyebrow(currentPlan, historical)}</Text>
+        <Text accessibilityRole="header" style={styles.planTitle}>{planTitle(currentPlan)}</Text>
+      </View>
+      {historical ? <ReferencePlanNotice /> : <PhysicianReviewCard plan={currentPlan} />}
+      <PlanMetadata plan={currentPlan} />
+      {currentPlan.physician_user_visible_notes ? (
+        <PlanNotice message={currentPlan.physician_user_visible_notes} title="یادداشت پزشک" />
+      ) : null}
+      {currentPlan.physician_change_summary.length > 0 ? (
+        <PlanChangeSummary changes={currentPlan.physician_change_summary} />
+      ) : null}
+      <PlanWarnings codes={currentPlan.warning_codes} />
 
-      {selectedDay !== null ? (
-        <View style={styles.daysSection}>
-          <Text style={styles.sectionTitle}>روزهای برنامه</Text>
-          <DaySelector days={currentPlan.days} selectedDayIndex={selectedDayIndex} onSelect={setSelectedDayIndex} />
-          <NutritionDayCard
-            actionsApi={actionsApi}
-            canEdit={editable}
-            day={selectedDay}
-            feedback={feedbackQuery.data?.feedback ?? {}}
-            onFeedbackSaved={(result) => {
-              queryClient.setQueryData<WeeklyPlanFeedback>(nutritionKeys.mealFeedback(currentPlan.id), {
-                feedback: {
-                  ...feedbackQuery.data?.feedback,
-                  [result.meal_id]: result.feedback_type,
-                },
-              });
-            }}
-            onLockChanged={(mealId, isLocked) => {
-              setCurrentPlan((previous) => updateMealLock(previous, mealId, isLocked));
-            }}
-            onPlanUpdated={(next) => {
-              setCurrentPlan(next);
-              onPlanUpdated(next);
-            }}
-            planId={currentPlan.id}
-          />
-        </View>
-      ) : (
-        <Notice message="برای این نسخه هنوز روزی ثبت نشده است." variant="info" />
-      )}
+      <DisclosureCard defaultExpanded={false} style={styles.planDisclosure} title="برنامه تغذیه">
+        <BudgetLedger plan={currentPlan} />
+        {selectedDay !== null ? (
+          <View style={styles.daysSection}>
+            <DaySelector days={currentPlan.days} selectedDayIndex={selectedDayIndex} onSelect={setSelectedDayIndex} />
+            <NutritionDayCard
+              actionsApi={actionsApi}
+              api={api}
+              canEdit={editable}
+              day={selectedDay}
+              feedback={feedbackQuery.data?.feedback ?? {}}
+              onFeedbackSaved={(result) => {
+                queryClient.setQueryData<WeeklyPlanFeedback>(nutritionKeys.mealFeedback(currentPlan.id), {
+                  feedback: {
+                    ...feedbackQuery.data?.feedback,
+                    [result.meal_id]: result.feedback_type,
+                  },
+                });
+              }}
+              onLockChanged={(mealId, isLocked) => {
+                setCurrentPlan((previous) => updateMealLock(previous, mealId, isLocked));
+              }}
+              onPlanUpdated={(next) => {
+                setCurrentPlan(next);
+                onPlanUpdated(next);
+              }}
+              planId={currentPlan.id}
+            />
+          </View>
+        ) : (
+          <Notice message="برای این نسخه هنوز روزی ثبت نشده است." variant="info" />
+        )}
+        <NutritionPlanHistory
+          activePlanId={activePlanId}
+          history={history}
+          onRetry={onHistoryRetry}
+          onSelect={onHistorySelect}
+          selectedPlanId={selectedPlanId}
+          state={historyState}
+        />
+      </DisclosureCard>
+
+      <NutritionNutrientDisclosure currentPlan={currentPlan} />
       <NutritionShoppingList
         api={api}
         connectivityStatus={connectivityStatus}
@@ -391,8 +389,148 @@ function NutritionPlanCard({
   );
 }
 
+function PhysicianReviewCard({ plan }: { readonly plan: WeeklyPlan }) {
+  const approved = plan.physician_approved && plan.review_status === "approved";
+  return (
+    <View style={[styles.reviewCard, approved ? styles.reviewApproved : styles.reviewPending]}>
+      <View style={[styles.reviewBadge, RTL_ROW]}>
+        <View style={styles.doctorAvatar}>
+          <Text style={styles.doctorEmoji}>🧑‍⚕️</Text>
+        </View>
+        <View style={styles.reviewContent}>
+          <Text style={styles.reviewTitle}>
+            {approved ? "تأییدشده توسط پزشک" : "در انتظار بررسی پزشک"}
+          </Text>
+          {!approved ? <Text style={styles.reviewSubtitle}>پیش‌نویس موقت؛ نیازمند بررسی پزشک</Text> : null}
+          {approved && plan.physician_approved_at ? (
+            <Text style={styles.reviewSubtitle}>تاریخ تأیید: {formatPlanDateTime(plan.physician_approved_at)}</Text>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ReferencePlanNotice() {
+  return (
+    <View style={styles.referenceNotice}>
+      <Text style={styles.referenceNoticeText}>این نسخه فقط برای مشاهده تاریخچه است و برنامه فعال تو نیست.</Text>
+    </View>
+  );
+}
+
+function PlanMetadata({ plan }: { readonly plan: WeeklyPlan }) {
+  const references = plan.price_snapshot.references;
+  const mainMeals = snapshotNumber(plan.input_snapshot, "main_meals_per_day");
+  const snacks = snapshotNumber(plan.input_snapshot, "snacks_per_day");
+  const mainMealsLabel = mainMeals === null ? "—" : formatNutritionNumber(mainMeals);
+  const snacksLabel = snacks === null ? "—" : formatNutritionNumber(snacks);
+  return (
+    <View style={styles.meta}>
+      <View style={[styles.metaChip, RTL_ROW]}>
+        <Text style={styles.metaIcon}>📋</Text>
+        <Text style={styles.metaValue}>نسخه {formatNutritionNumber(plan.revision)}</Text>
+        <Text style={styles.metaTag}>{lifecycleLabel(plan.lifecycle_status)}</Text>
+      </View>
+      <View style={[styles.metaChip, RTL_ROW]}>
+        <Text style={styles.metaIcon}>🏷️</Text>
+        <Text style={styles.metaText}>
+          {references !== undefined && references !== null ? "قیمت‌ها به‌روز و معتبر" : "استعلام قیمت"}
+        </Text>
+      </View>
+      <View style={[styles.metaChip, RTL_ROW]}>
+        <Text style={styles.metaIcon}>🍽️</Text>
+        <Text style={styles.metaText}>چیدمان: {mainMealsLabel} وعده اصلی + {snacksLabel} میان‌وعده</Text>
+      </View>
+    </View>
+  );
+}
+
+function PlanNotice({ message, title }: { readonly message: string; readonly title: string }) {
+  return (
+    <View style={styles.planNotice}>
+      <Text style={styles.planNoticeTitle}>{title}</Text>
+      <Text style={styles.planNoticeMessage}>{message}</Text>
+    </View>
+  );
+}
+
+function PlanChangeSummary({ changes }: { readonly changes: readonly { [key: string]: unknown }[] }) {
+  return (
+    <View style={styles.planNotice}>
+      <Text style={styles.planNoticeTitle}>خلاصه تغییرات پزشک</Text>
+      {changes.map((change, index) => (
+        <View key={`${String(change.operation ?? change.action ?? "change")}-${index}`} style={[styles.changeRow, RTL_ROW]}>
+          <Text style={styles.changeBullet}>•</Text>
+          <Text style={styles.planNoticeMessage}>{String(change.operation ?? change.action ?? "تغییر برنامه")}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function BudgetLedger({ plan }: { readonly plan: WeeklyPlan }) {
+  const status = plan.budget_status;
+  const statusStyle = status === "within_budget"
+    ? styles.ledgerValueWithin
+    : status === "over_budget"
+      ? styles.ledgerValueOver
+      : status === "flexible_overage"
+        ? styles.ledgerValueFlexible
+        : styles.ledgerValue;
+  const icon = status === "within_budget" ? "✅" : status === "over_budget" ? "⚠️" : "📊";
+  return (
+    <View accessibilityLabel="بودجه برنامه" style={styles.ledger}>
+      <LedgerItem icon="🏷️" label="هزینه برآوردی هفته" value={formatNutritionPlanMoney(plan.weekly_cost_irr)} valueStyle={styles.ledgerValueCost} />
+      <LedgerItem icon="👛" label="بودجه هفتگی" value={formatNutritionPlanMoney(plan.weekly_budget_irr)} valueStyle={styles.ledgerValue} />
+      <LedgerItem icon={icon} label="وضعیت بودجه" value={budgetStatusLabel(status)} valueStyle={statusStyle} />
+    </View>
+  );
+}
+
+function LedgerItem({ icon, label, value, valueStyle }: { readonly icon: string; readonly label: string; readonly value: string; readonly valueStyle: object }) {
+  return (
+    <View style={[styles.ledgerItem, RTL_ROW]}>
+      <Text style={styles.ledgerIcon}>{icon}</Text>
+      <View style={styles.ledgerContent}>
+        <Text style={styles.ledgerLabel}>{label}</Text>
+        <Text style={[styles.ledgerValue, valueStyle]}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+function NutritionNutrientDisclosure({ currentPlan }: { readonly currentPlan: WeeklyPlan }) {
+  return (
+    <DisclosureCard defaultExpanded={false} style={styles.planDisclosure} title="هدف در برابر مقدار برنامه">
+      <View style={styles.nutrientGrid}>
+        {Object.values(currentPlan.nutrients).map((nutrient) => (
+          <View key={nutrient.nutrient_code} style={styles.nutrientCard}>
+            <Text style={styles.nutrientLabel}>{nutritionLabel(nutrient.nutrient_code)}</Text>
+            <Text style={styles.nutrientValue}>{formatNutritionNumber(nutrient.planned)} {nutrient.unit}</Text>
+            <Text style={[styles.nutrientStatus, nutrientStatusStyle(nutrient.status)]}>{nutritionStatusLabel(nutrient.status)}</Text>
+            <Text style={styles.nutrientDetail}>
+              {nutrient.reference_kind ? `مرجع: ${nutrient.reference_kind}` : "مرجع هدف برنامه"}
+              {nutrient.data_confidence ? ` · اطمینان: ${nutrient.data_confidence}` : ""}
+            </Text>
+            {nutrient.difference_from_preferred !== null ? (
+              <Text style={styles.nutrientDetail}>اختلاف با مقدار ترجیحی: {formatNutritionNumber(nutrient.difference_from_preferred)}</Text>
+            ) : null}
+          </View>
+        ))}
+      </View>
+    </DisclosureCard>
+  );
+}
+
+function snapshotNumber(snapshot: { [key: string]: unknown }, key: string): number | null {
+  const value = snapshot[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function NutritionDayCard({
   actionsApi,
+  api,
   canEdit,
   day,
   feedback,
@@ -402,6 +540,7 @@ function NutritionDayCard({
   planId,
 }: {
   readonly actionsApi: NutritionPlanActionsApi;
+  readonly api: NutritionPlanApi;
   readonly canEdit: boolean;
   readonly day: WeeklyPlanDay;
   readonly feedback: WeeklyPlanFeedback["feedback"];
@@ -410,8 +549,25 @@ function NutritionDayCard({
   readonly onPlanUpdated: (plan: WeeklyPlan) => void;
   readonly planId: string;
 }) {
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenerateError, setRegenerateError] = useState<string | null>(null);
+
+  async function regenerateUnlockedMeals() {
+    if (!canEdit || regenerating) return;
+    setRegenerating(true);
+    setRegenerateError(null);
+    try {
+      const next = await api.partialRegenerate(planId, [day.day_index]);
+      onPlanUpdated(next);
+    } catch (error) {
+      setRegenerateError(nutritionPlanErrorMessage(error));
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
   return (
-    <Card style={styles.dayCard}>
+    <View style={styles.dayCard}>
       <View style={styles.dayHeading}>
         <View style={styles.dayCopy}>
           <Text style={styles.dayTitle}>{weekdayLabels[day.day_index] ?? `روز ${day.day_index + 1}`}</Text>
@@ -419,14 +575,36 @@ function NutritionDayCard({
         </View>
         <Text style={styles.dayCost}>{formatNutritionPlanMoney(day.cost_irr)}</Text>
       </View>
-      <View style={styles.nutrientGrid}>
-        {Object.entries(day.nutrient_totals).slice(0, 4).map(([code, value]) => (
-          <View key={code} style={styles.nutrientChip}>
-            <Text style={styles.nutrientValue}>{formatNutritionNumber(value)}</Text>
-            <Text style={styles.nutrientLabel}>{nutritionLabel(code)}</Text>
-          </View>
-        ))}
+      <View style={styles.dailySummary}>
+        <View style={styles.dailySummaryItem}>
+          <Text style={styles.dailySummaryValue}>
+            {formatNutritionNumber(day.nutrient_totals.energy_kcal ?? 0)} kcal
+          </Text>
+          <Text style={styles.dailySummaryLabel}>جمع روز</Text>
+        </View>
+        <View style={styles.dailySummaryItem}>
+          <Text style={styles.dailySummaryValue}>{formatNutritionPlanMoney(day.cost_irr)}</Text>
+          <Text style={styles.dailySummaryLabel}>هزینه</Text>
+        </View>
+        <View style={styles.dailySummaryItem}>
+          <Text style={styles.dailySummaryValue}>{formatNutritionNumber(day.nutrient_totals.protein_g ?? 0)} g</Text>
+          <Text style={styles.dailySummaryLabel}>پروتئین</Text>
+        </View>
+        <View style={styles.dailySummaryItem}>
+          <Text style={styles.dailySummaryValue}>{formatNutritionNumber(day.nutrient_totals.carbohydrate_g ?? 0)} g</Text>
+          <Text style={styles.dailySummaryLabel}>کربوهیدرات</Text>
+        </View>
       </View>
+      {canEdit && day.meals.some((meal) => !meal.is_locked) ? (
+        <Button
+          disabled={regenerating}
+          label="بازسازی وعده‌های باز این روز"
+          loading={regenerating}
+          onPress={() => void regenerateUnlockedMeals()}
+          variant="secondary"
+        />
+      ) : null}
+      {regenerateError !== null ? <Notice message={regenerateError} variant="danger" /> : null}
       <View style={styles.mealStack}>
         {day.meals.map((meal) => (
           <NutritionMealCard
@@ -442,7 +620,7 @@ function NutritionDayCard({
           />
         ))}
       </View>
-    </Card>
+    </View>
   );
 }
 
@@ -476,7 +654,14 @@ function NutritionMealCard({
   readonly onPlanUpdated: (plan: WeeklyPlan) => void;
   readonly planId: string;
 }) {
-  const mealName = meal.name_fa ?? meal.name_en ?? meal.meal_code ?? "وعده غذایی";
+  const mealLabel = meal.name_fa ?? meal.name_en ?? "وعده غذایی";
+  const mealName = meal.meal_code === null || meal.meal_code === undefined
+    ? mealLabel
+    : `${meal.meal_code} — ${mealLabel}`;
+  const mealMacroEntries = ["energy_kcal", "protein_g", "carbohydrate_g", "fat_g", "total_fat_g", "fibre_g"].flatMap((code) => {
+    const value = meal.nutrient_totals[code];
+    return typeof value === "number" ? [{ code, unit: code === "energy_kcal" ? "kcal" : code.endsWith("_mg") ? "mg" : "g", value }] : [];
+  });
   const [busy, setBusy] = useState<MealAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selector, setSelector] = useState<ReplacementSelector | null>(null);
@@ -642,7 +827,7 @@ function NutritionMealCard({
         <View style={styles.foodStack}>
           {meal.foods.map((food) => (
             <View key={`${food.slug}-${food.food_id ?? food.item_kind}`}>
-              <View style={styles.foodRow}>
+              <View style={[styles.foodRow, RTL_ROW]}>
                 <Text style={styles.foodName}>{food.name_fa || food.name_en}</Text>
                 <Text style={styles.foodAmount}>{formatNutritionNumber(food.grams)} گرم</Text>
               </View>
@@ -651,8 +836,18 @@ function NutritionMealCard({
           ))}
         </View>
       ) : <Text style={styles.bodyText}>جزئیات این وعده هنوز در دسترس نیست.</Text>}
+      {mealMacroEntries.length > 0 ? (
+        <View style={[styles.mealNutrients, RTL_ROW]}>
+          {mealMacroEntries.map((nutrient) => (
+            <View key={nutrient.code} style={styles.mealNutrient}>
+              <Text style={styles.mealNutrientValue}>{formatNutritionNumber(nutrient.value)} {nutrient.unit}</Text>
+              <Text style={styles.mealNutrientLabel}>{nutritionLabel(nutrient.code)}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
       {error !== null ? <Notice message={error} variant="danger" /> : null}
-      <View style={styles.mealActions}>
+      <View style={[styles.mealActions, RTL_ROW]}>
         <Button
           disabled={!editable}
           label={meal.is_locked ? "باز کردن قفل" : "قفل وعده"}
@@ -776,7 +971,7 @@ function ReplacementSheet({
                 accessibilityState={{ checked: selected }}
                 key={id}
                 onPress={() => onSelect(id)}
-                style={[styles.option, selected && styles.optionSelected]}
+                style={[styles.option, RTL_ROW, selected && styles.optionSelected]}
               >
                 <NutritionThumbnail imageUrl={option.image_url} name={name} style={styles.optionThumbnail} />
                 <Text style={[styles.optionName, selected && styles.optionNameSelected]}>{name}</Text>
@@ -894,32 +1089,29 @@ function NutritionPlanPdf({
   }
 
   return (
-    <Card style={styles.pdfCard}>
-      <Text style={styles.cardTitle}>نسخه PDF</Text>
-      <Text style={styles.bodyText}>فایل برنامه در فضای امن دستگاه ذخیره می‌شود و پس از باز کردن دوباره اپ باقی می‌ماند.</Text>
-      {status === "checking" ? <Skeleton height={52} /> : null}
-      {status !== "checking" && stored === null ? (
-        <Button
-          disabled={connectivityStatus === "offline" || status === "downloading"}
-          label="ذخیره PDF برای استفاده آفلاین"
-          loading={status === "downloading"}
-          onPress={() => void download()}
-          variant="secondary"
-        />
-      ) : null}
-      {stored !== null ? (
-        <View style={styles.pdfActions}>
-          <Button label="باز کردن PDF" onPress={() => void open()} />
-          <Button
-            disabled={connectivityStatus === "offline"}
-            label="دریافت دوباره"
-            onPress={() => void download()}
-            variant="ghost"
-          />
+    <View style={styles.pdfCta}>
+      <Pressable
+        accessibilityLabel="دانلود نسخه PDF برنامه غذایی"
+        accessibilityRole="button"
+        accessibilityState={{ busy: status === "downloading", disabled: status === "checking" || status === "downloading" || (connectivityStatus === "offline" && stored === null) }}
+        disabled={status === "checking" || status === "downloading" || (connectivityStatus === "offline" && stored === null)}
+        onPress={() => void (stored === null ? download() : open())}
+        style={({ pressed }) => [styles.pdfPressable, RTL_ROW, pressed && styles.pdfPressed]}
+      >
+        <View style={styles.pdfIcon}>
+          <AppIcon color={fiticianTokens.colors.aqua} name="document" size={fiticianTokens.iconSize.lg} />
         </View>
+        <View style={styles.pdfContent}>
+          <Text style={styles.pdfTitle}>دانلود نسخه PDF برنامه غذایی</Text>
+          <Text style={styles.pdfSubtitle}>دریافت فایل چاپی کامل با روزها، عکس غذاها و جدول ماکروها</Text>
+        </View>
+      </Pressable>
+      {status === "checking" ? <Skeleton height={4} /> : null}
+      {connectivityStatus === "offline" && stored === null ? (
+        <Text style={styles.pdfOffline}>برای دریافت PDF به اینترنت وصل شو.</Text>
       ) : null}
       {status === "error" ? <Notice message="دریافت یا باز کردن PDF انجام نشد؛ دوباره تلاش کن." variant="danger" /> : null}
-    </Card>
+    </View>
   );
 }
 
@@ -1004,14 +1196,14 @@ function PlanChoice({
       onPress={onPress}
       style={[styles.planChoice, selected && styles.planChoiceSelected]}
     >
-      <View style={styles.planChoiceHeading}>
+      <View style={[styles.planChoiceHeading, RTL_ROW]}>
         <Text style={[styles.planChoiceLabel, selected && styles.planChoiceLabelSelected]}>{label}</Text>
         {selected ? <Text style={styles.planChoiceActive}>برنامه فعال شما</Text> : null}
       </View>
       <Text style={[styles.planChoiceSubtitle, selected && styles.planChoiceSubtitleSelected]}>
         {formatNutritionPlanMoney(plan.weekly_cost_irr)} در هفته
       </Text>
-      <View style={styles.planChoiceMetrics}>
+      <View style={[styles.planChoiceMetrics, RTL_ROW]}>
         <PlanChoiceMetric label="کالری" value={planMetricLabel(plan, "goal_calories")} />
         <PlanChoiceMetric label="پروتئین" value={planMetricLabel(plan, "protein")} />
         <PlanChoiceMetric label="کربوهیدرات" value={planMetricLabel(plan, "carbohydrate")} />
@@ -1055,7 +1247,7 @@ function NutritionPlanHistory({
 
   return (
     <View style={styles.historySection}>
-      <Text style={styles.sectionTitle}>تاریخچه برنامه‌ها</Text>
+      <Text style={styles.historyHeading}>تاریخچه نسخه‌ها</Text>
       {state.status === "offline" ? <Notice message="فهرست تاریخچه تازه‌سازی نشده است." variant="offline" /> : null}
       {history.map((version) => (
         <Card
@@ -1064,7 +1256,7 @@ function NutritionPlanHistory({
           style={styles.historyCard}
           variant={version.id === selectedPlanId || version.id === activePlanId ? "raised" : "interactive"}
         >
-          <View style={styles.historyRow}>
+          <View style={[styles.historyRow, RTL_ROW]}>
             <View style={styles.historyCopy}>
               <Text style={styles.historyTitle}>{historyTitle(version)}</Text>
               <Text style={styles.historyDate}>{formatPlanDateTime(version.created_at)}</Text>
@@ -1086,24 +1278,25 @@ function DaySelector({
   readonly onSelect: (index: number) => void;
   readonly selectedDayIndex: number;
 }) {
+  const orderedDays = [...days].sort((first, second) => first.day_index - second.day_index);
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={[styles.daySelector, RTL_ROW]}
     >
-      {days.map((day, index) => (
+      {orderedDays.map((day) => (
         <Pressable
           accessibilityRole="tab"
-          accessibilityState={{ selected: index === selectedDayIndex }}
+          accessibilityState={{ selected: day.day_index === selectedDayIndex }}
           key={`${day.day_index}-${day.plan_date}`}
-          onPress={() => onSelect(index)}
-          style={[styles.dayTab, index === selectedDayIndex && styles.dayTabSelected]}
+          onPress={() => onSelect(day.day_index)}
+          style={[styles.dayTab, day.day_index === selectedDayIndex && styles.dayTabSelected]}
         >
-          <Text style={[styles.dayTabLabel, index === selectedDayIndex && styles.dayTabLabelSelected]}>
+          <Text style={[styles.dayTabLabel, day.day_index === selectedDayIndex && styles.dayTabLabelSelected]}>
             {weekdayLabels[day.day_index] ?? `روز ${day.day_index + 1}`}
           </Text>
-          <Text style={[styles.dayTabDate, index === selectedDayIndex && styles.dayTabDateSelected]}>{formatPlanDate(day.plan_date)}</Text>
+          <Text style={[styles.dayTabDate, day.day_index === selectedDayIndex && styles.dayTabDateSelected]}>{formatPlanDate(day.plan_date)}</Text>
         </Pressable>
       ))}
     </ScrollView>
@@ -1118,75 +1311,28 @@ function GenerationNotice({ result }: { readonly result: WeeklyPlanGeneration })
   return <Notice message={message} variant="warning" />;
 }
 
-function PlanReviewNotice({ status }: { readonly status: ReturnType<typeof getNutritionPlanStatus> }) {
-  if (status === "pending_review" || status === "physician_review") {
-    return <Notice message="این پیش‌نویس تا بررسی پزشک برنامه نهایی نیست و برای خرید نهایی قابل اتکا نیست." variant="warning" />;
-  }
-  if (status === "changes_requested") {
-    return <Notice message="پزشک برای ادامه اصلاح یا اطلاعات بیشتری خواسته است." variant="warning" />;
-  }
-  if (status === "rejected") return <Notice message="این نسخه توسط پزشک تأیید نشده و قابل اجرا نیست." variant="danger" />;
-  return null;
-}
-
-function StatusBadge({ status }: { readonly status: ReturnType<typeof getNutritionPlanStatus> }) {
-  const label = status === "active"
-    ? "فعال"
-    : status === "historical"
-      ? "تاریخی"
-      : status === "pending_review" || status === "physician_review"
-        ? "در انتظار بررسی"
-        : status === "changes_requested"
-          ? "نیازمند اصلاح"
-          : status === "rejected"
-            ? "رد شده"
-            : status === "archived"
-              ? "بایگانی"
-              : "نسخه اولیه";
-  return <Text style={[styles.statusBadge, status === "active" ? styles.statusActive : styles.statusPending]}>{label}</Text>;
-}
-
-function PlanStat({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <View style={styles.planStat}>
-      <Text style={styles.planStatValue}>{value}</Text>
-      <Text style={styles.planStatLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function PlanContextItem({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <View style={styles.planContextItem}>
-      <Text style={styles.planContextValue}>{value}</Text>
-      <Text style={styles.planContextLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function planHeadingEyebrow(plan: WeeklyPlan, historical: boolean): string {
+function planHeadingEyebrow(_plan: WeeklyPlan, historical: boolean): string {
   if (historical) return "نسخه قبلی";
-  if (plan.lifecycle_status === "active") return "برنامه فعال";
-  if (plan.physician_approved) return "تأییدشده برای اجرا";
-  return "پیش‌نویس در انتظار بررسی";
+  return "برنامه هفتگی";
 }
 
-function planRoleLabel(value: string | null | undefined): string {
-  if (value === "budget") return "با بودجه شما";
-  if (value === "ideal") return "ایده‌آل";
-  return "برنامه غذایی";
+function lifecycleLabel(status: string): string {
+  const values: Readonly<Record<string, string>> = {
+    active: "فعال",
+    archived: "بایگانی‌شده",
+    awaiting_lab_information: "در انتظار اطلاعات آزمایش",
+    changes_requested: "نیازمند تغییر",
+    pending_physician_review: "در انتظار بررسی",
+    physician_approved: "تأییدشده",
+    physician_review_in_progress: "در حال بررسی پزشک",
+    rejected: "ردشده",
+  };
+  return values[status] ?? status;
 }
 
 function planTitle(plan: WeeklyPlan): string {
-  if (plan.plan_role === "budget") return "برنامه با بودجه شما";
   if (plan.plan_role === "ideal") return "برنامه ایده‌آل";
   return "برنامه غذایی تو";
-}
-
-function planApprovalLabel(plan: WeeklyPlan): string {
-  if (plan.physician_approved && plan.review_status === "approved") return "تأیید شده";
-  if (plan.lifecycle_status === "rejected" || plan.review_status === "rejected") return "تأیید نشده";
-  return "در انتظار بررسی";
 }
 
 function planMetricLabel(plan: WeeklyPlan, code: string): string {
@@ -1214,15 +1360,6 @@ function PlanWarnings({ codes }: { readonly codes: readonly string[] }) {
   return <Notice message={messages.join(" ")} title="هشدارهای برنامه" variant="warning" />;
 }
 
-function SummaryRow({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.bodyText}>{value}</Text>
-    </View>
-  );
-}
-
 function viewData<TData>(state: MobileViewState<TData>): TData | undefined {
   if (state.status === "loading") return undefined;
   return "data" in state ? state.data : undefined;
@@ -1230,10 +1367,9 @@ function viewData<TData>(state: MobileViewState<TData>): TData | undefined {
 
 function budgetStatusLabel(value: string): string {
   if (value === "within_budget") return "در محدوده بودجه";
-  if (value === "flexible_overage") return "با مازاد انعطاف‌پذیر";
-  if (value === "over_budget") return "بیش از بودجه";
-  if (value === "unconstrained") return "بدون محدودیت بودجه";
-  return "وضعیت بودجه ثبت نشده";
+  if (value === "flexible_overage") return "کمی بالاتر از بودجه انعطاف‌پذیر";
+  if (value === "over_budget") return "بالاتر از بودجه";
+  return value;
 }
 
 function formatPlanDate(value: string): string {
@@ -1262,12 +1398,49 @@ function mealRoleLabel(value: string): string {
 }
 
 function nutritionLabel(value: string): string {
-  if (value === "energy" || value === "calories") return "انرژی";
-  if (value === "protein") return "پروتئین";
-  if (value === "carbohydrate" || value === "carbohydrates") return "کربوهیدرات";
-  if (value === "fat") return "چربی";
-  if (value === "fibre" || value === "fiber") return "فیبر";
-  return "سایر مواد مغذی";
+  const values: Readonly<Record<string, string>> = {
+    carbohydrate: "کربوهیدرات",
+    carbohydrate_g: "کربوهیدرات",
+    carbohydrates: "کربوهیدرات",
+    calcium_mg: "کلسیم",
+    energy: "انرژی",
+    energy_kcal: "انرژی",
+    fat: "چربی",
+    fat_g: "چربی",
+    fibre: "فیبر",
+    fibre_g: "فیبر",
+    fiber: "فیبر",
+    free_sugar_g: "قند آزاد",
+    goal_calories: "انرژی",
+    protein: "پروتئین",
+    protein_g: "پروتئین",
+    saturated_fat_g: "چربی اشباع",
+    sodium_mg: "سدیم",
+    total_fat: "چربی کل",
+    total_fat_g: "چربی کل",
+  };
+  return values[value] ?? value.replaceAll("_", " ");
+}
+
+function nutritionStatusLabel(value: string): string {
+  const values: Readonly<Record<string, string>> = {
+    above_applicable_limit: "بالاتر از حد مجاز",
+    below_minimum: "کمتر از حداقل",
+    below_preferred_but_acceptable: "کمتر از ترجیح، قابل‌قبول",
+    below_reference_target: "شکاف نسبت به مرجع غذایی",
+    data_incomplete: "داده ناکامل",
+    within_target: "در محدوده",
+  };
+  return values[value] ?? value;
+}
+
+function nutrientStatusStyle(value: string) {
+  if (value === "within_target") return styles.nutrientStatusPositive;
+  if (value === "above_applicable_limit") return styles.nutrientStatusDanger;
+  if (value === "data_incomplete" || value === "below_minimum" || value === "below_reference_target") {
+    return styles.nutrientStatusWarning;
+  }
+  return styles.nutrientStatusNeutral;
 }
 
 function nutritionPlanErrorMessage(error: unknown): string {
@@ -1308,6 +1481,17 @@ const styles = StyleSheet.create({
     textAlign: "auto",
     writingDirection: "rtl",
   },
+  changeBullet: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  changeRow: {
+    alignItems: "flex-start",
+    gap: fiticianTokens.spacing[2],
+  },
   dayCard: {
     gap: fiticianTokens.spacing[3],
   },
@@ -1331,10 +1515,45 @@ const styles = StyleSheet.create({
   },
   dayHeading: {
     alignItems: "flex-start",
+    direction: "rtl",
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  dailySummary: {
+    backgroundColor: fiticianTokens.colors.surfaceHighlight,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    direction: "rtl",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+    padding: fiticianTokens.spacing[3],
+  },
+  dailySummaryItem: {
+    alignItems: "stretch",
+    flexGrow: 1,
+    flexShrink: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: "44%",
+  },
+  dailySummaryLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  dailySummaryValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
   daySelector: {
+    direction: "rtl",
     flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingBottom: fiticianTokens.spacing[1],
@@ -1346,7 +1565,7 @@ const styles = StyleSheet.create({
     borderRadius: fiticianTokens.radii.medium,
     borderWidth: 1,
     gap: fiticianTokens.spacing[1],
-    minWidth: 92,
+    minWidth: 80,
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
   },
@@ -1385,6 +1604,20 @@ const styles = StyleSheet.create({
   },
   daysSection: {
     gap: fiticianTokens.spacing[3],
+  },
+  doctorAvatar: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.warningSurface,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    flexShrink: 0,
+    height: 56,
+    justifyContent: "center",
+    width: 56,
+  },
+  doctorEmoji: {
+    fontSize: 28,
   },
   eyebrow: {
     color: fiticianTokens.colors.aqua,
@@ -1451,6 +1684,14 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     gap: fiticianTokens.spacing[2],
   },
+  historyHeading: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
   historyTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
@@ -1465,6 +1706,60 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "auto",
     writingDirection: "rtl",
+  },
+  ledger: {
+    alignItems: "stretch",
+    gap: fiticianTokens.spacing[2],
+    width: "100%",
+  },
+  ledgerContent: {
+    alignItems: "stretch",
+    flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  ledgerIcon: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  ledgerItem: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[2],
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+    width: "100%",
+  },
+  ledgerLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  ledgerValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  ledgerValueCost: {
+    color: fiticianTokens.colors.aqua,
+  },
+  ledgerValueFlexible: {
+    color: fiticianTokens.colors.amber,
+  },
+  ledgerValueOver: {
+    color: fiticianTokens.colors.danger,
+  },
+  ledgerValueWithin: {
+    color: fiticianTokens.colors.success,
   },
   mealCard: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,
@@ -1484,22 +1779,106 @@ const styles = StyleSheet.create({
     height: 64,
     width: 64,
   },
+  mealNutrient: {
+    alignItems: "stretch",
+    backgroundColor: fiticianTokens.colors.surface,
+    borderRadius: fiticianTokens.radii.small,
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+    padding: fiticianTokens.spacing[2],
+  },
+  mealNutrientLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  mealNutrients: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+    paddingHorizontal: fiticianTokens.spacing[3],
+  },
+  mealNutrientValue: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
   mealStack: {
     gap: fiticianTokens.spacing[2],
   },
-  nutrientChip: {
-    backgroundColor: fiticianTokens.colors.surface,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.small,
-    borderWidth: 1,
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-    minWidth: "22%",
-    padding: fiticianTokens.spacing[2],
-  },
-  nutrientGrid: {
+  meta: {
+    alignItems: "center",
+    direction: "rtl",
     flexDirection: "row",
     flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+  },
+  metaChip: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceHighlight,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    flexGrow: 0,
+    flexShrink: 1,
+    gap: fiticianTokens.spacing[1],
+    maxWidth: "100%",
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  metaIcon: {
+    fontSize: 15,
+    lineHeight: 18,
+  },
+  metaTag: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderRadius: fiticianTokens.radii.pill,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    overflow: "hidden",
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: 2,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  metaText: {
+    color: fiticianTokens.colors.mist,
+    flexShrink: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  metaValue: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  nutrientCard: {
+    alignItems: "stretch",
+    backgroundColor: fiticianTokens.colors.surfaceSubtle,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[1],
+    padding: fiticianTokens.spacing[3],
+    width: "100%",
+  },
+  nutrientGrid: {
+    alignItems: "stretch",
+    flexDirection: "column",
     gap: fiticianTokens.spacing[2],
   },
   nutrientLabel: {
@@ -1508,6 +1887,32 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "auto",
     writingDirection: "rtl",
+  },
+  nutrientDetail: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  nutrientStatus: {
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  nutrientStatusDanger: {
+    color: fiticianTokens.colors.danger,
+  },
+  nutrientStatusNeutral: {
+    color: fiticianTokens.colors.muted,
+  },
+  nutrientStatusPositive: {
+    color: fiticianTokens.colors.success,
+  },
+  nutrientStatusWarning: {
+    color: fiticianTokens.colors.amber,
   },
   nutrientValue: {
     color: fiticianTokens.colors.ink,
@@ -1557,15 +1962,63 @@ const styles = StyleSheet.create({
   optionStack: {
     gap: fiticianTokens.spacing[3],
   },
-  pdfActions: {
-    gap: fiticianTokens.spacing[2],
+  pdfCta: {
+    backgroundColor: fiticianTokens.colors.teal,
+    borderColor: fiticianTokens.colors.aqua,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    overflow: "hidden",
+    width: "100%",
   },
-  pdfCard: {
+  pdfContent: {
     alignItems: "stretch",
-    gap: fiticianTokens.spacing[3],
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
   },
-  planCard: {
+  pdfIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.aquaAtmosphere,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    height: 52,
+    justifyContent: "center",
+    width: 52,
+  },
+  pdfOffline: {
+    color: fiticianTokens.colors.amber,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    paddingHorizontal: fiticianTokens.spacing[4],
+    paddingBottom: fiticianTokens.spacing[3],
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  pdfPressed: {
+    opacity: 0.82,
+  },
+  pdfPressable: {
+    alignItems: "center",
     gap: fiticianTokens.spacing[3],
+    minHeight: 104,
+    padding: fiticianTokens.spacing[4],
+  },
+  pdfSubtitle: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    lineHeight: 22,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  pdfTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "auto",
+    writingDirection: "rtl",
   },
   planChoice: {
     alignItems: "stretch",
@@ -1646,51 +2099,46 @@ const styles = StyleSheet.create({
   planChoiceSubtitleSelected: {
     color: fiticianTokens.colors.ink,
   },
-  planCopy: {
-    alignItems: "stretch",
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-  },
   planTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h2,
-    lineHeight: 32,
+    fontSize: fiticianTokens.typography.fontSize.h1,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 40,
     textAlign: "auto",
     writingDirection: "rtl",
   },
   planHeading: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[3],
-    justifyContent: "space-between",
-  },
-  planContext: {
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[2],
-  },
-  planContextItem: {
     alignItems: "stretch",
+    gap: fiticianTokens.spacing[1],
+  },
+  planDisclosure: {
     backgroundColor: fiticianTokens.colors.surface,
     borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.small,
-    borderWidth: 1,
-    flex: 1,
-    gap: fiticianTokens.spacing[1],
-    minWidth: 0,
-    padding: fiticianTokens.spacing[2],
+    borderRadius: fiticianTokens.radii.large,
+    padding: 0,
   },
-  planContextLabel: {
+  planNotice: {
+    alignItems: "stretch",
+    backgroundColor: fiticianTokens.colors.surfaceTranslucent,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.large,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[1],
+    padding: fiticianTokens.spacing[3],
+  },
+  planNoticeMessage: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    lineHeight: 23,
     textAlign: "auto",
     writingDirection: "rtl",
   },
-  planContextValue: {
+  planNoticeTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "auto",
     writingDirection: "rtl",
@@ -1698,29 +2146,59 @@ const styles = StyleSheet.create({
   planStack: {
     gap: fiticianTokens.spacing[3],
   },
-  planStat: {
+  referenceNotice: {
     alignItems: "stretch",
-    backgroundColor: fiticianTokens.colors.surfaceSubtle,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.small,
+    backgroundColor: fiticianTokens.colors.infoSurface,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.large,
     borderWidth: 1,
-    flexGrow: 1,
-    flexShrink: 1,
-    gap: fiticianTokens.spacing[1],
-    minWidth: "46%",
     padding: fiticianTokens.spacing[3],
   },
-  planStatLabel: {
+  referenceNoticeText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    lineHeight: 23,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  reviewApproved: {
+    backgroundColor: fiticianTokens.colors.successSurface,
+    borderColor: fiticianTokens.colors.success,
+  },
+  reviewBadge: {
+    alignItems: "center",
+    gap: fiticianTokens.spacing[3],
+  },
+  reviewCard: {
+    alignItems: "stretch",
+    backgroundColor: fiticianTokens.colors.warningSurface,
+    borderColor: fiticianTokens.colors.amber,
+    borderRadius: fiticianTokens.radii.extraLarge,
+    borderWidth: 1,
+    padding: fiticianTokens.spacing[3],
+  },
+  reviewContent: {
+    alignItems: "stretch",
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+  },
+  reviewPending: {
+    backgroundColor: fiticianTokens.colors.warningSurface,
+    borderColor: fiticianTokens.colors.amber,
+  },
+  reviewSubtitle: {
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     textAlign: "auto",
     writingDirection: "rtl",
   },
-  planStatValue: {
+  reviewTitle: {
     color: fiticianTokens.colors.ink,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "auto",
     writingDirection: "rtl",
@@ -1785,60 +2263,5 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     gap: fiticianTokens.spacing[3],
-  },
-  sectionHeading: {
-    alignItems: "stretch",
-    gap: fiticianTokens.spacing[1],
-  },
-  sectionHint: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
-  sectionTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
-    fontSize: fiticianTokens.typography.fontSize.h3,
-    lineHeight: 28,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
-  statusActive: {
-    backgroundColor: fiticianTokens.colors.success,
-    color: fiticianTokens.colors.canvas,
-  },
-  statusBadge: {
-    borderRadius: fiticianTokens.radii.pill,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    overflow: "hidden",
-    paddingHorizontal: fiticianTokens.spacing[3],
-    paddingVertical: fiticianTokens.spacing[2],
-    textAlign: "center",
-    writingDirection: "rtl",
-  },
-  statusPending: {
-    backgroundColor: fiticianTokens.colors.amber,
-    color: fiticianTokens.colors.canvas,
-  },
-  summaryLabel: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
-  summaryRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: fiticianTokens.spacing[2],
   },
 });

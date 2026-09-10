@@ -15,6 +15,7 @@ export type WeeklyPlanFood = components["schemas"]["WeeklyPlanFoodResponse"];
 export type WeeklyPlanNutrient = components["schemas"]["WeeklyPlanNutrientResponse"];
 export type WeeklyPlanGeneration = components["schemas"]["WeeklyPlanGenerationResponse"];
 export type WeeklyPlanHistoryItem = components["schemas"]["WeeklyPlanHistoryItemResponse"];
+export type PartialRegenerationInput = components["schemas"]["PartialRegenerationInput"];
 export type PlanBundleSelectionInput = components["schemas"]["PlanBundleSelectInput"];
 export type PlanBundleSelectResponse = components["schemas"]["PlanBundleSelectResponse"];
 export type { ShoppingList } from "./nutritionShoppingList";
@@ -32,6 +33,7 @@ export interface NutritionPlanApi {
   getLatest(): Promise<WeeklyPlan | null>;
   getLatestBundle(): Promise<WeeklyPlanGeneration | null>;
   getShoppingList(planId: string): Promise<ShoppingList>;
+  partialRegenerate(planId: string, dayIndexes: readonly number[]): Promise<WeeklyPlan>;
   selectBundle(bundleId: string, input: PlanBundleSelectionInput): Promise<PlanBundleSelectResponse>;
 }
 
@@ -95,6 +97,18 @@ export function createNutritionPlanApi(
 
     getLatestBundle() {
       return optional<WeeklyPlanGeneration>(request, `${nutritionBundlesPath}/latest`);
+    },
+
+    partialRegenerate(planId, dayIndexes) {
+      const input: PartialRegenerationInput = {
+        day_indexes: [...dayIndexes],
+        expected_plan_revision_id: planId,
+      };
+      return request<WeeklyPlan>({
+        body: jsonBody(input),
+        method: "POST",
+        path: `${nutritionPlansPath}/${encodeURIComponent(planId)}/edits/partial-regenerate`,
+      });
     },
 
     async getShoppingList(planId) {

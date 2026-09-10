@@ -5,6 +5,7 @@ import { nutritionKeys } from "../data/queryKeys";
 import type { ConnectivityStatus } from "../platform/connectivity";
 import { DisclosureCard, Notice, Skeleton } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
+import { RTL_ROW } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import { formatNutritionPlanMoney } from "./nutritionPlanModel";
 import { type NutritionPlanApi } from "./nutritionPlanApi";
@@ -47,8 +48,7 @@ export function NutritionShoppingList({
     <DisclosureCard
       defaultExpanded={false}
       style={styles.card}
-      summary="مواد لازم برای این نسخه از برنامه"
-      title="لیست خرید"
+      title="لیست خرید دقیق"
     >
       {state.status === "loading" ? <Skeleton height={260} /> : null}
       {state.status === "error" && list === undefined ? (
@@ -62,6 +62,7 @@ export function NutritionShoppingList({
       {state.status === "offline" && list === undefined ? (
         <Notice message="لیست خرید در حالت آفلاین در دسترس نیست." variant="offline" />
       ) : null}
+      {!executable ? <Notice message="تا تأیید پزشک، خرید نهایی را انجام نده." variant="warning" /> : null}
       {list !== undefined ? (
         <ShoppingListContent
           list={list}
@@ -81,16 +82,13 @@ function ShoppingListContent({
 }) {
   return (
     <>
-      {priceVisibility === "not_executable" ? (
-        <Notice message="قیمت مرجع فقط برای برنامه فعال و تأییدشده نمایش داده می‌شود." variant="warning" />
-      ) : null}
       <ShoppingWarnings codes={list.warning_codes} />
       {list.items.length === 0 ? (
         <Notice message="برای این نسخه ماده‌ای در لیست خرید ثبت نشده است." variant="info" />
       ) : (
         <View style={styles.itemStack}>
           {list.items.map((item) => (
-            <View key={item.food_id} style={styles.item}>
+            <View key={item.food_id} style={[styles.item, RTL_ROW]}>
               <View style={styles.itemCopy}>
                 <Text style={styles.itemName}>{item.name_fa}</Text>
                 <Text style={styles.itemEnglish}>{item.name_en}</Text>
@@ -108,7 +106,7 @@ function ShoppingListContent({
         </View>
       )}
       {priceVisibility === "approved" ? (
-        <View style={styles.totalRow}>
+        <View style={[styles.totalRow, RTL_ROW]}>
           <Text style={styles.totalLabel}>جمع هزینه مرجع تأییدشده</Text>
           <Text style={styles.totalValue}>{formatNutritionPlanMoney(list.total_cost_irr)}</Text>
         </View>
