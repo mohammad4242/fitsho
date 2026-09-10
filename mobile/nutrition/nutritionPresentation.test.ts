@@ -47,12 +47,30 @@ it("passes contract images to native thumbnails for catalogues, meals, and repla
   expect(catalogue).toContain("imageUrl={food.image_url}");
   expect(catalogue).toContain("imageUrl={meal.image_url}");
   expect(catalogue).toContain("<PageHeading");
-  expect(catalogue).toContain('title={mode === "foods" ? "کاتالوگ مواد غذایی" : "کاتالوگ وعده‌ها"}');
+  expect(catalogue).toContain('title="کاتالوگ مواد غذایی"');
+  expect(catalogue).toContain("ترکیب‌های کنترل‌شده تغذیه");
+  expect(catalogue).toContain("کاتالوگ وعده‌های غذایی");
+  expect(catalogue).toContain("دسته‌بندی وعده‌ها:");
+  expect(catalogue).toContain("RTL_ROW");
+  expect(catalogue).toContain("RTL_TEXT");
+  expect(catalogue).not.toContain("MealDetailsSheet");
   expect(foodRoute).toContain('initialMode="foods"');
   expect(mealRoute).toContain('initialMode="meals"');
   expect(plan).toContain("imageUrl={meal.image_url}");
   expect(plan).toContain("imageUrl={option.image_url}");
   expect(plan).toContain("<DisclosureCard");
+});
+
+it("keeps the meal catalogue background fixed behind a transparent native screen", async () => {
+  const source = await readFile(new URL("../app/(member)/member/meal-catalogue.tsx", import.meta.url), "utf8");
+
+  expect(source).toContain('require("../../../assets/home-food.webp")');
+  expect(source).toContain("<ImageBackground");
+  expect(source).toContain("<LinearGradient");
+  expect(source).toContain("<Rect");
+  expect(source).toContain("style={styles.transparentScreen}");
+  expect(source).toContain("contentContainerStyle={styles.transparentContent}");
+  expect(source).toContain('backgroundColor: "transparent"');
 });
 
 it("keeps the nutrition day selector in explicit RTL horizontal flow", async () => {

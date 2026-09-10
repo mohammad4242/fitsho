@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { nutritionKeys } from "../data/queryKeys";
 import { connectivityMonitor, type ConnectivityStatus } from "../platform/connectivity";
 import {
+  AppIcon,
   Button,
   Card,
   EmptyState,
@@ -17,7 +18,7 @@ import {
   TextField,
 } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
-import { formatPersianNumber } from "../ui/locale";
+import { RTL_LAYOUT, RTL_ROW, RTL_TEXT } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import {
   createNutritionCatalogueApi,
@@ -29,13 +30,35 @@ import {
   foodCatalogueMacroRows,
   foodCatalogueCategoryLabel,
   foodCataloguePortionRows,
+  formatCatalogueDisplayNumber,
   mealCatalogueCategoryLabel,
-  preparedMealCatalogueLabel,
   selectDefaultFoodPortion,
 } from "./nutritionCatalogueModel";
 import { NutritionThumbnail } from "./NutritionThumbnail";
 
 type CatalogueMode = "foods" | "meals";
+
+const MEAL_CATEGORY_ORDER: readonly MealCatalogueCategory[] = [
+  "breakfast",
+  "lunch",
+  "post_workout",
+  "snack",
+  "dinner",
+];
+
+const mealCatalogueRoleLabels: Readonly<Record<string, string>> = {
+  carbohydrate: "کربوهیدرات",
+  fat: "چربی",
+  fibre: "فیبر",
+  flavor_profile: "طعم و چاشنی",
+  micronutrient_source: "ریزمغذی‌ها",
+  none: "بدون نقش",
+  primary_carb: "کربوهیدرات اصلی",
+  primary_fat: "چربی اصلی",
+  primary_protein: "پروتئین اصلی",
+  protein: "پروتئین",
+  vegetable_volume: "حجم سبزیجات",
+};
 
 export function NutritionCatalogueSection({ initialMode }: { readonly initialMode?: CatalogueMode } = {}) {
   const auth = useMobileAuth();
@@ -47,7 +70,6 @@ export function NutritionCatalogueSection({ initialMode }: { readonly initialMod
   const [foodCategory, setFoodCategory] = useState<string | null>(null);
   const [mealCategory, setMealCategory] = useState<MealCatalogueCategory | null>(null);
   const [selectedFood, setSelectedFood] = useState<FoodCatalogueItem | null>(null);
-  const [selectedMeal, setSelectedMeal] = useState<MealCatalogueItem | null>(null);
   const normalizedQuery = query.trim();
   const foodQuery = useQuery({
     enabled: mode === "foods",
@@ -82,13 +104,21 @@ export function NutritionCatalogueSection({ initialMode }: { readonly initialMod
 
   return (
     <View style={styles.section}>
-      <PageHeading
-        eyebrow={dedicatedMode ? "تغذیه · کاتالوگ" : "تغذیه"}
-        supportingText={mode === "foods"
-          ? "مواد غذایی تأییدشده را جست‌وجو کن و جزئیات هر مورد را ببین."
-          : "وعده‌های منتشرشده و مواد تشکیل‌دهنده قابل نمایش را مرور کن."}
-        title={mode === "foods" ? "کاتالوگ مواد غذایی" : "کاتالوگ وعده‌ها"}
-      />
+      {mode === "meals" && dedicatedMode ? (
+        <MealCatalogueHero />
+      ) : mode === "foods" ? (
+        <PageHeading
+          eyebrow={dedicatedMode ? "تغذیه · کاتالوگ" : "تغذیه"}
+          supportingText="مواد غذایی تأییدشده را جست‌وجو کن و جزئیات هر مورد را ببین."
+          title="کاتالوگ مواد غذایی"
+        />
+      ) : (
+        <PageHeading
+          eyebrow={dedicatedMode ? "تغذیه · کاتالوگ" : "تغذیه"}
+          supportingText="وعده‌های منتشرشده و مواد تشکیل‌دهنده قابل نمایش را مرور کن."
+          title="کاتالوگ وعده‌ها"
+        />
+      )}
       {!dedicatedMode ? (
         <SegmentedControl
           accessibilityLabel="نوع کاتالوگ"
@@ -115,13 +145,23 @@ export function NutritionCatalogueSection({ initialMode }: { readonly initialMod
           category={mealCategory}
           onCategoryChange={setMealCategory}
           onRetry={() => void mealQuery.refetch()}
-          onSelect={setSelectedMeal}
           page={mealPage}
           state={mealState}
         />
       )}
       <FoodDetailsSheet food={selectedFood} onClose={() => setSelectedFood(null)} />
-      <MealDetailsSheet meal={selectedMeal} onClose={() => setSelectedMeal(null)} />
+    </View>
+  );
+}
+
+function MealCatalogueHero() {
+  return (
+    <View style={[styles.mealHero, RTL_LAYOUT]}>
+      <Text style={[styles.mealHeroEyebrow, RTL_TEXT]}>ترکیب‌های کنترل‌شده تغذیه</Text>
+      <Text accessibilityRole="header" style={[styles.mealHeroTitle, RTL_TEXT]}>کاتالوگ وعده‌های غذایی</Text>
+      <Text style={[styles.mealHeroDescription, RTL_TEXT]}>
+        ترکیب معتبر هر وعده و بازه مجاز مواد غذایی را مشاهده کنید. مقدار نهایی را موتور تغذیه تعیین می‌کند.
+      </Text>
     </View>
   );
 }
@@ -192,14 +232,12 @@ function MealCatalogueView({
   category,
   onCategoryChange,
   onRetry,
-  onSelect,
   page,
   state,
 }: {
   readonly category: MealCatalogueCategory | null;
   readonly onCategoryChange: (category: MealCatalogueCategory | null) => void;
   readonly onRetry: () => void;
-  readonly onSelect: (meal: MealCatalogueItem) => void;
   readonly page: ReturnType<typeof stateData<MealCataloguePage>>;
   readonly state: ReturnType<typeof getMobileViewState<MealCataloguePage>>;
 }) {
@@ -213,28 +251,20 @@ function MealCatalogueView({
   if (page === undefined) return null;
 
   return (
-    <View style={styles.catalogueStack}>
-      {state.status === "offline" || state.status === "stale" ? (
-        <Notice message="نتایج کاتالوگ تازه‌سازی نشده‌اند." variant="offline" />
-      ) : null}
-      <CategoryChips
-        categories={page.categories}
-        labelForCategory={(value) => mealCatalogueCategoryLabel(value as MealCatalogueCategory)}
-        onSelect={(value) => onCategoryChange(value as MealCatalogueCategory | null)}
-        selected={category}
-      />
+    <View style={styles.mealCatalogueStack}>
+      <MealCategoryFilter category={category} onCategoryChange={onCategoryChange} />
       {page.items.length === 0 ? (
-        <EmptyState title="وعده‌ای پیدا نشد">دسته‌بندی دیگری را انتخاب کن.</EmptyState>
+        <EmptyState title="در این دسته وعده‌ای ثبت نشده است">دسته‌بندی دیگری را انتخاب کن.</EmptyState>
       ) : (
-        <View style={styles.cardStack}>
+        <View style={styles.mealCardStack}>
           {page.items.map((meal) => (
-            <MealCatalogueCard key={meal.id} meal={meal} onPress={() => onSelect(meal)} />
+            <MealCatalogueCard
+              key={meal.id}
+              meal={meal}
+            />
           ))}
         </View>
       )}
-      <Text style={styles.disclaimer}>
-        فقط وعده‌های منتشرشده برای اعضا نمایش داده می‌شوند. جزئیات داخلی دستور آماده در اپ منتشر نمی‌شود.
-      </Text>
     </View>
   );
 }
@@ -268,24 +298,148 @@ function FoodCatalogueCard({ food, onPress }: { readonly food: FoodCatalogueItem
   );
 }
 
-function MealCatalogueCard({ meal, onPress }: { readonly meal: MealCatalogueItem; readonly onPress: () => void }) {
-  const prepared = preparedMealCatalogueLabel(meal.calculation_mode);
+function MealCategoryFilter({
+  category,
+  onCategoryChange,
+}: {
+  readonly category: MealCatalogueCategory | null;
+  readonly onCategoryChange: (category: MealCatalogueCategory | null) => void;
+}) {
   return (
-    <Card onPress={onPress} style={styles.catalogueCard} variant="interactive">
-      <View style={styles.catalogueIdentity}>
-        <View style={styles.cardHeading}>
-          <View style={styles.cardCopy}>
-            <Text style={styles.cardTitle}>{meal.name_fa}</Text>
-            <Text style={styles.cardEnglish}>{meal.name_en}</Text>
-          </View>
-          <Text style={styles.category}>{mealCatalogueCategoryLabel(meal.category)}</Text>
-        </View>
-        <NutritionThumbnail imageUrl={meal.image_url} name={meal.name_fa} style={styles.catalogueThumbnail} />
-      </View>
-      <Text style={styles.portionHint}>{formatPersianNumber(meal.items.length, { maximumFractionDigits: 0 })} ماده تأییدشده در این وعده</Text>
-      {prepared ? <Notice message={prepared.message} title={prepared.title} variant="info" /> : null}
-    </Card>
+    <View style={styles.mealFilter}>
+      <Text style={[styles.mealFilterLabel, RTL_TEXT]}>دسته‌بندی وعده‌ها:</Text>
+      <ScrollView
+        contentContainerStyle={[styles.mealChipRow, RTL_ROW]}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.mealChipScroller}
+      >
+        <MealChip label="همه" onPress={() => onCategoryChange(null)} selected={category === null} />
+        {MEAL_CATEGORY_ORDER.map((value) => (
+          <MealChip
+            key={value}
+            label={mealCatalogueCategoryLabel(value)}
+            onPress={() => onCategoryChange(value)}
+            selected={category === value}
+          />
+        ))}
+      </ScrollView>
+    </View>
   );
+}
+
+function MealChip({
+  label,
+  onPress,
+  selected,
+}: {
+  readonly label: string;
+  readonly onPress: () => void;
+  readonly selected: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[styles.mealChip, selected && styles.mealChipSelected]}
+    >
+      <Text style={[styles.mealChipText, selected && styles.mealChipTextSelected, RTL_TEXT]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function MealCatalogueCard({
+  meal,
+}: {
+  readonly meal: MealCatalogueItem;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const statusContainerStyle = meal.verification_status === "verified"
+    ? styles.mealStatusVerified
+    : meal.verification_status === "draft"
+      ? styles.mealStatusDraft
+      : styles.mealStatusRetired;
+  const statusTextStyle = meal.verification_status === "verified"
+    ? styles.mealStatusVerifiedText
+    : meal.verification_status === "draft"
+      ? styles.mealStatusDraftText
+      : styles.mealStatusRetiredText;
+
+  return (
+    <View style={[styles.mealCard, RTL_LAYOUT]} testID={`meal-card-${meal.id}`}>
+      <Pressable
+        accessibilityLabel={meal.name_fa}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        onPress={() => setExpanded((current) => !current)}
+        style={[styles.mealSummary, RTL_ROW]}
+        testID={`meal-card-${meal.id}-summary`}
+      >
+        <View style={[styles.mealIdentity, RTL_ROW]}>
+          <NutritionThumbnail imageUrl={meal.image_url} name={meal.name_fa} style={styles.mealImage} />
+          <View style={styles.mealCopy}>
+            <Text style={[styles.mealCode, RTL_TEXT]}>
+              {meal.code} · {mealCatalogueCategoryLabel(meal.category)}
+            </Text>
+            <Text style={[styles.mealTitle, RTL_TEXT]}>{meal.name_fa}</Text>
+          </View>
+        </View>
+        <View style={[styles.mealStatus, statusContainerStyle]}>
+          <Text style={[styles.mealStatusText, statusTextStyle, RTL_TEXT]}>
+            {mealStatusLabel(meal.verification_status)}
+          </Text>
+        </View>
+        <View style={styles.mealDisclosureIcon}>
+          <AppIcon color={fiticianTokens.colors.aqua} name={expanded ? "chevronUp" : "chevronDown"} size={fiticianTokens.iconSize.md} />
+        </View>
+      </Pressable>
+      {expanded ? (
+        <View style={[styles.mealDetails, RTL_LAYOUT]}>
+          <View style={styles.mealIngredientStack}>
+            {meal.items.map((item) => (
+              <MealIngredientRow item={item} key={item.food_id} />
+            ))}
+          </View>
+          <Text style={[styles.mealReferenceNote, RTL_TEXT]}>
+            مقادیر نهایی داخل این بازه توسط planner تعیین می‌شوند.
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function MealIngredientRow({ item }: { readonly item: MealCatalogueItem["items"][number] }) {
+  return (
+    <View style={[styles.mealIngredient, RTL_LAYOUT]}>
+      <Text style={[styles.mealIngredientName, RTL_TEXT]}>{item.food_name_fa}</Text>
+      <Text style={[styles.mealIngredientRole, RTL_TEXT]}>{mealCatalogueRoleLabel(item.functional_role)}</Text>
+      <View style={[styles.mealIngredientMeta, RTL_ROW]}>
+        <Text style={[styles.mealIngredientMetaText, RTL_TEXT]}>
+          {formatCatalogueDisplayNumber(item.min_grams, 1)} تا {formatCatalogueDisplayNumber(item.max_grams, 1)} گرم
+        </Text>
+        <Text style={[styles.mealIngredientMetaText, RTL_TEXT]}>
+          {item.is_required ? "الزامی" : "اختیاری"}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function mealCatalogueRoleLabel(role: string | null): string {
+  return role === null ? mealCatalogueRoleLabels.none : mealCatalogueRoleLabels[role] ?? role;
+}
+
+function mealStatusLabel(status: MealCatalogueItem["verification_status"]): string {
+  switch (status) {
+    case "draft":
+      return "پیش‌نویس";
+    case "verified":
+      return "تأییدشده";
+    case "retired":
+      return "بازنشسته";
+  }
 }
 
 function FoodDetailsSheet({ food, onClose }: { readonly food: FoodCatalogueItem | null; readonly onClose: () => void }) {
@@ -316,35 +470,6 @@ function FoodDetailsSheet({ food, onClose }: { readonly food: FoodCatalogueItem 
           </View>
           <Text style={styles.sourceText}>منبع: {food.source.name} · دادهٔ مرجع ثبت‌شده</Text>
           <Notice message="قیمت این ماده در کاتالوگ عضو نمایش داده نمی‌شود؛ هزینه فقط از برنامه تأییدشده می‌آید." variant="info" />
-          <Button label="بستن" onPress={onClose} variant="ghost" />
-        </View>
-      ) : null}
-    </Sheet>
-  );
-}
-
-function MealDetailsSheet({ meal, onClose }: { readonly meal: MealCatalogueItem | null; readonly onClose: () => void }) {
-  return (
-    <Sheet onClose={onClose} title={meal?.name_fa ?? "جزئیات وعده"} visible={meal !== null}>
-      {meal ? (
-        <View style={styles.sheetStack}>
-          <NutritionThumbnail imageUrl={meal.image_url} name={meal.name_fa} style={styles.sheetThumbnail} />
-          <Text style={styles.cardEnglish}>{meal.name_en}</Text>
-          <Text style={styles.sheetTitle}>مواد تشکیل‌دهنده</Text>
-          <View style={styles.detailStack}>
-            {meal.items.map((item) => (
-              <View key={item.food_id} style={styles.ingredientRow}>
-                <View style={styles.cardCopy}>
-                  <Text style={styles.cardTitle}>{item.food_name_fa}</Text>
-                  <Text style={styles.cardEnglish}>{item.food_name_en}</Text>
-                </View>
-                <Text style={styles.portionHint}>{item.reference_grams} گرم</Text>
-              </View>
-            ))}
-          </View>
-          {preparedMealCatalogueLabel(meal.calculation_mode) ? (
-            <Notice message="خلاصه قابل نمایش دستور آماده فقط در نسخه غذایی ارائه می‌شود." variant="warning" />
-          ) : null}
           <Button label="بستن" onPress={onClose} variant="ghost" />
         </View>
       ) : null}
@@ -421,6 +546,226 @@ function useConnectivityStatus(): ConnectivityStatus {
 }
 
 const styles = StyleSheet.create({
+  mealCard: {
+    backgroundColor: "rgba(10,31,30,0.75)",
+    borderColor: "rgba(234,244,241,0.12)",
+    borderRadius: fiticianTokens.radii.card,
+    borderTopColor: fiticianTokens.colors.aqua,
+    borderTopWidth: 6,
+    borderWidth: 1,
+    elevation: fiticianTokens.shadows.card.elevation,
+    overflow: "hidden",
+    padding: 18,
+    shadowColor: fiticianTokens.shadows.card.color,
+    shadowOffset: fiticianTokens.shadows.card.offset,
+    shadowOpacity: fiticianTokens.shadows.card.opacity,
+    shadowRadius: fiticianTokens.shadows.card.radius,
+  },
+  mealCatalogueStack: {
+    gap: fiticianTokens.spacing[4],
+  },
+  mealCardStack: {
+    gap: fiticianTokens.spacing[4],
+  },
+  mealHero: {
+    alignItems: "stretch",
+    gap: fiticianTokens.spacing[1],
+  },
+  mealHeroDescription: {
+    color: "rgba(232,244,241,0.78)",
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    lineHeight: 26,
+  },
+  mealHeroEyebrow: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    letterSpacing: 0.4,
+    lineHeight: 20,
+  },
+  mealHeroTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
+    fontSize: fiticianTokens.typography.fontSize.h1,
+    lineHeight: 40,
+  },
+  mealFilter: {
+    alignItems: "stretch",
+    gap: fiticianTokens.spacing[2],
+  },
+  mealFilterLabel: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 20,
+  },
+  mealChipScroller: {
+    width: "100%",
+  },
+  mealChipRow: {
+    alignItems: "center",
+    gap: fiticianTokens.spacing[2],
+  },
+  mealChip: {
+    alignItems: "center",
+    backgroundColor: "rgba(10,31,30,0.65)",
+    borderColor: "rgba(234,244,241,0.14)",
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  mealChipSelected: {
+    backgroundColor: fiticianTokens.colors.aqua,
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  mealChipText: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.compact,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 20,
+  },
+  mealChipTextSelected: {
+    color: fiticianTokens.colors.canvas,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+  },
+  mealSummary: {
+    alignItems: "center",
+    gap: fiticianTokens.spacing[3],
+    width: "100%",
+  },
+  mealIdentity: {
+    alignItems: "center",
+    flex: 1,
+    gap: fiticianTokens.spacing[3],
+    minWidth: 0,
+  },
+  mealImage: {
+    borderColor: "rgba(80,223,206,0.32)",
+    borderRadius: 12,
+    borderWidth: 1,
+    flexShrink: 0,
+    height: 68,
+    width: 68,
+  },
+  mealCopy: {
+    alignItems: "stretch",
+    flex: 1,
+    gap: fiticianTokens.spacing[1],
+    minWidth: 0,
+  },
+  mealCode: {
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 20,
+  },
+  mealTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.lg,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 26,
+  },
+  mealStatus: {
+    alignItems: "center",
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    flexShrink: 0,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  mealStatusText: {
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    lineHeight: 18,
+  },
+  mealStatusVerified: {
+    backgroundColor: "rgba(16,185,129,0.15)",
+    borderColor: "rgba(16,185,129,0.30)",
+  },
+  mealStatusVerifiedText: {
+    color: "#10b981",
+  },
+  mealStatusDraft: {
+    backgroundColor: "rgba(245,158,11,0.15)",
+    borderColor: "rgba(245,158,11,0.30)",
+  },
+  mealStatusDraftText: {
+    color: "#f59e0b",
+  },
+  mealStatusRetired: {
+    backgroundColor: "rgba(148,163,184,0.15)",
+    borderColor: "rgba(148,163,184,0.30)",
+  },
+  mealStatusRetiredText: {
+    color: "#94a3b8",
+  },
+  mealDisclosureIcon: {
+    alignItems: "center",
+    flexShrink: 0,
+    justifyContent: "center",
+    width: 28,
+  },
+  mealDetails: {
+    borderTopColor: "rgba(234,244,241,0.10)",
+    borderTopWidth: 1,
+    gap: fiticianTokens.spacing[3],
+    marginTop: fiticianTokens.spacing[4],
+    paddingTop: fiticianTokens.spacing[4],
+  },
+  mealIngredientStack: {
+    gap: fiticianTokens.spacing[2],
+  },
+  mealIngredient: {
+    alignItems: "stretch",
+    backgroundColor: "rgba(6,21,20,0.55)",
+    borderColor: "rgba(234,244,241,0.10)",
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: fiticianTokens.spacing[1],
+    padding: fiticianTokens.spacing[3],
+  },
+  mealIngredientName: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 22,
+  },
+  mealIngredientRole: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 18,
+  },
+  mealIngredientMeta: {
+    flexWrap: "wrap",
+    gap: fiticianTokens.spacing[2],
+    width: "100%",
+  },
+  mealIngredientMetaText: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    lineHeight: 20,
+  },
+  mealReferenceNote: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+  },
   cardCopy: {
     alignItems: "stretch",
     flex: 1,

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, within } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native";
@@ -54,7 +54,7 @@ const meal = {
     food_name_en: "Egg",
     food_name_fa: "تخم‌مرغ",
     food_slug: "egg",
-    functional_role: null,
+    functional_role: "protein",
     is_required: true,
     max_grams: 100,
     min_grams: 50,
@@ -65,14 +65,14 @@ const meal = {
   verification_status: "verified",
 };
 
-function queryResult<T>(data: T) {
+function queryResult<T>(data: T, overrides: { readonly isFetching?: boolean; readonly isStale?: boolean } = {}) {
   return {
     data,
     error: null,
     isError: false,
-    isFetching: false,
+    isFetching: overrides.isFetching ?? false,
     isPending: false,
-    isStale: false,
+    isStale: overrides.isStale ?? false,
   } as never;
 }
 
@@ -94,6 +94,15 @@ function findAncestorStyle(node: ReactTestInstance, key: string): Record<string,
   throw new Error(`Ancestor style ${key} not found`);
 }
 
+function isDescendant(parent: ReactTestInstance, node: ReactTestInstance): boolean {
+  let current = node.parent;
+  while (current !== null) {
+    if (current === parent) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
 beforeEach(() => {
   mockCreateCatalogueApi.mockReturnValue({
     getFoodCatalogue: jest.fn(),
@@ -109,17 +118,95 @@ beforeEach(() => {
   });
 });
 
-test("dedicated meal mode matches the meal hierarchy and opens native detail sheet", () => {
+test("dedicated meal mode matches the web hierarchy and expands ingredients inline", () => {
   renderCatalogue("meals");
 
-  expect(screen.getByRole("header", { name: "کاتالوگ وعده‌ها" })).toBeTruthy();
+  expect(screen.getByText("ترکیب‌های کنترل‌شده تغذیه")).toBeTruthy();
+  expect(screen.getByRole("header", { name: "کاتالوگ وعده‌های غذایی" })).toBeTruthy();
+  expect(screen.getByText("ترکیب معتبر هر وعده و بازه مجاز مواد غذایی را مشاهده کنید. مقدار نهایی را موتور تغذیه تعیین می‌کند.")).toBeTruthy();
   expect(screen.queryByRole("radiogroup")).toBeNull();
-  expect(screen.getAllByText("صبحانه")).toHaveLength(2);
+  expect(screen.getByText("دسته‌بندی وعده‌ها:")).toBeTruthy();
+  for (const category of ["همه", "صبحانه", "ناهار", "پس از تمرین", "میان‌وعده", "شام"]) {
+    expect(screen.getByRole("button", { name: category })).toBeTruthy();
+  }
+  expect(screen.getByRole("button", { name: "همه" }).props.accessibilityState).toMatchObject({ selected: true });
 
-  fireEvent.press(screen.getByText("املت سبزیجات"));
+  const card = screen.getByTestId("meal-card-meal-1");
+  const summary = screen.getByTestId("meal-card-meal-1-summary");
+  const image = screen.getByLabelText("تصویر املت سبزیجات موجود نیست");
+  expect(within(card).getByText(/breakfast-1/)).toBeTruthy();
+  expect(within(card).getByText(/صبحانه/)).toBeTruthy();
+  expect(within(card).getByText("املت سبزیجات")).toBeTruthy();
+  expect(within(card).getByText("تأییدشده")).toBeTruthy();
+  expect(screen.queryByText("تخم‌مرغ")).toBeNull();
+  expect(screen.queryByText("Vegetable omelette")).toBeNull();
+  expect(screen.queryByText(/ماده تأییدشده در این وعده/)).toBeNull();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(isDescendant(card, image)).toBe(true);
+  expect(StyleSheet.flatten(summary.props.style)).toMatchObject({ direction: "rtl", flexDirection: "row" });
 
-  expect(screen.getByText("مواد تشکیل‌دهنده")).toBeTruthy();
-  expect(screen.getByText("تخم‌مرغ")).toBeTruthy();
+  fireEvent.press(summary);
+
+  expect(within(card).getByText("تخم‌مرغ")).toBeTruthy();
+  expect(within(card).getByText("پروتئین")).toBeTruthy();
+  expect(within(card).getByText("۵۰ تا ۱۰۰ گرم")).toBeTruthy();
+  expect(within(card).getByText("الزامی")).toBeTruthy();
+  expect(summary.props.accessibilityState).toMatchObject({ expanded: true });
+  expect(screen.queryByRole("dialog")).toBeNull();
+
+  fireEvent.press(summary);
+  expect(within(card).queryByText("۵۰ تا ۱۰۰ گرم")).toBeNull();
+});
+
+test("dedicated meal mode preserves server verification statuses", () => {
+  mockUseQuery.mockImplementation(({ queryKey }) => {
+    const key = queryKey as readonly unknown[];
+    if (key[1] === "meal-catalogue") {
+      return queryResult({
+        categories: ["breakfast", "lunch", "dinner"],
+        items: [
+          meal,
+          { ...meal, code: "DR01", id: "meal-draft", name_fa: "وعده پیش‌نویس", verification_status: "draft" },
+          { ...meal, code: "RT01", id: "meal-retired", name_fa: "وعده بازنشسته", verification_status: "retired" },
+        ],
+      });
+    }
+    return queryResult({ categories: ["legumes"], items: [food], page: 1, page_size: 24, total: 1 });
+  });
+
+  renderCatalogue("meals");
+
+  expect(screen.getByText("تأییدشده")).toBeTruthy();
+  expect(screen.getByText("پیش‌نویس")).toBeTruthy();
+  expect(screen.getByText("بازنشسته")).toBeTruthy();
+});
+
+test("dedicated meal mode starts with all categories and an unfiltered request", async () => {
+  renderCatalogue("meals");
+
+  const mealQuery = mockUseQuery.mock.calls
+    .map(([options]) => options as { readonly queryKey: readonly unknown[]; readonly queryFn: () => Promise<unknown> })
+    .find((options) => options.queryKey[1] === "meal-catalogue");
+  expect(mealQuery?.queryKey).toEqual(["nutrition", "meal-catalogue", null]);
+
+  await mealQuery?.queryFn();
+  const catalogueApi = mockCreateCatalogueApi.mock.results[0]?.value as { getMealCatalogue: jest.Mock };
+  expect(catalogueApi.getMealCatalogue).toHaveBeenCalledWith(undefined);
+});
+
+test("dedicated meal mode renders stale cached data without a warning card", () => {
+  mockUseQuery.mockImplementation(({ queryKey }) => {
+    const key = queryKey as readonly unknown[];
+    if (key[1] === "meal-catalogue") {
+      return queryResult({ categories: ["breakfast"], items: [meal] }, { isFetching: true, isStale: true });
+    }
+    return queryResult({ categories: ["legumes"], items: [food], page: 1, page_size: 24, total: 1 });
+  });
+
+  renderCatalogue("meals");
+
+  expect(screen.getByText("املت سبزیجات")).toBeTruthy();
+  expect(screen.queryByText("نتایج کاتالوگ تازه‌سازی نشده‌اند.")).toBeNull();
 });
 
 test("dedicated food mode keeps search and category before phone-friendly cards", () => {
