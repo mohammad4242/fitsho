@@ -5,6 +5,9 @@ import { resolve } from "node:path";
 const withAndroidHardening = loadModuleSync(
   resolve(__dirname, "plugins/withAndroidHardening.ts"),
 ).default;
+const withAndroidRtl = loadModuleSync(
+  resolve(__dirname, "plugins/withAndroidRtl.ts"),
+).default;
 const withAndroidReleaseSymbols = loadModuleSync(
   resolve(__dirname, "plugins/withAndroidReleaseSymbols.ts"),
 ).default;
@@ -131,6 +134,7 @@ const config: ExpoConfig = {
       },
     ],
     withAndroidHardening as never,
+    withAndroidRtl as never,
     withAndroidReleaseSymbols as never,
   ],
   runtimeVersion: { policy: "appVersion" },

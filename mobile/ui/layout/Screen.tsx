@@ -87,6 +87,7 @@ export function Screen({
 
 const styles = StyleSheet.create({
   content: {
+    alignItems: "stretch",
     alignSelf: "center",
     direction: FITICIAN_NATIVE_DIRECTION,
     flexGrow: 1,

@@ -31,7 +31,7 @@ it("does not request another restart after RTL is active", () => {
 
   expect(configureFiticianRtl()).toEqual({ isRTL: true, restartRequired: false });
   expect(native.I18nManager.allowRTL).toHaveBeenCalledWith(true);
-  expect(native.I18nManager.forceRTL).not.toHaveBeenCalled();
+  expect(native.I18nManager.forceRTL).toHaveBeenCalledWith(true);
 });
 
 it("maps the existing native direction to the card language", () => {

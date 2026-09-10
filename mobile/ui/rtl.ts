@@ -15,10 +15,8 @@ export function languageForDirection(isRTL = I18nManager.isRTL): MobileLanguage 
 
 export function configureFiticianRtl(): FiticianRtlConfiguration {
   I18nManager.allowRTL(true);
-  if (I18nManager.isRTL) {
-    return { isRTL: true, restartRequired: false };
-  }
-
+  // The Android config plugin applies this before the bridge starts. Keep the JS
+  // guard unconditional so older development clients converge to the same policy.
   I18nManager.forceRTL(true);
-  return { isRTL: false, restartRequired: true };
+  return { isRTL: I18nManager.isRTL, restartRequired: !I18nManager.isRTL };
 }
