@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { afterEach, beforeEach, expect, jest, test } from "@jest/globals";
 import { Alert } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -205,7 +205,10 @@ test("keeps the update action enabled when a pending review version exists", () 
 
   renderWorkoutPlans();
 
+  const controls = screen.getByTestId("workout-plan-controls");
   const updateButton = screen.getByRole("button", { name: "به‌روزرسانی برنامه" });
+  expect(within(controls).getByTestId("segmented-control")).toBeTruthy();
+  expect(within(controls).getByRole("button", { name: "به‌روزرسانی برنامه" })).toBe(updateButton);
   expect(updateButton.props.accessibilityState).toMatchObject({ disabled: false });
 
   fireEvent.press(updateButton);

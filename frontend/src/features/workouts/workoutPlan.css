@@ -1,6 +1,9 @@
 .workout-plan-shell { min-height: 100svh; overflow-x: clip; padding: 0 1rem 5.75rem; background: var(--fitsho-canvas); }
 .workout-plan-main { width: min(100%, 52rem); margin: 0 auto; padding-top: .75rem; }
 .workout-plan-main > * { min-width: 0; }
+.workout-plan-controls { display: grid; gap: .45rem; margin-bottom: .95rem; }
+.workout-plan-controls .workout-generation-method { margin: 0; }
+.workout-plan-controls > .workout-generate { justify-self: start; }
 .workout-plan-hero { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .65rem; }
 .workout-plan-hero__content .eyebrow { margin: 0 0 .2rem; color: var(--fitsho-aqua); font-size: .68rem; font-weight: 850; }
 .workout-plan-hero h1 { margin: 0; font: 850 clamp(1.35rem, 4vw, 1.8rem)/1.2 inherit; letter-spacing: 0; }

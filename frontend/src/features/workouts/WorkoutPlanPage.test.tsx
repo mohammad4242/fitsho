@@ -198,7 +198,7 @@ function mockBrowserDownload() {
   return { click, createObjectURL, revokeObjectURL };
 }
 
-it("places the compact generation selector between coach status and workout days and persists both choices", async () => {
+it("places generation controls before the current workout program and persists both choices", async () => {
   api.getActiveWorkoutPlan.mockResolvedValue({
     ...plan,
     coach_review: {
@@ -212,13 +212,25 @@ it("places the compact generation selector between coach status and workout days
 
   render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
 
+  const pageTitle = await screen.findByRole("heading", { name: "برنامه تمرینی من" });
   const coachStatus = await screen.findByText("در انتظار تایید مربی");
   const selector = screen.getByRole("group", { name: "چه کسی برنامه‌ات را بنویسد؟" });
+  const controls = selector.closest(".workout-plan-controls");
+  const updateButton = screen.getByRole("button", { name: "به‌روزرسانی برنامه" });
+  const hero = pageTitle.closest("header");
+  const context = document.querySelector(".workout-plan-context");
   const schedule = screen.getByRole("list", { name: "روزهای تمرین تو" });
   const coachBanner = coachStatus.closest("aside");
+  expect(controls).not.toBeNull();
+  expect(updateButton.closest(".workout-plan-controls")).toBe(controls);
+  expect(hero).not.toBeNull();
+  expect(context).not.toBeNull();
   expect(coachBanner).not.toBeNull();
-  expect(coachBanner!.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  expect(selector.compareDocumentPosition(schedule) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(controls!.compareDocumentPosition(hero!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(hero!.compareDocumentPosition(context!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(context!.compareDocumentPosition(coachBanner!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(coachBanner!.compareDocumentPosition(schedule) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(coachBanner!.compareDocumentPosition(selector) & Node.DOCUMENT_POSITION_FOLLOWING).toBeFalsy();
 
   const internalEngine = screen.getByRole("radio", { name: "موتور داخلی" });
   const ai = screen.getByRole("radio", { name: "هوش مصنوعی" });

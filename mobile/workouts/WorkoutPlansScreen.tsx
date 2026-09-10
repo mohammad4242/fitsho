@@ -173,6 +173,14 @@ export function WorkoutPlansScreen() {
   const activeLoadError = activeState.status === "error" && activePlan === undefined;
   const activeOffline = activeState.status === "offline" && activePlan === undefined;
   const pendingLoading = pendingPlanId !== null && pendingState.status === "loading";
+  const canUpdateDisplayedPlan = selectedPlanId === null
+    && !loading
+    && !activeLoadError
+    && !activeOffline
+    && displayedPlan !== undefined
+    && displayedPlan !== null
+    && displayedPlan.status !== "failed"
+    && displayedPlan.days.length > 0;
 
   function retry() {
     void Promise.all([activeQuery.refetch(), historyQuery.refetch()]);
@@ -238,6 +246,25 @@ export function WorkoutPlansScreen() {
 
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
+      <View testID="workout-plan-controls" style={styles.planControlsSection}>
+        <GenerationMethodSelector
+          error={generationMethodError}
+          saving={generationMethodMutation.isPending}
+          selected={generationMethod}
+          onSelect={changeGenerationMethod}
+        />
+        {canUpdateDisplayedPlan ? (
+          <Button
+            disabled={generation.isPending}
+            label="به‌روزرسانی برنامه"
+            loading={generation.isPending}
+            onPress={startGeneration}
+            style={styles.updateButton}
+            variant="primary"
+          />
+        ) : null}
+      </View>
+
       <View style={styles.pageHeader}>
         <View style={styles.pageHeaderCopy}>
           <Text accessibilityRole="header" style={styles.pageTitle}>برنامه تمرینی من</Text>
@@ -272,20 +299,11 @@ export function WorkoutPlansScreen() {
         <PlanInlineNotice message="به‌روزرسانی برنامه انجام نشد؛ نسخهٔ ذخیره‌شده نمایش داده می‌شود." variant="warning" />
       ) : null}
 
-      <GenerationMethodSelector
-        error={generationMethodError}
-        saving={generationMethodMutation.isPending}
-        selected={generationMethod}
-        onSelect={changeGenerationMethod}
-      />
-
       {!loading && !activeLoadError && !activeOffline && displayedPlan !== undefined && displayedPlan !== null ? (
         <PlanView
           api={api}
-          generationPending={generation.isPending}
           historical={isViewingHistorical}
           onStartReplacement={startReplacement}
-          onGenerate={selectedPlanId === null ? startGeneration : undefined}
           pdfStore={pdfStore}
           plan={displayedPlan}
           pending={displayedPlan.status === "pending_review"}
@@ -500,19 +518,15 @@ function GenerationMethodSelector({
 
 function PlanView({
   api,
-  generationPending,
   historical,
   onStartReplacement,
-  onGenerate,
   pdfStore,
   plan,
   pending,
 }: {
   readonly api: ReturnType<typeof createWorkoutPlanApi>;
-  readonly generationPending?: boolean;
   readonly historical: boolean;
   readonly onStartReplacement?: (exerciseId: string) => void;
-  readonly onGenerate?: () => void;
   readonly pdfStore: ExpoWorkoutPlanPdfStore;
   readonly plan: WorkoutPlan;
   readonly pending: boolean;
@@ -575,16 +589,6 @@ function PlanView({
               <Text style={styles.sectionEyebrow}>برنامه هفتگی</Text>
               <Text style={styles.scheduleTitle}>روزهای تمرین تو</Text>
             </View>
-            {onGenerate ? (
-              <Button
-                disabled={generationPending}
-                label="به‌روزرسانی برنامه"
-                loading={generationPending}
-                onPress={onGenerate}
-                style={styles.updateButton}
-                variant="primary"
-              />
-            ) : null}
           </View>
           <View style={styles.daysSection}>
             {plan.days.map((day, dayIndex) => (
@@ -1260,6 +1264,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: fiticianTokens.spacing[1],
     minWidth: 0,
+  },
+  planControlsSection: {
+    gap: fiticianTokens.spacing[2],
+    marginBottom: fiticianTokens.spacing[1],
   },
   pageHeaderCopy: {
     flex: 1,

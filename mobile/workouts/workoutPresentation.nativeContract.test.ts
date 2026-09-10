@@ -42,6 +42,32 @@ it("uses the web-like workout page hierarchy without cinematic overview componen
   expect(source).toContain("disabled={saving}");
   expect(source).toContain("setGenerationMethodError");
   expect(source).toContain("queryClient.setQueryData(profileKeys.current(), profile)");
+
+  const screenStart = source.indexOf("export function WorkoutPlansScreen");
+  const renderStart = source.indexOf("  return (", screenStart);
+  const renderEnd = source.indexOf("\n  );\n}\n\nfunction PlanContextStrip", renderStart);
+  expect(screenStart).toBeGreaterThanOrEqual(0);
+  expect(renderStart).toBeGreaterThan(screenStart);
+  expect(renderEnd).toBeGreaterThan(renderStart);
+
+  const renderBlock = source.slice(renderStart, renderEnd);
+  const hierarchy = [
+    '<View testID="workout-plan-controls"',
+    "<GenerationMethodSelector",
+    "styles.pageHeader",
+    "<PlanContextStrip",
+    "<CoachReviewBanner",
+    "<PlanView",
+  ];
+  const positions = hierarchy.map((marker) => renderBlock.indexOf(marker));
+  expect(positions.every((position) => position >= 0)).toBe(true);
+  expect(positions).toEqual([...positions].sort((left, right) => left - right));
+
+  const planViewStart = source.indexOf("function PlanView");
+  const planViewEnd = source.indexOf("function ", planViewStart + "function PlanView".length);
+  const planView = source.slice(planViewStart, planViewEnd);
+  expect(planView).not.toContain("generationPending");
+  expect(planView).not.toContain("onGenerate");
 });
 
 it("maps only supported warnings and filters internal warning codes", () => {

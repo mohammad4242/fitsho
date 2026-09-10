@@ -249,6 +249,30 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   return (
     <div className="workout-plan-shell fitsho-page">
       <main className="workout-plan-main">
+        <div className="workout-plan-controls">
+          <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
+            <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
+            <div className="workout-generation-method__choices" role="group" aria-labelledby="workout-generation-method-title">
+              <label>
+                <input type="radio" name="workout-generation-method" checked={generationMethod === "fitsho_coach"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("fitsho_coach")} />
+                <span>{t("workoutPlan.fitshoCoach")}</span>
+              </label>
+              <label>
+                <input type="radio" name="workout-generation-method" checked={generationMethod === "ai"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("ai")} />
+                <span>{t("workoutPlan.aiOption")}</span>
+              </label>
+            </div>
+          </section>
+          {state === "ready" && plan !== null && !isViewingHistorical && (
+            <GenerateButton
+              generating={generating}
+              onClick={generate}
+              update
+              disabled={generationError === "cooldown"}
+            />
+          )}
+        </div>
+
         <header className="workout-plan-hero">
           <div className="workout-plan-hero__content">
             <p className="eyebrow">{t("workoutPlan.eyebrow")}</p>
@@ -318,19 +342,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
           </>
         )}
         {hasPendingReview && pendingPlan === null && <PendingReviewNotice />}
-        <section className="workout-generation-method" aria-labelledby="workout-generation-method-title">
-          <h2 id="workout-generation-method-title">{t("workoutPlan.generationMethodTitle")}</h2>
-          <div className="workout-generation-method__choices" role="group" aria-labelledby="workout-generation-method-title">
-            <label>
-              <input type="radio" name="workout-generation-method" checked={generationMethod === "fitsho_coach"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("fitsho_coach")} />
-              <span>{t("workoutPlan.fitshoCoach")}</span>
-            </label>
-            <label>
-              <input type="radio" name="workout-generation-method" checked={generationMethod === "ai"} disabled={savingGenerationMethod} onChange={() => changeGenerationMethod("ai")} />
-              <span>{t("workoutPlan.aiOption")}</span>
-            </label>
-          </div>
-        </section>
         {state === "ready" && plan !== null && (
           <>
             <section className="workout-schedule" aria-labelledby="workout-schedule-title">
@@ -339,14 +350,6 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
                   <p className="eyebrow eyebrow--accent">{t("workoutPlan.weekly")}</p>
                   <h2 id="workout-schedule-title" className="fitsho-display">{t("workoutPlan.scheduleTitle")}</h2>
                 </div>
-                {!isViewingHistorical && (
-                  <GenerateButton
-                    generating={generating}
-                    onClick={generate}
-                    update
-                    disabled={generationError === "cooldown"}
-                  />
-                )}
               </div>
               {generating && <p className="workout-generating" role="status">{t("workoutPlan.generating")}</p>}
               <WorkoutDays plan={plan} isEnglish={isEnglish} titleId="workout-schedule-title" interactive={!isViewingHistorical && plan.status === "active"} />
