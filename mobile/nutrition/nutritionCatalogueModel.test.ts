@@ -100,7 +100,20 @@ it("scales the separate calories and three card macros to the selected portion",
     { code: "carbohydrate_g", label: "کربوهیدرات", value: "۱۴٫۱" },
     { code: "total_fat_g", label: "چربی", value: "۱٫۳" },
   ]);
-  expect(foodCatalogueMacroRows(halfPortionFood).some((row) => row.code === "energy_kcal")).toBe(false);
+  expect(foodCatalogueMacroRows(halfPortionFood).some((row) => (row.code as string) === "energy_kcal")).toBe(false);
+});
+
+it("keeps all three macro cells when a card macro is unavailable", () => {
+  const incompleteFood = {
+    ...food,
+    macros: { ...food.macros, carbohydrate_g: null },
+  };
+
+  expect(foodCatalogueMacroRows(incompleteFood)).toEqual([
+    { code: "protein_g", label: "پروتئین", value: "۲٫۷" },
+    { code: "carbohydrate_g", label: "کربوهیدرات", value: "—" },
+    { code: "total_fat_g", label: "چربی", value: "۰٫۳" },
+  ]);
 });
 
 it("falls back to the first portion and uses the 100 gram basis when no portion exists", () => {

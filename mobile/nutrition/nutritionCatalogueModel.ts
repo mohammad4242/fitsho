@@ -87,12 +87,11 @@ export function foodCatalogueCalories(food: FoodCatalogueItem): CatalogueMetric 
 
 export function foodCatalogueMacroRows(food: FoodCatalogueItem): CatalogueMacroRow[] {
   const portion = selectDefaultFoodPortion(food);
-  return CARD_MACRO_ORDER.flatMap((code) => {
-    const value = food.macros[code];
-    return value === null || value === undefined
-      ? []
-      : [{ code, label: macroLabels[code], value: formatScaledValue(value, portion) }];
-  });
+  return CARD_MACRO_ORDER.map((code) => ({
+    code,
+    label: macroLabels[code],
+    value: formatScaledValue(food.macros[code], portion),
+  }));
 }
 
 export function foodCatalogueNutrientRows(

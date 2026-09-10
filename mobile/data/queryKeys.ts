@@ -61,10 +61,22 @@ export const nutritionKeys = {
   safety: () => ["nutrition", "safety"] as const,
   structuredExercise: () => ["nutrition", "structured-exercise"] as const,
   estimate: () => ["nutrition", "estimate"] as const,
-  foodCatalogue: (filters: { category: string; page: number; pageSize: number; query: string }) => [
+  foodCatalogue: (filters: {
+    category: string;
+    page: number;
+    pageSize: number;
+    query: string;
+    scope?: "member" | "admin";
+  }) => [
     "nutrition",
     "food-catalogue",
-    filters,
+    {
+      category: filters.category,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      query: filters.query,
+      scope: filters.scope ?? "member",
+    },
   ] as const,
   mealCatalogue: (category: string | null) => ["nutrition", "meal-catalogue", category] as const,
   tracking: (date: string) => ["nutrition", "tracking", date] as const,

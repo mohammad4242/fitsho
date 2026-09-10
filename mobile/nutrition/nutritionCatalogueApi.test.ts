@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 
 import type { MultipartUploadRequest, TransportRequest } from "@fitician/core";
 
-import { createNutritionCatalogueApi } from "./nutritionCatalogueApi";
+import { createNutritionCatalogueApi, type FoodCatalogueWriteInput } from "./nutritionCatalogueApi";
 
 it("uses member-only food and meal catalogue read endpoints", async () => {
   const requests: TransportRequest[] = [];
@@ -62,7 +62,7 @@ it("uses the member and admin food catalogue routes and all admin mutations", as
       return { image_url: "/media/food-catalogue/lentils.png" } as TResponse;
     },
   );
-  const foodPayload = {
+  const foodPayload: FoodCatalogueWriteInput = {
     slug: "lentils",
     name_fa: "عدس",
     name_en: "Lentils",

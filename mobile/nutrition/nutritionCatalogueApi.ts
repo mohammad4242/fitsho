@@ -41,6 +41,36 @@ export type CatalogueFoodImageAsset = {
   readonly mimeType: CatalogueFoodImageMimeType;
 };
 
+export function catalogueFoodImageMimeTypeForAsset(
+  mimeType: string | null | undefined,
+  uri: string,
+): CatalogueFoodImageMimeType | null {
+  if (isCatalogueFoodImageMimeType(mimeType)) return mimeType;
+  const extension = uri.split(/[?#]/u)[0]?.split(".").pop()?.toLowerCase();
+  if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
+  if (extension === "png") return "image/png";
+  if (extension === "webp") return "image/webp";
+  if (extension === "gif") return "image/gif";
+  return null;
+}
+
+export function isCatalogueFoodImageMimeType(value: string | null | undefined): value is CatalogueFoodImageMimeType {
+  return CATALOGUE_FOOD_IMAGE_MIME_TYPES.includes(value as CatalogueFoodImageMimeType);
+}
+
+export function catalogueFoodImageExtension(mimeType: CatalogueFoodImageMimeType): string {
+  switch (mimeType) {
+    case "image/gif":
+      return "gif";
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+  }
+}
+
 export type MealCatalogueCategory = components["schemas"]["MealCategory"];
 export type MealCatalogueItem = components["schemas"]["SharedCatalogueMealResponse"];
 export type MealCataloguePage = components["schemas"]["SharedCatalogueMealPageResponse"];
