@@ -35,6 +35,9 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(publicSource).toMatch(/GuidedTrainingQuestions/);
   expect(publicSource).toMatch(/PublicNutritionOnboardingFlow/);
   expect(publicSource).toMatch(/PublicAccountStep/);
+  const headerNote = publicSource.slice(publicSource.indexOf("headerNote:"), publicSource.indexOf("loadingScreen:"));
+  expect(headerNote).toContain('textAlign: "right"');
+  expect(headerNote).toContain('writingDirection: "rtl"');
   expect(publicSource).not.toMatch(/SharedProfileStage/);
   expect(publicSource).not.toMatch(/TrainingProfileStage/);
   expect(publicSource).not.toMatch(/SafetyStage/);

@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 20,
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   loadingScreen: {
