@@ -16,10 +16,14 @@ const native = vi.hoisted(() => ({
 
 vi.mock("react-native", () => native);
 vi.mock("./components/AppIcon", () => ({ AppIcon: "AppIcon" }));
+vi.mock("./components/Card", () => ({ Card: "Card" }));
 
+import { DisclosureCard } from "./components/DisclosureCard";
 import { GroupedList } from "./components/GroupedList";
 import { PageHeading } from "./components/PageHeading";
 import { SegmentedControl } from "./components/SegmentedControl";
+import { ScreenHeader } from "./components/ScreenHeader";
+import { SectionHeader } from "./components/SectionHeader";
 
 function render(element: ReactElement): ReactTestRenderer {
   let renderer: ReactTestRenderer | undefined;
@@ -69,7 +73,7 @@ test("renders compact page headings with optional opposite action in RTL and LTR
   expect(rtlRenderer.root.findByProps({ accessibilityLabel: "ویرایش" })).toBeTruthy();
   expect(flattenStyle(findHostByProps(rtlRenderer, { testID: "rtl-heading" }).props.style)).toMatchObject({
     direction: "rtl",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
   });
 
   const ltrRenderer = render(
@@ -107,7 +111,7 @@ test("renders a selected RTL segmented option with a 48dp interaction target", (
   expect(flattenStyle(selected.props.style)).toMatchObject({ minHeight: 48, minWidth: 48 });
   expect(flattenStyle(renderer.root.findByProps({ testID: "segmented-control" }).props.style)).toMatchObject({
     direction: "rtl",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
   });
 
   act(() => {
@@ -134,8 +138,29 @@ test("keeps grouped-list rows full-width and pressable", () => {
   const rowStyle = flattenStyle(row.props.style);
   expect(rowStyle.width).toBe("100%");
   expect(rowStyle.minHeight).toBeGreaterThanOrEqual(48);
+  expect(rowStyle.flexDirection).toBe("row");
   act(() => row.props.onPress());
   expect(onPress).toHaveBeenCalledTimes(1);
+});
+
+test("keeps shared Persian headers and disclosure copy on the logical RTL side", () => {
+  const sectionRenderer = render(
+    createElement(SectionHeader, { title: "تنظیمات", actionLabel: "ویرایش", onAction: vi.fn() }),
+  );
+  const sectionViews = sectionRenderer.root.findAll((node) => String(node.type) === "View");
+  expect(flattenStyle(sectionViews[0]?.props.style).flexDirection).toBe("row");
+
+  const screenRenderer = render(
+    createElement(ScreenHeader, { subtitle: "توضیحات فارسی", title: "داشبورد" }),
+  );
+  const screenViews = screenRenderer.root.findAll((node) => String(node.type) === "View");
+  expect(flattenStyle(screenViews[2]?.props.style).alignItems).toBe("stretch");
+
+  const disclosureRenderer = render(
+    createElement(DisclosureCard, { summary: "خلاصه فارسی", title: "جزئیات", children: "محتوا" }),
+  );
+  const disclosureHeader = disclosureRenderer.root.find((node) => String(node.type) === "Pressable");
+  expect(flattenStyle(disclosureHeader.props.style).flexDirection).toBe("row");
 });
 
 test("renders a page heading without inventing a brand row", () => {

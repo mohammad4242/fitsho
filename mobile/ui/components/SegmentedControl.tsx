@@ -42,13 +42,12 @@ export function SegmentedControl({
   testID = "segmented-control",
 }: SegmentedControlProps) {
   const unavailable = disabled || loading;
-  const isRtl = direction === "rtl";
 
   return (
     <View
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="radiogroup"
-      style={[styles.container, { direction, flexDirection: isRtl ? "row-reverse" : "row" }, style]}
+      style={[styles.container, { direction, flexDirection: "row" }, style]}
       testID={testID}
     >
       {options.map((option) => {

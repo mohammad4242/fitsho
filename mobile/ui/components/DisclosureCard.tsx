@@ -37,7 +37,7 @@ export function DisclosureCard({ title, summary, icon, leading, trailing, childr
           if (expanded === undefined) setOpen(!visible);
           onExpandedChange?.(!visible);
         }}
-        style={({ pressed }) => [styles.header, direction === "ltr" && styles.headerLtr, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.header, pressed && styles.pressed]}
       >
         {leading ?? (icon ? <AppIcon name={icon} color={tokens.colors.aqua} /> : null)}
         <View style={styles.copy}>
@@ -58,8 +58,7 @@ export function DisclosureCard({ title, summary, icon, leading, trailing, childr
 const styles = StyleSheet.create({
   card: { padding: 0, overflow: "hidden" },
   ltr: { direction: "ltr" },
-  header: { minHeight: tokens.layout.minimumTouchTarget, padding: tokens.spacing[3], gap: tokens.spacing[3], flexDirection: "row-reverse", alignItems: "center" },
-  headerLtr: { flexDirection: "row" },
+  header: { minHeight: tokens.layout.minimumTouchTarget, padding: tokens.spacing[3], gap: tokens.spacing[3], flexDirection: "row", alignItems: "center" },
   copy: { flex: 1, minWidth: 0, gap: tokens.spacing[1] },
   title: { color: tokens.colors.ink, fontFamily: tokens.typography.fontFamily.bodyPersian, fontSize: tokens.typography.fontSize.body, fontWeight: tokens.typography.fontWeight.bold, textAlign: "right", writingDirection: "rtl" },
   titleLtr: { fontFamily: tokens.typography.fontFamily.bodyEnglish, textAlign: "left", writingDirection: "ltr" },

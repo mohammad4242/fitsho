@@ -60,7 +60,6 @@ export function GroupedList({ direction = "rtl", sections, style, testID }: Grou
             const unavailable = item.disabled === true;
             const rowStyle: StyleProp<ViewStyle> = [
               styles.row,
-              { flexDirection: isRtl ? ("row-reverse" as const) : ("row" as const) },
               itemIndex > 0 && styles.divided,
               unavailable && styles.disabledRow,
             ];
@@ -149,6 +148,7 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     gap: fiticianTokens.spacing[3],
+    flexDirection: "row",
     minHeight: 68,
     paddingHorizontal: fiticianTokens.spacing[4],
     paddingVertical: fiticianTokens.spacing[3],

@@ -39,7 +39,7 @@ export function PageHeading({
     <View
       style={[
         styles.container,
-        { direction, flexDirection: isRtl ? "row-reverse" : "row" },
+        { direction, flexDirection: "row" },
         style,
       ]}
       testID={testID}

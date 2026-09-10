@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     lineHeight: 32,
   },
   copy: {
-    alignItems: "flex-end",
+    alignItems: "stretch",
     gap: fiticianTokens.spacing[1],
   },
   eyebrow: {
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   },
   topRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
   },

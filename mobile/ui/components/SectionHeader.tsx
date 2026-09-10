@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   },
   container: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "space-between",
   },
