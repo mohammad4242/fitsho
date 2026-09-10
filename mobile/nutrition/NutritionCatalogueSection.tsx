@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
   },
   sheetThumbnail: {
-    alignSelf: "flex-end",
+    alignSelf: "flex-start",
     height: 128,
     width: 128,
   },

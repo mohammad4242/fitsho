@@ -63,7 +63,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "left",
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   card: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,

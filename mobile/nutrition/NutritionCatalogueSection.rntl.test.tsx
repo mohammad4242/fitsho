@@ -134,4 +134,5 @@ test("dedicated food mode keeps search and category before phone-friendly cards"
 
   expect(screen.getByText("ماکروها در ۱۰۰ گرم")).toBeTruthy();
   expect(findAncestorStyle(screen.getByText("عدس"), "flexDirection")).toMatchObject({ flexDirection: "row" });
+  expect(findAncestorStyle(screen.getByLabelText("تصویر عدس موجود نیست"), "alignSelf")).toMatchObject({ alignSelf: "flex-start" });
 });
