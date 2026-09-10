@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 it("keeps onboarding guided, native, and RTL-friendly", async () => {
   const entrySource = await readFile(resolve(import.meta.dirname, "../app/(public)/index.tsx"), "utf8");
+  const landingSource = await readFile(resolve(import.meta.dirname, "../public/PublicLandingScreen.tsx"), "utf8");
   const source = await readFile(resolve(import.meta.dirname, "OnboardingScreen.tsx"), "utf8");
   const publicSource = await readFile(resolve(import.meta.dirname, "PublicOnboardingScreen.tsx"), "utf8");
   const publicQuestionSource = await readFile(resolve(import.meta.dirname, "public/GuidedSharedProfileQuestions.tsx"), "utf8");
@@ -11,13 +12,15 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   const publicNutritionSource = await readFile(resolve(import.meta.dirname, "public/PublicNutritionOnboardingFlow.tsx"), "utf8");
   const publicAccountSource = await readFile(resolve(import.meta.dirname, "public/PublicAccountStep.tsx"), "utf8");
 
-  expect(entrySource).toMatch(/public-entry-hero\.jpg/);
-  expect(entrySource).toMatch(/Media/);
-  expect(entrySource).toMatch(/const landing = authCopy\.landing/);
-  expect(entrySource).toMatch(/landing\.hero\.title/);
-  expect(entrySource).toMatch(/landing\.process\.title/);
-  expect(entrySource).toMatch(/landing\.intelligence\.title/);
-  expect(entrySource).not.toMatch(/pillRow/);
+  expect(entrySource).toMatch(/PublicLandingScreen/);
+  expect(landingSource).toMatch(/landfilm\.mp4/);
+  expect(landingSource).toMatch(/public-entry-film/);
+  expect(landingSource).toMatch(/const landing = authCopy\.landing/);
+  expect(landingSource).toMatch(/landing\.hero\.title/);
+  expect(landingSource).toMatch(/landing\.process\.title/);
+  expect(landingSource).toMatch(/landing\.intelligence\.title/);
+  expect(landingSource).toMatch(/Animated\.ScrollView/);
+  expect(landingSource).not.toMatch(/pillRow/);
   expect(source).toMatch(/getOnboardingSteps/);
   expect(source).toMatch(/ProgressBar/);
   expect(source).toMatch(/questionIndex/);

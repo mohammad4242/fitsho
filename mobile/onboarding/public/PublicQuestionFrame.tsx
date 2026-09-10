@@ -117,6 +117,7 @@ export interface PublicChoiceOption {
   readonly description?: string;
   readonly icon?: React.ComponentProps<typeof AppIcon>["name"];
   readonly label: string;
+  readonly layout?: "default" | "sex";
   readonly selectionRole?: "checkbox" | "radio";
   readonly value: string;
 }
@@ -125,6 +126,7 @@ export function PublicChoiceCard({
   description,
   disabled = false,
   icon,
+  layout = "default",
   label,
   onPress,
   selectionRole = "radio",
@@ -134,6 +136,7 @@ export function PublicChoiceCard({
   readonly onPress: () => void;
   readonly selected: boolean;
 }) {
+  const isSexLayout = layout === "sex";
   return (
     <Pressable
       accessibilityLabel={label}
@@ -141,10 +144,16 @@ export function PublicChoiceCard({
       accessibilityState={selectionRole === "checkbox" ? { checked: selected, disabled } : { disabled, selected }}
       disabled={disabled}
       onPress={onPress}
-      style={[styles.choiceCard, selected && styles.choiceCardSelected, disabled && styles.choiceCardDisabled]}
+      style={[
+        styles.choiceCard,
+        !icon && styles.choiceCardCentered,
+        isSexLayout && styles.sexChoiceCard,
+        selected && styles.choiceCardSelected,
+        disabled && styles.choiceCardDisabled,
+      ]}
     >
       {icon ? (
-        <View style={[styles.choiceIcon, selected && styles.choiceIconSelected]}>
+        <View style={[styles.choiceIcon, isSexLayout && styles.sexChoiceIcon, selected && styles.choiceIconSelected]}>
           <AppIcon
             color={selected ? fiticianTokens.colors.canvas : fiticianTokens.colors.aqua}
             name={icon}
@@ -152,8 +161,8 @@ export function PublicChoiceCard({
           />
         </View>
       ) : null}
-      <View style={styles.choiceContent}>
-        <Text style={styles.choiceLabel}>{label}</Text>
+      <View style={[styles.choiceContent, !icon && styles.choiceContentCentered, isSexLayout && styles.sexChoiceContent]}>
+        <Text style={[styles.choiceLabel, !icon && styles.choiceLabelCentered, isSexLayout && styles.sexChoiceLabel]}>{label}</Text>
         {description ? <Text style={styles.choiceDescription}>{description}</Text> : null}
       </View>
     </Pressable>

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
+import { StyleSheet } from "react-native";
 import { useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -83,7 +84,7 @@ test("shows exactly one shared question at a time and keeps the Web five-step or
   fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
   expect(screen.getByRole("header", { name: "هدف اصلی تو چیست؟" })).toBeTruthy();
 
-  fireEvent.press(screen.getByRole("radio", { name: "عضله‌سازی" }));
+  fireEvent.press(screen.getByRole("radio", { name: "عضله‌سازی 💪" }));
   advance();
   expect(onComplete).toHaveBeenCalledTimes(1);
 });
@@ -126,6 +127,40 @@ test("shared back returns to the previous question and exits from question one",
   expect(onBack).toHaveBeenCalledTimes(1);
 });
 
+test("uses the Web gender card scale, body range hints, and goal labels", () => {
+  renderWithSafeArea(<SharedHarness />);
+
+  fireEvent.changeText(screen.getByLabelText("نام نمایشی"), "سارا");
+  fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
+  fireEvent.press(screen.getByTestId("birth-day"));
+  fireEvent.press(screen.getByTestId("birth-day-option-12"));
+  fireEvent.press(screen.getByTestId("birth-month"));
+  fireEvent.press(screen.getByTestId("birth-month-option-5"));
+  fireEvent.press(screen.getByTestId("birth-year"));
+  fireEvent.press(screen.getByTestId("birth-year-option-1992"));
+  fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
+
+  const female = screen.getByRole("radio", { name: "زن" });
+  expect(StyleSheet.flatten(female.props.style)).toMatchObject({
+    flexDirection: "column",
+    minHeight: 116,
+  });
+
+  fireEvent.press(female);
+  advance();
+  expect(screen.getByText("۱۲۰ تا ۲۳۰ سانتی‌متر")).toBeTruthy();
+  expect(screen.getByText("۳۵ تا ۳۰۰ کیلوگرم")).toBeTruthy();
+  fireEvent.changeText(screen.getByLabelText("قد (سانتی‌متر)"), "168");
+  fireEvent.changeText(screen.getByLabelText("وزن فعلی (کیلوگرم)"), "64");
+  fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
+
+  expect(screen.getByRole("radio", { name: "کاهش وزن 🔻⬆️" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "افزایش وزن 🔺️⬇️" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "چربی‌سوزی 🔥" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "عضله‌سازی 💪" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "چربی‌سوزی + عضله‌سازی 🔥💪" })).toBeTruthy();
+});
+
 function TrainingHarness({ onComplete, onBack }: { onComplete?: () => void; onBack?: () => void }) {
   const [values, setValues] = useState(emptyProfileFormValues);
   return (
@@ -143,11 +178,11 @@ test("training follows the exact conditional Web order and progress count", () =
 
   expect(screen.getByRole("header", { name: "چقدر سابقه تمرین مداوم داری؟" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "ماه اولمه" })).toBeTruthy();
-  expect(screen.getByRole("radio", { name: "مبتدی" })).toBeTruthy();
-  expect(screen.getByRole("radio", { name: "متوسط" })).toBeTruthy();
-  expect(screen.getByRole("radio", { name: "پیشرفته" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "مبتدی (زیر ۶ ماه)" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "متوسط (۶ ماه تا ۲ سال)" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "پیشرفته (بیش از ۲ سال)" })).toBeTruthy();
 
-  fireEvent.press(screen.getByRole("radio", { name: "مبتدی" }));
+  fireEvent.press(screen.getByRole("radio", { name: "مبتدی (زیر ۶ ماه)" }));
   advance();
   expect(screen.getByText("تمرین 2 از 9")).toBeTruthy();
   fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
@@ -181,7 +216,7 @@ test("keeps Web duration, intensity, priority, caution, and week choices", () =>
   const onComplete = jest.fn();
   renderWithSafeArea(<TrainingHarness onComplete={onComplete} />);
 
-  fireEvent.press(screen.getByRole("radio", { name: "مبتدی" }));
+  fireEvent.press(screen.getByRole("radio", { name: "مبتدی (زیر ۶ ماه)" }));
   advance();
   fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
   fireEvent.press(screen.getByRole("radio", { name: "۲ روز در هفته" }));

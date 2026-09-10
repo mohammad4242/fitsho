@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useSafeAreaFrame } from "react-native-safe-area-context";
 
 import type { ProductMode } from "@fitician/core/profile";
 
@@ -61,6 +62,8 @@ function faNumber(value: number): string {
 }
 
 export function PublicAccountStep({ onAuthenticated, onEdit }: PublicAccountStepProps) {
+  const { width } = useSafeAreaFrame();
+  const compactLayout = width <= 650;
   const auth = useMobileAuth();
   const google = useGoogleSignIn();
   const [method, setMethod] = useState<AccountMethod>("email");
@@ -176,20 +179,31 @@ export function PublicAccountStep({ onAuthenticated, onEdit }: PublicAccountStep
   }
 
   return (
-    <View style={styles.account} testID="public-account-step">
-      <View style={styles.accountTopline}>
+    <View style={styles.accountSurface}>
+      <View style={[styles.accountCard, compactLayout && styles.accountCardCompact]} testID="public-account-card">
+        <View style={[styles.account, compactLayout && styles.accountCompact]} testID="public-account-step">
+      <View style={[styles.accountTopline, compactLayout && styles.accountToplineCompact]}>
+        {compactLayout ? (
+          <Pressable accessibilityLabel={copy.edit} accessibilityRole="button" onPress={onEdit} style={styles.accountEdit}>
+            <Text style={styles.textButton}>{copy.edit}</Text>
+          </Pressable>
+        ) : null}
         <View style={styles.accountHeader}>
           <Text style={styles.progressLabel}>{copy.lastStep}</Text>
           <Text accessibilityRole="header" style={styles.accountTitle}>{copy.title}</Text>
           <Text style={styles.accountIntro}>{copy.intro}</Text>
         </View>
-        <Pressable accessibilityRole="button" onPress={onEdit}>
-          <Text style={styles.textButton}>{copy.edit}</Text>
-        </Pressable>
+        {!compactLayout ? (
+          <Pressable accessibilityLabel={copy.edit} accessibilityRole="button" onPress={onEdit} style={styles.accountEdit}>
+            <Text style={styles.textButton}>{copy.edit}</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View style={styles.accountSecurity}>
-        <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={28} />
+        <View style={styles.accountSecurityIcon}>
+          <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={20} />
+        </View>
         <View style={styles.accountSecurityCopy}>
           <Text style={styles.accountSecurityTitle}>{copy.securityTitle}</Text>
           <Text style={styles.accountSecurityBody}>{copy.securityBody}</Text>
@@ -217,21 +231,23 @@ export function PublicAccountStep({ onAuthenticated, onEdit }: PublicAccountStep
         </Pressable>
       </View>
 
-      <View accessibilityLabel="روش‌های ورود" style={styles.accountProviders}>
-        <Button
-          disabled={google.available && !google.ready}
-          label={copy.google}
-          loading={busy}
-          onPress={submitGoogle}
-          style={styles.providerButton}
-          variant="secondary"
-        />
+      <View accessibilityLabel="روش‌های ورود" style={[styles.accountProviders, compactLayout && styles.accountProvidersCompact]} testID="public-account-providers">
+        <View style={[styles.accountProvider, compactLayout && styles.accountProviderCompact]}>
+          <Button
+            disabled={google.available && !google.ready}
+            label={copy.google}
+            loading={busy}
+            onPress={submitGoogle}
+            style={styles.providerButton}
+            variant="secondary"
+          />
+        </View>
         <Pressable
           accessibilityLabel={`${copy.apple} ${copy.soon}`}
           accessibilityRole="button"
           accessibilityState={{ disabled: true }}
           disabled
-          style={styles.appleProvider}
+          style={[styles.appleProvider, compactLayout && styles.appleProviderCompact]}
         >
           <Text style={styles.appleProviderLabel}>{copy.apple}</Text>
           <Text style={styles.appleProviderHint}>{copy.soon}</Text>
@@ -350,6 +366,8 @@ export function PublicAccountStep({ onAuthenticated, onEdit }: PublicAccountStep
           />
         </View>
       )}
+        </View>
+      </View>
     </View>
   );
 }

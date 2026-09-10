@@ -51,9 +51,9 @@ export interface GuidedTrainingQuestionsProps {
 const stages = ["تجربه", "برنامه", "ایمنی"] as const;
 const experienceOptions = [
   ["first_month", "ماه اولمه"],
-  ["beginner", "مبتدی"],
-  ["intermediate", "متوسط"],
-  ["advanced", "پیشرفته"],
+  ["beginner", "مبتدی (زیر ۶ ماه)"],
+  ["intermediate", "متوسط (۶ ماه تا ۲ سال)"],
+  ["advanced", "پیشرفته (بیش از ۲ سال)"],
 ] as const;
 const durationOptions = [
   ["30", "۲۰ تا ۳۰ دقیقه"],

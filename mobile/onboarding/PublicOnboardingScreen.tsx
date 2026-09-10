@@ -199,6 +199,20 @@ export function PublicOnboardingScreen() {
     );
   }
 
+  const accountMode = state.step === "review" || state.step === "nutrition_preferences" ? state.mode : null;
+  if (accountMode !== null) {
+    return (
+      <Screen contentWidth="full" contentContainerStyle={styles.accountScreen}>
+        {error ? <Notice message={error} variant="danger" /> : null}
+        <PublicAccountStep
+          mode={accountMode}
+          onAuthenticated={() => router.replace(onboardingRoute(PUBLIC_ONBOARDING_SOURCE))}
+          onEdit={editAnswers}
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <View style={styles.header}>
@@ -421,5 +435,10 @@ const styles = StyleSheet.create({
   screen: {
     gap: fiticianTokens.spacing[4],
     paddingBottom: fiticianTokens.spacing[7],
+  },
+  accountScreen: {
+    backgroundColor: fiticianTokens.colors.canvas,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
 });

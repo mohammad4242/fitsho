@@ -35,11 +35,11 @@ const sexOptions = [
 ] as const;
 
 const goalOptions = [
-  { icon: "scale" as const, label: "کاهش وزن", value: "lose_weight" },
-  { icon: "target" as const, label: "افزایش وزن", value: "gain_weight" },
-  { icon: "flame" as const, label: "چربی‌سوزی", value: "fat_loss" },
-  { icon: "training" as const, label: "عضله‌سازی", value: "build_muscle" },
-  { icon: "target" as const, label: "چربی‌سوزی + عضله‌سازی", value: "body_recomposition" },
+  { label: "کاهش وزن 🔻⬆️", value: "lose_weight" },
+  { label: "افزایش وزن 🔺️⬇️", value: "gain_weight" },
+  { label: "چربی‌سوزی 🔥", value: "fat_loss" },
+  { label: "عضله‌سازی 💪", value: "build_muscle" },
+  { label: "چربی‌سوزی + عضله‌سازی 🔥💪", value: "body_recomposition" },
 ] as const;
 
 function faNumber(value: number): string {
@@ -273,11 +273,12 @@ export function GuidedSharedProfileQuestions({
         </View>
       ) : null}
       {question === 2 ? (
-        <View style={styles.choiceGrid}>
+        <View style={styles.sexChoiceGrid}>
           {sexOptions.map((option) => (
             <PublicChoiceCard
               {...option}
               key={option.value}
+              layout="sex"
               onPress={() => selectAndAdvance(
                 () => onChange("sex", option.value),
                 () => setQuestion(3),
@@ -291,6 +292,7 @@ export function GuidedSharedProfileQuestions({
         <View style={styles.bodyFields}>
           <TextField
             keyboardType="number-pad"
+            hint="۱۲۰ تا ۲۳۰ سانتی‌متر"
             label="قد (سانتی‌متر)"
             maxLength={3}
             onChangeText={(value) => updateBodyValue("height_cm", value)}
@@ -299,13 +301,13 @@ export function GuidedSharedProfileQuestions({
           />
           <TextField
             keyboardType="decimal-pad"
+            hint="۳۵ تا ۳۰۰ کیلوگرم"
             label="وزن فعلی (کیلوگرم)"
             maxLength={6}
             onChangeText={(value) => updateBodyValue("current_weight_kg", value)}
             textDirection="ltr"
             value={values.current_weight_kg}
           />
-          <Text style={styles.questionDescription}>قد: ۱۲۰ تا ۲۳۰ سانتی‌متر · وزن: ۳۵ تا ۳۰۰ کیلوگرم</Text>
           {showBodyConfirmation ? (
             <Pressable
               accessibilityLabel="این مقادیر درست هستند."

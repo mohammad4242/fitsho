@@ -3,13 +3,45 @@ import { StyleSheet } from "react-native";
 import { fiticianTokens } from "../../ui/tokens";
 
 export const publicOnboardingStyles = StyleSheet.create({
+  accountSurface: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.canvas,
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[3],
+    width: "100%",
+  },
   account: {
     alignSelf: "center",
     gap: fiticianTokens.spacing[5],
-    maxWidth: 520,
+    maxWidth: 832,
     paddingBottom: fiticianTokens.spacing[6],
     paddingTop: fiticianTokens.spacing[3],
     width: "100%",
+  },
+  accountCard: {
+    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.extraLarge,
+    borderTopColor: fiticianTokens.colors.aqua,
+    borderWidth: 1,
+    maxWidth: 832,
+    paddingHorizontal: fiticianTokens.spacing[6],
+    paddingVertical: fiticianTokens.spacing[6],
+    width: "100%",
+  },
+  accountCardCompact: {
+    borderRadius: fiticianTokens.radii.large,
+    paddingHorizontal: fiticianTokens.spacing[4],
+    paddingVertical: fiticianTokens.spacing[4],
+  },
+  accountCompact: {
+    paddingBottom: 0,
+    paddingTop: 0,
+  },
+  accountEdit: {
+    alignSelf: "flex-start",
   },
   accountHeader: {
     gap: fiticianTokens.spacing[3],
@@ -71,6 +103,13 @@ export const publicOnboardingStyles = StyleSheet.create({
     flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
+  accountProvidersCompact: {
+    flexDirection: "column",
+  },
+  accountProviderCompact: {
+    flex: 0,
+    width: "100%",
+  },
   accountSecurity: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.aquaAtmosphere,
@@ -80,6 +119,16 @@ export const publicOnboardingStyles = StyleSheet.create({
     flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     padding: fiticianTokens.spacing[4],
+  },
+  accountSecurityIcon: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.medium,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
   },
   accountSecurityCopy: {
     flex: 1,
@@ -115,6 +164,9 @@ export const publicOnboardingStyles = StyleSheet.create({
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
+  accountToplineCompact: {
+    flexDirection: "column",
+  },
   appleProvider: {
     alignItems: "center",
     backgroundColor: fiticianTokens.colors.surface,
@@ -127,6 +179,10 @@ export const publicOnboardingStyles = StyleSheet.create({
     minHeight: 64,
     opacity: 0.48,
     paddingHorizontal: fiticianTokens.spacing[2],
+  },
+  appleProviderCompact: {
+    flex: 0,
+    width: "100%",
   },
   appleProviderLabel: {
     color: fiticianTokens.colors.muted,
@@ -237,6 +293,9 @@ export const publicOnboardingStyles = StyleSheet.create({
     paddingHorizontal: fiticianTokens.spacing[4],
     paddingVertical: fiticianTokens.spacing[3],
   },
+  choiceCardCentered: {
+    justifyContent: "center",
+  },
   choiceCardDisabled: {
     opacity: 0.45,
   },
@@ -251,6 +310,9 @@ export const publicOnboardingStyles = StyleSheet.create({
     flex: 1,
     gap: fiticianTokens.spacing[1],
     minWidth: 0,
+  },
+  choiceContentCentered: {
+    alignItems: "center",
   },
   choiceDescription: {
     color: fiticianTokens.colors.muted,
@@ -292,6 +354,9 @@ export const publicOnboardingStyles = StyleSheet.create({
     lineHeight: 24,
     textAlign: "auto",
     writingDirection: "rtl",
+  },
+  choiceLabelCentered: {
+    textAlign: "center",
   },
   content: {
     gap: fiticianTokens.spacing[4],
@@ -521,6 +586,31 @@ export const publicOnboardingStyles = StyleSheet.create({
     writingDirection: "rtl",
   },
   footer: {
+    gap: fiticianTokens.spacing[3],
+  },
+  sexChoiceCard: {
+    flex: 1,
+    flexDirection: "column",
+    gap: fiticianTokens.spacing[3],
+    justifyContent: "center",
+    minHeight: 116,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[4],
+  },
+  sexChoiceContent: {
+    flex: 0,
+  },
+  sexChoiceIcon: {
+    borderRadius: fiticianTokens.radii.pill,
+    height: 48,
+    width: 48,
+  },
+  sexChoiceLabel: {
+    fontSize: fiticianTokens.typography.fontSize.lg,
+    textAlign: "center",
+  },
+  sexChoiceGrid: {
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
 });

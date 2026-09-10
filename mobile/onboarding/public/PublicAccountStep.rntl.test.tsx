@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
+import { StyleSheet } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
@@ -77,6 +78,15 @@ test("matches the Web final account hierarchy and email registration handoff", a
 
   await waitFor(() => expect(mockAuth.register).toHaveBeenCalledWith({ email: "person@example.com", password: "abcdefgh" }));
   expect(onAuthenticated).toHaveBeenCalledTimes(1);
+});
+
+test("uses the Web mobile account card layout", () => {
+  renderAccount();
+
+  expect(StyleSheet.flatten(screen.getByTestId("public-account-providers").props.style)).toMatchObject({
+    flexDirection: "column",
+  });
+  expect(screen.getByTestId("public-account-card")).toBeTruthy();
 });
 
 test("supports existing-account login, Google, and inline phone OTP resend", async () => {
