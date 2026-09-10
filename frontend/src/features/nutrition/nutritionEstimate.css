@@ -787,7 +787,7 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   border-radius: var(--fitsho-radius-lg);
   background: linear-gradient(180deg, rgb(255 255 255 / 2%), transparent), var(--fitsho-surface);
   box-shadow: var(--fitsho-shadow-soft);
-  animation: nutrition-entry-panel-in var(--fitsho-duration-normal) var(--fitsho-ease) both;
+  animation: nutrition-entry-panel-in var(--fitsho-duration-medium) var(--fitsho-ease) both;
 }
 .nutrition-entry-panel > header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .65rem; }
 .nutrition-entry-panel > header h2 { margin: .1rem 0 0; font-size: 1.05rem; }
