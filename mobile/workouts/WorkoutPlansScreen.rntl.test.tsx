@@ -15,7 +15,14 @@ jest.mock("expo-router", () => ({
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("../auth/MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
-jest.mock("../ui/rtl", () => ({ languageForDirection: jest.fn() }));
+jest.mock("../ui/rtl", () => ({
+  getRowDirectionStyle: (direction = "rtl") => ({ direction, flexDirection: "row" }),
+  getTextDirectionStyle: (direction = "rtl", textAlign = direction === "rtl" ? "right" : "left") => ({
+    textAlign,
+    writingDirection: direction,
+  }),
+  languageForDirection: jest.fn(),
+}));
 jest.mock("../platform/connectivity", () => ({
   connectivityMonitor: {
     getSnapshot: () => ({ status: "online" }),

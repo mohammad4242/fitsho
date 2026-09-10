@@ -26,7 +26,14 @@ jest.mock("../platform/connectivity", () => ({
   },
 }));
 jest.mock("../ui/navigation/BackBehaviorProvider", () => ({ useAndroidBackHandler: jest.fn() }));
-jest.mock("../ui/rtl", () => ({ languageForDirection: jest.fn() }));
+jest.mock("../ui/rtl", () => ({
+  getRowDirectionStyle: (direction = "rtl") => ({ direction, flexDirection: "row" }),
+  getTextDirectionStyle: (direction = "rtl", textAlign = direction === "rtl" ? "right" : "left") => ({
+    textAlign,
+    writingDirection: direction,
+  }),
+  languageForDirection: jest.fn(),
+}));
 jest.mock("expo-video", () => {
   const React = jest.requireActual("react") as typeof import("react");
   const { View } = jest.requireActual("react-native") as typeof import("react-native");
