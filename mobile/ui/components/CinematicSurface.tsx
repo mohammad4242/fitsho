@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
 
+import { RTL_LAYOUT } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export interface CinematicSurfaceProps extends Omit<ViewProps, "style"> {
@@ -24,7 +25,7 @@ export function CinematicSurface({
   ...viewProps
 }: CinematicSurfaceProps) {
   return (
-    <View {...viewProps} style={[styles.surface, variants[variant], style]}>
+    <View {...viewProps} style={[styles.surface, RTL_LAYOUT, variants[variant], style]}>
       <View pointerEvents="none" style={styles.highlight} />
       <View pointerEvents="none" style={styles.ambient} />
       {accent ? <View pointerEvents="none" style={styles.signal} /> : null}

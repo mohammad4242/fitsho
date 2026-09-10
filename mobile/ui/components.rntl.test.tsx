@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
-import { Animated, Text } from "react-native";
+import { Animated, StyleSheet, Text } from "react-native";
 import { Circle } from "react-native-svg";
 
 jest.mock("expo-router", () => ({
@@ -8,6 +8,7 @@ jest.mock("expo-router", () => ({
 }));
 
 import { Button } from "./components/Button";
+import { CinematicSurface } from "./components/CinematicSurface";
 import { TextField } from "./components/Input";
 import { MetricRing } from "./components/MetricRing";
 import { Dialog, Sheet } from "./components/Overlay";
@@ -91,6 +92,18 @@ test("keeps Persian overlays direction-aware", () => {
   );
 
   expect(view).toBeTruthy();
+});
+
+test("anchors the shared cinematic surface to the RTL layout boundary", () => {
+  render(
+    <CinematicSurface testID="cinematic-surface">
+      <Text>محتوا</Text>
+    </CinematicSurface>,
+  );
+
+  expect(StyleSheet.flatten(screen.getByTestId("cinematic-surface").props.style)).toMatchObject({
+    direction: "rtl",
+  });
 });
 
 test("announces errors and exposes native modal boundaries", () => {
