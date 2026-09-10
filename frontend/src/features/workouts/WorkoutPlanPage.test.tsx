@@ -441,6 +441,47 @@ it("renders the pending plan returned by generation with its review warning", as
   expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
 });
 
+it("replaces the visible active plan with the generated pending plan", async () => {
+  const archivedVersion = {
+    ...pendingVersion,
+    id: plan.id,
+    status: "superseded" as const,
+    is_active: false,
+    coach_review: { ...pendingVersion.coach_review, state: "initial_generated" as const },
+  };
+  const replacementPlan: WorkoutPlan = {
+    ...pendingPlan,
+    days: pendingPlan.days.map((day) => ({
+      ...day,
+      exercises: day.exercises.map((item) => ({
+        ...item,
+        exercise: { ...item.exercise, name_fa: "حرکت جایگزین جدید", slug: "replacement-new" },
+      })),
+    })),
+  };
+  api.getActiveWorkoutPlan
+    .mockResolvedValueOnce(plan)
+    .mockResolvedValueOnce(null);
+  api.getWorkoutPlanHistory
+    .mockResolvedValueOnce([{ ...archivedVersion, id: plan.id, status: "active", is_active: true }])
+    .mockResolvedValueOnce([pendingVersion, archivedVersion]);
+  api.getWorkoutPlan.mockResolvedValue(replacementPlan);
+  api.generateWorkoutPlan.mockResolvedValue({ plan: replacementPlan, reused: false });
+  const user = userEvent.setup();
+
+  render(<MemoryRouter><WorkoutPlanPage planDurationWeeks={4} /></MemoryRouter>);
+
+  expect(await screen.findByText("پرس سینه دمبل")).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "به‌روزرسانی برنامه" }));
+
+  expect(await screen.findByText("حرکت جایگزین جدید")).toBeInTheDocument();
+  expect(screen.getAllByRole("heading", { name: "برنامه تمرینی من" })).toHaveLength(1);
+  expect(screen.getAllByRole("list", { name: "روزهای تمرین تو" })).toHaveLength(1);
+  expect(screen.getAllByText("در انتظار تایید مربی")).toHaveLength(1);
+  expect(screen.queryByText("پرس سینه دمبل")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /نسخه اولیه/ })).toBeInTheDocument();
+});
+
 it("lets the member inspect old and coach-approved immutable versions", async () => {
   const approvedPlan: WorkoutPlan = {
     ...plan,
