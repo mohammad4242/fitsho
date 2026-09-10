@@ -5,6 +5,7 @@ import { ExerciseMedia } from "../exercises/ExerciseMedia";
 import type { WorkoutDay } from "../workouts/workoutApi";
 import { Button, CinematicSurface, StateSkeleton } from "../ui/components";
 import { formatPersianNumber } from "../ui/locale";
+import { RTL_ROW } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import { getHomeHeroLayout } from "./homePresentation";
 
@@ -27,7 +28,7 @@ export function WorkoutTodayCard({ day, state }: WorkoutTodayCardProps) {
 
   return (
     <CinematicSurface accent style={styles.card} variant="hero">
-      <View style={[styles.layout, stacked && styles.layoutStacked]}>
+      <View style={[styles.layout, RTL_ROW, stacked && styles.layoutStacked]}>
         <View style={[styles.mediaWrap, stacked && styles.mediaStacked]}>
           {firstExercise ? (
             <ExerciseMedia

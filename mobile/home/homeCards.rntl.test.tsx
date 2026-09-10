@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
+import React from "react";
 import { Circle } from "react-native-svg";
 import { StyleSheet } from "react-native";
 import type { ReactTestInstance } from "react-test-renderer";
@@ -22,6 +23,16 @@ function findAncestorStyle(node: ReactTestInstance, key: string): Record<string,
   throw new Error(`Ancestor style ${key} not found`);
 }
 
+function findAncestorStyleWithFlexDirection(node: ReactTestInstance): Record<string, unknown> {
+  let current = node.parent;
+  while (current !== null) {
+    const style = StyleSheet.flatten(current.props.style) as Record<string, unknown> | undefined;
+    if (style?.flexDirection !== undefined) return style;
+    current = current.parent;
+  }
+  throw new Error("Ancestor flex layout not found");
+}
+
 jest.mock("expo-router", () => ({
   useRouter: () => ({ push: mockPush }),
   useFocusEffect: () => undefined,
@@ -31,7 +42,13 @@ jest.mock("expo-video", () => ({
   useVideoPlayer: () => ({}),
 }));
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
-jest.mock("../exercises/ExerciseMedia", () => ({ ExerciseMedia: () => null }));
+jest.mock("../exercises/ExerciseMedia", () => ({
+  ExerciseMedia: (props: Record<string, unknown>) => {
+    const ReactRuntime = require("react") as typeof React;
+    const ReactNative = require("react-native") as typeof import("react-native");
+    return ReactRuntime.createElement(ReactNative.View, props);
+  },
+}));
 
 test("renders calorie progress as a real accessible metric ring", () => {
   render(
@@ -128,6 +145,32 @@ test("does not render a decorative empty day number or stale snapshot sentence",
 
   expect(screen.queryByText("01")).toBeNull();
   expect(screen.queryByText("آخرین نسخه ذخیره‌شده نمایش داده می‌شود.")).toBeNull();
+});
+
+test("shows the real Persian title for today's workout", () => {
+  render(
+    <WorkoutTodayCard
+      day={{
+        day_number: 2,
+        estimated_duration_minutes: 48,
+        exercises: [{
+          exercise: {
+            media_path: "/media/exercises/curl.mp4",
+            media_type: "video",
+            name_en: "Dumbbell curl",
+            name_fa: "جلو بازو دمبل",
+          },
+        }],
+        title_en: "Chest and biceps",
+        title_fa: "سینه + جلو بازو",
+      } as never}
+      state="ready"
+    />,
+  );
+
+  expect(screen.getByText("سینه + جلو بازو")).toBeTruthy();
+  expect(findAncestorStyleWithFlexDirection(screen.getByLabelText("رسانه تمرین جلو بازو دمبل")))
+    .toMatchObject({ direction: "rtl", flexDirection: "row" });
 });
 
 test("uses the same moderately larger icon in both quick action cards", () => {

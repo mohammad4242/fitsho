@@ -1,7 +1,7 @@
 export type HomeHeroLayout = "split" | "stacked";
 
 export function getHomeHeroLayout(screenWidth: number): HomeHeroLayout {
-  return screenWidth < 350 ? "stacked" : "split";
+  return screenWidth < 320 ? "stacked" : "split";
 }
 
 export function getQuickActionColumns(screenWidth: number): 1 | 2 {

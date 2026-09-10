@@ -5,8 +5,9 @@ import { describe, expect, it } from "vitest";
 import { getHomeHeroLayout, getQuickActionColumns } from "./homePresentation";
 
 describe("getHomeHeroLayout", () => {
-  it("stacks dense workout content only on narrow phones", () => {
-    expect(getHomeHeroLayout(320)).toBe("stacked");
+  it("keeps exercise media beside the workout title on supported phones", () => {
+    expect(getHomeHeroLayout(319)).toBe("stacked");
+    expect(getHomeHeroLayout(320)).toBe("split");
     expect(getHomeHeroLayout(360)).toBe("split");
     expect(getHomeHeroLayout(430)).toBe("split");
   });
