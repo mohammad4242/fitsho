@@ -193,7 +193,7 @@ export function WorkoutPlanPage({ planDurationWeeks }: { planDurationWeeks: numb
   }
 
   function deleteVersion(version: WorkoutPlanVersionSummary) {
-    if (!isDeletableVersion(version) || deletingVersionId !== null) return;
+    if (!isDeletableVersion(version) || deletingVersionId === version.id) return;
     const confirmed = window.confirm(
       `${l("این نسخه قدیمی برنامه تمرینی حذف شود؟", "Delete this old workout plan version?")}\n\n${l("این نسخه از تاریخچه برنامه‌های شما حذف می‌شود.", "This version will be removed from your workout plan history.")}`,
     );

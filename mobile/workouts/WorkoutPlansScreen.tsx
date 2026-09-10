@@ -194,7 +194,7 @@ export function WorkoutPlansScreen() {
   }
 
   function confirmDelete(version: WorkoutPlanVersionSummary) {
-    if (!isDeletableWorkoutPlanVersion(version) || deletingPlanId !== null) return;
+    if (!isDeletableWorkoutPlanVersion(version) || deletingPlanId === version.id) return;
     Alert.alert(
       "حذف نسخه قدیمی",
       "این نسخه از تاریخچه برنامه‌های تمرینی شما حذف شود؟",
