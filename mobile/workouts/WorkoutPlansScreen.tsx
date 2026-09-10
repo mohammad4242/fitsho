@@ -596,8 +596,17 @@ function PlanView({
 }) {
   const router = useRouter();
   const [expandedDay, setExpandedDay] = useState<number | null>(plan.days[0]?.day_number ?? null);
+  const [activePreviewId, setActivePreviewId] = useState<string | null>(null);
   const executable = isWorkoutPlanExecutable(plan, historical);
   const visibleWarnings = getUserVisibleWorkoutWarnings(plan.warnings);
+
+  useEffect(() => {
+    setActivePreviewId(null);
+  }, [plan.id]);
+
+  function togglePreview(previewId: string): void {
+    setActivePreviewId((current) => current === previewId ? null : previewId);
+  }
 
   return (
     <View style={styles.planSection} testID={`workout-plan-view-${plan.id}`}>
@@ -619,13 +628,18 @@ function PlanView({
               <WorkoutDayCard
                 day={day}
                 dayIndex={dayIndex}
+                activePreviewId={activePreviewId}
                 expanded={expandedDay === day.day_number}
                 focus={dayIndex === 0}
                 key={day.day_number}
                 onOpenExercise={(slug) => router.push({ pathname: "/member/exercises/[slug]", params: { slug } })}
                 onStartReplacement={executable && !pending ? onStartReplacement : undefined}
+                onTogglePreview={togglePreview}
                 showNext={dayIndex === 0 && executable && !historical}
-                onToggle={() => setExpandedDay((current) => current === day.day_number ? null : day.day_number)}
+                onToggle={() => {
+                  setActivePreviewId(null);
+                  setExpandedDay((current) => current === day.day_number ? null : day.day_number);
+                }}
               />
             ))}
           </View>
@@ -798,21 +812,25 @@ function WorkoutPdfTool({
 }
 
 function WorkoutDayCard({
+  activePreviewId,
   day,
   dayIndex,
   expanded,
   focus,
   onOpenExercise,
   onStartReplacement,
+  onTogglePreview,
   showNext,
   onToggle,
 }: {
+  readonly activePreviewId: string | null;
   readonly day: WorkoutDay;
   readonly dayIndex: number;
   readonly expanded: boolean;
   readonly focus: boolean;
   readonly onOpenExercise: (slug: string) => void;
   readonly onStartReplacement?: (exerciseId: string) => void;
+  readonly onTogglePreview: (previewId: string) => void;
   readonly showNext: boolean;
   readonly onToggle: () => void;
 }) {
@@ -820,6 +838,7 @@ function WorkoutDayCard({
   const coreExercises = day.exercises.filter((item) => item.section === "core");
   const leadExercise = mainExercises[0] ?? day.exercises[0];
   const leadName = leadExercise?.exercise.name_fa || leadExercise?.exercise.name_en || "";
+  const leadPreviewId = `${day.day_number}:lead`;
   return (
     <Pressable
       accessibilityLabel={`روز ${formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: ${day.title_fa || day.title_en}`}
@@ -836,25 +855,36 @@ function WorkoutDayCard({
       <View style={[styles.daySummary, focus ? styles.focusDaySummary : styles.secondaryDaySummary]}>
         {focus && dayIndex === 0 && leadExercise ? (
           <Pressable
-            accessibilityLabel={`باز کردن راهنمای ${leadExercise.exercise.name_fa || leadExercise.exercise.name_en}`}
+            accessibilityLabel={leadExercise.exercise.media_type === "video"
+              ? `${activePreviewId === leadPreviewId ? "توقف" : "پخش"} پیش‌نمایش جلسه ${leadName}`
+              : `باز کردن راهنمای ${leadName}`}
             accessibilityRole="button"
             onPress={(event) => {
               event.stopPropagation();
-              onOpenExercise(leadExercise.exercise.slug);
+              if (leadExercise.exercise.media_type === "video") {
+                onTogglePreview(leadPreviewId);
+              } else {
+                onOpenExercise(leadExercise.exercise.slug);
+              }
             }}
             style={({ pressed }) => [styles.dayMediaButton, pressed && styles.mediaPressed]}
           >
             <ExerciseMedia
               accessibilityLabel={`پیش‌نمایش ${leadExercise.exercise.name_fa || leadExercise.exercise.name_en}`}
+              autoplay={activePreviewId === leadPreviewId}
               compact
+              deferVideo
               mediaType={leadExercise.exercise.media_type}
               name={leadExercise.exercise.name_fa || leadExercise.exercise.name_en}
               path={leadExercise.exercise.media_path}
               style={styles.focusDayMedia}
+              videoActive={activePreviewId === leadPreviewId}
             />
-            <View pointerEvents="none" style={styles.dayMediaBadge}>
-              <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
-            </View>
+            {activePreviewId === leadPreviewId ? null : (
+              <View pointerEvents="none" style={styles.dayMediaBadge}>
+                <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
+              </View>
+            )}
           </Pressable>
         ) : null}
         <View style={[styles.dayNumberBox, focus ? styles.focusDayNumber : styles.secondaryDayNumber]}>
@@ -888,6 +918,8 @@ function WorkoutDayCard({
               onOpen={() => onOpenExercise(exercise.exercise.slug)}
               onOpenAlternative={onOpenExercise}
               onStartReplacement={onStartReplacement}
+              onTogglePreview={onTogglePreview}
+              videoActive={activePreviewId === exercise.id}
             />
           ))}
           {coreExercises.length > 0 ? (
@@ -900,6 +932,8 @@ function WorkoutDayCard({
                   onOpen={() => onOpenExercise(exercise.exercise.slug)}
                   onOpenAlternative={onOpenExercise}
                   onStartReplacement={onStartReplacement}
+                  onTogglePreview={onTogglePreview}
+                  videoActive={activePreviewId === exercise.id}
                 />
               ))}
             </View>
@@ -930,11 +964,15 @@ function WorkoutExerciseRow({
   onOpen,
   onOpenAlternative,
   onStartReplacement,
+  onTogglePreview,
+  videoActive,
 }: {
   readonly exercise: WorkoutPlanExercise;
   readonly onOpen: () => void;
   readonly onOpenAlternative: (slug: string) => void;
   readonly onStartReplacement?: (exerciseId: string) => void;
+  readonly onTogglePreview: (previewId: string) => void;
+  readonly videoActive: boolean;
 }) {
   const language = languageForDirection();
   const actionCopy = language === "en"
@@ -949,26 +987,37 @@ function WorkoutExerciseRow({
   return (
     <View style={styles.exerciseRow}>
       <Pressable
-        accessibilityLabel={`باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
+        accessibilityLabel={exercise.exercise.media_type === "video"
+          ? `${videoActive ? "توقف" : "پخش"} پیش‌نمایش ${exercise.exercise.name_fa || exercise.exercise.name_en}`
+          : `باز کردن راهنمای ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
         accessibilityRole="button"
         onPress={(event) => {
           event.stopPropagation();
-          onOpen();
+          if (exercise.exercise.media_type === "video") {
+            onTogglePreview(exercise.id);
+          } else {
+            onOpen();
+          }
         }}
         style={({ pressed }) => [styles.exerciseMediaButton, pressed && styles.mediaPressed]}
+        testID={`workout-exercise-preview-${exercise.id}`}
       >
         <ExerciseMedia
           accessibilityLabel={`پیش‌نمایش ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
+          autoplay={videoActive}
           compact
           deferVideo
           mediaType={exercise.exercise.media_type}
           name={exercise.exercise.name_fa || exercise.exercise.name_en}
           path={exercise.exercise.media_path}
           style={styles.exerciseMedia}
+          videoActive={videoActive}
         />
-        <View pointerEvents="none" style={styles.exerciseMediaBadge}>
-          <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
-        </View>
+        {videoActive ? null : (
+          <View pointerEvents="none" style={styles.exerciseMediaBadge}>
+            <AppIcon color={fiticianTokens.colors.ink} name="play" size={fiticianTokens.iconSize.sm} />
+          </View>
+        )}
       </Pressable>
       <View style={styles.exerciseCopy}>
         <Text style={styles.exerciseTitle}>{exercise.exercise.name_fa || exercise.exercise.name_en}</Text>

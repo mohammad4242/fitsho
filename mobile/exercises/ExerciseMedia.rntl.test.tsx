@@ -55,17 +55,34 @@ test("keeps image media available when its route loses focus", () => {
   expect(screen.getByLabelText("تصویر حرکت")).toBeTruthy();
 });
 
-test("can defer video previews until exercise details open", () => {
+test("uses a real poster without mounting a deferred video player", () => {
   render(
     <ExerciseMedia
       accessibilityLabel="رسانه حرکت"
       deferVideo
       mediaType="video"
       name="پرس بالا سینه دمبل"
-      path="/media/incline-press.mp4"
+      path="/media/exercises/incline-press/media-abc.mp4"
     />,
   );
 
   expect(screen.queryByTestId("native-video")).toBeNull();
-  expect(screen.getByText("برای مشاهده، جزئیات حرکت را باز کن")).toBeTruthy();
+  expect(screen.getByLabelText("پوستر حرکت پرس بالا سینه دمبل")).toBeTruthy();
+  expect(screen.queryByText("برای مشاهده، جزئیات حرکت را باز کن")).toBeNull();
+});
+
+test("mounts the deferred video only when its preview is active", () => {
+  render(
+    <ExerciseMedia
+      accessibilityLabel="رسانه حرکت"
+      deferVideo
+      mediaType="video"
+      name="پرس بالا سینه دمبل"
+      path="/media/exercises/incline-press/media-abc.mp4"
+      videoActive
+    />,
+  );
+
+  expect(screen.getByTestId("native-video")).toBeTruthy();
+  expect(screen.queryByLabelText("پوستر حرکت پرس بالا سینه دمبل")).toBeNull();
 });

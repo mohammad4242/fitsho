@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import * as exerciseMedia from "./exerciseMedia";
-
 import {
+  availableMediaPresentations,
   buildExerciseMediaItems,
+  exerciseVideoPosterPath,
   isExerciseMediaRenderable,
   resolveExerciseMediaUrl,
   type ExerciseMediaItem,
@@ -75,13 +75,18 @@ describe("native exercise media", () => {
     expect(isExerciseMediaRenderable("", "gif")).toBe(false);
   });
 
-  it("returns only usable gender collections and ignores shared or broken media", () => {
-    const availableMediaPresentations = (exerciseMedia as unknown as {
-      availableMediaPresentations?: (items: readonly ExerciseMediaItem[]) => readonly string[];
-    }).availableMediaPresentations;
-    expect(typeof availableMediaPresentations).toBe("function");
-    if (availableMediaPresentations === undefined) return;
+  it("derives a lightweight poster beside managed exercise videos", () => {
+    expect(exerciseVideoPosterPath("/media/exercises/bench/media-abc.mp4")).toBe(
+      "/media/exercises/bench/media-abc.poster.webp",
+    );
+    expect(exerciseVideoPosterPath("/media/exercises/bench/media-abc.webm")).toBe(
+      "/media/exercises/bench/media-abc.poster.webp",
+    );
+    expect(exerciseVideoPosterPath("https://cdn.example/video.mp4")).toBeNull();
+    expect(exerciseVideoPosterPath("/media/exercises/bench/media-abc.gif")).toBeNull();
+  });
 
+  it("returns only usable gender collections and ignores shared or broken media", () => {
     expect(availableMediaPresentations([
       mediaItem("male", "/media/male-1.mp4"),
       mediaItem("male", "/media/male-2.mp4"),

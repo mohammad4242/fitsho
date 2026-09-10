@@ -6,7 +6,11 @@ import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewSty
 import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
 import { AppIcon, Media } from "../ui/components";
 import { fiticianTokens } from "../ui/tokens";
-import { isExerciseMediaRenderable, resolveExerciseMediaUrl } from "./exerciseMedia";
+import {
+  exerciseVideoPosterPath,
+  isExerciseMediaRenderable,
+  resolveExerciseMediaUrl,
+} from "./exerciseMedia";
 
 export interface ExerciseMediaProps {
   readonly accessibilityLabel: string;
@@ -17,6 +21,7 @@ export interface ExerciseMediaProps {
   readonly name: string;
   readonly path: string;
   readonly style?: StyleProp<ViewStyle>;
+  readonly videoActive?: boolean;
 }
 
 export function ExerciseMedia({
@@ -28,21 +33,32 @@ export function ExerciseMedia({
   name,
   path,
   style,
+  videoActive = false,
 }: ExerciseMediaProps) {
   const isFocused = useIsFocused();
   const runtime = getMobileRuntimeConfig();
   const source = { uri: resolveExerciseMediaUrl(path, runtime.apiBaseUrl) };
-  const [failed, setFailed] = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setFailed(false);
+    setPosterFailed(false);
+    setVideoFailed(false);
     setLoading(true);
   }, [mediaType, path]);
 
-  const renderable = isExerciseMediaRenderable(path, mediaType) && !failed;
+  const renderable = isExerciseMediaRenderable(path, mediaType);
   const deferredVideo = renderable && mediaType === "video" && deferVideo;
-  const mediaMounted = renderable && !deferredVideo && (mediaType !== "video" || isFocused);
+  const posterPath = deferredVideo ? exerciseVideoPosterPath(path) : null;
+  const showPoster = deferredVideo
+    && (!videoActive || videoFailed)
+    && posterPath !== null
+    && !posterFailed;
+  const mediaMounted = renderable
+    && !videoFailed
+    && (!deferredVideo || videoActive)
+    && (mediaType !== "video" || isFocused);
 
   return (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="image" style={[styles.frame, compact && styles.compactFrame, style]}>
@@ -54,6 +70,10 @@ export function ExerciseMedia({
             contentFit="cover"
             kind="video"
             loop
+            onError={() => {
+              setVideoFailed(true);
+              setLoading(false);
+            }}
             onFirstFrameRender={() => setLoading(false)}
             source={source}
             style={[styles.media, compact && styles.compactMedia]}
@@ -62,7 +82,7 @@ export function ExerciseMedia({
           <Media
             accessibilityLabel={`تصویر حرکت ${name}`}
             onError={() => {
-              setFailed(true);
+              setVideoFailed(true);
               setLoading(false);
             }}
             onLoad={() => setLoading(false)}
@@ -71,17 +91,19 @@ export function ExerciseMedia({
             style={[styles.media, compact && styles.compactMedia]}
           />
         )
-      ) : deferredVideo ? (
-        <View style={styles.fallback}>
-          <AppIcon color={fiticianTokens.colors.aqua} name="training" size={fiticianTokens.iconSize.xl} />
-          <Text style={styles.fallbackText}>برای مشاهده، جزئیات حرکت را باز کن</Text>
-        </View>
-      ) : renderable ? null : (
+      ) : showPoster ? (
+        <Media
+          accessibilityLabel={`پوستر حرکت ${name}`}
+          onError={() => setPosterFailed(true)}
+          source={{ uri: resolveExerciseMediaUrl(posterPath, runtime.apiBaseUrl) }}
+          style={[styles.media, compact && styles.compactMedia]}
+        />
+      ) : !renderable || posterFailed || videoFailed ? (
         <View style={styles.fallback}>
           <AppIcon color={fiticianTokens.colors.aqua} name="training" size={fiticianTokens.iconSize.xl} />
           <Text style={styles.fallbackText}>نمایش حرکت آماده نیست</Text>
         </View>
-      )}
+      ) : null}
       {mediaMounted && loading ? (
         <View pointerEvents="none" style={styles.loadingOverlay}>
           <ActivityIndicator accessibilityLabel="در حال بارگذاری رسانه حرکت" color={fiticianTokens.colors.aqua} />

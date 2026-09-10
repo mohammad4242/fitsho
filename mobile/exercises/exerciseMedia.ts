@@ -75,6 +75,12 @@ export function resolveExerciseMediaUrl(path: string, apiBaseUrl: string): strin
   return `${apiBaseUrl.replace(/\/+$/u, "")}/${path.replace(/^\/+/, "")}`;
 }
 
+export function exerciseVideoPosterPath(path: string): string | null {
+  if (!path.startsWith("/media/exercises/")) return null;
+  if (!/\.(?:mp4|webm)$/iu.test(path)) return null;
+  return path.replace(/\.(?:mp4|webm)$/iu, ".poster.webp");
+}
+
 export function isExerciseMediaRenderable(
   path: string,
   mediaType: components["schemas"]["MediaType"],

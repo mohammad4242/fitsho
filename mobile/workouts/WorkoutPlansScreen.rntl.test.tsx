@@ -18,7 +18,14 @@ jest.mock("expo-router", () => ({
   useRouter: jest.fn(),
   useIsFocused: jest.fn(() => true),
 }));
-jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
+jest.mock("expo-video", () => {
+  const React = jest.requireActual("react") as typeof import("react");
+  const { View } = jest.requireActual("react-native") as typeof import("react-native");
+  return {
+    VideoView: (props: Record<string, unknown>) => React.createElement(View, { testID: "native-video", ...props }),
+    useVideoPlayer: (source: unknown) => ({ source }),
+  };
+});
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("../auth/MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
 jest.mock("../ui/rtl", () => ({
@@ -216,6 +223,35 @@ test("renders the web-parity workout hierarchy and shared generation control", (
   expect(screen.getByRole("radio", { name: "موتور داخلی" })).toBeTruthy();
   expect(screen.getByRole("radio", { name: "هوش مصنوعی" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "ساخت برنامه تمرینی" })).toBeTruthy();
+});
+
+test("keeps exactly one inline workout video player active", () => {
+  const first = {
+    ...makeExercise("exercise-1", "شنا", "Push-up"),
+    media_path: "/media/exercises/push-up/media-first.mp4",
+    media_type: "video" as const,
+  };
+  const second = {
+    ...makeExercise("exercise-2", "پرس سینه", "Bench press"),
+    media_path: "/media/exercises/bench-press/media-second.mp4",
+    media_type: "video" as const,
+  };
+  mockActivePlan = makePlan("active", [
+    makePlanExercise("row-1", first, []),
+    makePlanExercise("row-2", second, []),
+  ]);
+
+  renderWorkoutPlans();
+
+  expect(screen.queryByTestId("native-video")).toBeNull();
+  expect(screen.getAllByLabelText(/پوستر حرکت/)).toHaveLength(3);
+
+  fireEvent.press(screen.getByTestId("workout-exercise-preview-row-1"), { stopPropagation: jest.fn() });
+  expect(screen.getAllByTestId("native-video")).toHaveLength(1);
+
+  fireEvent.press(screen.getByTestId("workout-exercise-preview-row-2"), { stopPropagation: jest.fn() });
+  expect(screen.getAllByTestId("native-video")).toHaveLength(1);
+  expect(screen.getByTestId("native-video").props.player.source.uri).toContain("media-second.mp4");
 });
 
 test("renders one compact RTL tools row and routes Body Analysis to its history", () => {

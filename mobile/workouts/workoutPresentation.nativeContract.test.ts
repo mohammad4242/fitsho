@@ -233,11 +233,12 @@ it("keeps session duration compact and removes only stale informational notices"
   expect(source).toContain("اتصال اینترنت برقرار نیست؛ آخرین برنامهٔ ذخیره‌شده نمایش داده می‌شود.");
 });
 
-it("keeps each exercise as one roomy detail action", async () => {
+it("keeps video preview separate from the exercise detail action", async () => {
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
   const row = source.slice(source.indexOf("function WorkoutExerciseRow"), source.indexOf("function WorkoutHistory"));
 
-  expect(row).toContain("accessibilityLabel={`باز کردن راهنمای");
+  expect(row).toContain('exercise.exercise.media_type === "video"');
+  expect(row).toContain("onTogglePreview(exercise.id)");
   expect(row).toContain("onOpen();");
   expect(row).toContain("onStartReplacement(exercise.id)");
   expect(row).not.toContain('label="راهنما"');

@@ -13,6 +13,8 @@ it("keeps only the first day media-first and preserves media in expanded exercis
   expect(source).toContain("mediaType={exercise.exercise.media_type}");
   expect(source).toContain("path={exercise.exercise.media_path}");
   expect(source).toContain("deferVideo");
+  expect(source).toContain("activePreviewId");
+  expect(source).toContain("videoActive={videoActive}");
 });
 
 it("keeps the focus media compact and secondary days in compact rows", async () => {
