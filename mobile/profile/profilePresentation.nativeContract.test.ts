@@ -18,4 +18,14 @@ it("keeps profile presentation grouped around real account data", async () => {
   expect(source).toMatch(/shared\.height_cm/);
   expect(source).toMatch(/shared\.current_weight_kg/);
   expect(source).toMatch(/AccountPrivacyLinks/);
+  expect(source).not.toMatch(/flexDirection: "row-reverse"/);
+  expect(source).not.toMatch(/alignItems: "flex-end"/);
+  expect(source).not.toMatch(/textAlign: "left"/);
+});
+
+it("keeps the profile photo card on native RTL ordering", async () => {
+  const source = await readFile(resolve(import.meta.dirname, "ProfilePhotoControl.tsx"), "utf8");
+
+  expect(source).not.toMatch(/flexDirection: "row-reverse"/);
+  expect(source).toMatch(/flexDirection: "row"/);
 });

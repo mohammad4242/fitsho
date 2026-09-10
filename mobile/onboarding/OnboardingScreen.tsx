@@ -402,17 +402,17 @@ export function OnboardingScreen() {
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <View style={styles.brandRow}>
-        <Text style={styles.brand}>FITICIAN</Text>
         <View style={styles.topActions}>
+          <Pressable accessibilityLabel="خروج" accessibilityRole="button" disabled={busy} onPress={logout}>
+            <Text style={styles.backLink}>خروج</Text>
+          </Pressable>
           {state.step !== "product_mode" ? (
             <Pressable accessibilityLabel="بازگشت" accessibilityRole="button" disabled={busy} onPress={goBack}>
               <Text style={styles.backLink}>بازگشت</Text>
             </Pressable>
           ) : null}
-          <Pressable accessibilityLabel="خروج" accessibilityRole="button" disabled={busy} onPress={logout}>
-            <Text style={styles.backLink}>خروج</Text>
-          </Pressable>
         </View>
+        <Text style={styles.brand}>FITICIAN</Text>
       </View>
       <View style={styles.progressBlock}>
         <Text style={styles.progressSummary}>{progressSummary}</Text>
@@ -521,14 +521,6 @@ export function ModeStage({
             onPress={() => onSelect(option.mode)}
             style={({ pressed }) => [styles.modeCard, option.mode === "both" && styles.recommendedCard, pressed && styles.pressed]}
           >
-            <View style={styles.modeAccent} />
-            <View style={[styles.modeIcon, option.mode === "both" && styles.modeIconRecommended]}>
-              <AppIcon
-                color={option.mode === "both" ? fiticianTokens.colors.amber : fiticianTokens.colors.aqua}
-                name={option.icon}
-                size={fiticianTokens.iconSize.lg}
-              />
-            </View>
             <View style={styles.modeContent}>
               {option.mode === "both" ? <Text style={styles.recommended}>پیشنهاد فیتشو</Text> : null}
               <Text style={styles.modeTitle}>{copy?.labels?.[option.mode] ?? option.label}</Text>
@@ -536,6 +528,14 @@ export function ModeStage({
                 <Text style={styles.modeDescription}>{copy?.descriptions?.[option.mode] ?? option.description}</Text>
               )}
             </View>
+            <View style={[styles.modeIcon, option.mode === "both" && styles.modeIconRecommended]}>
+              <AppIcon
+                color={option.mode === "both" ? fiticianTokens.colors.amber : fiticianTokens.colors.aqua}
+                name={option.icon}
+                size={fiticianTokens.iconSize.lg}
+              />
+            </View>
+            <View style={styles.modeAccent} />
           </Pressable>
         ))}
       </View>
@@ -1166,8 +1166,8 @@ function ActionBar({
 }) {
   return (
     <View style={styles.actions}>
-      {onBack ? <Button disabled={busy} label="قبلی" onPress={onBack} variant="secondary" /> : null}
       <Button disabled={busy} label={nextLabel} loading={busy} onPress={() => void onNext()} style={styles.nextButton} />
+      {onBack ? <Button disabled={busy} label="قبلی" onPress={onBack} variant="secondary" /> : null}
     </View>
   );
 }
@@ -1227,8 +1227,8 @@ function GuidedQuestionFlow({
 function ReviewRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
     <View style={styles.reviewRow}>
-      <Text style={styles.reviewValue}>{value}</Text>
       <Text style={styles.reviewLabel}>{label}</Text>
+      <Text style={styles.reviewValue}>{value}</Text>
     </View>
   );
 }
@@ -1396,13 +1396,13 @@ function ToggleField({
           onPress={() => field.onChange(!field.value)}
           style={styles.toggleRow}
         >
+          <Text style={styles.toggleLabel}>{label}</Text>
           <Switch
             onValueChange={field.onChange}
             thumbColor={fiticianTokens.colors.ink}
             trackColor={{ false: fiticianTokens.colors.lineStrong, true: fiticianTokens.colors.aqua }}
             value={Boolean(field.value)}
           />
-          <Text style={styles.toggleLabel}>{label}</Text>
         </Pressable>
       )}
     />
@@ -1557,7 +1557,7 @@ export function nutritionPreferencesFormValuesForState(
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "flex-start",
   },
@@ -1580,7 +1580,7 @@ const styles = StyleSheet.create({
   },
   brandRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
   },
@@ -1598,7 +1598,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
   },
   choiceGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
@@ -1656,7 +1656,7 @@ const styles = StyleSheet.create({
   },
   headingTop: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   helper: {
@@ -1691,7 +1691,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.card,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[4],
     minHeight: 112,
     padding: fiticianTokens.spacing[4],
@@ -1771,7 +1771,7 @@ const styles = StyleSheet.create({
   },
   questionMeta: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
   },
   questionProgress: {
@@ -1813,7 +1813,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     paddingBottom: fiticianTokens.spacing[3],
   },
@@ -1843,7 +1843,7 @@ const styles = StyleSheet.create({
   },
   topActions: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   title: {
@@ -1865,7 +1865,7 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     minHeight: fiticianTokens.layout.minimumTouchTarget,
   },

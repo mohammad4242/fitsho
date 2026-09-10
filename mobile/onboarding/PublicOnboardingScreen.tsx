@@ -125,15 +125,15 @@ export function PublicOnboardingScreen() {
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <View style={styles.brandRow}>
-        <Text style={styles.brand}>FITICIAN</Text>
         <View style={styles.progressPill}>
-          <View style={styles.progressDot} />
           <Text style={styles.progressText}>{progress}</Text>
+          <View style={styles.progressDot} />
         </View>
+        <Text style={styles.brand}>FITICIAN</Text>
       </View>
       <View style={styles.publicHeaderNote} testID="public-onboarding-header-note">
-        <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={fiticianTokens.iconSize.sm} />
         <Text style={styles.publicHeaderNoteText}>{publicOnboardingCopy.header}</Text>
+        <AppIcon color={fiticianTokens.colors.aqua} name="shield" size={fiticianTokens.iconSize.sm} />
       </View>
       <View style={styles.progressTrack}>
         <ProgressBar label="پیشرفت مسیر شخصی‌سازی" progress={onboardingProgressValue(state)} />
@@ -229,12 +229,12 @@ function AccountHandoffStage({
       />
       <Button label={publicOnboardingCopy.account.edit} onPress={onBack} variant="ghost" />
       <Card variant="hero" style={styles.accountCard}>
-        <View style={styles.accountIcon}>
-          <AppIcon accessibilityLabel="امنیت" color={fiticianTokens.colors.aqua} name="shield" size={fiticianTokens.iconSize.lg} />
-        </View>
         <View style={styles.accountCopy}>
           <Text style={styles.accountTitle}>{publicOnboardingCopy.account.securityTitle}</Text>
           <Text style={styles.accountDescription}>{publicOnboardingCopy.account.securityBody}</Text>
+        </View>
+        <View style={styles.accountIcon}>
+          <AppIcon accessibilityLabel="امنیت" color={fiticianTokens.colors.aqua} name="shield" size={fiticianTokens.iconSize.lg} />
         </View>
       </Card>
       <View style={styles.accountActions}>
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   },
   accountCard: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[4],
   },
   accountCopy: {
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   },
   brandRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
   },
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.line,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     paddingHorizontal: fiticianTokens.spacing[3],
     paddingVertical: fiticianTokens.spacing[2],
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   },
   publicHeaderNote: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     width: "100%",
   },

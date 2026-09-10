@@ -475,8 +475,8 @@ export function ProfileScreen() {
 
       <AccountPrivacyLinks />
       <View style={styles.actions}>
-        <Button disabled={busy} label={section === "personal" ? "بستن" : "بازگشت"} onPress={goBackOrClose(goBack, section, router)} variant="secondary" />
         <Button disabled={busy} label="ذخیره تغییرات" loading={busy} onPress={() => void saveCurrentSection()} />
+        <Button disabled={busy} label={section === "personal" ? "بستن" : "بازگشت"} onPress={goBackOrClose(goBack, section, router)} variant="secondary" />
       </View>
     </Screen>
   );
@@ -559,10 +559,10 @@ function ProfileFormGroup({
   return (
     <Card style={styles.formGroup} variant="default">
       <View style={styles.formGroupHeader}>
+        <Text style={styles.formGroupTitle}>{title}</Text>
         <View style={styles.formGroupIcon}>
           <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={18} />
         </View>
-        <Text style={styles.formGroupTitle}>{title}</Text>
       </View>
       <View style={styles.formGroupFields}>{children}</View>
     </Card>
@@ -934,6 +934,9 @@ function NutritionSection({
       />
       <FormField label="یادآوری ثبت روزانه">
         <View style={styles.switchRow}>
+          <Text style={styles.mutedText}>
+            {preferences.daily_check_in_enabled ? "فعال" : "غیرفعال"}
+          </Text>
           <Switch
             accessibilityLabel="یادآوری ثبت روزانه"
             onValueChange={(value) => onPreferencesChange("daily_check_in_enabled", value)}
@@ -941,9 +944,6 @@ function NutritionSection({
             trackColor={{ false: fiticianTokens.colors.lineStrong, true: fiticianTokens.colors.aqua }}
             value={preferences.daily_check_in_enabled}
           />
-          <Text style={styles.mutedText}>
-            {preferences.daily_check_in_enabled ? "فعال" : "غیرفعال"}
-          </Text>
         </View>
       </FormField>
       {preferences.daily_check_in_enabled ? (
@@ -1039,12 +1039,12 @@ function ProfileStat({
 }) {
   return (
     <View style={[styles.overviewStat, separated && styles.overviewStatSeparated]}>
-      <View style={styles.overviewStatIcon}>
-        <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={17} />
-      </View>
       <View style={styles.overviewStatCopy}>
         <Text style={styles.overviewStatLabel}>{label}</Text>
         <Text style={[styles.overviewStatValue, direction === "ltr" && styles.overviewStatNumeric]}>{value}</Text>
+      </View>
+      <View style={styles.overviewStatIcon}>
+        <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={17} />
       </View>
     </View>
   );
@@ -1261,7 +1261,7 @@ function profileErrorMessage(error: unknown): string {
 
 const styles = StyleSheet.create({
   actions: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
     marginTop: fiticianTokens.spacing[2],
@@ -1311,7 +1311,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[2],
   },
   choiceGrid: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
     justifyContent: "flex-start",
@@ -1350,7 +1350,7 @@ const styles = StyleSheet.create({
   },
   formGroupHeader: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   formGroupIcon: {
@@ -1401,7 +1401,7 @@ const styles = StyleSheet.create({
   overviewStat: {
     alignItems: "center",
     flexBasis: "31%",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexGrow: 1,
     flexShrink: 1,
     gap: fiticianTokens.spacing[1],
@@ -1429,7 +1429,7 @@ const styles = StyleSheet.create({
     width: 30,
   },
   overviewStats: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
     paddingTop: fiticianTokens.spacing[2],
@@ -1486,7 +1486,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomColor: fiticianTokens.colors.line,
     borderBottomWidth: 1,
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     paddingBottom: fiticianTokens.spacing[3],
   },
@@ -1511,7 +1511,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     maxWidth: "38%",
-    textAlign: "left",
+    textAlign: "right",
     writingDirection: "rtl",
   },
   measurementDescription: {
@@ -1524,12 +1524,12 @@ const styles = StyleSheet.create({
   },
   measurementHeading: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   measurementRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   measurementTitle: {
@@ -1668,7 +1668,7 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.bold,
   },
   progressSteps: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     minHeight: 64,
     position: "relative",
   },
@@ -1689,12 +1689,12 @@ const styles = StyleSheet.create({
   },
   switchRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "flex-end",
   },
   twoColumns: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
 });

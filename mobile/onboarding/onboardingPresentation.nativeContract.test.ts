@@ -30,4 +30,8 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(publicSource).toMatch(/مسیر امن انتقال اطلاعات/);
   expect(publicSource).toMatch(/getOnboardingStageProgress/);
   expect(publicSource).not.toMatch(/WebView/);
+  expect(source).not.toMatch(/flexDirection: "row-reverse"/);
+  expect(publicSource).not.toMatch(/flexDirection: "row-reverse"/);
+  expect(source).toMatch(/flexDirection: "row"/);
+  expect(publicSource).toMatch(/flexDirection: "row"/);
 });

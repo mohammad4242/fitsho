@@ -165,7 +165,7 @@ export function ProfilePhotoControl({
 const styles = StyleSheet.create({
   actions: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[2],
   },
   avatar: {
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   identityRow: {
     alignItems: "center",
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
   },
   photo: {
