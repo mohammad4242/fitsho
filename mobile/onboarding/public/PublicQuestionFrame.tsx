@@ -2,6 +2,7 @@ import { type ReactNode, useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import { AppIcon } from "../../ui/components";
+import { fiticianDirectionalIconName } from "../../ui/icons";
 import { fiticianTokens } from "../../ui/tokens";
 import { publicOnboardingStyles as styles } from "./publicOnboardingStyles";
 
@@ -50,7 +51,7 @@ export function PublicQuestionFrame({
         onPress={onBack}
         style={styles.backButton}
       >
-        <AppIcon color={fiticianTokens.colors.mist} name="arrowLeft" size={20} />
+        <AppIcon color={fiticianTokens.colors.mist} name={fiticianDirectionalIconName("back")} size={20} />
       </Pressable>
       {!hideStageTrack ? (
         <View accessibilityLabel={stageLabel} style={styles.stageRow}>

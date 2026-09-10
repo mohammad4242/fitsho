@@ -1,6 +1,8 @@
 import type { ComponentProps } from "react";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
+import type { FiticianDirection } from "./rtl";
+
 export const fiticianIconNames = [
   "home",
   "training",
@@ -26,6 +28,7 @@ export const fiticianIconNames = [
   "target",
   "shield",
   "arrowLeft",
+  "arrowRight",
   "chevronDown",
   "chevronUp",
   "refresh",
@@ -62,6 +65,7 @@ const iconMap: Record<FiticianIconName, MaterialIconName> = {
   target: "target",
   shield: "shield-check-outline",
   arrowLeft: "arrow-left",
+  arrowRight: "arrow-right",
   chevronDown: "chevron-down",
   chevronUp: "chevron-up",
   refresh: "refresh",
@@ -72,4 +76,14 @@ const iconMap: Record<FiticianIconName, MaterialIconName> = {
 
 export function fiticianIconName(name: FiticianIconName): MaterialIconName {
   return iconMap[name];
+}
+
+export type FiticianDirectionalIcon = "back" | "forward";
+
+export function fiticianDirectionalIconName(
+  semantic: FiticianDirectionalIcon,
+  direction: FiticianDirection = "rtl",
+): "arrowLeft" | "arrowRight" {
+  if (semantic === "back") return direction === "rtl" ? "arrowRight" : "arrowLeft";
+  return direction === "rtl" ? "arrowLeft" : "arrowRight";
 }
