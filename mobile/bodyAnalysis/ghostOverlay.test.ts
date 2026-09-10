@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
+import { ghostAssetCalibrationForView } from "@fitician/core/body-ghost";
 
 import {
-  getGhostAssetCalibration,
   getGhostOverlayLayout,
   resolveGhostOverlayVariant,
 } from "./ghostOverlay";
@@ -22,11 +22,11 @@ it("uses the shared front privacy-line golden vector", () => {
 
   expect(layout).toMatchObject({ mirrored: false, scale: 0.8, view: "front" });
   expect(layout.privacyLine.anchor.x).toBeCloseTo(0.5);
-  expect(layout.privacyLine.anchor.y).toBeCloseTo(0.164);
+  expect(layout.privacyLine.anchor.y).toBeCloseTo(0.180025);
   expect(layout.privacyLine.start.x).toBeCloseTo(0.1);
   expect(layout.privacyLine.end.x).toBeCloseTo(0.9);
-  expect(layout.privacyLine.start.y).toBeCloseTo(0.164);
-  expect(layout.privacyLine.end.y).toBeCloseTo(0.164);
+  expect(layout.privacyLine.start.y).toBeCloseTo(0.180025);
+  expect(layout.privacyLine.end.y).toBeCloseTo(0.180025);
 });
 
 it("mirrors only the side Ghost for the left profile", () => {
@@ -42,13 +42,13 @@ it("mirrors only the side Ghost for the left profile", () => {
 });
 
 it.each([
-  ["male", "front", 0.08],
-  ["male", "side", 0.08],
-  ["male", "back", 0.08],
-  ["female", "front", 0.045],
-  ["female", "side", 0.06],
-  ["female", "back", 0.055],
-] as const)("places the %s %s privacy line on the Ghost neck", (variant, view, expectedTop) => {
+  ["male", "front", 0.10003125],
+  ["male", "side", 0.10425],
+  ["male", "back", 0.0159375],
+  ["female", "front", 0.1098125],
+  ["female", "side", 0.1099296875],
+  ["female", "back", 0.0228125],
+] as const)("places the %s %s privacy line on the Ghost visible top", (variant, view, expectedTop) => {
   const layout = getGhostOverlayLayout(view, 1, "right", variant);
 
   expect(layout.privacyLine.anchor.y).toBeCloseTo(expectedTop);
@@ -62,7 +62,7 @@ it.each([
   ["female", "side", 0.83, -0.025],
   ["female", "back", 0.94, -0.11],
 ] as const)("matches the web artwork calibration for %s/%s", (variant, view, scale, translateYRatio) => {
-  expect(getGhostAssetCalibration(variant, view)).toEqual({ scale, translateYRatio });
+  expect(ghostAssetCalibrationForView(view, variant)).toEqual({ scale, translateYRatio });
 });
 
 it("keeps fixed artwork calibration when the user changes Ghost size", () => {

@@ -13,9 +13,9 @@ it("creates an integer crop action from the shared privacy plan", () => {
     view: "front",
   })).toEqual({
     crop: {
-      height: 2208,
+      height: 2160,
       originX: 0,
-      originY: 192,
+      originY: 240,
       width: 1600,
     },
   });
@@ -23,7 +23,7 @@ it("creates an integer crop action from the shared privacy plan", () => {
 
 it("validates that the encoded result contains only pixels below the privacy line", () => {
   const encoded: EncodedBodyPhoto = {
-    height: 2208,
+    height: 2160,
     mimeType: "image/jpeg",
     uri: "file:///cache/body-front-cropped.jpg",
     width: 1600,

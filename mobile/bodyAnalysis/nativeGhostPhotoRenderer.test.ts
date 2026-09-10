@@ -99,8 +99,8 @@ beforeEach(() => {
 
 it("renders the transformed photo into a private JPEG on Android", async () => {
   const source = createImage();
-  const canvas = createImage({ height: 1656, width: 1200 });
-  const rendered = createImage({ height: 1656, width: 1200 });
+  const canvas = createImage({ height: 1620, width: 1200 });
+  const rendered = createImage({ height: 1620, width: 1200 });
   source.renderIntoAsync = vi.fn(async () => rendered);
   canvas.renderIntoAsync = vi.fn(async () => rendered);
   loadFromFileAsync.mockResolvedValue(source);
@@ -116,7 +116,7 @@ it("renders the transformed photo into a private JPEG on Android", async () => {
     ghostScale: 1,
     ghostVariant: "male",
   })).resolves.toEqual({
-    height: 1656,
+    height: 1620,
     mimeType: "image/jpeg",
     privacyCropApplied: true,
     source: "library",
@@ -127,24 +127,24 @@ it("renders the transformed photo into a private JPEG on Android", async () => {
   expect(loadFromFileAsync).toHaveBeenCalledWith("/cache/source.png");
   expect(createBlankImage).toHaveBeenCalledWith(
     1200,
-    1656,
+    1620,
     false,
     { r: 160 / 255, g: 163 / 255, b: 161 / 255 },
   );
   expect(canvas.renderIntoAsync).toHaveBeenCalledWith(
     source,
     0,
-    -144,
+    -180,
     1200,
-    1656,
+    1620,
   );
   expect(rendered.saveToTemporaryFileAsync).toHaveBeenCalledWith("jpg", 92);
 });
 
-it("uses the female neck crop for the selected view", async () => {
+it("uses the female Ghost top crop for the selected view", async () => {
   const source = createImage();
-  const canvas = createImage({ height: 1701, width: 1200 });
-  const rendered = createImage({ height: 1701, width: 1200 });
+  const canvas = createImage({ height: 1759, width: 1200 });
+  const rendered = createImage({ height: 1759, width: 1200 });
   canvas.renderIntoAsync = vi.fn(async () => rendered);
   loadFromFileAsync.mockResolvedValue(source);
   createBlankImage.mockReturnValue(canvas);
@@ -162,20 +162,20 @@ it("uses the female neck crop for the selected view", async () => {
 
   expect(createBlankImage).toHaveBeenCalledWith(
     1200,
-    1701,
+    1759,
     false,
     expect.any(Object),
   );
 });
 
 it.each([
-  ["male", "front", 1, false, 192, 1656],
-  ["male", "side", 1, false, 192, 1656],
-  ["male", "back", 1, false, 192, 1656],
-  ["female", "front", 1, false, 108, 1719],
-  ["female", "side", 1, false, 144, 1692],
-  ["female", "back", 1, false, 132, 1701],
-  ["male", "side", 1.1, true, 91, 1732],
+  ["male", "front", 1, false, 240, 1620],
+  ["male", "side", 1, false, 250, 1612],
+  ["male", "back", 1, false, 38, 1771],
+  ["female", "front", 1, false, 264, 1602],
+  ["female", "side", 1, false, 264, 1602],
+  ["female", "back", 1, false, 55, 1759],
+  ["male", "side", 1.1, true, 155, 1684],
 ] as const)("keeps the privacy boundary as the first native JPEG row for %s/%s scale %s", async (
   variant,
   view,

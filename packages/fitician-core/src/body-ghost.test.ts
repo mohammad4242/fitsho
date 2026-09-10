@@ -1,24 +1,43 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ghostAssetCalibrationForView,
+  ghostAssetVisibleTopRatioForView,
   ghostPrivacyCutRatioForView,
   ghostPrivacyLineGeometry,
 } from "./body-ghost";
 
-describe("body Ghost neck privacy geometry", () => {
+describe("body Ghost upper-edge privacy geometry", () => {
   it.each([
-    ["male", "front", 0.08],
-    ["male", "side", 0.08],
-    ["male", "back", 0.08],
-    ["female", "front", 0.045],
-    ["female", "side", 0.06],
-    ["female", "back", 0.055],
-  ] as const)("uses the %s %s neck anchor", (variant, view, expectedRatio) => {
+    ["male", "front", 156 / 1280, 0.10003125],
+    ["male", "side", 156 / 1280, 0.10425],
+    ["male", "back", 104 / 1280, 0.0159375],
+    ["female", "front", 44 / 1280, 0.1098125],
+    ["female", "side", 77 / 1280, 0.1099296875],
+    ["female", "back", 140 / 1280, 0.0228125],
+  ] as const)("uses the visible upper edge of the %s %s asset", (
+    variant,
+    view,
+    expectedAssetTop,
+    expectedRatio,
+  ) => {
+    expect(ghostAssetVisibleTopRatioForView(view, variant)).toBeCloseTo(expectedAssetTop);
     expect(ghostPrivacyCutRatioForView(view, variant)).toBeCloseTo(expectedRatio);
     expect(ghostPrivacyLineGeometry(view, 1, false, variant).anchor.y).toBeCloseTo(expectedRatio);
   });
 
-  it("keeps the neck line horizontal when the side Ghost is mirrored", () => {
+  it("keeps the asset calibration in the shared geometry contract", () => {
+    expect(ghostAssetCalibrationForView("front", "female")).toEqual({
+      scale: 0.78,
+      translateYRatio: -0.027,
+    });
+    expect(ghostAssetCalibrationForView("back", "neutral")).toEqual({
+      scale: 0.91,
+      translateYRatio: -0.103,
+    });
+  });
+
+  it("keeps the upper-edge line horizontal when the side Ghost is mirrored", () => {
     const right = ghostPrivacyLineGeometry("side", 1, false, "female");
     const left = ghostPrivacyLineGeometry("side", 1, true, "female");
 

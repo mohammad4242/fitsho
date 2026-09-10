@@ -15,6 +15,8 @@ export {
   GHOST_SIDE_PRIVACY_CUT_RATIO,
   clampGhostScale,
   getGhostGeometry,
+  ghostAssetCalibrationForView,
+  ghostAssetVisibleTopRatioForView,
   ghostPrivacyCutRatioForView,
   ghostPrivacyLineGeometry,
   isPointInZone,
@@ -23,6 +25,7 @@ export {
   transformGhostZone,
 } from "./body-ghost";
 export type {
+  GhostAssetCalibration,
   GhostPoint,
   GhostPrivacyLine,
   GhostOverlayVariant,

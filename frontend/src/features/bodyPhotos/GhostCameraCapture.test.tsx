@@ -200,8 +200,8 @@ it("captures the transformed privacy crop, mirrors the user camera, and returns 
   const canvas = document.querySelector("canvas");
   expect(canvas).not.toBeNull();
   expect(canvas).toHaveProperty("width", 1280);
-  expect(canvas).toHaveProperty("height", 1580);
-  expect(drawImage).toHaveBeenCalledWith(video, 0, 340, 1280, 1580, 0, 0, 1280, 1580);
+  expect(canvas).toHaveProperty("height", 1690);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 230, 1280, 1690, 0, 0, 1280, 1690);
   expect(screen.getByRole("button", { name: /use this camera photo/i })).toBeInTheDocument();
 
   await act(async () => {
@@ -221,7 +221,7 @@ it("captures the transformed privacy crop, mirrors the user camera, and returns 
   expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:camera-preview");
 });
 
-it("captures the higher privacy crop for a back photo", async () => {
+it("captures from the visible Ghost top for a back photo", async () => {
   const drawImage = vi.fn();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
     save: vi.fn(),
@@ -254,13 +254,13 @@ it("captures the higher privacy crop for a back photo", async () => {
   const canvas = document.querySelector("canvas");
   expect(canvas).not.toBeNull();
   expect(canvas).toHaveProperty("width", 1280);
-  expect(canvas).toHaveProperty("height", 1805);
-  expect(drawImage).toHaveBeenCalledWith(video, 0, 115, 1280, 1805, 0, 0, 1280, 1805);
+  expect(canvas).toHaveProperty("height", 1889);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 31, 1280, 1889, 0, 0, 1280, 1889);
 
   rendered.unmount();
 });
 
-it("captures the lower privacy crop for a side photo", async () => {
+it("captures from the visible Ghost top for a side photo", async () => {
   const drawImage = vi.fn();
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
     save: vi.fn(),
@@ -293,8 +293,8 @@ it("captures the lower privacy crop for a side photo", async () => {
   const canvas = document.querySelector("canvas");
   expect(canvas).not.toBeNull();
   expect(canvas).toHaveProperty("width", 1280);
-  expect(canvas).toHaveProperty("height", 1728);
-  expect(drawImage).toHaveBeenCalledWith(video, 0, 192, 1280, 1728, 0, 0, 1280, 1728);
+  expect(canvas).toHaveProperty("height", 1720);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 200, 1280, 1720, 0, 0, 1280, 1720);
 
   rendered.unmount();
 });

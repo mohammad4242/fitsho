@@ -6,27 +6,50 @@ import type { BodyPhotoSide, BodyPhotoView } from "./body-photos.js";
 
 export { GHOST_SCALE_MAX, GHOST_SCALE_MIN } from "./body-ghost-scale.js";
 
-export const GHOST_PRIVACY_CUT_RATIO = 0.08;
-export const GHOST_SIDE_PRIVACY_CUT_RATIO = 0.08;
-export const GHOST_BACK_PRIVACY_CUT_RATIO = 0.08;
-
 export type GhostOverlayVariant = "male" | "female" | "neutral";
 
-const GHOST_NECK_PRIVACY_CUT_RATIOS: Record<
+export type GhostAssetCalibration = {
+  readonly scale: number;
+  readonly translateYRatio: number;
+};
+
+const GHOST_ASSET_CALIBRATIONS: Record<
+  Exclude<GhostOverlayVariant, "neutral">,
+  Record<BodyPhotoView, GhostAssetCalibration>
+> = {
+  female: {
+    back: { scale: 0.94, translateYRatio: -0.11 },
+    front: { scale: 0.78, translateYRatio: -0.027 },
+    side: { scale: 0.83, translateYRatio: -0.025 },
+  },
+  male: {
+    back: { scale: 0.91, translateYRatio: -0.103 },
+    front: { scale: 0.87, translateYRatio: -0.071 },
+    side: { scale: 0.88, translateYRatio: -0.063 },
+  },
+};
+
+const GHOST_ASSET_VISIBLE_TOP_RATIOS: Record<
   Exclude<GhostOverlayVariant, "neutral">,
   Record<BodyPhotoView, number>
 > = {
+  // First visible artwork row in each 1280 px source asset.
   female: {
-    back: 0.055,
-    front: 0.045,
-    side: 0.06,
+    back: 140 / 1280,
+    front: 44 / 1280,
+    side: 77 / 1280,
   },
   male: {
-    back: 0.08,
-    front: 0.08,
-    side: 0.08,
+    back: 104 / 1280,
+    front: 156 / 1280,
+    side: 156 / 1280,
   },
 };
+
+// Legacy constants remain available, but are derived from the same asset data.
+export const GHOST_PRIVACY_CUT_RATIO = calculateGhostPrivacyCutRatio("front", "male");
+export const GHOST_SIDE_PRIVACY_CUT_RATIO = calculateGhostPrivacyCutRatio("side", "male");
+export const GHOST_BACK_PRIVACY_CUT_RATIO = calculateGhostPrivacyCutRatio("back", "male");
 
 export type GhostPoint = {
   x: number;
@@ -94,8 +117,33 @@ export function ghostPrivacyCutRatioForView(
   view: BodyPhotoView,
   variant: GhostOverlayVariant = "male",
 ): number {
+  return calculateGhostPrivacyCutRatio(view, variant);
+}
+
+function calculateGhostPrivacyCutRatio(
+  view: BodyPhotoView,
+  variant: GhostOverlayVariant,
+): number {
+  const calibration = ghostAssetCalibrationForView(view, variant);
+  const visibleTop = ghostAssetVisibleTopRatioForView(view, variant);
+  const ratio = 0.5 + (visibleTop - 0.5) * calibration.scale + calibration.translateYRatio;
+  return Math.round(ratio * 1_000_000_000_000) / 1_000_000_000_000;
+}
+
+export function ghostAssetCalibrationForView(
+  view: BodyPhotoView,
+  variant: GhostOverlayVariant = "male",
+): GhostAssetCalibration {
   const resolvedVariant = variant === "female" ? "female" : "male";
-  return GHOST_NECK_PRIVACY_CUT_RATIOS[resolvedVariant][view];
+  return GHOST_ASSET_CALIBRATIONS[resolvedVariant][view];
+}
+
+export function ghostAssetVisibleTopRatioForView(
+  view: BodyPhotoView,
+  variant: GhostOverlayVariant = "male",
+): number {
+  const resolvedVariant = variant === "female" ? "female" : "male";
+  return GHOST_ASSET_VISIBLE_TOP_RATIOS[resolvedVariant][view];
 }
 
 export function transformGhostPoint(

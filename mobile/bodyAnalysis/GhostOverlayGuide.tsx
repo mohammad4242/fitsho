@@ -66,12 +66,8 @@ export function GhostOverlayGuide({
           style={[
             styles.asset,
             {
-              transform: [
-                { scale: layout.assetCalibration.scale },
-                {
-                  translateY: `${layout.assetCalibration.translateYRatio * 100}%` as `${number}%`,
-                },
-              ],
+              top: `${layout.assetCalibration.translateYRatio * 100}%` as DimensionValue,
+              transform: [{ scale: layout.assetCalibration.scale }],
             },
           ]}
         />
@@ -84,6 +80,7 @@ const styles = StyleSheet.create({
   asset: {
     height: "100%",
     opacity: 0.48,
+    position: "relative",
     transformOrigin: "center",
     width: "100%",
   },

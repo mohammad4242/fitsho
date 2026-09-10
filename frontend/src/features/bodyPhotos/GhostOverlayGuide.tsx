@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { ghostAssetCalibrationForView } from "@fitician/core/body-ghost";
 
 import { ghostOverlayAssets, resolveGhostOverlayVariant } from "./ghostOverlayAssets";
 import {
@@ -22,6 +23,7 @@ export function GhostOverlayGuide({
 }) {
   const { t } = useTranslation();
   const variant = resolveGhostOverlayVariant(sex);
+  const assetCalibration = ghostAssetCalibrationForView(view, variant);
   const mirrored = view === "side" && sideProfile === "left";
   const privacyLine = ghostPrivacyLineGeometry(view, ghostScale, mirrored, variant);
   return (
@@ -57,6 +59,11 @@ export function GhostOverlayGuide({
           src={ghostOverlayAssets[variant][view]}
           alt=""
           aria-hidden="true"
+          style={{
+            position: "relative",
+            top: ghostPercentage(assetCalibration.translateYRatio),
+            transform: `scale(${assetCalibration.scale})`,
+          }}
         />
       </div>
     </div>

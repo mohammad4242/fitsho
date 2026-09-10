@@ -4,6 +4,8 @@ import {
   GHOST_SCALE_MAX,
   GHOST_SCALE_MIN,
   getGhostGeometry,
+  ghostAssetCalibrationForView,
+  ghostAssetVisibleTopRatioForView,
   ghostPrivacyLineGeometry,
   isPointInZone,
   pointZoneDistance,
@@ -19,6 +21,8 @@ void GHOST_PRIVACY_CUT_RATIO;
 void GHOST_SCALE_MAX;
 void GHOST_SCALE_MIN;
 void geometry;
+void ghostAssetCalibrationForView(view);
+void ghostAssetVisibleTopRatioForView(view);
 void ghostPrivacyLineGeometry(view);
 void isPointInZone({ x: 0.5, y: 0.5 }, geometry.bodyBounds);
 void pointZoneDistance({ x: 0.5, y: 0.5 }, geometry.bodyBounds);

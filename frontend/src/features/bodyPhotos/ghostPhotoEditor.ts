@@ -105,7 +105,7 @@ export async function renderGhostPhoto(
   view: BodyPhotoView = "front",
   ghostScaleOrRuntime: number | GhostPhotoCanvasRuntime = 1,
   runtimeOrVariant: GhostPhotoCanvasRuntime | GhostOverlayVariant = browserGhostPhotoCanvasRuntime,
-  variant = "male",
+  variant: GhostOverlayVariant = "male",
 ): Promise<File> {
   const ghostScale = typeof ghostScaleOrRuntime === "number" ? ghostScaleOrRuntime : 1;
   const canvasRuntime = typeof ghostScaleOrRuntime === "number"
