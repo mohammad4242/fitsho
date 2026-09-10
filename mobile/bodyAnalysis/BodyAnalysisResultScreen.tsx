@@ -328,6 +328,7 @@ function PhotoDetails({
             ) : (
               <Image
                 accessibilityLabel={replaceView(bodyPhotoCopy.results.photoAlt, viewLabel(photo.view))}
+                resizeMode="contain"
                 source={{ uri: photoUris[photo.view] }}
                 style={styles.photo}
               />

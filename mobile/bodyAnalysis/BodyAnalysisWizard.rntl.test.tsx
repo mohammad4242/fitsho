@@ -200,6 +200,14 @@ test("uploads each confirmed view before advancing to the next web view", async 
   fireEvent.press(screen.getByLabelText("تأیید back"));
   await waitFor(() => expect(uploadedViews).toEqual(["front", "side", "back"]));
   expect(await screen.findByText(bodyPhotoCopy.reviewTitle)).toBeTruthy();
+  for (const view of ["front", "side", "back"] as const) {
+    const previewLabel = bodyPhotoCopy.previewAlt.replace("{{view}}", {
+      front: "روبه‌رو",
+      side: "نیمرخ",
+      back: "پشت",
+    }[view]);
+    expect(screen.getByLabelText(previewLabel).props.resizeMode).toBe("contain");
+  }
   expect(screen.getByText(bodyPhotoCopy.processingTerms)).toBeTruthy();
   expect(screen.getByText(bodyPhotoCopy.modelTraining)).toBeTruthy();
   expect(screen.getByText(bodyPhotoCopy.modelTrainingHint)).toBeTruthy();

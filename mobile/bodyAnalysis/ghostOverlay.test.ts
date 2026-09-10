@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 
 import {
+  getGhostAssetCalibration,
   getGhostOverlayLayout,
   resolveGhostOverlayVariant,
 } from "./ghostOverlay";
@@ -30,11 +31,14 @@ it("uses the shared front privacy-line golden vector", () => {
 
 it("mirrors only the side Ghost for the left profile", () => {
   const layout = getGhostOverlayLayout("side", 0.95, "left");
+  const right = getGhostOverlayLayout("side", 0.95, "right");
 
   expect(layout.mirrored).toBe(true);
   expect(layout.privacyLine.anchor.x).toBe(0.5);
+  expect(layout.privacyLine.anchor.y).toBe(right.privacyLine.anchor.y);
   expect(layout.privacyLine.start.x).toBeCloseTo(0.025);
   expect(layout.privacyLine.end.x).toBeCloseTo(0.975);
+  expect(layout.assetCalibration).toEqual(right.assetCalibration);
 });
 
 it.each([
@@ -48,6 +52,25 @@ it.each([
   const layout = getGhostOverlayLayout(view, 1, "right", variant);
 
   expect(layout.privacyLine.anchor.y).toBeCloseTo(expectedTop);
+});
+
+it.each([
+  ["male", "front", 0.87, -0.071],
+  ["male", "side", 0.88, -0.063],
+  ["male", "back", 0.91, -0.103],
+  ["female", "front", 0.78, -0.027],
+  ["female", "side", 0.83, -0.025],
+  ["female", "back", 0.94, -0.11],
+] as const)("matches the web artwork calibration for %s/%s", (variant, view, scale, translateYRatio) => {
+  expect(getGhostAssetCalibration(variant, view)).toEqual({ scale, translateYRatio });
+});
+
+it("keeps fixed artwork calibration when the user changes Ghost size", () => {
+  const smaller = getGhostOverlayLayout("front", 0.75, "right", "male");
+  const larger = getGhostOverlayLayout("front", 1.15, "right", "male");
+
+  expect(smaller.assetCalibration).toEqual({ scale: 0.87, translateYRatio: -0.071 });
+  expect(larger.assetCalibration).toEqual(smaller.assetCalibration);
 });
 
 it("never turns the Ghost into a body-shape rejection gate", () => {

@@ -101,9 +101,19 @@ export function BodyBeforeAfterComparison({
       >
         {beforeUri !== undefined && afterUri !== undefined ? (
           <>
-            <Image accessibilityIgnoresInvertColors source={{ uri: beforeUri }} style={styles.stageImage} />
+            <Image
+              accessibilityIgnoresInvertColors
+              resizeMode="contain"
+              source={{ uri: beforeUri }}
+              style={styles.stageImage}
+            />
             <View style={[styles.afterLayer, { width: `${100 - position}%` }]}>
-              <Image accessibilityIgnoresInvertColors source={{ uri: afterUri }} style={styles.stageImage} />
+              <Image
+                accessibilityIgnoresInvertColors
+                resizeMode="contain"
+                source={{ uri: afterUri }}
+                style={styles.stageImage}
+              />
             </View>
             <View style={[styles.divider, { left: `${position}%` }]} />
             <View style={[styles.photoLabel, styles.beforeLabel]}>

@@ -49,7 +49,15 @@ export function GhostOverlayGuide({
       </View>
       <View
         accessibilityLabel={`شبح ${view === "front" ? "روبه‌رو" : view === "side" ? "نیمرخ" : "پشت"}`}
-        style={styles.assetFrame}
+        style={[
+          styles.assetFrame,
+          {
+            transform: [
+              ...(layout.mirrored ? [{ scaleX: -1 }] : []),
+              { scale: layout.scale },
+            ],
+          },
+        ]}
       >
         <Image
           accessibilityLabel=""
@@ -59,8 +67,10 @@ export function GhostOverlayGuide({
             styles.asset,
             {
               transform: [
-                ...(layout.mirrored ? [{ scaleX: -1 }] : []),
-                { scale: layout.scale },
+                { scale: layout.assetCalibration.scale },
+                {
+                  translateY: `${layout.assetCalibration.translateYRatio * 100}%` as `${number}%`,
+                },
               ],
             },
           ]}
@@ -74,6 +84,7 @@ const styles = StyleSheet.create({
   asset: {
     height: "100%",
     opacity: 0.48,
+    transformOrigin: "center",
     width: "100%",
   },
   assetFrame: {
@@ -84,6 +95,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: 0,
+    transformOrigin: "center",
   },
   overlay: {
     bottom: 0,

@@ -529,6 +529,7 @@ function CaptureReview({
                   ) : (
                     <Image
                       accessibilityLabel={replaceView(bodyPhotoCopy.previewAlt, viewLabel(view))}
+                      resizeMode="contain"
                       source={{ uri: asset.uri }}
                       style={styles.reviewImage}
                     />

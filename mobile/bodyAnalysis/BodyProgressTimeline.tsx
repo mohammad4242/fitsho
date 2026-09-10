@@ -214,6 +214,7 @@ function TimelineItem({
               <Image
                 accessibilityLabel="آخرین عکس پیشرفت"
                 accessibilityIgnoresInvertColors
+                resizeMode="contain"
                 source={{ uri: latestPhotoUri }}
                 style={styles.latestImage}
               />

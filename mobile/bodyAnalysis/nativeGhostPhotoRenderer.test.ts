@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 
 const { createBlankImage, loadFromFileAsync } = vi.hoisted(() => ({
   createBlankImage: vi.fn(),
@@ -10,9 +10,72 @@ vi.mock("react-native-nitro-image", () => ({
   Images: { createBlankImage, loadFromFileAsync },
 }));
 
+import { ghostPrivacyLineGeometry } from "@fitician/core/body-ghost";
 import { GHOST_EDITOR_DEFAULT_TRANSFORM } from "@fitician/core/body-ghost-editor";
 
 import { renderNativeGhostPhoto } from "./nativeGhostPhotoRenderer";
+
+const savedMarkerImages = new Map<string, MarkerImage>();
+
+type Marker = "above" | "boundary" | "below";
+
+class MarkerImage {
+  readonly height: number;
+  readonly width: number;
+  private readonly markerSource: MarkerImage | null;
+  private readonly originY: number;
+  private readonly drawHeight: number;
+  private readonly boundarySourceY: number;
+
+  constructor(
+    width: number,
+    height: number,
+    options: {
+      boundarySourceY?: number;
+      drawHeight?: number;
+      markerSource?: MarkerImage | null;
+      originY?: number;
+    } = {},
+  ) {
+    this.width = width;
+    this.height = height;
+    this.boundarySourceY = options.boundarySourceY ?? 0;
+    this.drawHeight = options.drawHeight ?? height;
+    this.markerSource = options.markerSource ?? null;
+    this.originY = options.originY ?? 0;
+  }
+
+  async renderIntoAsync(
+    source: MarkerImage,
+    x: number,
+    y: number,
+    right: number,
+    bottom: number,
+  ): Promise<MarkerImage> {
+    return new MarkerImage(right - x, bottom - y, {
+      boundarySourceY: source.boundarySourceY,
+      drawHeight: bottom - y,
+      markerSource: source,
+      originY: y,
+    });
+  }
+
+  async saveToTemporaryFileAsync(): Promise<string> {
+    const path = `/cache/body-photo-marker-${savedMarkerImages.size}.jpg`;
+    savedMarkerImages.set(path, this);
+    return path;
+  }
+
+  markerAt(outputY: number): Marker {
+    if (this.markerSource === null) return "above";
+    const sourceY = Math.floor(
+      ((outputY - this.originY) * this.markerSource.height) / this.drawHeight,
+    );
+    if (sourceY < this.boundarySourceY - 2) return "above";
+    if (sourceY <= this.boundarySourceY + 2) return "boundary";
+    return "below";
+  }
+}
 
 function createImage(overrides: Record<string, unknown> = {}) {
   return {
@@ -28,6 +91,11 @@ function createImage(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  savedMarkerImages.clear();
+});
 
 it("renders the transformed photo into a private JPEG on Android", async () => {
   const source = createImage();
@@ -98,4 +166,49 @@ it("uses the female neck crop for the selected view", async () => {
     false,
     expect.any(Object),
   );
+});
+
+it.each([
+  ["male", "front", 1, false, 192, 1656],
+  ["male", "side", 1, false, 192, 1656],
+  ["male", "back", 1, false, 192, 1656],
+  ["female", "front", 1, false, 108, 1719],
+  ["female", "side", 1, false, 144, 1692],
+  ["female", "back", 1, false, 132, 1701],
+  ["male", "side", 1.1, true, 91, 1732],
+] as const)("keeps the privacy boundary as the first native JPEG row for %s/%s scale %s", async (
+  variant,
+  view,
+  ghostScale,
+  mirrored,
+  boundarySourceY,
+  expectedHeight,
+) => {
+  const source = new MarkerImage(1600, 2400, { boundarySourceY });
+  const canvas = new MarkerImage(1200, expectedHeight);
+  loadFromFileAsync.mockResolvedValue(source);
+  createBlankImage.mockReturnValue(canvas);
+
+  const rightLine = ghostPrivacyLineGeometry(view, ghostScale, false, variant);
+  const visibleLine = ghostPrivacyLineGeometry(view, ghostScale, mirrored, variant);
+  expect(visibleLine.anchor.y).toBe(rightLine.anchor.y);
+
+  const output = await renderNativeGhostPhoto({
+    height: 2400,
+    source: "library",
+    uri: "file:///cache/source-marker.jpg",
+    width: 1600,
+    transform: GHOST_EDITOR_DEFAULT_TRANSFORM,
+    view,
+    ghostScale,
+    ghostVariant: variant,
+  });
+  const rendered = savedMarkerImages.get(output.uri.replace("file://", ""));
+
+  expect(rendered).toBeDefined();
+  expect(rendered?.markerAt(0)).toBe("boundary");
+  expect(rendered?.markerAt(4)).toBe("below");
+  for (let row = 0; row < output.height; row += 1) {
+    expect(rendered?.markerAt(row)).not.toBe("above");
+  }
 });
