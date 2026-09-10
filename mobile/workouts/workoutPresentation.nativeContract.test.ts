@@ -154,34 +154,22 @@ it("keeps each exercise as one roomy detail action", async () => {
   expect(row).not.toContain('label="راهنما"');
 });
 
-it("keeps workout media first in the existing RTL row containers", async () => {
+it("keeps workout media first inside the RTL screen hierarchy", async () => {
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
-  const daySummary = source.slice(source.indexOf("daySummary:"), source.indexOf("durationBadge:"));
-  const exerciseRow = source.slice(source.indexOf("exerciseRow:"), source.indexOf("readOnlyAlternatives:"));
 
-  expect(daySummary).toContain('flexDirection: "row"');
-  expect(daySummary).not.toContain('flexDirection: "row-reverse"');
-  expect(exerciseRow).toContain('flexDirection: "row"');
-  expect(exerciseRow).not.toContain('flexDirection: "row-reverse"');
+  expect(source).toMatch(/<Screen contentWidth="reading"/);
+  expect(source).toContain('writingDirection: "rtl"');
+  expect(source).toMatch(/<View style=\{styles\.exerciseRow\}>[\s\S]*?<ExerciseMedia[\s\S]*?<View style=\{styles\.exerciseCopy\}>/);
 });
 
 it("uses native RTL ordering for workout summaries and actions", async () => {
   const plansSource = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
   const cycleSource = await readFile(new URL("./WorkoutCyclePanel.tsx", import.meta.url), "utf8");
 
-  for (const styleName of ["contextStrip", "pageHeader", "reviewBanner", "scheduleHeading", "exerciseAction", "exerciseStat", "exerciseStatsRow", "historyRow"]) {
-    const style = plansSource.slice(plansSource.indexOf(`${styleName}:`), plansSource.indexOf(`${styleName}:`) + 240);
-    expect(style).toContain('flexDirection: "row"');
-    expect(style).not.toContain('flexDirection: "row-reverse"');
-  }
-  expect(plansSource).toContain('alignSelf: "flex-start"');
-  expect(plansSource).not.toContain('alignSelf: "flex-end"');
-
-  for (const styleName of ["choiceRow", "formHeading", "summaryHeading", "summaryMetrics"]) {
-    const style = cycleSource.slice(cycleSource.indexOf(`${styleName}:`), cycleSource.indexOf(`${styleName}:`) + 220);
-    expect(style).toContain('flexDirection: "row"');
-    expect(style).not.toContain('flexDirection: "row-reverse"');
-  }
+  expect(plansSource).toMatch(/<Screen contentWidth="reading"/);
+  expect(cycleSource).toContain('writingDirection: "rtl"');
+  expect(plansSource).toContain('name={expanded ? "chevronUp" : "chevronDown"}');
+  expect(plansSource).toContain('textAlign: "right"');
 });
 
 it("shows alternatives independently of executability and keeps the web action order", async () => {

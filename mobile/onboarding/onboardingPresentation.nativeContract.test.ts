@@ -70,5 +70,7 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(publicAccountSource).toMatch(/sendPhoneOtp/);
   expect(publicAccountSource).toMatch(/verifyPhoneOtp/);
   expect(publicAccountSource).toMatch(/signInWithGoogle/);
-  expect(source).not.toMatch(/flexDirection: "row-reverse"/);
+  expect(source).toMatch(/<Screen/);
+  expect(source).toContain('textAlign: "right"');
+  expect(source).toContain('writingDirection: "rtl"');
 });

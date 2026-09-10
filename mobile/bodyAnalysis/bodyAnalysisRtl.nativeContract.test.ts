@@ -17,15 +17,15 @@ const bodyAnalysisFiles = [
   "BodyProgressTimeline.tsx",
 ] as const;
 
-it("keeps body-analysis layout on native RTL primitives", async () => {
+it("keeps body-analysis media unmirrored and text direction local", async () => {
   const sources = await Promise.all(
     bodyAnalysisFiles.map((file) => readFile(new URL(`./${file}`, import.meta.url), "utf8")),
   );
 
-  for (const source of sources) {
-    expect(source).not.toContain('flexDirection: "row-reverse"');
-    expect(source).not.toContain('alignItems: "flex-end"');
-  }
+  const combinedSource = sources.join("\n");
+  expect(combinedSource).not.toMatch(/scaleX:\s*-1/);
+  expect(combinedSource).toContain('writingDirection: "rtl"');
+  expect(combinedSource).toContain('writingDirection: "ltr"');
 });
 
 it("keeps the Body Analysis product mark explicitly LTR", async () => {

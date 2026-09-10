@@ -74,11 +74,11 @@ it("keeps exercise catalogue and detail rows on native RTL ordering", async () =
   const detailSource = await readFile(new URL("./ExerciseDetailScreen.tsx", import.meta.url), "utf8");
   const genderSource = await readFile(new URL("./GenderMediaSelector.tsx", import.meta.url), "utf8");
 
-  expect(catalogSource).not.toContain('flexDirection: "row-reverse"');
-  expect(catalogSource).not.toContain('alignItems: "flex-end"');
-  expect(detailSource).not.toContain('flexDirection: "row-reverse"');
-  expect(detailSource).not.toContain('alignItems: "flex-end"');
-  expect(genderSource).not.toContain('flexDirection: "row-reverse"');
+  expect(catalogSource).toMatch(/<Screen contentWidth="reading"/);
+  expect(detailSource).toMatch(/<Screen contentWidth="reading"/);
+  expect(catalogSource).toContain('writingDirection: "rtl"');
+  expect(detailSource).toContain('writingDirection: "rtl"');
+  expect(genderSource).toContain('justifyContent: "center"');
   expect(detailSource).toContain('direction={language === "en" ? "ltr" : "rtl"}');
   expect(detailSource).toContain('language === "en" ? (');
 });

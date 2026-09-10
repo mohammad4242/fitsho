@@ -26,15 +26,13 @@ it("keeps the native coach workflow online-write gated and revision-aware", asyn
 it("keeps coach review layout logical for native RTL", async () => {
   const source = await readFile(new URL("./CoachWorkoutReviewScreen.tsx", import.meta.url), "utf8");
 
-  expect(source).not.toContain('flexDirection: "row-reverse"');
-  expect(source).not.toContain('alignItems: "flex-end"');
-  expect(source).toMatch(/dayHeader: \{[^}]*flexDirection: "row"/);
-  expect(source).toMatch(/leaseCard: \{[^}]*flexDirection: "row"/);
-  expect(source).toMatch(/memberIdentity: \{[^}]*flexDirection: "row"/);
-  expect(source).toMatch(/profileStrip: \{ flexDirection: "row"/);
-  expect(source).toMatch(/templateSlug:\s*\{[\s\S]*?flexDirection: "row"/);
-  expect(source).toMatch(/versionLabels: \{ flexDirection: "row"/);
+  expect(source).toMatch(/<Screen contentWidth="reading">/);
+  expect(source).toContain('textAlign: "right"');
+  expect(source).toContain('writingDirection: "rtl"');
   expect(source).toMatch(
     /<View style=\{styles\.dayHeader\}>\s*<Text style=\{styles\.dayTitle\}>[\s\S]*?<Text style=\{styles\.dayNumber\}>/,
+  );
+  expect(source).toMatch(
+    /<View style=\{styles\.headerCopy\}>[\s\S]*?<View style=\{styles\.memberIdentity\}>[\s\S]*?<Text style=\{styles\.detailTitle\}>/,
   );
 });
