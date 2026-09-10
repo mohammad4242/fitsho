@@ -21,9 +21,9 @@ const nutritionRingColors: Record<NutritionProgressTone, string> = {
 export function NutritionSummaryCard({ error = false, loading, summary }: NutritionSummaryCardProps) {
   const router = useRouter();
   const hasTarget = summary.targetCalories !== null;
-  const consumed = summary.consumedCalories;
-  const aboveTargetCalories = consumed !== null && summary.targetCalories !== null
-    ? Math.max(0, consumed - summary.targetCalories)
+  const aboveExpenditureCalories = summary.targetCalories !== null
+    && summary.estimatedDailyExpenditureCalories !== null
+    ? Math.max(0, summary.targetCalories - summary.estimatedDailyExpenditureCalories)
     : 0;
 
   if (loading && !hasTarget) return <StateSkeleton variant="card" />;
@@ -50,13 +50,9 @@ export function NutritionSummaryCard({ error = false, loading, summary }: Nutrit
           <>
             <View style={styles.calorieRow}>
               <View style={styles.calorieValues}>
-                {consumed !== null ? (
-                  <CalorieMetric label="مصرف امروز" value={consumed} />
-                ) : null}
                 <CalorieMetric
                   label="هدف کالری روزانه"
                   value={summary.targetCalories ?? 0}
-                  withDivider={consumed !== null}
                 />
                 {summary.estimatedDailyExpenditureCalories !== null ? (
                   <CalorieMetric
@@ -74,8 +70,8 @@ export function NutritionSummaryCard({ error = false, loading, summary }: Nutrit
                 progress={summary.progress}
               />
             </View>
-            {aboveTargetCalories > 0 ? (
-              <Text style={styles.overageText}>{formatNumber(aboveTargetCalories)} کالری بیشتر از هدف روزانه</Text>
+            {aboveExpenditureCalories > 0 ? (
+              <Text style={styles.overageText}>{formatNumber(aboveExpenditureCalories)} کالری بالاتر از مصرف تقریبی روزانه</Text>
             ) : null}
             <MetricStrip
               items={[

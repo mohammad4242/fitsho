@@ -42,7 +42,7 @@ test("renders calorie progress as a real accessible metric ring", () => {
         consumedCalories: 750,
         estimatedDailyExpenditureCalories: 2557,
         fat: 62,
-        progress: 0.375,
+        progress: 2000 / 2557,
         protein: 130,
         status: "on_plan",
         targetCalories: 2000,
@@ -51,7 +51,7 @@ test("renders calorie progress as a real accessible metric ring", () => {
   );
 
   expect(screen.getByRole("progressbar", { name: "پیشرفت کالری امروز" }).props.accessibilityValue)
-    .toEqual({ max: 100, min: 0, now: 38 });
+    .toEqual({ max: 100, min: 0, now: 78 });
   expect(screen.UNSAFE_getAllByType(Circle)).toHaveLength(2);
   fireEvent.press(screen.getByRole("button", { name: "نمایش جزئیات تغذیه" }));
   expect(mockPush).toHaveBeenCalledWith("/member/nutrition");
@@ -77,7 +77,7 @@ test("keeps the nutrition summary on the quiet web card surface", () => {
   expect(screen.UNSAFE_queryAllByType(CinematicSurface)).toHaveLength(0);
 });
 
-test("shows tracked calories beside the daily calorie goal", () => {
+test("shows target calories and estimated expenditure without tracked calories", () => {
   render(
     <NutritionSummaryCard
       loading={false}
@@ -94,8 +94,8 @@ test("shows tracked calories beside the daily calorie goal", () => {
     />,
   );
 
-  expect(screen.getByText("۷۵۰")).toBeTruthy();
-  expect(screen.getByText("مصرف امروز")).toBeTruthy();
+  expect(screen.queryByText("۷۵۰")).toBeNull();
+  expect(screen.queryByText("مصرف امروز")).toBeNull();
   expect(screen.getByText("۲٬۰۰۰")).toBeTruthy();
   expect(screen.getByText("هدف کالری روزانه")).toBeTruthy();
   expect(screen.getByText("۲٬۵۵۷")).toBeTruthy();
@@ -112,7 +112,7 @@ test("omits estimated daily expenditure when the estimate has no TDEE", () => {
         consumedCalories: 750,
         estimatedDailyExpenditureCalories: null,
         fat: 62,
-        progress: 0.375,
+        progress: 2000 / 2557,
         protein: 130,
         status: "on_plan",
         targetCalories: 2000,
@@ -194,25 +194,25 @@ test("uses blue at the exact 60 percent nutrition progress boundary", () => {
   expect(screen.UNSAFE_getAllByType(Circle)[1].props.stroke).toBe(fiticianTokens.colors.blue);
 });
 
-test("uses danger at 90 percent and explains intake above target", () => {
+test("uses danger for a gain target above estimated expenditure", () => {
   render(
     <NutritionSummaryCard
       loading={false}
       summary={{
         carbohydrate: 180,
         consumedCalories: 2200,
-        estimatedDailyExpenditureCalories: 2557,
+        estimatedDailyExpenditureCalories: 2400,
         fat: 62,
-        progress: 1.1,
+        progress: 1.25,
         protein: 130,
         status: "off_plan",
-        targetCalories: 2000,
+        targetCalories: 3000,
       }}
     />,
   );
 
   expect(screen.UNSAFE_getAllByType(Circle)[1].props.stroke).toBe(fiticianTokens.colors.danger);
-  expect(screen.getByText("۲۰۰ کالری بیشتر از هدف روزانه")).toBeTruthy();
+  expect(screen.getByText("۶۰۰ کالری بالاتر از مصرف تقریبی روزانه")).toBeTruthy();
   expect(screen.getByRole("progressbar", { name: "پیشرفت کالری امروز" }).props.accessibilityValue)
     .toEqual({ max: 100, min: 0, now: 100 });
 });

@@ -60,7 +60,7 @@ it("selects the first real workout day without changing plan data", () => {
   expect(day?.exercises[0]?.exercise.media_path).toBe("/media/push-up.gif");
 });
 
-it("prefers daily plan totals and actual tracking while preserving safe fallbacks", () => {
+it("prefers daily plan totals and calculates progress from target versus TDEE", () => {
   const summary = nutritionSummary(
     {
       days: [{
@@ -97,7 +97,7 @@ it("prefers daily plan totals and actual tracking while preserving safe fallback
   expect(summary.targetCalories).toBe(2200);
   expect(summary.estimatedDailyExpenditureCalories).toBe(2557);
   expect(summary.consumedCalories).toBe(880);
-  expect(summary.progress).toBeCloseTo(0.4);
+  expect(summary.progress).toBeCloseTo(2200 / 2557);
   expect(summary.protein).toBe(64);
   expect(summary.carbohydrate).toBe(90);
   expect(summary.fat).toBe(22);
@@ -136,13 +136,21 @@ it("returns an empty nutrition state when neither plan nor estimate exists", () 
   });
 });
 
-it("keeps gain and loss nutrition progress target-relative and preserves over-target intake", () => {
+it("keeps gain and loss nutrition progress independent from tracked intake", () => {
+  const estimate = {
+    targets: {
+      tdee: { preferred: 2400 },
+      protein: { preferred: 145 },
+      carbohydrate: { preferred: 240 },
+      total_fat: { preferred: 70 },
+    },
+  } as never;
   const gainSummary = nutritionSummary(
     {
       days: [{ nutrient_totals: { energy_kcal: 3_000 }, plan_date: "2026-09-09" }],
       physician_approved: true,
     } as never,
-    null,
+    estimate,
     {
       actual_totals: { energy_kcal: 1_800 },
       check_in_status: null,
@@ -156,7 +164,7 @@ it("keeps gain and loss nutrition progress target-relative and preserves over-ta
       days: [{ nutrient_totals: { energy_kcal: 1_800 }, plan_date: "2026-09-09" }],
       physician_approved: true,
     } as never,
-    null,
+    estimate,
     {
       actual_totals: { energy_kcal: 2_000 },
       check_in_status: null,
@@ -166,6 +174,6 @@ it("keeps gain and loss nutrition progress target-relative and preserves over-ta
     "2026-09-09",
   );
 
-  expect(gainSummary.progress).toBeCloseTo(0.6);
-  expect(lossSummary.progress).toBeCloseTo(1.111111);
+  expect(gainSummary.progress).toBeCloseTo(3000 / 2400);
+  expect(lossSummary.progress).toBeCloseTo(1800 / 2400);
 });
