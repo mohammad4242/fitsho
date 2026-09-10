@@ -34,15 +34,25 @@ export function nextLocalBodyPhotoView(
   ]);
 }
 
+export function pendingLocalBodyPhotoViews(
+  session: BodyPhotoSession,
+  localViews: Iterable<BodyPhotoView>,
+): BodyPhotoView[] {
+  const uploadedViews = new Set(session.photos.map((photo) => photo.view));
+  const localViewSet = new Set(localViews);
+  return ( ["front", "side", "back"] as const).filter((view) => (
+    localViewSet.has(view) && !uploadedViews.has(view)
+  ));
+}
+
 export function draftForCapturedBodyPhoto(
   draft: BodyPhotoFlowDraft,
   view: BodyPhotoView,
   nextView: BodyPhotoView | null,
-  captureMode: BodyPhotoFlowDraft["capture_mode"],
 ): BodyPhotoFlowDraft {
   return {
     ...draft,
-    capture_mode: captureMode,
+    capture_mode: "library",
     current_view: nextView ?? view,
     updated_at: Date.now(),
   };

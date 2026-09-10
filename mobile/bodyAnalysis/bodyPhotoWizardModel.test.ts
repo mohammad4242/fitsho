@@ -8,6 +8,7 @@ import {
   draftForCapturedBodyPhoto,
   isResumableBodyPhotoSession,
   nextLocalBodyPhotoView,
+  pendingLocalBodyPhotoViews,
 } from "./bodyPhotoWizardModel";
 
 function session(state: BodyPhotoSession["state"]): BodyPhotoSession {
@@ -48,9 +49,23 @@ it("advances local captures while honoring views already on the server", () => {
 
 it("keeps an uncaptured current view in the persisted draft for safe resume", () => {
   const draft = createBodyPhotoFlowDraft("initial_plan", "session-1");
-  const next = draftForCapturedBodyPhoto(draft, "front", "side", "library");
+  const next = draftForCapturedBodyPhoto(draft, "front", "side");
 
   expect(next.current_view).toBe("side");
   expect(next.capture_mode).toBe("library");
   expect(JSON.stringify(next)).not.toMatch(/uri|bytes|base64|pixels/i);
+});
+
+it("returns to the web upload mode after a camera capture", () => {
+  const draft = createBodyPhotoFlowDraft("initial_plan", "session-1");
+  const next = draftForCapturedBodyPhoto(draft, "front", "side");
+
+  expect(next.capture_mode).toBe("library");
+});
+
+it("orders any legacy local uploads as front, side, then back", () => {
+  const existing = session("draft");
+  existing.photos.push({ view: "side" } as BodyPhotoSession["photos"][number]);
+
+  expect(pendingLocalBodyPhotoViews(existing, ["back", "front"])).toEqual(["front", "back"]);
 });

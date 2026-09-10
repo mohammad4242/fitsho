@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import type { BodyPhotoView } from "@fitician/core/body-photos";
+
 jest.mock("expo-file-system", () => ({ File: class {} }));
 jest.mock("expo-secure-store", () => ({
   deleteItemAsync: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -11,7 +13,37 @@ jest.mock("expo-secure-store", () => ({
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("../auth/MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
-jest.mock("./BodyPhotoCapture", () => ({ BodyPhotoCapture: () => null }));
+jest.mock("./BodyPhotoCapture", () => {
+  const { Button } = jest.requireActual("../ui/components") as typeof import("../ui/components");
+  return {
+    BodyPhotoCapture: ({
+      onCaptured,
+      view,
+    }: {
+      readonly onCaptured: (asset: {
+        readonly height: number;
+        readonly mimeType: "image/jpeg";
+        readonly privacyCropApplied: true;
+        readonly source: "library";
+        readonly uri: string;
+        readonly width: number;
+      }) => void | Promise<void>;
+      readonly view: BodyPhotoView;
+    }) => (
+      <Button
+        label={`تأیید ${view}`}
+        onPress={() => void onCaptured({
+          height: 1920,
+          mimeType: "image/jpeg",
+          privacyCropApplied: true,
+          source: "library",
+          uri: `file:///encoded-${view}.jpg`,
+          width: 1280,
+        })}
+      />
+    ),
+  };
+});
 jest.mock("./bodyPhotoApi", () => ({ createBodyPhotoApi: jest.fn() }));
 jest.mock("../profile/profileApi", () => ({ createProfileApi: jest.fn() }));
 
@@ -45,8 +77,21 @@ const createdSession = {
 };
 
 type CreateSession = (purpose: string) => Promise<typeof createdSession>;
+type UploadPhoto = (
+  sessionId: string,
+  view: BodyPhotoView,
+  asset: {
+    readonly height: number;
+    readonly mimeType: "image/jpeg";
+    readonly privacyCropApplied: true;
+    readonly source: "library";
+    readonly uri: string;
+    readonly width: number;
+  },
+) => Promise<typeof createdSession>;
 
 let createSession: jest.Mock<CreateSession>;
+let uploadPhoto: jest.Mock<UploadPhoto>;
 
 function renderWizard() {
   return render(
@@ -58,13 +103,14 @@ function renderWizard() {
 
 beforeEach(() => {
   createSession = jest.fn<CreateSession>().mockResolvedValue(createdSession);
+  uploadPhoto = jest.fn<UploadPhoto>().mockResolvedValue(createdSession);
   mockUseMobileAuth.mockReturnValue({
     download: jest.fn(),
     request: jest.fn(),
     upload: jest.fn(),
     user: { id: "user-1" },
   } as never);
-  mockCreateBodyPhotoApi.mockReturnValue({ createSession } as never);
+  mockCreateBodyPhotoApi.mockReturnValue({ createSession, uploadPhoto } as never);
   mockCreateProfileApi.mockReturnValue({
     getProfile: jest.fn<() => Promise<typeof profile>>().mockResolvedValue(profile),
   } as never);
@@ -86,4 +132,35 @@ test("requires current measurements before starting a secure body-analysis sessi
   fireEvent.press(screen.getByLabelText("ذخیره و ادامه"));
 
   await waitFor(() => expect(createSession).toHaveBeenCalledWith("initial_plan"));
+});
+
+test("uploads each confirmed view before advancing to the next web view", async () => {
+  const uploadedViews: BodyPhotoView[] = [];
+  uploadPhoto.mockImplementation(async (_sessionId, view) => {
+    uploadedViews.push(view);
+    return {
+      ...createdSession,
+      photos: uploadedViews.map((uploadedView) => ({ view: uploadedView })),
+    } as typeof createdSession;
+  });
+
+  renderWizard();
+  fireEvent(await screen.findByLabelText("تأیید می‌کنم این اندازه‌ها برای همین جلسه عکس فعلی هستند"), "valueChange", true);
+  fireEvent.press(await screen.findByLabelText("ذخیره و ادامه"));
+
+  fireEvent.press(await screen.findByLabelText("تأیید front"));
+  await waitFor(() => expect(uploadPhoto).toHaveBeenCalledWith(
+    "body-session-1",
+    "front",
+    expect.objectContaining({ uri: "file:///encoded-front.jpg" }),
+  ));
+  expect(await screen.findByLabelText("تأیید side")).toBeTruthy();
+
+  fireEvent.press(screen.getByLabelText("تأیید side"));
+  await waitFor(() => expect(uploadedViews).toEqual(["front", "side"]));
+  expect(await screen.findByLabelText("تأیید back")).toBeTruthy();
+
+  fireEvent.press(screen.getByLabelText("تأیید back"));
+  await waitFor(() => expect(uploadedViews).toEqual(["front", "side", "back"]));
+  expect(await screen.findByText("تصاویر را مرور کن")).toBeTruthy();
 });

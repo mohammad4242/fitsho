@@ -31,6 +31,7 @@ import {
   draftForCapturedBodyPhoto,
   isResumableBodyPhotoSession,
   nextLocalBodyPhotoView,
+  pendingLocalBodyPhotoViews,
 } from "./bodyPhotoWizardModel";
 
 export interface BodyAnalysisWizardProps {
@@ -205,12 +206,13 @@ export function BodyAnalysisWizard({
       draft,
       activeView,
       nextView,
-      asset.source,
     );
+    const uploaded = await api.uploadPhoto(session.id, activeView, asset);
     const previous = capturedAssets[activeView];
     if (previous !== undefined && previous.uri !== asset.uri) deleteLocalFile(previous.uri);
     await draftStore.save(userId, nextDraft);
     setCapturedAssets((current) => ({ ...current, [activeView]: asset }));
+    setSession(uploaded);
     setDraft(nextDraft);
     setActiveView(nextView);
     setPhase(nextView === null ? "review" : "capture");
@@ -223,10 +225,7 @@ export function BodyAnalysisWizard({
 
   async function submitAnalysis() {
     if (session === null || !complete || !operationalConsent || phase === "submitting") return;
-    const pendingViews = (Object.keys(capturedAssets) as BodyPhotoView[]).filter((view) => (
-      capturedAssets[view] !== undefined
-      && !session.photos.some((photo) => photo.view === view)
-    ));
+    const pendingViews = pendingLocalBodyPhotoViews(session, Object.keys(capturedAssets).filter(isBodyPhotoView));
     setPhase("submitting");
     setError(null);
     setUploadProgress({ activeView: null, completed: 0, total: pendingViews.length });
