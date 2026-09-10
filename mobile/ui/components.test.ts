@@ -49,6 +49,7 @@ import { Dialog, Sheet } from "./components/Overlay";
 import { FormField, TextField } from "./components/Input";
 import { Media } from "./components/Media";
 import { Notice, Skeleton } from "./components/Feedback";
+import { ProgressBar } from "./components/ProgressBar";
 
 function element(value: unknown): NativeElement {
   let current = value as { type: unknown; props: Record<string, unknown> };
@@ -155,6 +156,12 @@ it("infers LTR for technical fields when callers omit a direction", () => {
     textAlign: "left",
     writingDirection: "ltr",
   });
+});
+
+it("anchors shared progress bars to the RTL start edge", () => {
+  const progress = element(ProgressBar({ label: "پیشرفت", progress: 0.5 }));
+
+  expect(flattenStyle(progress.props.style)).toMatchObject({ direction: "rtl" });
 });
 
 it("preserves font scaling and source order for the shared button label", () => {

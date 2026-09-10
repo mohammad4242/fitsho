@@ -1,5 +1,6 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
+import { RTL_LAYOUT } from "../rtl";
 import { fiticianTokens } from "../tokens";
 
 export interface ProgressBarProps {
@@ -17,7 +18,7 @@ export function ProgressBar({ color = fiticianTokens.colors.aqua, label, progres
       accessibilityLabel={label}
       accessibilityRole="progressbar"
       accessibilityValue={{ max: 100, min: 0, now: Math.round(clampedProgress * 100) }}
-      style={[styles.track, style]}
+      style={[styles.track, RTL_LAYOUT, style]}
     >
       <View style={[styles.fill, { backgroundColor: color, width: `${clampedProgress * 100}%` }]} />
     </View>
