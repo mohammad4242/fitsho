@@ -8,6 +8,7 @@ import type {
   BodyPhoto,
   BodyPhotoSession,
   BodyProgressComparison,
+  BodyProgressTimelineItem,
 } from "@fitician/core/body-photos";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
@@ -24,8 +25,8 @@ import {
 import { Screen } from "../ui/layout";
 import { fiticianTokens } from "../ui/tokens";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
-import { BodyAnalysisMuscleSection } from "./BodyAnalysisMuscleSection";
-import { BodyAnalysisOverviewCard } from "./BodyAnalysisOverviewCard";
+import { BodyAnalysisExperienceTabs } from "./BodyAnalysisExperienceTabs";
+import { bodyPhotoCopy } from "./bodyAnalysisCopy";
 import { bodyAreaLabel } from "./bodyAnalysisPresentation";
 import {
   createPrivateBodyPhotoClient,
@@ -55,6 +56,7 @@ export function BodyAnalysisResultScreen() {
   const [session, setSession] = useState<BodyPhotoSession | null>(null);
   const [analysis, setAnalysis] = useState<BodyAnalysis | null>(null);
   const [comparison, setComparison] = useState<BodyProgressComparison | null>(null);
+  const [progressItems, setProgressItems] = useState<readonly BodyProgressTimelineItem[]>([]);
   const [photoUris, setPhotoUris] = useState<Partial<Record<BodyPhoto["view"], string>>>({});
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -70,9 +72,10 @@ export function BodyAnalysisResultScreen() {
     setLoading(true);
     setFailed(false);
     try {
-      const [loadedSession, loadedAnalysis] = await Promise.all([
+      const [loadedSession, loadedAnalysis, loadedTimeline] = await Promise.all([
         api.getSession(sessionId),
         api.getAnalysis(sessionId),
+        api.getTimeline().catch(() => null),
       ]);
       let effectiveAnalysis = loadedAnalysis;
       if (effectiveAnalysis === null && loadedSession.state === "queued") {
@@ -84,6 +87,7 @@ export function BodyAnalysisResultScreen() {
       }
       setSession(loadedSession);
       setAnalysis(effectiveAnalysis);
+      setProgressItems(loadedTimeline?.items ?? []);
       setComparison(await api.getComparison(sessionId).catch(() => null));
       setFailed(false);
       if (mediaClient !== null) {
@@ -167,9 +171,9 @@ export function BodyAnalysisResultScreen() {
       <View style={styles.content}>
         <PageHeading
           action={<Button label="تاریخچه" onPress={() => router.replace("/member/body-analysis-history")} style={styles.headerAction} variant="ghost" />}
-          eyebrow="تحلیل بدن"
-          supportingText={`جلسه ثبت‌شده در ${formatSessionDate(session.created_at)} · وضعیت: ${sessionStatusLabel(session.state)}`}
-          title="تحلیل بدن"
+          eyebrow={bodyPhotoCopy.eyebrow}
+          supportingText={`${bodyPhotoCopy.results.sessionDate.replace("{{date}}", formatSessionDate(session.created_at))} · وضعیت: ${sessionStatusLabel(session.state)}`}
+          title={bodyPhotoCopy.results.title}
         />
         {analysis === null ? (
           <Notice message="تحلیل این جلسه هنوز آغاز نشده است." variant="info" />
@@ -190,15 +194,17 @@ export function BodyAnalysisResultScreen() {
           <Button disabled={actionBusy} label="تلاش دوباره" loading={actionBusy} onPress={() => void retry()} />
         ) : null}
         {analysis?.experience_result !== null && analysis?.experience_result !== undefined ? (
-          <>
-            <BodyAnalysisOverviewCard experience={analysis.experience_result} />
-            <BodyAnalysisMuscleSection experience={analysis.experience_result} />
-          </>
+          <BodyAnalysisExperienceTabs
+            experience={analysis.experience_result}
+            progressItems={progressItems}
+            progressSessionId={analysis.session_id}
+            review={<ReviewStatusCard analysis={analysis} />}
+          />
         ) : analysis?.normalized_result !== null && analysis?.normalized_result !== undefined ? (
           <NormalizedResult analysis={analysis} />
         ) : null}
-        {analysis !== null && hasAnalysisResult(analysis) ? <ReviewStatusCard analysis={analysis} /> : null}
-        {comparison !== null ? <BodyProgressComparisonCard comparison={comparison} /> : null}
+        {analysis !== null && hasAnalysisResult(analysis) && !hasExperienceResult(analysis) ? <ReviewStatusCard analysis={analysis} /> : null}
+        {comparison !== null && !hasExperienceResult(analysis) ? <BodyProgressComparisonCard comparison={comparison} /> : null}
         {analysis !== null && hasAnalysisResult(analysis) ? (
           <PrivacyDisclaimer />
         ) : null}
@@ -418,6 +424,10 @@ function hasAnalysisResult(analysis: BodyAnalysis): boolean {
     (analysis.experience_result !== null && analysis.experience_result !== undefined)
     || analysis.normalized_result !== null
   );
+}
+
+function hasExperienceResult(analysis: BodyAnalysis | null): boolean {
+  return analysis?.experience_result !== null && analysis?.experience_result !== undefined;
 }
 
 function resultSourceLabel(source: BodyAnalysis["result_source"]): string {

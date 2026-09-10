@@ -7,6 +7,7 @@ import type {
   BodyAnalysisExperienceV4,
   BodyPhotoSession,
   BodyProgressComparison,
+  BodyProgressTimelineResponse,
 } from "@fitician/core/body-photos";
 
 jest.mock("expo-router", () => ({ useLocalSearchParams: jest.fn(), useRouter: jest.fn() }));
@@ -23,6 +24,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
 import { createBodyPhotoApi } from "./bodyPhotoApi";
+import { bodyAnalysisCopy } from "./bodyAnalysisCopy";
 import { BodyAnalysisResultScreen } from "./BodyAnalysisResultScreen";
 
 const mockUseLocalSearchParams = jest.mocked(useLocalSearchParams);
@@ -162,6 +164,7 @@ beforeEach(() => {
     getSession: jest.fn<() => Promise<BodyPhotoSession>>().mockResolvedValue(session),
     getAnalysis: jest.fn<() => Promise<BodyAnalysis | null>>().mockResolvedValue(analysis),
     getComparison: jest.fn<() => Promise<BodyProgressComparison | null>>().mockResolvedValue(comparison),
+    getTimeline: jest.fn<() => Promise<BodyProgressTimelineResponse>>().mockResolvedValue({ schema_version: "1.0", items: [] }),
   } as never);
   mockReplace.mockClear();
 });
@@ -170,17 +173,25 @@ test("follows the Web result story with real metrics, findings, reviews, and com
   renderResult();
 
   expect(await screen.findByRole("header", { name: "تحلیل بدن" })).toBeTruthy();
+  const overviewTab = screen.getByRole("tab", { name: bodyAnalysisCopy.tabs.overview });
+  const musclesTab = screen.getByRole("tab", { name: bodyAnalysisCopy.tabs.muscles });
+  const progressTab = screen.getByRole("tab", { name: bodyAnalysisCopy.tabs.progress });
+  expect(overviewTab.props.accessibilityState?.selected).toBe(true);
   expect(screen.getByText("درصد چربی تخمینی")).toBeTruthy();
   expect(screen.getByText("شاخص‌های بصری بدن")).toBeTruthy();
+
+  fireEvent.press(musclesTab);
   expect(screen.getByRole("header", { name: "یافته‌های همین تحلیل" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "سرشانه" })).toBeTruthy();
   expect(screen.getAllByText("بازوها").length).toBeGreaterThan(0);
-  expect(screen.getByRole("header", { name: "بازبینی متخصصان" })).toBeTruthy();
-  expect(screen.getByRole("header", { name: "مقایسه پیشرفت" })).toBeTruthy();
-  expect(screen.queryByText("نسخه نتیجه")).toBeNull();
-
   fireEvent.press(screen.getByRole("button", { name: "سرشانه" }));
   expect(screen.getByText(/نسبت به بقیه بدنت عقب‌تره/)).toBeTruthy();
+
+  fireEvent.press(progressTab);
+  expect(screen.getByRole("header", { name: "روند تغییرات بدن" })).toBeTruthy();
+  expect(screen.getByText("اولین اسکن شما ثبت شد")).toBeTruthy();
+  expect(screen.getByRole("header", { name: "بازبینی متخصصان" })).toBeTruthy();
+  expect(screen.queryByText("نسخه نتیجه")).toBeNull();
 
   expect(screen.getByText(/این بررسی توسط AI انجام شده/)).toBeTruthy();
 });
