@@ -56,7 +56,7 @@ it("defines the public, auth, onboarding, account, member, coach, and physician 
     "(member)/member/food-catalogue.tsx",
     "(member)/member/meal-catalogue.tsx",
     "(member)/member/profile.tsx",
-    "(member)/member/body-analysis.tsx",
+    "(member)/member/body-analysis-capture.tsx",
     "(member)/member/body-analysis-history.tsx",
     "(member)/member/body-analysis-result/[sessionId].tsx",
     "(member)/member/exercises/index.tsx",
@@ -231,10 +231,20 @@ it("opens Body Progress from the tab without replacing the capture wizard", asyn
   expect(tabSource).toContain('requiredCapability="training"');
   expect(tabSource).not.toContain("BodyAnalysisWizard");
 
-  const captureRoute = resolve(appRoot, "(member)/member/body-analysis.tsx");
+  const captureRoute = resolve(appRoot, "(member)/member/body-analysis-capture.tsx");
   const captureSource = await readFile(captureRoute, "utf8");
   expect(captureSource).toContain("BodyAnalysisWizard");
   expect(captureSource).not.toContain("BodyAnalysisHistoryScreen");
+});
+
+it("keeps the Body Progress history and capture wizard on distinct destinations", async () => {
+  const historyRoute = resolve(appRoot, "(member)/member/(tabs)/body-analysis.tsx");
+  const captureRoute = resolve(appRoot, "(member)/member/body-analysis-capture.tsx");
+
+  await expect(readFile(historyRoute, "utf8")).resolves.toMatch(/BodyAnalysisHistoryScreen/);
+  await expect(routeExists("(member)/member/body-analysis-capture.tsx")).resolves.toBe(true);
+  await expect(readFile(captureRoute, "utf8")).resolves.toMatch(/BodyAnalysisWizard/);
+  await expect(routeExists("(member)/member/body-analysis.tsx")).resolves.toBe(false);
 });
 
 it("uses the data-driven member home instead of the route-entry placeholder", async () => {
@@ -244,7 +254,7 @@ it("uses the data-driven member home instead of the route-entry placeholder", as
 });
 
 it("uses the native body-analysis wizard inside the member boundary", async () => {
-  const route = resolve(appRoot, "(member)/member/body-analysis.tsx");
+  const route = resolve(appRoot, "(member)/member/body-analysis-capture.tsx");
   await expect(readFile(route, "utf8")).resolves.toMatch(/BodyAnalysisWizard/);
   await expect(readFile(route, "utf8")).resolves.toMatch(/member/);
 });

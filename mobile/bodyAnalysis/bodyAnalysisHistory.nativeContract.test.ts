@@ -9,7 +9,7 @@ it("keeps body-analysis history member-scoped and deletion explicit", async () =
   expect(source).toMatch(/deleteSession/);
   expect(source).toMatch(/BodyAnalysisDeleteDialog/);
   expect(source).toContain("/member/body-analysis-result/");
-  expect(source).toContain("/member/body-analysis");
+  expect(source).toContain("/member/body-analysis-capture");
   expect(source).not.toContain("/admin/");
   expect(source).not.toMatch(/console\.|Log\./);
 });

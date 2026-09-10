@@ -200,9 +200,9 @@ test("preserves start, resume, and result navigation", async () => {
   fireEvent.press(screen.getByRole("button", { name: "ادامه نشست" }));
   fireEvent.press(screen.getByRole("button", { name: "مشاهده نتیجه" }));
 
-  expect(mockPush).toHaveBeenNthCalledWith(1, "/member/body-analysis");
+  expect(mockPush).toHaveBeenNthCalledWith(1, "/member/body-analysis-capture");
   expect(mockPush).toHaveBeenNthCalledWith(2, {
-    pathname: "/member/body-analysis",
+    pathname: "/member/body-analysis-capture",
     params: { sessionId: "incomplete-1" },
   });
   expect(mockPush).toHaveBeenNthCalledWith(3, "/member/body-analysis-result/latest-1");

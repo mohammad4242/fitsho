@@ -74,7 +74,7 @@ export function BodyAnalysisHistoryScreen({ tabRoot = false }: BodyAnalysisHisto
   }
 
   function startNewSession() {
-    router.push("/member/body-analysis");
+    router.push("/member/body-analysis-capture");
   }
 
   return (
@@ -109,7 +109,7 @@ export function BodyAnalysisHistoryScreen({ tabRoot = false }: BodyAnalysisHisto
             onDelete={openDeleteDialog}
             onOpen={(item) => router.push(`/member/body-analysis-result/${encodeURIComponent(item.session.id)}`)}
             onResume={(item) => router.push({
-              pathname: "/member/body-analysis",
+              pathname: "/member/body-analysis-capture",
               params: { sessionId: item.session.id },
             })}
             userId={auth.user?.id}
