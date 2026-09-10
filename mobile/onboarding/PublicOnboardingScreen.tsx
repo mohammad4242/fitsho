@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 20,
-    textAlign: "center",
+    textAlign: "auto",
     writingDirection: "rtl",
   },
   loadingScreen: {
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: 34,
     lineHeight: 45,
-    textAlign: "auto",
+    textAlign: "center",
     writingDirection: "rtl",
   },
   screen: {
