@@ -40,7 +40,7 @@ import {
   TextField,
 } from "../ui/components";
 import { Screen } from "../ui/layout";
-import { RTL_ROW } from "../ui/rtl";
+import { getTextDirectionStyle, LTR_TEXT, RTL_ROW, RTL_TEXT } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import {
   createExerciseApi,
@@ -570,13 +570,9 @@ function ExerciseCard({
   readonly onPress: () => void;
 }) {
   const name = exerciseTitle(exercise.name_fa, exercise.name_en);
+  const viewLabel = exercise.content_type === "guide" ? exerciseCopy.viewGuide : exerciseCopy.viewExercise;
   return (
-    <Card
-      accessibilityLabel={name}
-      onPress={onPress}
-      style={styles.exerciseCard}
-      variant="interactive"
-    >
+    <Card accessibilityLabel={name} style={styles.exerciseCard}>
       <View style={styles.cardMedia}>
         <ExerciseMedia
           accessibilityLabel={`نمایش حرکت ${name}`}
@@ -589,28 +585,71 @@ function ExerciseCard({
         <View pointerEvents="none" style={styles.cardMediaScrim} />
         <Text style={styles.mediaDifficulty}>{exerciseCopy.difficulties[exercise.difficulty]}</Text>
       </View>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardCopy}>
-          <Text style={styles.exerciseName}>{name}</Text>
-          <Text style={styles.exerciseSecondary}>{exerciseSecondaryTitle(exercise.name_fa, exercise.name_en)}</Text>
+      <View style={styles.cardBody}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardCopy}>
+            <Text style={styles.exerciseName}>{name}</Text>
+            <Text style={[styles.exerciseSecondary, LTR_TEXT]}>
+              {exerciseSecondaryTitle(exercise.name_fa, exercise.name_en)}
+            </Text>
+          </View>
+          <Text style={styles.contentBadge}>
+            {exercise.content_type === "guide" ? exerciseCopy.guides : "حرکت"}
+          </Text>
         </View>
-        <Text style={styles.contentBadge}>
-          {exercise.content_type === "guide" ? exerciseCopy.guides : "حرکت"}
-        </Text>
-      </View>
-      <View style={styles.metaRow}>
-        <Text style={styles.metaText}>
-          {exercise.primary_muscle === null ? "عضله بررسی نشده" : exerciseCopy.muscles[exercise.primary_muscle]}
-        </Text>
-        <Text style={styles.metaText}>
-          {exercise.equipment.map((value) => exerciseCopy.equipments[value]).join("، ")}
-        </Text>
-        {exercise.muscle_focus !== null && exercise.muscle_focus !== undefined ? (
-          <Text style={styles.metaText}>{exerciseCopy.muscleFocuses[exercise.muscle_focus]}</Text>
-        ) : null}
+        <View style={styles.metadataList}>
+          <ExerciseMetaRow
+            label={exerciseCopy.primaryMuscleLabel}
+            value={localizedPrimaryMuscle(exercise.primary_muscle)}
+          />
+          <ExerciseMetaRow
+            label={exerciseCopy.equipment}
+            value={localizedEquipment(exercise.equipment)}
+          />
+          <ExerciseMetaRow
+            label={exerciseCopy.muscleFocusLabel}
+            value={localizedMuscleFocus(exercise.muscle_focus)}
+          />
+        </View>
+        <Button
+          accessibilityLabel={viewLabel}
+          label={viewLabel}
+          onPress={onPress}
+          style={styles.viewButton}
+          variant="primary"
+        >
+          <View pointerEvents="none" style={styles.viewButtonContent}>
+            <Text style={styles.viewButtonLabel}>{viewLabel}</Text>
+            <Text accessible={false} style={styles.viewButtonArrow}>←</Text>
+          </View>
+        </Button>
       </View>
     </Card>
   );
+}
+
+function ExerciseMetaRow({ label, value }: { readonly label: string; readonly value: string }) {
+  return (
+    <View style={[styles.metadataRow, RTL_ROW]}>
+      <Text style={[styles.metadataLabel, RTL_TEXT]}>{label}</Text>
+      <Text style={[styles.metadataValue, getTextDirectionStyle("rtl", "left")]}>{value}</Text>
+    </View>
+  );
+}
+
+function localizedPrimaryMuscle(primaryMuscle: MuscleGroup | null): string {
+  if (primaryMuscle === null) return exerciseCopy.needsReview;
+  return exerciseCopy.muscles[primaryMuscle] ?? exerciseCopy.needsReview;
+}
+
+function localizedEquipment(equipment: readonly Equipment[]): string {
+  const value = equipment.map((item) => exerciseCopy.equipments[item]).join("، ");
+  return value || exerciseCopy.notSpecified;
+}
+
+function localizedMuscleFocus(muscleFocus: MuscleFocus | null | undefined): string {
+  if (muscleFocus === null || muscleFocus === undefined) return exerciseCopy.notSpecified;
+  return exerciseCopy.muscleFocuses[muscleFocus] ?? exerciseCopy.notSpecified;
 }
 
 function DiscoveryStage({
@@ -991,9 +1030,13 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: fiticianTokens.spacing[1],
   },
+  cardBody: {
+    gap: fiticianTokens.spacing[4],
+    padding: fiticianTokens.spacing[4],
+  },
   cardHeader: {
+    ...RTL_ROW,
     alignItems: "flex-start",
-    flexDirection: "row",
     gap: fiticianTokens.spacing[3],
     justifyContent: "space-between",
   },
@@ -1073,7 +1116,15 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   exerciseCard: {
-    gap: fiticianTokens.spacing[3],
+    backgroundColor: fiticianTokens.colors.surface,
+    borderColor: fiticianTokens.colors.lineStrong,
+    elevation: fiticianTokens.shadows.soft.elevation,
+    overflow: "hidden",
+    padding: 0,
+    shadowColor: fiticianTokens.shadows.soft.color,
+    shadowOffset: fiticianTokens.shadows.soft.offset,
+    shadowOpacity: fiticianTokens.shadows.soft.opacity,
+    shadowRadius: fiticianTokens.shadows.soft.radius,
   },
   exerciseName: {
     color: fiticianTokens.colors.ink,
@@ -1097,22 +1148,63 @@ const styles = StyleSheet.create({
     textAlign: "auto",
     writingDirection: "rtl",
   },
-  metaRow: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    flexWrap: "wrap",
+  metadataLabel: {
+    color: fiticianTokens.colors.muted,
+    flexShrink: 0,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+  },
+  metadataList: {
     gap: fiticianTokens.spacing[2],
   },
-  metaText: {
-    color: fiticianTokens.colors.muted,
+  metadataRow: {
+    alignItems: "center",
+    borderBottomColor: fiticianTokens.colors.line,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderStyle: "dashed",
+    gap: fiticianTokens.spacing[4],
+    justifyContent: "space-between",
+    paddingBottom: fiticianTokens.spacing[2],
+    width: "100%",
+  },
+  metadataValue: {
+    color: fiticianTokens.colors.ink,
+    flex: 1,
     flexShrink: 1,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+  },
+  viewButton: {
+    borderRadius: fiticianTokens.radii.medium,
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    width: "100%",
+  },
+  viewButtonArrow: {
+    color: fiticianTokens.colors.petrol,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.lg,
+    lineHeight: 22,
+    textAlign: "center",
+    writingDirection: "ltr",
+  },
+  viewButtonContent: {
+    ...RTL_ROW,
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  viewButtonLabel: {
+    color: fiticianTokens.colors.petrol,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.sm,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     textAlign: "auto",
     writingDirection: "rtl",
   },
   discoveryPanel: {
-    backgroundColor: fiticianTokens.colors.surfaceRaised,
+    backgroundColor: fiticianTokens.colors.surface,
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.extraLarge,
     borderWidth: 1,
@@ -1243,12 +1335,11 @@ const styles = StyleSheet.create({
     borderColor: fiticianTokens.colors.aqua,
   },
   mediaDifficulty: {
-    backgroundColor: fiticianTokens.colors.mediaOverlay,
-    borderColor: fiticianTokens.colors.lineStrong,
+    backgroundColor: fiticianTokens.colors.amber,
+    borderColor: fiticianTokens.colors.amber,
     borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
-    bottom: fiticianTokens.spacing[3],
-    color: fiticianTokens.colors.ink,
+    color: fiticianTokens.colors.petrol,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     overflow: "hidden",
@@ -1256,6 +1347,7 @@ const styles = StyleSheet.create({
     paddingVertical: fiticianTokens.spacing[1],
     position: "absolute",
     left: fiticianTokens.spacing[3],
+    top: fiticianTokens.spacing[3],
     textAlign: "center",
     writingDirection: "rtl",
   },

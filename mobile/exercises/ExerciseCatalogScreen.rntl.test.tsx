@@ -68,6 +68,21 @@ const exercisePage = {
   total_pages: 1,
 };
 
+const focusedGuidePage = {
+  ...exercisePage,
+  items: [
+    {
+      ...exercisePage.items[0],
+      content_type: "guide",
+      id: "upper-chest-guide",
+      muscle_focus: "upper_chest",
+      name_en: "Incline press guide",
+      name_fa: "راهنمای پرس بالاسینه",
+      slug: "upper-chest-guide",
+    },
+  ],
+};
+
 function queryResult<T>(data: T | undefined) {
   return {
     data,
@@ -227,6 +242,45 @@ test("all exercises is an explicit mode that enables the full catalogue", () => 
   expect(screen.getByText("۱ نتیجه")).toBeTruthy();
   expect(latestExerciseQueryOptions().enabled).toBe(true);
   expect(latestExerciseFilters()).toEqual({ content_type: "exercise", page: 1, page_size: 12 });
+});
+
+test("renders labeled metadata and routes from the explicit exercise CTA", () => {
+  const push = jest.fn();
+  mockUseRouter.mockReturnValue({ push } as never);
+
+  renderCatalog();
+  fireEvent.press(screen.getByRole("button", { name: "همه حرکات" }));
+
+  expect(screen.getByText("عضله اصلی")).toBeTruthy();
+  expect(screen.getByText("سینه")).toBeTruthy();
+  expect(screen.getByText("تجهیزات")).toBeTruthy();
+  expect(screen.getByText("وزن بدن")).toBeTruthy();
+  expect(screen.getByText("بخش هدف")).toBeTruthy();
+  expect(screen.getByText("مشخص نشده")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "مشاهده حرکت" })).toBeTruthy();
+  expect(screen.queryByText("ویرایش")).toBeNull();
+  expect(screen.queryByText("حذف")).toBeNull();
+
+  fireEvent.press(screen.getByRole("button", { name: "مشاهده حرکت" }));
+
+  expect(push).toHaveBeenCalledWith({
+    params: { slug: "push-up" },
+    pathname: "/member/exercises/[slug]",
+  });
+});
+
+test("renders localized focus metadata and the guide CTA", () => {
+  mockUseQuery.mockImplementation((options) => {
+    const queryOptions = options as QueryOptions;
+    if (queryOptions.queryKey?.[1] === "categories") return queryResult(categories);
+    return queryResult(queryOptions.enabled === false ? undefined : focusedGuidePage);
+  });
+
+  renderCatalog();
+  fireEvent.press(screen.getByRole("button", { name: "همه حرکات" }));
+
+  expect(screen.getByText("بالاسینه")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "مشاهده راهنما" })).toBeTruthy();
 });
 
 test("search enables matching results without a guided muscle selection", () => {
