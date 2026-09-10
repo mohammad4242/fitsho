@@ -125,6 +125,38 @@ it("keeps technical input values locally LTR inside the Persian form shell", () 
   });
 });
 
+it("infers LTR for technical fields when callers omit a direction", () => {
+  const password = element(
+    TextField({ label: "رمز عبور", secureTextEntry: true, value: "secret", onChangeText: vi.fn() }),
+  );
+  const numeric = element(
+    TextField({ label: "کد", keyboardType: "number-pad", value: "1234", onChangeText: vi.fn() }),
+  );
+  const email = element(
+    TextField({ label: "ایمیل", keyboardType: "email-address", value: "user@example.com", onChangeText: vi.fn() }),
+  );
+  const url = element(
+    TextField({ label: "لینک", keyboardType: "url", value: "https://example.com", onChangeText: vi.fn() }),
+  );
+
+  expect(flattenStyle(element((password.props.children as readonly unknown[])[1]).props.style)).toMatchObject({
+    textAlign: "left",
+    writingDirection: "ltr",
+  });
+  expect(flattenStyle(element((numeric.props.children as readonly unknown[])[1]).props.style)).toMatchObject({
+    textAlign: "left",
+    writingDirection: "ltr",
+  });
+  expect(flattenStyle(element((email.props.children as readonly unknown[])[1]).props.style)).toMatchObject({
+    textAlign: "left",
+    writingDirection: "ltr",
+  });
+  expect(flattenStyle(element((url.props.children as readonly unknown[])[1]).props.style)).toMatchObject({
+    textAlign: "left",
+    writingDirection: "ltr",
+  });
+});
+
 it("preserves font scaling and source order for the shared button label", () => {
   const result = element(Button({ label: "Save", onPress: vi.fn() }));
   const label = element(result.props.children);

@@ -58,6 +58,32 @@ export interface TextFieldProps extends Omit<TextInputProps, "accessibilityLabel
   readonly textDirection?: "auto" | "ltr" | "rtl";
 }
 
+function resolveTextDirection(
+  explicitDirection: TextFieldProps["textDirection"],
+  inputProps: TextInputProps,
+): "auto" | "ltr" | "rtl" {
+  if (explicitDirection !== undefined) return explicitDirection;
+
+  const technicalKeyboard = inputProps.keyboardType !== undefined && [
+    "ascii-capable",
+    "decimal-pad",
+    "email-address",
+    "number-pad",
+    "numeric",
+    "phone-pad",
+    "url",
+  ].includes(inputProps.keyboardType);
+  const technicalInputMode = inputProps.inputMode !== undefined && [
+    "decimal",
+    "email",
+    "numeric",
+    "tel",
+    "url",
+  ].includes(inputProps.inputMode);
+
+  return inputProps.secureTextEntry || technicalKeyboard || technicalInputMode ? "ltr" : "rtl";
+}
+
 export function TextField({
   accessibilityLabel,
   error,
@@ -65,12 +91,13 @@ export function TextField({
   label,
   required = false,
   style,
-  textDirection = "rtl",
+  textDirection,
   ...textInputProps
 }: TextFieldProps) {
-  const textStyle = textDirection === "auto"
+  const resolvedTextDirection = resolveTextDirection(textDirection, textInputProps);
+  const textStyle = resolvedTextDirection === "auto"
     ? { textAlign: undefined, writingDirection: "auto" as const }
-    : getTextDirectionStyle(textDirection);
+    : getTextDirectionStyle(resolvedTextDirection);
 
   return (
     <FormField error={error} description={hint} label={label} required={required}>
