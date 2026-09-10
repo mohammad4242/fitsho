@@ -54,3 +54,18 @@ test("keeps image media available when its route loses focus", () => {
   expect(screen.queryByTestId("native-video")).toBeNull();
   expect(screen.getByLabelText("تصویر حرکت")).toBeTruthy();
 });
+
+test("can defer video previews until exercise details open", () => {
+  render(
+    <ExerciseMedia
+      accessibilityLabel="رسانه حرکت"
+      deferVideo
+      mediaType="video"
+      name="پرس بالا سینه دمبل"
+      path="/media/incline-press.mp4"
+    />,
+  );
+
+  expect(screen.queryByTestId("native-video")).toBeNull();
+  expect(screen.getByText("برای مشاهده، جزئیات حرکت را باز کن")).toBeTruthy();
+});

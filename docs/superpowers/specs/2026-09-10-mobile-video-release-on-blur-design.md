@@ -3,14 +3,15 @@
 ## Goal
 
 Release native exercise-video resources when the user leaves the current mobile
-route, preventing hidden tab screens from retaining `expo-video` players and
-causing Android heap exhaustion.
+route and avoid constructing one native player per workout-list row, preventing
+hidden tabs and stacked previews from causing Android heap exhaustion.
 
 ## Scope
 
 - Update `mobile/exercises/ExerciseMedia.tsx`.
+- Update `mobile/workouts/WorkoutPlansScreen.tsx` so row previews defer videos.
 - Add focused React Native rendering tests for focused and unfocused video media.
-- Keep image media, API contracts, playback controls, and route behavior unchanged.
+- Keep image media, API contracts, detail-screen playback controls, and route behavior unchanged.
 
 ## Design
 
@@ -18,12 +19,15 @@ causing Android heap exhaustion.
 `Media` only while its route is focused. On blur, the `Media` subtree unmounts;
 the existing `useVideoPlayer` cleanup then releases the native ExoPlayer. When
 the route is focused again, the video player is created again from the same
-source. Non-video media remains mounted and unchanged.
+source. Workout-plan exercise rows opt into a deferred video preview, keeping
+the row lightweight while the existing detail route remains the playback entry
+point. Non-video media remains mounted and unchanged.
 
 ## Verification
 
 - Focused video media mounts a native video view.
 - Unfocused video media does not mount a native video view.
+- Deferred workout-row video media does not mount a native video view.
 - Existing mobile workout and media tests pass.
 - Run a physical-device smoke check after rebuilding the development APK; no
   backend or persisted-data changes are required.

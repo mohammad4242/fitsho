@@ -12,6 +12,7 @@ export interface ExerciseMediaProps {
   readonly accessibilityLabel: string;
   readonly autoplay?: boolean;
   readonly compact?: boolean;
+  readonly deferVideo?: boolean;
   readonly mediaType: components["schemas"]["MediaType"];
   readonly name: string;
   readonly path: string;
@@ -22,6 +23,7 @@ export function ExerciseMedia({
   accessibilityLabel,
   autoplay = false,
   compact = false,
+  deferVideo = false,
   mediaType,
   name,
   path,
@@ -39,7 +41,8 @@ export function ExerciseMedia({
   }, [mediaType, path]);
 
   const renderable = isExerciseMediaRenderable(path, mediaType) && !failed;
-  const mediaMounted = renderable && (mediaType !== "video" || isFocused);
+  const deferredVideo = renderable && mediaType === "video" && deferVideo;
+  const mediaMounted = renderable && !deferredVideo && (mediaType !== "video" || isFocused);
 
   return (
     <View accessibilityLabel={accessibilityLabel} accessibilityRole="image" style={[styles.frame, compact && styles.compactFrame, style]}>
@@ -68,6 +71,11 @@ export function ExerciseMedia({
             style={[styles.media, compact && styles.compactMedia]}
           />
         )
+      ) : deferredVideo ? (
+        <View style={styles.fallback}>
+          <AppIcon color={fiticianTokens.colors.aqua} name="training" size={fiticianTokens.iconSize.xl} />
+          <Text style={styles.fallbackText}>برای مشاهده، جزئیات حرکت را باز کن</Text>
+        </View>
       ) : renderable ? null : (
         <View style={styles.fallback}>
           <AppIcon color={fiticianTokens.colors.aqua} name="training" size={fiticianTokens.iconSize.xl} />

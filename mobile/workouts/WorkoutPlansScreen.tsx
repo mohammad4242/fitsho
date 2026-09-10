@@ -915,6 +915,7 @@ function WorkoutExerciseRow({
         <ExerciseMedia
           accessibilityLabel={`پیش‌نمایش ${exercise.exercise.name_fa || exercise.exercise.name_en}`}
           compact
+          deferVideo
           mediaType={exercise.exercise.media_type}
           name={exercise.exercise.name_fa || exercise.exercise.name_en}
           path={exercise.exercise.media_path}
