@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import mimetypes
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -48,6 +49,7 @@ logger = logging.getLogger(__name__)
 def create_app(settings: Settings | None = None) -> FastAPI:
     active_settings = settings or get_settings()
     active_settings.media_root.mkdir(parents=True, exist_ok=True)
+    mimetypes.add_type("image/webp", ".webp")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
