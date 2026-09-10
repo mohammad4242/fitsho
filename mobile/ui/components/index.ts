@@ -11,6 +11,8 @@ export type { DisclosureCardProps } from "./DisclosureCard";
 export type { ButtonProps, ButtonVariant } from "./Button";
 export { AppIcon } from "./AppIcon";
 export type { AppIconProps } from "./AppIcon";
+export { BrandMark } from "./BrandMark";
+export type { BrandMarkProps } from "./BrandMark";
 export { ProgressBar } from "./ProgressBar";
 export type { ProgressBarProps } from "./ProgressBar";
 export { SectionHeader } from "./SectionHeader";

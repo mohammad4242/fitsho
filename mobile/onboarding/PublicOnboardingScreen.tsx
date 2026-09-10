@@ -13,7 +13,7 @@ import type { ProductMode, ProfileFormValues } from "@fitician/core/profile";
 import { validateStep } from "@fitician/core/profile-validation";
 
 import { onboardingRoute, PUBLIC_ONBOARDING_SOURCE } from "../auth/authRoute";
-import { AppIcon, Notice, StateSkeleton } from "../ui/components";
+import { BrandMark, AppIcon, Notice, StateSkeleton } from "../ui/components";
 import { useAndroidBackHandler } from "../ui/navigation/BackBehaviorProvider";
 import { Screen } from "../ui/layout";
 import { mobileRequestErrorMessage } from "../ui/requestState";
@@ -219,7 +219,12 @@ export function PublicOnboardingScreen() {
   return (
     <Screen contentWidth="reading" contentContainerStyle={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.brand}>فیتشو</Text>
+        <BrandMark
+          accessibilityLabel="فیتشو"
+          label="فیتشو"
+          onPress={() => router.replace("/")}
+          testID="public-onboarding-brand-mark"
+        />
         {compactLayout ? null : <Text style={styles.headerNote}>{copy.header}</Text>}
       </View>
       {error ? <Notice message={error} variant="danger" /> : null}
@@ -333,20 +338,12 @@ function publicOnboardingErrorMessage(error: unknown): string {
 }
 
 const styles = StyleSheet.create({
-  brand: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.h3,
-    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
   eyebrow: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "auto",
+    textAlign: "center",
     writingDirection: "rtl",
   },
   header: {
@@ -366,7 +363,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     lineHeight: 20,
-    textAlign: "auto",
+    textAlign: "center",
     writingDirection: "rtl",
   },
   loadingScreen: {

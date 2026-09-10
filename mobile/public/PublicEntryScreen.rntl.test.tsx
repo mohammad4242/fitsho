@@ -46,6 +46,8 @@ beforeEach(() => {
 test("keeps the Web hero hierarchy in a concise native entry", () => {
   renderEntry();
 
+  expect(screen.getByTestId("public-entry-brand-mark")).toBeTruthy();
+  expect(screen.getByTestId("public-entry-brand-mark-pulse")).toBeTruthy();
   expect(screen.getByRole("header", { name: "هر بدن، برنامه خودش را می‌خواهد." })).toBeTruthy();
   expect(screen.getByText("تمرین و تغذیه‌ای متناسب با بدن، هدف و مسیر تو.")).toBeTruthy();
   expect(screen.getByRole("button", { name: "برنامه من را بساز" })).toBeTruthy();

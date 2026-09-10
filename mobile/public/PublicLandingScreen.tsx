@@ -17,7 +17,7 @@ import Svg, { Circle, Defs, Path, RadialGradient, Stop } from "react-native-svg"
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { authCopy } from "../auth/copy";
-import { Button, Media } from "../ui/components";
+import { BrandMark, Button, Media } from "../ui/components";
 import { Screen } from "../ui/layout";
 import { LTR_TEXT } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
@@ -106,6 +106,7 @@ export function PublicLandingScreen() {
           onOpenMenu={() => setMenuOpen(true)}
           onScrollToAnalysis={() => scrollTo(bodyStart)}
           onScrollToProcess={() => scrollTo(processStart)}
+          onBrandPress={() => router.replace("/")}
           onSignIn={() => router.push("/auth/sign-in")}
           onStart={() => router.push("/public-onboarding")}
           wideLayout={wideLayout}
@@ -133,6 +134,7 @@ export function PublicLandingScreen() {
 function LandingHeader({
   menuOpen,
   onCloseMenu,
+  onBrandPress,
   onOpenMenu,
   onScrollToAnalysis,
   onScrollToProcess,
@@ -142,6 +144,7 @@ function LandingHeader({
 }: {
   readonly menuOpen: boolean;
   readonly onCloseMenu: () => void;
+  readonly onBrandPress: () => void;
   readonly onOpenMenu: () => void;
   readonly onScrollToAnalysis: () => void;
   readonly onScrollToProcess: () => void;
@@ -151,7 +154,12 @@ function LandingHeader({
 }) {
   return (
     <View style={styles.header}>
-      <Text style={styles.brand}>{authCopy.common.brand}</Text>
+      <BrandMark
+        accessibilityLabel={authCopy.common.brand}
+        label={authCopy.common.brand}
+        onPress={onBrandPress}
+        testID="public-entry-brand-mark"
+      />
       {wideLayout ? (
         <View style={styles.headerNav}>
           <Pressable accessibilityRole="button" onPress={onScrollToProcess} style={styles.headerLink}>
