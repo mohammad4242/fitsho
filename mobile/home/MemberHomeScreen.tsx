@@ -205,6 +205,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.body,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    textAlign: "center",
     writingDirection: "rtl",
   },
   offlineText: {

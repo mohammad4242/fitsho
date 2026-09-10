@@ -192,6 +192,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
+    textAlign: "center",
+    writingDirection: "rtl",
   },
   stepSubtitle: {
     color: fiticianTokens.colors.muted,

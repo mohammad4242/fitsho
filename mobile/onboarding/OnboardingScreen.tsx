@@ -1749,6 +1749,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
     writingDirection: "rtl",
   },
   progressBlock: {
@@ -1784,6 +1785,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
     writingDirection: "rtl",
   },
   questionTitle: {

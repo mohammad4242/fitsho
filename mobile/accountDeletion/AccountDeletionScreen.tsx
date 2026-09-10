@@ -239,6 +239,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
+    textAlign: "right",
     writingDirection: "rtl",
   },
   pendingCard: { gap: fiticianTokens.spacing[3] },

@@ -192,6 +192,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: 1,
+    textAlign: "center",
     writingDirection: "rtl",
   },
   itemTitle: {

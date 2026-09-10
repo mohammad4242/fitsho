@@ -10,6 +10,7 @@ import { useMobileAuth } from "../auth/MobileAuthProvider";
 import type { ConnectivityStatus } from "../platform/connectivity";
 import { Button, Card, MetricRing, Notice, Skeleton } from "../ui/components";
 import { getMobileViewState } from "../ui/requestState";
+import { LTR_TEXT, RTL_TEXT } from "../ui/rtl";
 import { fiticianTokens } from "../ui/tokens";
 import { NutritionDualMetricRing } from "./NutritionDualMetricRing";
 import { NutritionAnimatedNumber } from "./NutritionAnimatedNumber";
@@ -124,9 +125,9 @@ function NutritionEstimateSummaryCard({
                   <View style={summaryStyles.breakdownItem}>
                     <Text style={summaryStyles.bmrDot}>●</Text>
                     {bmr === null ? (
-                      <Text style={summaryStyles.breakdownText}>BMR: —</Text>
+                      <Text style={summaryStyles.breakdownTextLtr}>BMR: —</Text>
                     ) : (
-                      <NutritionAnimatedNumber prefix="BMR: " style={summaryStyles.breakdownText} value={bmr} />
+                      <NutritionAnimatedNumber prefix="BMR: " style={summaryStyles.breakdownTextLtr} value={bmr} />
                     )}
                   </View>
                   <View style={summaryStyles.breakdownItem}>
@@ -297,10 +298,18 @@ const summaryStyles = StyleSheet.create({
     gap: fiticianTokens.spacing[1],
   },
   breakdownText: {
+    ...RTL_TEXT,
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
-    writingDirection: "rtl",
+    textAlign: "right",
+  },
+  breakdownTextLtr: {
+    ...LTR_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyEnglish,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    textAlign: "right",
   },
   card: {
     backgroundColor: fiticianTokens.colors.surface,
@@ -542,6 +551,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
     writingDirection: "rtl",
   },
   unit: {

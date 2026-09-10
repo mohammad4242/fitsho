@@ -736,6 +736,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "right",
     writingDirection: "rtl",
   },
   feedbackCard: {

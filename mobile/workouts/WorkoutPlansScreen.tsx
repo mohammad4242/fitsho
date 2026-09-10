@@ -1410,6 +1410,8 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.compact,
     lineHeight: 20,
+    textAlign: "right",
+    writingDirection: "rtl",
   },
   selectorError: {
     color: fiticianTokens.colors.coral,

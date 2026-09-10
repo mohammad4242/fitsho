@@ -742,6 +742,8 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.canvas,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
+    textAlign: "center",
+    writingDirection: "rtl",
   },
   body: {
     color: fiticianTokens.colors.mist,

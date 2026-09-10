@@ -253,6 +253,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
     writingDirection: "rtl",
   },
   container: {
@@ -392,6 +393,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
     writingDirection: "rtl",
   },
   metricCard: {
@@ -469,6 +471,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
     writingDirection: "rtl",
   },
   viewTabTextActive: {

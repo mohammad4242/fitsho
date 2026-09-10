@@ -1278,6 +1278,8 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.canvas,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h2,
+    textAlign: "center",
+    writingDirection: "rtl",
   },
   brand: {
     color: fiticianTokens.colors.aqua,
@@ -1579,6 +1581,7 @@ const styles = StyleSheet.create({
     fontSize: fiticianTokens.typography.fontSize.xs,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: 3,
+    textAlign: "center",
     writingDirection: "rtl",
   },
   profileProgress: {

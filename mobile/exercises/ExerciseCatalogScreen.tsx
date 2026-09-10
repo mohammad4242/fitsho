@@ -1069,6 +1069,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[1],
+    textAlign: "center",
     writingDirection: "rtl",
   },
   exerciseCard: {
@@ -1255,6 +1256,7 @@ const styles = StyleSheet.create({
     paddingVertical: fiticianTokens.spacing[1],
     position: "absolute",
     left: fiticianTokens.spacing[3],
+    textAlign: "center",
     writingDirection: "rtl",
   },
   pageIndicator: {

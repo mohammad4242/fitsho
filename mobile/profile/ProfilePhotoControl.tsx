@@ -180,6 +180,8 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.canvas,
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h2,
+    textAlign: "center",
+    writingDirection: "rtl",
   },
   card: {
     gap: fiticianTokens.spacing[2],
@@ -204,6 +206,7 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.sm,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
     writingDirection: "rtl",
   },
   description: {

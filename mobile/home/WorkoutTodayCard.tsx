@@ -191,6 +191,7 @@ const styles = StyleSheet.create({
     color: fiticianTokens.colors.muted,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: 9,
+    textAlign: "center",
     writingDirection: "rtl",
   },
   title: {
