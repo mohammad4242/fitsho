@@ -5,6 +5,27 @@ import { fileURLToPath } from "node:url";
 
 const nutritionDirectory = dirname(fileURLToPath(import.meta.url));
 
+it("removes stale/offline notices without dropping actionable workflow status", async () => {
+  const source = await readFile(resolve(nutritionDirectory, "NutritionTrackingSection.tsx"), "utf8");
+  const workflowView = source.indexOf('        <View style={styles.workflowStatus}');
+  const workflowStart = source.lastIndexOf("      {", workflowView);
+  const workflowEnd = source.indexOf('      <View aria-label="کالری ثبت‌شده"', workflowStart);
+  const workflow = source.slice(workflowStart, workflowEnd);
+
+  expect(source).not.toContain("آخرین ثبت ذخیره‌شده نمایش داده می‌شود؛ تغییرات جدید بعد از اتصال انجام می‌شوند.");
+  expect(source).not.toContain("هدف‌های ذخیره‌شده نمایش داده می‌شوند؛ ممکن است با آخرین وضعیت پروفایل هماهنگ نباشند.");
+  expect(workflow).not.toContain('dailyState.status === "offline"');
+  expect(workflow).not.toContain('dailyState.status === "stale"');
+  expect(workflow).not.toContain('estimateState.status === "offline"');
+  expect(workflow).not.toContain('estimateState.status === "stale"');
+  expect(workflow).not.toContain("estimate?.is_stale");
+  expect(workflow).toContain('estimateState.status === "error" && estimate === null');
+  expect(workflow).toContain("catalogueState.status ===");
+  expect(workflow).toContain("actionError !== null");
+  expect(workflow).toContain("photoError !== null");
+  expect(workflow).toContain("photoSuccess !== null");
+});
+
 it("keeps native tracking on member nutrition contracts", async () => {
   const source = await readFile(resolve(nutritionDirectory, "NutritionTrackingSection.tsx"), "utf8");
 

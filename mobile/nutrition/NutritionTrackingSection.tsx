@@ -566,23 +566,12 @@ export function NutritionTrackingSection() {
         />
       ) : null}
 
-      {(dailyState.status === "offline"
-        || dailyState.status === "stale"
-        || estimateState.status === "offline"
-        || estimateState.status === "stale"
-        || estimate?.is_stale
-        || (estimateState.status === "error" && estimate === null)
+      {(estimateState.status === "error" && estimate === null
         || (entryMode === "manual" && (catalogueState.status === "offline" || catalogueState.status === "stale" || catalogueState.status === "error"))
         || actionError !== null
         || photoError !== null
         || photoSuccess !== null) ? (
         <View style={styles.workflowStatus} testID="nutrition-workflow-status">
-          {dailyState.status === "offline" || dailyState.status === "stale" ? (
-            <Notice compact message="آخرین ثبت ذخیره‌شده نمایش داده می‌شود؛ تغییرات جدید بعد از اتصال انجام می‌شوند." variant="offline" />
-          ) : null}
-          {estimateState.status === "offline" || estimateState.status === "stale" || estimate?.is_stale ? (
-            <Notice compact message="هدف‌های ذخیره‌شده نمایش داده می‌شوند؛ ممکن است با آخرین وضعیت پروفایل هماهنگ نباشند." variant="offline" />
-          ) : null}
           {estimateState.status === "error" && estimate === null ? (
             <Notice compact message="هدف برنامه دریافت نشد؛ ثبت‌های واقعی امروز همچنان در دسترس هستند." variant="warning" />
           ) : null}
