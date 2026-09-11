@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import test from "node:test";
+import { resolve } from "node:path";
 
-import { findSecretMatches } from "./secret-scan.mjs";
+import { findSecretMatches, scanTrackedFiles } from "./secret-scan.mjs";
 
 test("secret scanner ignores empty and documented placeholder values", () => {
   const source = [
@@ -43,4 +46,22 @@ test("secret scanner catches non-placeholder quoted credentials", () => {
   const source = `${keyName}: "${value}"`;
 
   assert.deepEqual(findSecretMatches(source), [{ line: 1, rule: "quoted-secret" }]);
+});
+
+test("secret scanner skips tracked files deleted from the worktree", () => {
+  const scratchRoot = resolve(import.meta.dirname, "../../.codex-tmp");
+  mkdirSync(scratchRoot, { recursive: true });
+  const repoRoot = mkdtempSync(resolve(scratchRoot, "secret-scan-test-"));
+  const trackedFile = resolve(repoRoot, "deleted.txt");
+
+  try {
+    execFileSync("git", ["init", "--quiet", repoRoot]);
+    writeFileSync(trackedFile, "safe\n");
+    execFileSync("git", ["-C", repoRoot, "add", "deleted.txt"]);
+    unlinkSync(trackedFile);
+
+    assert.deepEqual(scanTrackedFiles(repoRoot), []);
+  } finally {
+    rmSync(repoRoot, { recursive: true, force: true });
+  }
 });

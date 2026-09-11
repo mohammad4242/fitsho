@@ -66,7 +66,8 @@ export function scanTrackedFiles(root = projectRoot) {
   for (const relativePath of result.stdout.split("\0")) {
     if (!relativePath) continue;
     const filePath = resolve(root, relativePath);
-    if (!statSync(filePath).isFile()) continue;
+    const fileStats = statSync(filePath, { throwIfNoEntry: false });
+    if (fileStats === undefined || !fileStats.isFile()) continue;
     const source = readFileSync(filePath);
     if (source.includes(0)) continue;
 
