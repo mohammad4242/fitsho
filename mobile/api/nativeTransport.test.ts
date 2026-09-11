@@ -8,6 +8,7 @@ import {
 } from "../platform/logging";
 
 const fileSystem = vi.hoisted(() => {
+  const fileConstructor = vi.fn();
   const fileWrite = vi.fn();
   class MockFile {
     readonly uri: string;
@@ -16,12 +17,18 @@ const fileSystem = vi.hoisted(() => {
     readonly delete = vi.fn();
 
     constructor(...uris: unknown[]) {
+      fileConstructor();
       const directory = uris[0] as { uri?: string } | undefined;
       this.uri = `${directory?.uri ?? "file:///cache/"}${String(uris[1] ?? "upload.bin")}`;
     }
   }
 
-  return { File: MockFile, Paths: { cache: { uri: "file:///cache/" } }, fileWrite };
+  return {
+    File: MockFile,
+    Paths: { cache: { uri: "file:///cache/" } },
+    fileConstructor,
+    fileWrite,
+  };
 });
 
 vi.mock("expo-file-system", () => fileSystem);
@@ -146,7 +153,7 @@ it("reports failed HTTP requests without sending response details", async () => 
   expect(JSON.stringify(captureException.mock.calls[0])).not.toContain("PROFILE_PRIVATE");
 });
 
-it("uploads binary parts without constructing an ArrayBuffer-backed Blob", async () => {
+it("serializes multipart bytes without native temporary files", async () => {
   const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
     new Response(JSON.stringify({ uploaded: true }), { status: 200 }),
   );
@@ -154,23 +161,8 @@ it("uploads binary parts without constructing an ArrayBuffer-backed Blob", async
     apiBaseUrl: "https://api.fitician.example",
     fetchImpl,
   });
-  const originalBlob = globalThis.Blob;
-  const originalFormData = globalThis.FormData;
-  class AndroidBlob {
-    constructor() {
-      throw new Error("Creating blobs from 'ArrayBuffer' and 'ArrayBufferView' are not supported");
-    }
-  }
-  class NativeFormData {
-    readonly parts: Array<[string, unknown]> = [];
-
-    append(name: string, value: unknown): void {
-      this.parts.push([name, value]);
-    }
-  }
-
-  globalThis.Blob = AndroidBlob as unknown as typeof Blob;
-  globalThis.FormData = NativeFormData as unknown as typeof FormData;
+  const originalTextEncoder = globalThis.TextEncoder;
+  Object.defineProperty(globalThis, "TextEncoder", { configurable: true, value: undefined });
   try {
     await expect(transport.upload({
       method: "PUT",
@@ -183,22 +175,21 @@ it("uploads binary parts without constructing an ArrayBuffer-backed Blob", async
       path: "/api/v1/body-photo-sessions/session-1/photos/front",
     })).resolves.toEqual({ uploaded: true });
   } finally {
-    globalThis.Blob = originalBlob;
-    globalThis.FormData = originalFormData;
+    Object.defineProperty(globalThis, "TextEncoder", {
+      configurable: true,
+      value: originalTextEncoder,
+    });
   }
 
   const [, init] = fetchImpl.mock.calls[0];
-  const formData = init?.body as unknown as NativeFormData;
-  expect(formData.parts[0]?.[1]).toMatchObject({
-    name: "body-front.jpg",
-    type: "image/jpeg",
-  });
-  const nativeValue = formData.parts[0]?.[1] as {
-    bytes?: () => Promise<Uint8Array>;
-    uri?: string;
-  };
-  expect(nativeValue.uri).toContain("file:///cache/");
-  expect(nativeValue.bytes).toBeTypeOf("function");
-  await expect(nativeValue.bytes!()).resolves.toEqual(Uint8Array.from([1, 2, 3]));
-  expect(fileSystem.fileWrite).toHaveBeenCalledWith(Uint8Array.from([1, 2, 3]));
+  const body = init?.body;
+  expect(body).toBeInstanceOf(Uint8Array);
+  const serialized = new TextDecoder().decode(body as Uint8Array);
+  expect(serialized).toContain('name="file"; filename="body-front.jpg"');
+  expect(serialized).toContain("Content-Type: image/jpeg");
+  expect((init?.headers as Headers).get("Content-Type")).toMatch(
+    /^multipart\/form-data; boundary=----FiticianBoundary/u,
+  );
+  expect(fileSystem.fileConstructor).not.toHaveBeenCalled();
+  expect(fileSystem.fileWrite).not.toHaveBeenCalled();
 });

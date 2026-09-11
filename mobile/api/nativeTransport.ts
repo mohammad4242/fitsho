@@ -8,7 +8,6 @@ import {
   type MultipartUploadRequest,
   type TransportRequest,
 } from "@fitician/core";
-import { File, Paths } from "expo-file-system";
 import {
   CORRELATION_ID_HEADER,
   createCorrelationId,
@@ -26,19 +25,12 @@ export interface NativeTransportOptions {
   readonly trustedOrigin?: string | null;
 }
 
-type NativeFileFormDataValue = {
-  readonly bytes: () => Promise<Uint8Array>;
-  readonly name: string;
-  readonly type: string;
-  readonly uri: string;
+type PreparedMultipartBody = {
+  readonly body: Uint8Array;
+  readonly contentType: string;
 };
 
-type PreparedMultipartFormData = {
-  readonly formData: FormData;
-  readonly temporaryFiles: readonly File[];
-};
-
-let temporaryUploadSequence = 0;
+let multipartBoundarySequence = 0;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -59,14 +51,14 @@ function requestHeaders(
   headers: TransportRequest["headers"],
   trustedOrigin: string | null | undefined,
   correlationId: string,
-  isMultipart: boolean,
+  contentType: string | null,
 ): Headers {
   const result = new Headers(headers);
   if (trustedOrigin !== undefined && trustedOrigin !== null && !result.has("Origin")) {
     result.set("Origin", trustedOrigin);
   }
-  if (!isMultipart && !result.has("Content-Type")) {
-    result.set("Content-Type", "application/json");
+  if (!result.has("Content-Type")) {
+    result.set("Content-Type", contentType ?? "application/json");
   }
   if (!result.has(CORRELATION_ID_HEADER)) {
     result.set(CORRELATION_ID_HEADER, correlationId);
@@ -79,11 +71,11 @@ function requestInit(
   body: BodyInit | undefined,
   trustedOrigin: string | null | undefined,
   correlationId: string,
-  isMultipart = false,
+  contentType: string | null = null,
 ): RequestInit {
   return {
     body,
-    headers: requestHeaders(request.headers, trustedOrigin, correlationId, isMultipart),
+    headers: requestHeaders(request.headers, trustedOrigin, correlationId, contentType),
     method: request.method ?? "GET",
     signal: request.signal as AbortSignal | undefined,
   };
@@ -128,49 +120,69 @@ function responseFilename(response: Response): string | null {
   }
 }
 
-function bytesToNativeFile(part: MultipartPart): {
-  readonly file: File;
-  readonly value: NativeFileFormDataValue;
-} {
-  const file = new File(
-    Paths.cache,
-    `fitician-upload-${Date.now()}-${temporaryUploadSequence++}.bin`,
-  );
-  file.write(part.bytes as Uint8Array);
-  return {
-    file,
-    value: {
-      bytes: () => file.bytes(),
-      name: part.filename ?? "upload.bin",
-      type: part.contentType ?? "application/octet-stream",
-      uri: file.uri,
-    },
-  };
+function multipartQuotedValue(value: string): string {
+  return value.replace(/["\r\n]/gu, "_");
 }
 
-function multipartFormData(parts: readonly MultipartPart[]): PreparedMultipartFormData {
-  const formData = new FormData();
-  const temporaryFiles: File[] = [];
-  for (const part of parts) {
-    if (part.bytes !== undefined) {
-      const prepared = bytesToNativeFile(part);
-      temporaryFiles.push(prepared.file);
-      formData.append(part.name, prepared.value as unknown as Blob);
+function joinBytes(chunks: readonly Uint8Array[]): Uint8Array {
+  const result = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.byteLength, 0));
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
+
+function utf8Bytes(value: string): Uint8Array {
+  const bytes: number[] = [];
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0xfffd;
+    if (codePoint <= 0x7f) {
+      bytes.push(codePoint);
+    } else if (codePoint <= 0x7ff) {
+      bytes.push(0xc0 | (codePoint >> 6), 0x80 | (codePoint & 0x3f));
+    } else if (codePoint <= 0xffff) {
+      bytes.push(
+        0xe0 | (codePoint >> 12),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
     } else {
-      formData.append(part.name, part.value ?? "");
+      bytes.push(
+        0xf0 | (codePoint >> 18),
+        0x80 | ((codePoint >> 12) & 0x3f),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
     }
   }
-  return { formData, temporaryFiles };
+  return Uint8Array.from(bytes);
 }
 
-function cleanupTemporaryFiles(files: readonly File[]): void {
-  for (const file of files) {
-    try {
-      file.delete();
-    } catch {
-      // The cache may clean up an upload file before this request completes.
+function multipartBody(parts: readonly MultipartPart[]): PreparedMultipartBody {
+  const boundary = `----FiticianBoundary${Date.now().toString(36)}${multipartBoundarySequence++}`;
+  const chunks: Uint8Array[] = [];
+  for (const part of parts) {
+    const disposition = `Content-Disposition: form-data; name="${multipartQuotedValue(part.name)}"`;
+    chunks.push(utf8Bytes(`--${boundary}\r\n`));
+    if (part.bytes !== undefined) {
+      const filename = multipartQuotedValue(part.filename ?? "upload.bin");
+      const contentType = part.contentType ?? "application/octet-stream";
+      chunks.push(utf8Bytes(
+        `${disposition}; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`,
+      ));
+      chunks.push(part.bytes as Uint8Array);
+    } else {
+      chunks.push(utf8Bytes(`${disposition}\r\n\r\n${part.value ?? ""}`));
     }
+    chunks.push(utf8Bytes("\r\n"));
   }
+  chunks.push(utf8Bytes(`--${boundary}--\r\n`));
+  return {
+    body: joinBytes(chunks),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+  };
 }
 
 export function createNativeTransport(options: NativeTransportOptions): FiticianTransport {
@@ -182,7 +194,7 @@ export function createNativeTransport(options: NativeTransportOptions): Fitician
     request: TransportRequest,
     body: BodyInit | undefined,
     operation: "request" | "download" | "upload",
-    isMultipart = false,
+    contentType: string | null = null,
   ): Promise<Response> {
     const correlationId = correlationIdFactory();
     const startedAt = Date.now();
@@ -190,7 +202,7 @@ export function createNativeTransport(options: NativeTransportOptions): Fitician
     try {
       response = await fetchRequest(
         requestUrl(options.apiBaseUrl, request.path),
-        requestInit(request, body, options.trustedOrigin, correlationId, isMultipart),
+        requestInit(request, body, options.trustedOrigin, correlationId, contentType),
       );
       await ensureOk(response);
       logger.captureMessage("native_request_completed", "info", {
@@ -232,21 +244,17 @@ export function createNativeTransport(options: NativeTransportOptions): Fitician
     },
 
     async upload<TResponse>(request: MultipartUploadRequest): Promise<TResponse> {
-      const prepared = multipartFormData(request.parts);
-      try {
-        const response = await send(
-          request,
-          prepared.formData,
-          "upload",
-          true,
-        );
-        if (response.status === 204) {
-          return undefined as TResponse;
-        }
-        return (await response.json()) as TResponse;
-      } finally {
-        cleanupTemporaryFiles(prepared.temporaryFiles);
+      const prepared = multipartBody(request.parts);
+      const response = await send(
+        request,
+        prepared.body as unknown as BodyInit,
+        "upload",
+        prepared.contentType,
+      );
+      if (response.status === 204) {
+        return undefined as TResponse;
       }
+      return (await response.json()) as TResponse;
     },
   };
 }
