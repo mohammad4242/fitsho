@@ -12,6 +12,11 @@ import {
 } from "./release-build-plan.mjs";
 import * as releasePlan from "./release-build-plan.mjs";
 
+test("EAS builds the shared core package before app bundling", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(packageJson.scripts["eas-build-post-install"], "npm --prefix .. run build:core");
+});
+
 test("release CLI accepts the standard Expo token and preserves legacy CI secrets", () => {
   const { buildEasEnvironment } = releasePlan;
   assert.equal(typeof buildEasEnvironment, "function");

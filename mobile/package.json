@@ -9,6 +9,7 @@
     "ios": "expo run:ios",
     "android": "expo run:android",
     "prebuild": "expo prebuild",
+    "eas-build-post-install": "npm --prefix .. run build:core",
     "test": "vitest run accountDeletion/*.test.ts api/*.test.ts auth/*.test.ts bodyAnalysis/*.test.ts coach/*.test.ts config/*.test.ts data/*.test.ts exercises/*.test.ts home/*.test.ts media/*.test.ts notifications/*.test.ts nutrition/*.test.ts onboarding/*.test.ts physician/*.test.ts platform/*.test.ts profile/*.test.ts ui/*.test.ts upload/*.test.ts video/*.test.ts workouts/*.test.ts",
     "pretest:native": "npm --prefix .. run build:core",
     "test:native": "jest --config jest.config.cjs --runInBand",
