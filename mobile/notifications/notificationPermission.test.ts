@@ -14,6 +14,7 @@ vi.mock("react-native", () => ({ Platform: platform }));
 vi.mock("expo-notifications", () => ({
   AndroidImportance: { DEFAULT: 5, HIGH: 6 },
   AndroidNotificationVisibility: { PRIVATE: 2 },
+  IosAuthorizationStatus: { EPHEMERAL: 4, PROVISIONAL: 3 },
   getDevicePushTokenAsync: mocks.getDevicePushTokenAsync,
   getPermissionsAsync: mocks.getPermissionsAsync,
   requestPermissionsAsync: mocks.requestPermissionsAsync,
@@ -120,6 +121,18 @@ it("requests iOS permission and returns the native APNs token without relabeling
   });
   await expect(getIosApnsToken()).resolves.toBe("apns-token");
   expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+});
+
+it("treats provisional iOS notification permission as usable", async () => {
+  platform.OS = "ios";
+  mocks.getPermissionsAsync.mockResolvedValue({
+    granted: false,
+    canAskAgain: false,
+    ios: { status: Notifications.IosAuthorizationStatus.PROVISIONAL },
+  });
+
+  await expect(prepareNotifications(store)).resolves.toBe("granted");
+  expect(mocks.requestPermissionsAsync).not.toHaveBeenCalled();
 });
 
 it("classifies denied and blocked iOS notification permission", async () => {

@@ -23,6 +23,15 @@ export interface NotificationPermissionRequestStore {
   write(value: string): Promise<void>;
 }
 
+function notificationPermissionIsUsable(
+  permissions: Notifications.NotificationPermissionsStatus,
+): boolean {
+  if (permissions.granted) return true;
+  if (Platform.OS !== "ios") return false;
+  return permissions.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+    || permissions.ios?.status === Notifications.IosAuthorizationStatus.EPHEMERAL;
+}
+
 const securePermissionRequestStore: NotificationPermissionRequestStore = {
   read: () => SecureStore.getItemAsync(NOTIFICATION_PERMISSION_REQUESTED_KEY),
   write: (value) => SecureStore.setItemAsync(NOTIFICATION_PERMISSION_REQUESTED_KEY, value),
@@ -114,7 +123,7 @@ export async function requestAndroidNotificationPermission(
   }
 
   const current = await Notifications.getPermissionsAsync();
-  if (current.granted) {
+  if (notificationPermissionIsUsable(current)) {
     return "granted";
   }
   if (!current.canAskAgain) {
@@ -126,7 +135,7 @@ export async function requestAndroidNotificationPermission(
 
   const requested = await Notifications.requestPermissionsAsync();
   await storage.write("1");
-  if (requested.granted) {
+  if (notificationPermissionIsUsable(requested)) {
     return "granted";
   }
   return requested.canAskAgain ? "denied" : "blocked";
@@ -150,7 +159,7 @@ export async function requestNotificationPermission(
   }
 
   const current = await Notifications.getPermissionsAsync();
-  if (current.granted) {
+  if (notificationPermissionIsUsable(current)) {
     return "granted";
   }
   if (!current.canAskAgain) {
@@ -162,7 +171,7 @@ export async function requestNotificationPermission(
 
   const requested = await Notifications.requestPermissionsAsync();
   await storage.write("1");
-  if (requested.granted) {
+  if (notificationPermissionIsUsable(requested)) {
     return "granted";
   }
   return requested.canAskAgain ? "denied" : "blocked";
