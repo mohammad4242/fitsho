@@ -16,6 +16,11 @@ production submission:
 - `FITICIAN_SUPPORT_EMAIL`
 - `FITICIAN_APP_REVIEW_ACCOUNT`
 - `FITICIAN_APP_REVIEW_PASSWORD`
+- `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`
+
+`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` must be a real Google OAuth client ID in
+the EAS `preview` and `production` environments. It is intentionally empty in
+the repository examples and must not be committed as a credential.
 
 `FITICIAN_PUBLIC_WEB_ORIGIN` must serve `/privacy` and `/delete-account` over
 HTTPS. `FITICIAN_SUPPORT_URL` must be a public HTTPS support page. The

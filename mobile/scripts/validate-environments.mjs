@@ -15,7 +15,10 @@ for (const variant of ["development", "preview", "production"]) {
   for (const required of schema.required) {
     assert.ok(values[required], `${required} is required for ${variant}`);
   }
-  validateEnvironment(variant, values, { allowPlaceholder: variant === "production" });
+  validateEnvironment(variant, values, {
+    allowPlaceholder: true,
+    requireGoogleIosClientId: variant !== "development",
+  });
 }
 
 console.log("Fitician mobile environment examples are valid");

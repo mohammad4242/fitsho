@@ -106,6 +106,9 @@ for (const clientId of [googleAndroidClientId, googleIosClientId]) {
     throw new Error("Google client IDs must use the Google OAuth client ID format");
   }
 }
+if (appVariant !== "development" && !googleIosClientId) {
+  throw new Error("EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID is required for iOS release builds");
+}
 
 const config: ExpoConfig = {
   name: "Fitician",

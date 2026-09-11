@@ -93,6 +93,7 @@ for (const required of [
   /scheme:\s*["']https["']/,
   /associatedDomains/,
   /EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID/,
+  /EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID is required for iOS release builds/u,
   /pathPrefix:\s*["']\/link["']/,
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
   /["']expo-background-task["']/,

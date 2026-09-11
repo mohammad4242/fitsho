@@ -74,6 +74,28 @@ test("validates each configured Google client ID without blocking the other plat
   }));
 });
 
+test("requires the iOS Google client ID for release environments", () => {
+  const base = {
+    APP_VARIANT: "preview",
+    EXPO_PUBLIC_API_BASE_URL: "https://api-preview.fitician.example",
+    EXPO_PUBLIC_FRONTEND_ORIGIN: "https://preview.fitician.example",
+    FITICIAN_APP_LINK_HOST: "preview.fitician.example",
+  };
+
+  assert.throws(
+    () => validateEnvironment("preview", base, { requireGoogleIosClientId: true }),
+    /EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID is required/u,
+  );
+  assert.doesNotThrow(() => validateEnvironment("preview", {
+    ...base,
+    EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: "ios.apps.googleusercontent.com",
+  }, { requireGoogleIosClientId: true }));
+  assert.doesNotThrow(() => validateEnvironment("preview", base, {
+    allowPlaceholder: true,
+    requireGoogleIosClientId: true,
+  }));
+});
+
 test("documents emulator and physical Android development API targets", async () => {
   const example = await readFile(resolve(mobileRoot, ".env.development.example"), "utf8");
 
