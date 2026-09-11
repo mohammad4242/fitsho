@@ -9,6 +9,8 @@ export const REQUIRED_MAESTRO_FLOWS = [
   "coach.yaml",
   "physician.yaml",
   "role-boundary.yaml",
+  "authentication.yaml",
+  "body-analysis-entry.yaml",
 ];
 
 const legacyBrandPattern = /Fitsho|Fitition/u;
@@ -34,6 +36,9 @@ export function validateMaestroFlows(files) {
     assert.match(flow, /subflows\/sign-in\.yaml/u, `${flowName} must reuse the sign-in flow`);
   }
   assert.match(files["member.yaml"], /تحلیل بدن/u);
+  assert.match(files["authentication.yaml"], /subflows\/sign-in\.yaml/u);
+  assert.match(files["body-analysis-entry.yaml"], /تحلیل بدن/u);
+  assert.match(files["body-analysis-entry.yaml"], /subflows\/sign-in\.yaml/u);
   assert.match(files["coach.yaml"], /E2E: مربی/u);
   assert.match(files["physician.yaml"], /E2E: پزشک/u);
   assert.match(files["role-boundary.yaml"], /E2E: مربی/u);

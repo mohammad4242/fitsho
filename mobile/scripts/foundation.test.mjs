@@ -30,6 +30,10 @@ test("declares the Fitician workspace and native foundation", async () => {
     new URL("mobile/modules/fitician-body-vision/nitro.json", projectRoot),
     "utf8",
   );
+  const bodyVisionReactNativeConfig = await readFile(
+    new URL("mobile/modules/fitician-body-vision/react-native.config.js", projectRoot),
+    "utf8",
+  );
   const bodyVisionIosSource = await readFile(
     new URL("mobile/modules/fitician-body-vision/ios/FiticianBodyVision.swift", projectRoot),
     "utf8",
@@ -73,6 +77,7 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(bodyVisionNitroSpec, /"iosModuleName":\s*"FiticianBodyVision"/u);
   assert.match(bodyVisionNitroSpec, /"language":\s*"swift"/u);
   assert.match(bodyVisionNitroSpec, /"implementationClassName":\s*"FiticianBodyVision"/u);
+  assert.match(bodyVisionReactNativeConfig, /ios:\s*\{\s*\}/u);
   assert.match(bodyVisionIosSource, /PoseLandmarker/u);
   assert.match(bodyVisionIosSource, /ImageSegmenter/u);
   assert.match(bodyVisionIosSource, /modelStatus/u);

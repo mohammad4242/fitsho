@@ -1,0 +1,13 @@
+appId: com.fitician.app
+env:
+  FITICIAN_TEST_EMAIL: ${FITICIAN_TEST_MEMBER_EMAIL}
+  FITICIAN_TEST_PASSWORD: ${FITICIAN_TEST_MEMBER_PASSWORD}
+---
+- clearState
+- launchApp
+- runFlow:
+    file: subflows/sign-in.yaml
+- tapOn: "تحلیل بدن"
+- extendedWaitUntil:
+    visible: "اندازه‌ها را تأیید کن"
+    timeout: 20000

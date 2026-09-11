@@ -27,4 +27,6 @@ async function readYamlFiles(directory, prefix = "") {
 test("keeps the Maestro acceptance flows Fitician-only and environment-driven", async () => {
   const flows = await readYamlFiles(maestroRoot);
   assert.doesNotThrow(() => validateMaestroFlows(flows));
+  assert.match(flows["authentication.yaml"], /subflows\/sign-in\.yaml/u);
+  assert.match(flows["body-analysis-entry.yaml"], /تحلیل بدن/u);
 });

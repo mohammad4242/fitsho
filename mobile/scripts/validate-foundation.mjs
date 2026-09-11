@@ -32,6 +32,10 @@ const bodyVisionNitroSpec = await readFile(
   resolve(mobileRoot, "modules/fitician-body-vision/nitro.json"),
   "utf8",
 );
+const bodyVisionReactNativeConfig = await readFile(
+  resolve(mobileRoot, "modules/fitician-body-vision/react-native.config.js"),
+  "utf8",
+);
 const bodyVisionIosSource = await readFile(
   resolve(mobileRoot, "modules/fitician-body-vision/ios/FiticianBodyVision.swift"),
   "utf8",
@@ -141,6 +145,7 @@ for (const required of [
 ]) {
   assert.match(bodyVisionNitroSpec, required);
 }
+assert.match(bodyVisionReactNativeConfig, /ios:\s*\{\s*\}/u);
 for (const required of [
   /PoseLandmarker/u,
   /ImageSegmenter/u,
