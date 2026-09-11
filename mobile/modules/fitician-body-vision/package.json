@@ -6,6 +6,8 @@
   "types": "src/index.ts",
   "files": [
     "android",
+    "ios",
+    "FiticianBodyVision.podspec",
     "nitrogen",
     "nitro.json",
     "react-native.config.js",

@@ -35,7 +35,11 @@ export interface NativeBodyVisionBenchmark {
   modelStatus: string;
 }
 
-export interface FiticianBodyVision extends HybridObject<{ android: "kotlin" }> {
+export interface FiticianBodyVision
+  extends HybridObject<{
+    android: "kotlin";
+    ios: "swift";
+  }> {
   readonly contractVersion: string;
   readonly modelStatus: string;
   process(frame: Frame): NativeBodyVisionResult;

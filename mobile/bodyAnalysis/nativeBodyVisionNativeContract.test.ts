@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -53,5 +53,42 @@ describe("Android body vision spike wiring", () => {
     const gradle = await read("android/build.gradle");
 
     expect(gradle).not.toContain("com.android.tools.build:gradle:9.2.1");
+  });
+});
+
+describe("iOS body vision module wiring", () => {
+  it("declares the generated Swift implementation without changing the public contract", async () => {
+    const source = await read("src/FiticianBodyVision.nitro.ts");
+    const nitro = await read("nitro.json");
+    const packageJson = JSON.parse(await read("package.json")) as {
+      files?: string[];
+    };
+    const podspec = await read("FiticianBodyVision.podspec");
+    const swift = await read("ios/FiticianBodyVision.swift");
+
+    expect(source).toContain('android: "kotlin";');
+    expect(source).toContain('ios: "swift";');
+    expect(source).toContain("contractVersion");
+    expect(source).toContain("NativeBodyVisionResult");
+    expect(nitro).toMatch(/"ios"\s*:\s*\{[\s\S]*"language"\s*:\s*"swift"/u);
+    expect(nitro).toContain('"implementationClassName": "FiticianBodyVision"');
+    expect(packageJson.files).toEqual(expect.arrayContaining(["ios", "FiticianBodyVision.podspec"]));
+    expect(podspec).toContain("add_nitrogen_files");
+    expect(podspec).toContain("MediaPipeTasksVision");
+    expect(podspec).toContain("pose_landmarker_lite.task");
+    expect(podspec).toContain("selfie_segmenter.tflite");
+    expect(swift).toContain("HybridFiticianBodyVisionSpec");
+    expect(swift).toContain("PoseLandmarker");
+    expect(swift).toContain("ImageSegmenter");
+    expect(swift).toContain("MODEL_STATUS_NOT_PACKAGED");
+  });
+
+  it("regenerates the iOS Nitrogen bridge instead of hand-writing it", async () => {
+    const generatedIos = await readdir(resolve(bodyVisionRoot, "nitrogen/generated/ios"));
+
+    expect(generatedIos).toEqual(expect.arrayContaining([
+      "FiticianBodyVision+autolinking.rb",
+      "FiticianBodyVisionAutolinking.swift",
+    ]));
   });
 });

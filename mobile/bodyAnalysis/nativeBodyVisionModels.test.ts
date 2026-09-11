@@ -48,4 +48,15 @@ describe("native body vision model packaging", () => {
       expect(nativeSource).toContain(`body_vision/${model}`);
     }
   });
+
+  it("exposes the exact model files as deterministic iOS pod resources", async () => {
+    const podspec = await readFile(
+      resolve(mobileRoot, "modules/fitician-body-vision/FiticianBodyVision.podspec"),
+      "utf8",
+    );
+
+    expect(podspec).toContain("android/src/main/assets/body_vision/pose_landmarker_lite.task");
+    expect(podspec).toContain("android/src/main/assets/body_vision/selfie_segmenter.tflite");
+    expect(podspec).toMatch(/s\.resources\s*=|s\.resource_bundles\s*=/u);
+  });
 });

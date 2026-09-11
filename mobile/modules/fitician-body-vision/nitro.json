@@ -10,6 +10,10 @@
   },
   "autolinking": {
     "FiticianBodyVision": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "FiticianBodyVision"
+      },
       "android": {
         "language": "kotlin",
         "implementationClassName": "FiticianBodyVision"
