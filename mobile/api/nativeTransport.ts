@@ -47,6 +47,11 @@ function requestBody(body: TransportRequest["body"]): string | undefined {
   return body === undefined ? undefined : JSON.stringify(body);
 }
 
+function nativeAbortSignal(signal: TransportRequest["signal"]): AbortSignal | undefined {
+  if (signal === undefined || typeof AbortSignal === "undefined") return undefined;
+  return signal instanceof AbortSignal ? signal : undefined;
+}
+
 function requestHeaders(
   headers: TransportRequest["headers"],
   trustedOrigin: string | null | undefined,
@@ -77,7 +82,7 @@ function requestInit(
     body,
     headers: requestHeaders(request.headers, trustedOrigin, correlationId, contentType),
     method: request.method ?? "GET",
-    signal: request.signal as AbortSignal | undefined,
+    signal: nativeAbortSignal(request.signal),
   };
 }
 

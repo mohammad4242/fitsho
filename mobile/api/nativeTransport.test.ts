@@ -193,3 +193,28 @@ it("serializes multipart bytes without native temporary files", async () => {
   expect(fileSystem.fileConstructor).not.toHaveBeenCalled();
   expect(fileSystem.fileWrite).not.toHaveBeenCalled();
 });
+
+it("does not pass the upload manager signal to native fetch", async () => {
+  const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+    new Response(JSON.stringify({ uploaded: true }), { status: 200 }),
+  );
+  const transport = createNativeTransport({
+    apiBaseUrl: "https://api.fitician.example",
+    fetchImpl,
+  });
+
+  await transport.upload({
+    method: "POST",
+    parts: [{
+      bytes: Uint8Array.from([1, 2, 3]),
+      contentType: "image/jpeg",
+      filename: "food-photo.jpg",
+      name: "file",
+    }],
+    path: "/api/v1/nutrition/tracking/photo-estimates?language=fa",
+    signal: { aborted: false },
+  });
+
+  const [, init] = fetchImpl.mock.calls[0];
+  expect(init?.signal).toBeUndefined();
+});
