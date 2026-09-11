@@ -14,6 +14,7 @@ import {
   mobileLogger,
   type MobileLogger,
 } from "../platform/logging";
+import { resolveBackendResourceUrl } from "../config/backendResourceUrl";
 
 export type NativeFetchLike = typeof fetch;
 
@@ -40,7 +41,7 @@ function requestUrl(baseUrl: string, path: string): string {
   if (/^https?:\/\//i.test(path)) {
     throw new Error("Native API request paths must be relative to the configured backend");
   }
-  return `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  return resolveBackendResourceUrl(path, baseUrl);
 }
 
 function requestBody(body: TransportRequest["body"]): string | undefined {

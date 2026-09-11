@@ -61,9 +61,8 @@ it("resolves private profile URLs and keeps user-facing failures safe", () => {
   expect(resolveProfilePhotoUrl("/api/v1/profile/photo/user-1?v=1", "https://api.fitician.test")).toBe(
     "https://api.fitician.test/api/v1/profile/photo/user-1?v=1",
   );
-  expect(resolveProfilePhotoUrl("https://cdn.fitician.test/photo.jpg", "https://api.fitician.test")).toBe(
-    "https://cdn.fitician.test/photo.jpg",
-  );
+  expect(() => resolveProfilePhotoUrl("https://cdn.fitician.test/photo.jpg", "https://api.fitician.test"))
+    .toThrow(/configured backend origin/u);
   expect(profilePhotoErrorMessage(new ApiError(422, "invalid", null, "invalid_geometry"))).toBe(
     "عکس باید مربعی باشد.",
   );

@@ -2,6 +2,7 @@ import type { ImagePickerOptions } from "expo-image-picker";
 import type { MultipartPart } from "@fitician/core";
 
 import type { UploadJob } from "../upload/uploadManager";
+import { resolveBackendResourceUrl } from "../config/backendResourceUrl";
 
 export const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 export const PROFILE_PHOTO_MIN_DIMENSION = 128;
@@ -84,8 +85,7 @@ export function isProfilePhotoMimeType(value: string | null | undefined): value 
 }
 
 export function resolveProfilePhotoUrl(path: string, apiBaseUrl: string): string {
-  if (/^https?:\/\//iu.test(path)) return path;
-  return `${apiBaseUrl.replace(/\/+$/u, "")}/${path.replace(/^\/+/, "")}`;
+  return resolveBackendResourceUrl(path, apiBaseUrl);
 }
 
 export function profilePhotoErrorMessage(error: unknown): string {

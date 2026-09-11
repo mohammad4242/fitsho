@@ -61,9 +61,8 @@ describe("native exercise media", () => {
     expect(resolveExerciseMediaUrl("/media/primary.mp4", "https://api.fitician.test/")).toBe(
       "https://api.fitician.test/media/primary.mp4",
     );
-    expect(resolveExerciseMediaUrl("https://cdn.fitician.test/video.mp4", "https://api.fitician.test")).toBe(
-      "https://cdn.fitician.test/video.mp4",
-    );
+    expect(() => resolveExerciseMediaUrl("https://cdn.fitician.test/video.mp4", "https://api.fitician.test"))
+      .toThrow(/configured backend origin/u);
   });
 
   it("accepts real GIF, image, and video media but rejects placeholders", () => {

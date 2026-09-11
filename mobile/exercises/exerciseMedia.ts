@@ -1,6 +1,7 @@
 import type { components } from "@fitician/core";
 
 import type { ExerciseDetail } from "./exerciseApi";
+import { resolveBackendResourceUrl } from "../config/backendResourceUrl";
 
 export type ExerciseMediaItem = {
   readonly key: string;
@@ -71,8 +72,7 @@ export function buildExerciseMediaItems(exercise: ExerciseMediaSource): Exercise
 }
 
 export function resolveExerciseMediaUrl(path: string, apiBaseUrl: string): string {
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${apiBaseUrl.replace(/\/+$/u, "")}/${path.replace(/^\/+/, "")}`;
+  return resolveBackendResourceUrl(path, apiBaseUrl);
 }
 
 export function exerciseVideoPosterPath(path: string): string | null {
