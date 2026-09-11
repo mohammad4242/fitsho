@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, within } from "@testing-library/react-native";
 import { expect, jest, test } from "@jest/globals";
+import type { ReactTestInstance } from "react-test-renderer";
 
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
@@ -67,7 +68,14 @@ const experience = {
   review_notice_code: "review_pending",
 } as unknown as BodyAnalysisExperienceV4;
 
-test("matches the Web interactive female map and highlights a clicked muscle", () => {
+function directChildTestIDs(node: ReactTestInstance): string[] {
+  return node.children
+    .filter((child): child is ReactTestInstance => typeof child !== "string")
+    .map((child) => child.props.testID)
+    .filter((testID): testID is string => typeof testID === "string");
+}
+
+test("uses the Ghost as the only muscle selector", () => {
   render(<BodyAnalysisMuscleSection experience={experience} />);
 
   const image = screen.getByTestId("body-analysis-map-image");
@@ -75,12 +83,37 @@ test("matches the Web interactive female map and highlights a clicked muscle", (
   expect(image.props.source).toBe(bodyResultAssets.map.female.front);
   expect(screen.getByTestId("body-analysis-map-hit-region-shoulders")).toBeTruthy();
   expect(screen.getByTestId("body-analysis-map-hit-region-chest")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "سرشانه" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "سینه" })).toBeNull();
+  expect(screen.queryByText("ناحیهٔ انتخاب‌شده")).toBeNull();
 
   fireEvent.press(screen.getByTestId("body-analysis-map-hit-region-shoulders"));
 
   expect(screen.getByTestId("body-analysis-map-mask-shoulders")).toBeTruthy();
-  expect(screen.getAllByText("سرشانه").length).toBeGreaterThan(0);
-  expect(screen.getByText(/نسبت به بقیه بدنت عقب‌تره/)).toBeTruthy();
+  const detail = within(screen.getByTestId("body-analysis-selected-detail"));
+  expect(detail.getByText("سرشانه")).toBeTruthy();
+  expect(detail.getByText("ناحیهٔ اولویت‌دار")).toBeTruthy();
+  expect(detail.getByText(/نسبت به بقیه بدنت عقب‌تره/)).toBeTruthy();
+});
+
+test("places selected details above the Ghost and replaces them on the next tap", () => {
+  render(<BodyAnalysisMuscleSection experience={experience} />);
+
+  fireEvent.press(screen.getByTestId("body-analysis-map-hit-region-shoulders"));
+
+  const section = screen.getByTestId("body-analysis-muscle-section");
+  const childTestIDs = directChildTestIDs(section);
+  expect(childTestIDs.indexOf("body-analysis-selected-detail"))
+    .toBeLessThan(childTestIDs.indexOf("body-analysis-map-card"));
+
+  fireEvent.press(screen.getByTestId("body-analysis-map-hit-region-chest"));
+
+  expect(screen.getByTestId("body-analysis-map-mask-chest")).toBeTruthy();
+  const detail = within(screen.getByTestId("body-analysis-selected-detail"));
+  expect(detail.getByText("سینه")).toBeTruthy();
+  expect(detail.getByText("نقطهٔ قوت ظاهری")).toBeTruthy();
+  expect(detail.getByText("سینه خوب جلو افتاده و فعلاً جزو اولویت‌های اصلیت نیست.")).toBeTruthy();
+  expect(screen.queryByText("سرشانه نسبت به بقیه بدنت عقب‌تره و بهتره فعلاً بیشتر روش کار کنی.")).toBeNull();
 });
 
 test("changes the map artwork and available hit regions with the selected view", () => {

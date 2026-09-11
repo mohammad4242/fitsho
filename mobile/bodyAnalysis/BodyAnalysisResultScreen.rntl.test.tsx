@@ -182,9 +182,10 @@ test("follows the Web result story with real metrics, findings, reviews, and com
 
   fireEvent.press(musclesTab);
   expect(screen.getByRole("header", { name: "یافته‌های همین تحلیل" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "سرشانه" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "سرشانه" })).toBeNull();
+  expect(screen.getByTestId("body-analysis-map-hit-region-shoulders")).toBeTruthy();
   expect(screen.getAllByText("بازوها").length).toBeGreaterThan(0);
-  fireEvent.press(screen.getByRole("button", { name: "سرشانه" }));
+  fireEvent.press(screen.getByTestId("body-analysis-map-hit-region-shoulders"));
   expect(screen.getByText(/نسبت به بقیه بدنت عقب‌تره/)).toBeTruthy();
 
   fireEvent.press(progressTab);

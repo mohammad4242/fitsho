@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import {
   Defs,
   Mask,
@@ -76,10 +76,6 @@ export function BodyAnalysisMuscleSection({
     () => new Map(bodyMapRegions.map((layout) => [layout.area, layout] as const)),
     [],
   );
-  const visibleRegions = useMemo(
-    () => experience.regions.filter((region) => region.supporting_views.includes(activeView)),
-    [activeView, experience.regions],
-  );
   const hitRegions = useMemo(
     () => bodyMapHitRegions(sex, activeView).filter((hitRegion) => {
       const layout = layoutsByArea.get(hitRegion.area);
@@ -110,11 +106,34 @@ export function BodyAnalysisMuscleSection({
   const mapImageLabel = `نمای ${viewLabels[activeView]} نقشه بدن ${sexLabels[sex]}`;
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} testID="body-analysis-muscle-section">
       <SectionHeader eyebrow="نقشهٔ بدن" title="یافته‌های همین تحلیل" />
       <Text style={styles.intro}>برای دیدن یک ناحیه، روی خود بدن بزن.</Text>
 
-      <Card variant="hero" style={styles.mapCard}>
+      {selectedRegion !== undefined ? (
+        <Card
+          accessibilityLiveRegion="polite"
+          style={styles.selectionCard}
+          testID="body-analysis-selected-detail"
+          variant="glass"
+        >
+          <Text style={styles.selectionEyebrow}>ناحیهٔ انتخاب‌شده</Text>
+          <Text style={styles.selectionTitle}>{bodyAreaLabel(selectedRegion.area)}</Text>
+          <Text style={styles.selectionStatus}>
+            {bodyRegionClassificationLabel(selectedRegion.display_classification)}
+          </Text>
+          <Text style={styles.body}>{bodyRegionInsight(selectedRegion)}</Text>
+          <Text style={styles.muted}>
+            نماهای پشتیبان: {selectedRegion.supporting_views.map((view) => allViewLabels[view]).join("، ")}
+          </Text>
+        </Card>
+      ) : null}
+
+      <Card
+        style={styles.mapCard}
+        testID="body-analysis-map-card"
+        variant="hero"
+      >
         <View style={styles.mapHeader}>
           <View style={styles.mapCopy}>
             <Text style={styles.mapEyebrow}>BODY MAP</Text>
@@ -213,32 +232,6 @@ export function BodyAnalysisMuscleSection({
         </View>
       </Card>
 
-      <View accessibilityRole="list" style={styles.regionList}>
-        {visibleRegions.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <Text style={styles.body}>برای این نما، ناحیهٔ قابل ارزیابی ثبت نشده است.</Text>
-          </Card>
-        ) : visibleRegions.map((region) => (
-          <RegionButton
-            key={region.area}
-            onPress={() => selectArea(region.area)}
-            region={region}
-            selected={selectedArea === region.area}
-          />
-        ))}
-      </View>
-
-      {selectedRegion !== undefined ? (
-        <Card accessibilityLiveRegion="polite" style={styles.selectionCard} variant="glass">
-          <Text style={styles.selectionEyebrow}>ناحیهٔ انتخاب‌شده</Text>
-          <Text style={styles.selectionTitle}>{bodyAreaLabel(selectedRegion.area)}</Text>
-          <Text style={styles.body}>{bodyRegionInsight(selectedRegion)}</Text>
-          <Text style={styles.muted}>
-            نماهای پشتیبان: {selectedRegion.supporting_views.map((view) => allViewLabels[view]).join("، ")}
-          </Text>
-        </Card>
-      ) : null}
-
       <View style={styles.summaryStack}>
         <RegionSummaryCard
           emptyText="فعلاً نقطه‌ضعف واضحی ثبت نشده."
@@ -255,33 +248,6 @@ export function BodyAnalysisMuscleSection({
         />
       </View>
     </View>
-  );
-}
-
-function RegionButton({
-  onPress,
-  region,
-  selected,
-}: {
-  readonly onPress: () => void;
-  readonly region: BodyAnalysisExperienceRegion;
-  readonly selected: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={bodyAreaLabel(region.area)}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.regionButton, selected && styles.regionButtonSelected, pressed && styles.pressed]}
-    >
-      <View style={[styles.regionDot, selected && styles.regionDotSelected]} />
-      <View style={styles.regionCopy}>
-        <Text style={styles.regionTitle}>{bodyAreaLabel(region.area)}</Text>
-        <Text style={styles.regionStatus}>{bodyRegionClassificationLabel(region.display_classification)}</Text>
-      </View>
-      <AppIcon color={selected ? BODY_MAP_AQUA : fiticianTokens.colors.muted} name="arrowLeft" size={20} />
-    </Pressable>
   );
 }
 
@@ -324,9 +290,6 @@ const styles = StyleSheet.create({
   },
   container: {
     gap: fiticianTokens.spacing[3],
-  },
-  emptyCard: {
-    padding: fiticianTokens.spacing[3],
   },
   figure: {
     height: "100%",
@@ -406,57 +369,6 @@ const styles = StyleSheet.create({
     textAlign: "auto",
     writingDirection: "rtl",
   },
-  pressed: {
-    opacity: 0.82,
-    transform: [{ scale: fiticianTokens.motion.pressedScale }],
-  },
-  regionButton: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surface,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.medium,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[2],
-    minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: fiticianTokens.spacing[3],
-    paddingVertical: fiticianTokens.spacing[2],
-  },
-  regionButtonSelected: {
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    borderColor: BODY_MAP_AQUA,
-  },
-  regionCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  regionDot: {
-    backgroundColor: fiticianTokens.colors.muted,
-    borderRadius: fiticianTokens.radii.pill,
-    height: 8,
-    width: 8,
-  },
-  regionDotSelected: {
-    backgroundColor: BODY_MAP_AQUA,
-  },
-  regionList: {
-    gap: fiticianTokens.spacing[2],
-  },
-  regionStatus: {
-    color: fiticianTokens.colors.muted,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
-  regionTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "auto",
-    writingDirection: "rtl",
-  },
   selectionCard: {
     borderRightColor: BODY_MAP_AQUA,
     borderRightWidth: 4,
@@ -475,6 +387,14 @@ const styles = StyleSheet.create({
     fontFamily: fiticianTokens.typography.fontFamily.displayPersian,
     fontSize: fiticianTokens.typography.fontSize.h3,
     lineHeight: 28,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
+  selectionStatus: {
+    color: BODY_MAP_AQUA,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
     textAlign: "auto",
     writingDirection: "rtl",
   },
