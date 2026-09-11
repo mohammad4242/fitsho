@@ -1,9 +1,14 @@
 import type { components, TransportRequest } from "@fitician/core";
+import { Platform } from "react-native";
 
 export type NotificationDevice = components["schemas"]["NotificationDeviceResponse"];
 export type NotificationPreferences = components["schemas"]["NotificationPreferencesResponse"];
 export type NotificationPreferencesUpdate = components["schemas"]["NotificationPreferencesUpdateRequest"];
 export type NotificationTokenProvider = "fcm" | "apns";
+
+export function notificationProviderForPlatform(platform: string): NotificationTokenProvider {
+  return platform === "ios" ? "apns" : "fcm";
+}
 
 export type AuthenticatedNotificationRequest = <TResponse>(
   request: TransportRequest,
@@ -33,7 +38,7 @@ export function createNotificationApi(
       method: "GET",
       path: "/api/v1/notifications/devices",
     }),
-    registerCurrentDevice: (token, provider = "fcm") => request<NotificationDevice>({
+    registerCurrentDevice: (token, provider = notificationProviderForPlatform(Platform.OS)) => request<NotificationDevice>({
       body: jsonBody({ provider, token }),
       method: "PUT",
       path: "/api/v1/notifications/devices/current",

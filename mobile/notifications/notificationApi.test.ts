@@ -2,7 +2,19 @@ import { expect, it, vi } from "vitest";
 
 import type { TransportRequest } from "@fitician/core";
 
-import { createNotificationApi, type AuthenticatedNotificationRequest } from "./notificationApi";
+vi.mock("react-native", () => ({ Platform: { OS: "android" } }));
+
+import {
+  createNotificationApi,
+  notificationProviderForPlatform,
+  type AuthenticatedNotificationRequest,
+} from "./notificationApi";
+
+it("maps native platforms to their real push-token providers", () => {
+  expect(notificationProviderForPlatform("android")).toBe("fcm");
+  expect(notificationProviderForPlatform("ios")).toBe("apns");
+  expect(notificationProviderForPlatform("web")).toBe("fcm");
+});
 
 it("uses the current-device notification and preference endpoints", async () => {
   const request = vi.fn<AuthenticatedNotificationRequest>(
