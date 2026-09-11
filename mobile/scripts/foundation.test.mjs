@@ -39,6 +39,7 @@ test("declares the Fitician workspace and native foundation", async () => {
     "utf8",
   );
   const mobileTsconfig = await readJson("mobile/tsconfig.json");
+  const jestConfig = await readFile(new URL("../jest.config.cjs", import.meta.url), "utf8");
 
   assert.deepEqual(rootPackage.workspaces, ["frontend", "mobile", "packages/fitician-core"]);
   assert.equal(mobilePackage.name, "@fitician/mobile");
@@ -89,6 +90,8 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(releaseSymbolsPlugin, /android\.enableMinifyInReleaseBuilds/);
   assert.equal(mobilePackage.scripts["export:android:source-maps"], "node scripts/releaseArtifacts.mjs");
   assert.equal(mobileTsconfig.compilerOptions.strict, true);
+  assert.match(jestConfig, /testPathIgnorePatterns/u);
+  assert.match(jestConfig, /\\.expo/u);
   assert.doesNotMatch(appConfig, /Fitsho|Fitition/);
 });
 
