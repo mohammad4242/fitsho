@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { beforeEach, expect, jest, test } from "@jest/globals";
+import { AppState, type AppStateStatus } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 jest.mock("expo-file-system", () => ({ File: class {} }));
@@ -8,7 +9,7 @@ jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("react-native-worklets", () => ({ scheduleOnRN: jest.fn() }));
 jest.mock("react-native-vision-camera", () => ({
-  Camera: () => null,
+  Camera: jest.fn(() => null),
   useCameraDevice: jest.fn(() => undefined),
   useCameraPermission: jest.fn(() => ({ canRequestPermission: true, hasPermission: false, requestPermission: jest.fn() })),
   useFrameOutput: jest.fn(() => ({})),
@@ -20,6 +21,7 @@ jest.mock("./nativeGhostPhotoRenderer", () => ({ renderNativeGhostPhoto: jest.fn
 
 import { BodyPhotoCapture } from "./BodyPhotoCapture";
 import { launchImageLibraryAsync } from "expo-image-picker";
+import { Camera, useCameraDevice, useCameraPermission } from "react-native-vision-camera";
 import { renderNativeGhostPhoto } from "./nativeGhostPhotoRenderer";
 import type { BodyPhotoCapturedAsset } from "./cameraCapture";
 import { ApiError } from "@fitician/core";
@@ -42,7 +44,10 @@ const renderedAsset: BodyPhotoCapturedAsset = {
 
 const noopCapture = jest.fn<(asset: BodyPhotoCapturedAsset) => void>();
 
-function renderCapture(onCaptured: (asset: BodyPhotoCapturedAsset) => void | Promise<void> = noopCapture) {
+function renderCapture(
+  onCaptured: (asset: BodyPhotoCapturedAsset) => void | Promise<void> = noopCapture,
+  options: { readonly initialCaptureMode?: "camera" | "library" } = {},
+) {
   return render(
     <SafeAreaProvider initialMetrics={{
       frame: { height: 800, width: 390, x: 0, y: 0 },
@@ -50,6 +55,7 @@ function renderCapture(onCaptured: (asset: BodyPhotoCapturedAsset) => void | Pro
     }}>
       <BodyPhotoCapture
         completedViews={["front"]}
+        initialCaptureMode={options.initialCaptureMode}
         onCancel={jest.fn()}
         onCaptured={onCaptured}
         sex="male"
@@ -143,6 +149,46 @@ test("keeps the selected editor state and reports an upload failure separately",
   await waitFor(() => expect(screen.getByText("سرویس ثبت عکس موقتاً در دسترس نیست. دوباره تلاش کن.")).toBeTruthy());
   expect(screen.getByLabelText("ویرایشگر کادر عکس")).toBeTruthy();
   expect(onCaptured).toHaveBeenCalledWith(renderedAsset);
+});
+
+test("pauses the camera and cancels countdown when the app leaves the foreground", async () => {
+  let onAppStateChange: ((nextState: AppStateStatus) => void) | undefined;
+  const previousAppState = AppState.currentState;
+  Object.defineProperty(AppState, "currentState", { configurable: true, value: "active" });
+  const addEventListener = jest.spyOn(AppState, "addEventListener").mockImplementation((_type, listener) => {
+    onAppStateChange = listener;
+    return { remove: jest.fn() };
+  });
+  jest.mocked(useCameraPermission).mockReturnValue({
+    canRequestPermission: true,
+    hasPermission: true,
+    requestPermission: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
+    status: "authorized",
+  });
+  jest.mocked(useCameraDevice).mockReturnValue({ id: "front" } as never);
+  const cameraCalls = (Camera as unknown as { mock: { calls: Array<unknown[]> } }).mock.calls;
+
+  try {
+    renderCapture(noopCapture, { initialCaptureMode: "camera" });
+    await waitFor(() => expect(Camera).toHaveBeenCalled());
+    expect(cameraCalls.at(-1)?.[0]).toEqual(expect.objectContaining({ isActive: true }));
+    act(() => {
+      const cameraProps = cameraCalls.at(-1)?.[0] as { onPreviewStarted?: () => void } | undefined;
+      cameraProps?.onPreviewStarted?.();
+    });
+    fireEvent.press(screen.getByRole("button", { name: "شروع شمارش ۵ ثانیه‌ای" }));
+    expect(screen.getByText("5")).toBeTruthy();
+
+    await act(async () => {
+      onAppStateChange?.("background");
+    });
+
+    expect(cameraCalls.at(-1)?.[0]).toEqual(expect.objectContaining({ isActive: false }));
+    expect(screen.queryByText("در حال شمارش…")).toBeNull();
+  } finally {
+    addEventListener.mockRestore();
+    Object.defineProperty(AppState, "currentState", { configurable: true, value: previousAppState });
+  }
 });
 
 test("keeps editor gesture ownership while the photo is being dragged", async () => {

@@ -3,6 +3,7 @@ import { ApiError } from "@fitician/core";
 export const BODY_PHOTO_COUNTDOWN_SECONDS = 5 as const;
 export const BODY_PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 export type BodyPhotoMimeType = (typeof BODY_PHOTO_MIME_TYPES)[number];
+export type BodyPhotoSourceMimeType = BodyPhotoMimeType | "image/heic" | "image/heif";
 export type BodyPhotoCaptureSource = "camera" | "library";
 
 export type BodyPhotoCapturedAsset = {
@@ -27,17 +28,26 @@ export function filePathToUri(path: string): string {
 export function bodyPhotoMimeTypeForAsset(
   mimeType: string | null | undefined,
   uri: string,
-): BodyPhotoMimeType | null {
+  options: { readonly allowIosHeif?: boolean } = {},
+): BodyPhotoSourceMimeType | null {
   if (isBodyPhotoMimeType(mimeType)) return mimeType;
+  if (options.allowIosHeif && isIosHeifMimeType(mimeType)) return mimeType;
   const extension = uri.split(/[?#]/u)[0]?.split(".").pop()?.toLowerCase();
   if (extension === "jpg" || extension === "jpeg") return "image/jpeg";
   if (extension === "png") return "image/png";
   if (extension === "webp") return "image/webp";
+  if (options.allowIosHeif && (extension === "heic" || extension === "heif")) {
+    return `image/${extension}`;
+  }
   return null;
 }
 
 export function isBodyPhotoMimeType(value: string | null | undefined): value is BodyPhotoMimeType {
   return BODY_PHOTO_MIME_TYPES.includes(value as BodyPhotoMimeType);
+}
+
+function isIosHeifMimeType(value: string | null | undefined): value is "image/heic" | "image/heif" {
+  return value === "image/heic" || value === "image/heif";
 }
 
 export function bodyPhotoCaptureErrorMessage(error: unknown): string {

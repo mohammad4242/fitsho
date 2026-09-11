@@ -8,10 +8,13 @@ import {
 import { File } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import {
+  AppState,
   Image,
+  Platform,
   StyleSheet,
   Text,
   View,
+  type AppStateStatus,
 } from "react-native";
 import type { BodyPhotoSide, BodyPhotoView } from "@fitician/core/body-photos";
 import type { Sex } from "@fitician/core/profile";
@@ -69,6 +72,12 @@ export function BodyPhotoCapture({
   const { canRequestPermission, hasPermission, requestPermission } = useCameraPermission();
   const [captureMode, setCaptureMode] = useState<"camera" | "library">(initialCaptureMode);
   const [cameraPosition, setCameraPosition] = useState<CameraPosition>("front");
+  const [appState, setAppState] = useState<AppStateStatus>(() => {
+    const currentState = AppState.currentState;
+    return currentState === "background" || currentState === "inactive" || currentState === "extension"
+      ? currentState
+      : "active";
+  });
   const [source, setSource] = useState<BodyPhotoEncoderSource | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [ghostScale, setGhostScale] = useState(initialGhostScale);
@@ -90,6 +99,17 @@ export function BodyPhotoCapture({
   }, [source]);
 
   useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      setAppState(nextState);
+      if (nextState !== "active") {
+        setCountdown(null);
+        setPreviewReady(false);
+      }
+    });
+    return () => subscription?.remove();
+  }, []);
+
+  useEffect(() => {
     return () => {
       const current = sourceRef.current;
       if (current?.source === "camera") deleteLocalFile(current.uri);
@@ -109,7 +129,7 @@ export function BodyPhotoCapture({
   }, [countdown]);
 
   const capturePhoto = useCallback(async () => {
-    if (!previewReady || busy || source !== null) return;
+    if (appState !== "active" || !previewReady || busy || source !== null) return;
     setBusy(true);
     setCameraError(null);
     let rawUri: string | null = null;
@@ -134,7 +154,7 @@ export function BodyPhotoCapture({
       }
       setBusy(false);
     }
-  }, [busy, photoOutput, previewReady, source]);
+  }, [appState, busy, photoOutput, previewReady, source]);
 
   useEffect(() => {
     if (countdown !== 0) return;
@@ -177,7 +197,9 @@ export function BodyPhotoCapture({
       if (result.canceled) return;
       const asset = result.assets[0];
       if (asset === undefined) throw new Error("No photo selected");
-      const mimeType = bodyPhotoMimeTypeForAsset(asset.mimeType, asset.uri);
+      const mimeType = bodyPhotoMimeTypeForAsset(asset.mimeType, asset.uri, {
+        allowIosHeif: Platform.OS === "ios",
+      });
       if (mimeType === null) throw new Error("Unsupported photo format");
       if (asset.width <= 0 || asset.height <= 0) throw new Error("Invalid photo dimensions");
       setSource({
@@ -258,7 +280,7 @@ export function BodyPhotoCapture({
     <Camera
       device={device}
       enableNativeTapToFocusGesture
-      isActive={captureMode === "camera" && source === null}
+      isActive={appState === "active" && captureMode === "camera" && source === null}
       mirrorMode="off"
       onError={(error) => setCameraError(bodyPhotoCaptureErrorMessage(error))}
       onPreviewStarted={() => setPreviewReady(true)}

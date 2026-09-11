@@ -33,6 +33,12 @@ it("accepts supported image types from picker metadata or the URI extension", ()
   expect(bodyPhotoMimeTypeForAsset("image/gif", "asset.gif")).toBeNull();
 });
 
+it("accepts iOS HEIF sources only when the native iOS renderer will transcode them", () => {
+  expect(bodyPhotoMimeTypeForAsset("image/heic", "asset.heic")).toBeNull();
+  expect(bodyPhotoMimeTypeForAsset("image/heic", "asset.heic", { allowIosHeif: true })).toBe("image/heic");
+  expect(bodyPhotoMimeTypeForAsset(undefined, "asset.HEIF", { allowIosHeif: true })).toBe("image/heif");
+});
+
 it("keeps capture failures user-safe and does not expose native details", () => {
   expect(bodyPhotoCaptureErrorMessage({ name: "NotAllowedError" })).toContain("دسترسی");
   expect(bodyPhotoCaptureErrorMessage(new Error("camera unavailable"))).toContain("دوربین");
