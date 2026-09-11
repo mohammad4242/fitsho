@@ -66,6 +66,8 @@ class MarkerImage {
     return path;
   }
 
+  dispose(): void {}
+
   markerAt(outputY: number): Marker {
     if (this.markerSource === null) return "above";
     const sourceY = Math.floor(
@@ -88,6 +90,7 @@ function createImage(overrides: Record<string, unknown> = {}) {
     resizeAsync: vi.fn(async () => createImage()),
     rotateAsync: vi.fn(async () => createImage()),
     saveToTemporaryFileAsync: vi.fn(async () => "/cache/body-photo.jpg"),
+    dispose: vi.fn(),
     ...overrides,
   };
 }
@@ -139,6 +142,29 @@ it("renders the transformed photo into a private JPEG on Android", async () => {
     1620,
   );
   expect(rendered.saveToTemporaryFileAsync).toHaveBeenCalledWith("jpg", 92);
+  expect(source.dispose).toHaveBeenCalledTimes(1);
+  expect(canvas.dispose).toHaveBeenCalledTimes(1);
+  expect(rendered.dispose).toHaveBeenCalledTimes(1);
+});
+
+it("releases native images when rendering fails", async () => {
+  const source = createImage();
+  const canvas = createImage();
+  canvas.renderIntoAsync = vi.fn().mockRejectedValue(new Error("native render failed"));
+  loadFromFileAsync.mockResolvedValue(source);
+  createBlankImage.mockReturnValue(canvas);
+
+  await expect(renderNativeGhostPhoto({
+    height: 2400,
+    source: "library",
+    uri: "file:///cache/source.png",
+    width: 1600,
+    transform: GHOST_EDITOR_DEFAULT_TRANSFORM,
+    view: "front",
+  })).rejects.toThrow("native render failed");
+
+  expect(source.dispose).toHaveBeenCalledTimes(1);
+  expect(canvas.dispose).toHaveBeenCalledTimes(1);
 });
 
 it("uses the female Ghost top crop for the selected view", async () => {

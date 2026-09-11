@@ -24,6 +24,7 @@ function createImage(overrides: Record<string, unknown> = {}) {
     })),
     rotateAsync: vi.fn(async () => createImage()),
     saveToTemporaryFileAsync: vi.fn(async () => "/cache/body-photo-ios.jpg"),
+    dispose: vi.fn(),
     ...overrides,
   };
 }
@@ -64,4 +65,7 @@ it("passes destination width and height to Nitro Image on iOS", async () => {
     1800,
   );
   expect(rendered.saveToTemporaryFileAsync).toHaveBeenCalledWith("jpg", 92);
+  expect(source.dispose).toHaveBeenCalledTimes(1);
+  expect(canvas.dispose).toHaveBeenCalledTimes(1);
+  expect(rendered.dispose).toHaveBeenCalledTimes(1);
 });
