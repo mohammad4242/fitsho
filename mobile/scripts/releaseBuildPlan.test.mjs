@@ -77,6 +77,7 @@ test("protected release workflow exposes all three EAS artifact profiles", async
   const packageJson = JSON.parse(await readFile(resolve(root, "mobile/package.json"), "utf8"));
   assert.match(androidWorkflow, /workflow_dispatch:/u);
   assert.match(androidWorkflow, /EAS_TOKEN/u);
+  assert.match(androidWorkflow, /node-version:\s*["']20\.19\.4["']/u);
   assert.match(iosWorkflow, /name: Fitician iOS release/u);
   assert.match(iosWorkflow, /workflow_dispatch:/u);
   assert.match(iosWorkflow, /EAS_TOKEN/u);
