@@ -81,7 +81,7 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(bodyVisionIosSource, /PoseLandmarker/u);
   assert.match(bodyVisionIosSource, /ImageSegmenter/u);
   assert.match(bodyVisionIosSource, /import UIKit/u);
-  assert.match(bodyVisionIosSource, /applying orientation: cgImageOrientation\(from: frame\.orientation, mirrored: true\)/u);
+  assert.match(bodyVisionIosSource, /applying: cgImageOrientation\(from: frame\.orientation, mirrored: true\)/u);
   assert.match(bodyVisionIosSource, /MPImage\(pixelBuffer: normalizedPixelBuffer, orientation: \.up\)/u);
   assert.doesNotMatch(bodyVisionIosSource, /uiImageOrientation\(from: frame\.orientation, mirrored: frame\.isMirrored\)/u);
   assert.match(bodyVisionIosSource, /modelStatus/u);

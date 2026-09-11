@@ -182,7 +182,7 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
     // transform before inference so front-camera frames keep Android parity.
     let normalizedPixelBuffer = try makeBgraPixelBuffer(
       from: pixelBuffer,
-      applying orientation: cgImageOrientation(from: frame.orientation, mirrored: true),
+      applying: cgImageOrientation(from: frame.orientation, mirrored: true),
     )
     return try MPImage(pixelBuffer: normalizedPixelBuffer, orientation: .up)
   }

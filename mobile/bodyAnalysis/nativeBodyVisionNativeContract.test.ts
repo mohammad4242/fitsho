@@ -57,6 +57,11 @@ describe("Android body vision spike wiring", () => {
 });
 
 describe("iOS body vision module wiring", () => {
+  it("calls the mirrored pixel converter with a valid Swift argument label", async () => {
+    const swift = await read("ios/FiticianBodyVision.swift");
+    expect(swift).toContain("applying: cgImageOrientation(from: frame.orientation, mirrored: true)");
+    expect(swift).not.toContain("applying orientation: cgImageOrientation");
+  });
   it("declares the generated Swift implementation without changing the public contract", async () => {
     const source = await read("src/FiticianBodyVision.nitro.ts");
     const nitro = await read("nitro.json");
