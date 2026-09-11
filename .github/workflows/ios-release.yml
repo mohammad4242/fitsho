@@ -51,6 +51,28 @@ jobs:
         with:
           node-version: "20.19.4"
           cache: npm
+      - name: Select Swift 6.2 toolchain
+        run: |
+          set -euo pipefail
+          xcode_app=""
+          for candidate in \
+            /Applications/Xcode_26.3.app \
+            /Applications/Xcode_26.2.app \
+            /Applications/Xcode_26.1.1.app \
+            /Applications/Xcode_26.0.1.app; do
+            if [[ -d "$candidate" ]]; then
+              xcode_app="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$xcode_app" ]]; then
+            echo "No Xcode 26 toolchain is installed on macos-15" >&2
+            ls -d /Applications/Xcode*.app >&2
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode_app"
+          xcodebuild -version
+          swift --version
       - run: npm ci
       - run: npm run build:core
       - name: Generate sideload iOS project
