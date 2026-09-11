@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   useCameraDevice,
@@ -16,6 +16,8 @@ import {
   View,
   type AppStateStatus,
 } from "react-native";
+import type { NativeBodyVisionResult } from "@fitician/body-vision";
+import type { GhostPoseValidationResult } from "@fitician/core/body-ghost-pose";
 import type { BodyPhotoSide, BodyPhotoView } from "@fitician/core/body-photos";
 import type { Sex } from "@fitician/core/profile";
 
@@ -30,6 +32,8 @@ import {
 } from "@fitician/core/body-ghost-scale";
 import { GHOST_EDITOR_DEFAULT_TRANSFORM } from "@fitician/core/body-ghost-editor";
 import { GhostOverlayGuide } from "./GhostOverlayGuide";
+import { getNativeBodyVision, validateNativeBodyVisionResult } from "./nativeBodyVision";
+import { NativeBodyVisionCamera } from "./NativeBodyVisionCamera";
 import {
   BODY_PHOTO_COUNTDOWN_SECONDS,
   advanceBodyPhotoCountdown,
@@ -57,6 +61,15 @@ export interface BodyPhotoCaptureProps {
 }
 
 type CameraPosition = "front" | "back";
+type LiveStatus = "available" | "unavailable" | "loading";
+type LiveWarning =
+  | "person_missing"
+  | "multiple_people"
+  | "body_out_of_frame"
+  | "too_close"
+  | "too_far"
+  | "wrong_view";
+
 export function BodyPhotoCapture({
   completedViews = [],
   initialCaptureMode = "library",
@@ -85,7 +98,11 @@ export function BodyPhotoCapture({
   const [previewReady, setPreviewReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>("unavailable");
+  const [liveWarnings, setLiveWarnings] = useState<LiveWarning[]>([]);
   const sourceRef = useRef<BodyPhotoEncoderSource | null>(null);
+  const nativeVision = useMemo(() => getNativeBodyVision(), []);
+  const visionReady = nativeVision !== null && nativeVision.modelStatus === "ready";
   const device = useCameraDevice(cameraPosition);
   const photoOutput = usePhotoOutput({
     containerFormat: "jpeg",
@@ -119,6 +136,31 @@ export function BodyPhotoCapture({
   useEffect(() => {
     setPreviewReady(false);
   }, [cameraPosition, captureMode, view]);
+
+  const onNativeVisionResult = useCallback((result: NativeBodyVisionResult) => {
+    try {
+      const { validation } = validateNativeBodyVisionResult(result, {
+        ghostScale,
+        sideProfile,
+        view,
+      });
+      setLiveWarnings(liveWarningsFromValidation(validation));
+      setLiveStatus("available");
+    } catch {
+      setLiveStatus("unavailable");
+      setLiveWarnings([]);
+    }
+  }, [ghostScale, sideProfile, view]);
+
+  const onNativeVisionError = useCallback(() => {
+    setLiveStatus("unavailable");
+    setLiveWarnings([]);
+  }, []);
+
+  useEffect(() => {
+    setLiveStatus(visionReady ? "loading" : "unavailable");
+    setLiveWarnings([]);
+  }, [appState, cameraPosition, captureMode, view, visionReady]);
 
   useEffect(() => {
     if (countdown === null) return undefined;
@@ -254,6 +296,7 @@ export function BodyPhotoCapture({
     true,
   );
 
+  const cameraIsActive = appState === "active" && captureMode === "camera" && source === null;
   const cameraContent = !hasPermission ? (
     <View style={styles.cameraMessage}>
       <Text style={styles.cameraMessageTitle}>دسترسی دوربین لازم است</Text>
@@ -276,11 +319,23 @@ export function BodyPhotoCapture({
       <Notice message={cameraError} variant="danger" />
       <Button label="تلاش دوباره با دوربین" onPress={() => setCameraError(null)} variant="secondary" />
     </View>
+  ) : visionReady && nativeVision !== null && appState === "active" ? (
+    <NativeBodyVisionCamera
+      device={device}
+      isActive={cameraIsActive}
+      nativeVision={nativeVision}
+      onError={(error) => setCameraError(bodyPhotoCaptureErrorMessage(error))}
+      onNativeError={onNativeVisionError}
+      onNativeResult={onNativeVisionResult}
+      onPreviewStarted={() => setPreviewReady(true)}
+      onPreviewStopped={() => setPreviewReady(false)}
+      photoOutput={photoOutput}
+    />
   ) : (
     <Camera
       device={device}
       enableNativeTapToFocusGesture
-      isActive={appState === "active" && captureMode === "camera" && source === null}
+      isActive={cameraIsActive}
       mirrorMode="off"
       onError={(error) => setCameraError(bodyPhotoCaptureErrorMessage(error))}
       onPreviewStarted={() => setPreviewReady(true)}
@@ -424,13 +479,53 @@ export function BodyPhotoCapture({
               ) : null}
             </View>
           ) : null}
-          <Text style={styles.liveStatus}>راهنمای زنده موقتاً غیرفعال است؛ ثبت عکس همچنان ممکن است.</Text>
+          {visionReady && liveStatus === "available" ? (
+            <Text style={styles.liveStatus}>راهنمای زنده فعال است.</Text>
+          ) : visionReady ? (
+            <Text style={styles.liveStatus}>راهنمای زنده در حال آماده‌سازی است.</Text>
+          ) : (
+            <Text style={styles.liveStatus}>راهنمای زنده روی این نسخه در دسترس نیست؛ ثبت عکس همچنان ممکن است.</Text>
+          )}
+          {liveWarnings.length > 0 ? (
+            <Notice message={liveWarnings.map(liveWarningLabel).join(" · ")} variant="warning" />
+          ) : null}
         </>
       ) : null}
 
       {source === null ? <Button disabled={busy} label="بستن این مرحله" onPress={closeCapture} variant="ghost" /> : null}
     </View>
   );
+}
+
+function liveWarningsFromValidation(validation: GhostPoseValidationResult): LiveWarning[] {
+  const warnings = new Set<LiveWarning>();
+  if (validation.warnings.includes("person_missing") || validation.hardRejectCode === "body_not_detected") {
+    warnings.add("person_missing");
+  }
+  if (validation.warnings.includes("multiple_people") || validation.hardRejectCode === "multiple_people_detected") {
+    warnings.add("multiple_people");
+  }
+  if (validation.warnings.includes("body_out_of_frame") || validation.hardRejectCode === "body_out_of_frame") {
+    warnings.add("body_out_of_frame");
+  }
+  if (validation.warnings.includes("too_close")) warnings.add("too_close");
+  if (validation.warnings.includes("too_far")) warnings.add("too_far");
+  if (validation.warnings.includes("wrong_view") || validation.hardRejectCode === "unexpected_body_view") {
+    warnings.add("wrong_view");
+  }
+  return [...warnings];
+}
+
+function liveWarningLabel(warning: LiveWarning): string {
+  const labels: Record<LiveWarning, string> = {
+    body_out_of_frame: "تمام بدن داخل کادر نیست",
+    multiple_people: "فقط یک نفر باید در کادر باشد",
+    person_missing: "بدن پیدا نشد",
+    too_close: "کمی دورتر بایست",
+    too_far: "کمی نزدیک‌تر بایست",
+    wrong_view: "نمای انتخاب‌شده را رعایت کن",
+  };
+  return labels[warning];
 }
 
 export function PhotoClothingGuide() {
