@@ -38,3 +38,18 @@ it("leaves the Expo Development Client URL unmodified", async () => {
     }),
   ).resolves.toBeNull();
 });
+
+it("leaves the native OAuth callback for Auth Session untouched", async () => {
+  await expect(
+    redirectSystemPath({
+      initial: false,
+      path: "com.fitician.app:/oauthredirect?code=authorization-code&state=state-value",
+    }),
+  ).resolves.toBeNull();
+  await expect(
+    redirectSystemPath({
+      initial: false,
+      path: "fitician:///oauthredirect?error=access_denied&state=state-value",
+    }),
+  ).resolves.toBeNull();
+});

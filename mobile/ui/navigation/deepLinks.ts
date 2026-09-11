@@ -2,6 +2,7 @@ import { DEFAULT_APP_LINK_HOST } from "../../config/runtimeConfig";
 
 const deepLinkBase = "fitician://app";
 const nativeLinkHosts = new Set(["app", "auth", "link", "member"]);
+const authSessionCallbackSchemes = new Set(["fitician:", "com.fitician.app:"]);
 
 type MemberDeepLinkResource = "cycles" | "exercises" | "plans";
 
@@ -22,7 +23,9 @@ export function normalizeNativeDeepLinkPath(
   if (isExpoDevelopmentClientIntent(path)) return null;
 
   const parsed = parseDeepLink(path);
-  if (parsed === null || !isAllowedNativeLink(parsed, options.appLinkHost ?? DEFAULT_APP_LINK_HOST)) {
+  if (parsed === null) return "/";
+  if (isAuthSessionCallback(parsed)) return null;
+  if (!isAllowedNativeLink(parsed, options.appLinkHost ?? DEFAULT_APP_LINK_HOST)) {
     return "/";
   }
 
@@ -50,6 +53,16 @@ function isExpoDevelopmentClientIntent(path: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isAuthSessionCallback(parsed: URL): boolean {
+  if (!authSessionCallbackSchemes.has(parsed.protocol)) return false;
+  const isBundleCallback = parsed.protocol === "com.fitician.app:"
+    && parsed.pathname === "/oauthredirect";
+  const isFiticianCallback = parsed.protocol === "fitician:"
+    && (parsed.pathname === "/oauthredirect" || parsed.hostname === "oauthredirect");
+  if (!isBundleCallback && !isFiticianCallback) return false;
+  return ["code", "id_token", "error", "state"].some((key) => parsed.searchParams.has(key));
 }
 
 function parseDeepLink(path: string): URL | null {
