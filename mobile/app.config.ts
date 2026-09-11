@@ -93,7 +93,9 @@ function resolveAppLinkHost(rawHost: string | undefined, isProduction: boolean):
 const isProduction = appVariant === "production";
 const runtimeEnvironment = appVariant as MobileRuntimeEnvironment;
 const updatesUrl = process.env.EXPO_UPDATES_URL?.trim();
-const easProjectId = process.env.EAS_PROJECT_ID?.trim();
+const easProjectId =
+  process.env.EAS_PROJECT_ID?.trim() ||
+  "55951ae7-6c79-4a3a-9b89-69d4585b4667";
 const googleServicesFile = process.env.GOOGLE_SERVICES_JSON?.trim();
 const appLinkHost = resolveAppLinkHost(process.env.FITICIAN_APP_LINK_HOST, isProduction);
 const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() || "";
