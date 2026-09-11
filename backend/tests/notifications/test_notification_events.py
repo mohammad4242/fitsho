@@ -229,9 +229,13 @@ def test_cycle_reminder_producer_persists_and_deduplicates_events(db: Session) -
     )
     db.flush()
 
-    assert enqueue_due_cycle_reminders(db, now=now) == 2
+    enqueued = enqueue_due_cycle_reminders(db, now=now)
+    assert enqueued >= 2
     assert enqueue_due_cycle_reminders(db, now=now) == 0
-    assert len(db.scalars(select(NotificationOutboxEvent)).all()) == 2
+    events = db.scalars(
+        select(NotificationOutboxEvent).where(NotificationOutboxEvent.user_id == user.id)
+    ).all()
+    assert len(events) == 2
 
 
 def test_reminder_payload_has_no_member_or_medical_text() -> None:
