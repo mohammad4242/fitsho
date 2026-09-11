@@ -38,3 +38,8 @@ it("keeps development configuration explicit while allowing local development ta
     "http://localhost:5173",
   );
 });
+
+it("fails closed when development configuration is missing", () => {
+  expect(() => resolveApiBaseUrl(undefined, "development")).toThrow(/required/u);
+  expect(() => resolveFrontendOrigin(undefined, "development")).toThrow(/required/u);
+});

@@ -218,3 +218,17 @@ it("does not pass the upload manager signal to native fetch", async () => {
   const [, init] = fetchImpl.mock.calls[0];
   expect(init?.signal).toBeUndefined();
 });
+
+it("rejects absolute API paths so requests cannot escape the configured backend", async () => {
+  const fetchImpl = vi.fn<typeof fetch>();
+  const transport = createNativeTransport({
+    apiBaseUrl: "https://api.fitician.example",
+    fetchImpl,
+  });
+
+  await expect(transport.request({
+    method: "GET",
+    path: "https://public.example/api/v1/profile",
+  })).rejects.toThrow(/relative/u);
+  expect(fetchImpl).not.toHaveBeenCalled();
+});

@@ -21,15 +21,8 @@ it("normalizes the native API, trusted web origin, and optional Google client co
   });
 });
 
-it("uses safe development defaults when optional Expo extra values are absent", () => {
-  expect(mobileRuntimeConfigFromExtra({})).toEqual({
-    appLinkHost: "app.fitician.example",
-    apiBaseUrl: "http://10.0.2.2:8001",
-    environment: "development",
-    frontendOrigin: "http://localhost:5173",
-    googleAndroidClientId: null,
-    googleIosClientId: null,
-  });
+it("fails closed when development API configuration is absent", () => {
+  expect(() => mobileRuntimeConfigFromExtra({})).toThrow(/required/u);
 });
 
 it("fails closed to release semantics for an invalid explicit environment", () => {

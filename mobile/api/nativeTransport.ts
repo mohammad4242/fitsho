@@ -38,7 +38,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function requestUrl(baseUrl: string, path: string): string {
   if (/^https?:\/\//i.test(path)) {
-    return path;
+    throw new Error("Native API request paths must be relative to the configured backend");
   }
   return `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }

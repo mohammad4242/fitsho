@@ -19,15 +19,4 @@ export function logMobileRuntimeConfiguration(
     api_base_url: config.apiBaseUrl,
     environment: config.environment,
   });
-
-  try {
-    if (new URL(config.apiBaseUrl).hostname === "10.0.2.2") {
-      logDevelopmentDiagnostic("emulator_only_api_target", "warning", {
-        api_base_url: config.apiBaseUrl,
-        target: "android_emulator_only",
-      });
-    }
-  } catch {
-    // Runtime config validation owns malformed URL handling.
-  }
 }

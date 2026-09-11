@@ -1,6 +1,4 @@
 import {
-  DEVELOPMENT_API_BASE_URL,
-  DEVELOPMENT_FRONTEND_ORIGIN,
   resolveApiBaseUrl,
   resolveFrontendOrigin,
   type MobileRuntimeEnvironment,
@@ -26,15 +24,6 @@ export interface MobileRuntimeExtra {
   readonly googleAndroidClientId?: unknown;
   readonly googleIosClientId?: unknown;
 }
-
-const DEFAULT_RUNTIME_CONFIG: MobileRuntimeConfig = {
-  appLinkHost: DEFAULT_APP_LINK_HOST,
-  apiBaseUrl: DEVELOPMENT_API_BASE_URL,
-  environment: "development",
-  frontendOrigin: DEVELOPMENT_FRONTEND_ORIGIN,
-  googleAndroidClientId: null,
-  googleIosClientId: null,
-};
 
 function trimmedString(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -70,7 +59,7 @@ export function mobileRuntimeConfigFromExtra(
   const googleAndroidClientId = trimmedString(extra?.googleAndroidClientId);
   const googleIosClientId = trimmedString(extra?.googleIosClientId);
   return {
-    appLinkHost: appLinkHost ?? DEFAULT_RUNTIME_CONFIG.appLinkHost,
+    appLinkHost: appLinkHost ?? DEFAULT_APP_LINK_HOST,
     apiBaseUrl: resolveApiBaseUrl(apiBaseUrl ?? undefined, environment),
     environment,
     frontendOrigin: resolveFrontendOrigin(frontendOrigin ?? undefined, environment),

@@ -8,9 +8,6 @@ export const TAILSCALE_BACKEND_HOST = endpointConfig.tailscaleBackendHost;
 export const PRODUCTION_API_BASE_URL = `http://${TAILSCALE_BACKEND_HOST}:${endpointConfig.backendPort}`;
 export const PRODUCTION_FRONTEND_ORIGIN = `http://${TAILSCALE_BACKEND_HOST}:${endpointConfig.frontendPort}`;
 
-export const DEVELOPMENT_API_BASE_URL = endpointConfig.developmentApiBaseUrl;
-export const DEVELOPMENT_FRONTEND_ORIGIN = endpointConfig.developmentFrontendOrigin;
-
 function normalizedString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -69,10 +66,7 @@ export function resolveApiBaseUrl(
     return configured;
   }
 
-  return normalizedUrl(
-    normalizedString(value) ?? DEVELOPMENT_API_BASE_URL,
-    "EXPO_PUBLIC_API_BASE_URL",
-  );
+  return requireConfiguredUrl(value, environment, "EXPO_PUBLIC_API_BASE_URL");
 }
 
 export function resolveFrontendOrigin(
@@ -97,8 +91,5 @@ export function resolveFrontendOrigin(
     return configured;
   }
 
-  return normalizedUrl(
-    normalizedString(value) ?? DEVELOPMENT_FRONTEND_ORIGIN,
-    "EXPO_PUBLIC_FRONTEND_ORIGIN",
-  );
+  return requireConfiguredUrl(value, environment, "EXPO_PUBLIC_FRONTEND_ORIGIN");
 }
