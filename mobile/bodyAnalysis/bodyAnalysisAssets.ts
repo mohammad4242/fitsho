@@ -11,11 +11,11 @@ export const bodyResultAssets: {
 } = {
   map: {
     female: {
-      back: require("../assets/body-analysis/web/female-back.jpg"),
+      back: require("../assets/body-analysis/web/female-map-back.jpg"),
       front: require("../assets/body-analysis/web/female-front.jpg"),
     },
     male: {
-      back: require("../assets/body-analysis/web/male-back.jpg"),
+      back: require("../assets/body-analysis/web/male-map-back.jpg"),
       front: require("../assets/body-analysis/web/male-front.jpg"),
     },
   },

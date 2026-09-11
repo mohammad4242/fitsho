@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { test } from "node:test";
 
 const projectRoot = new URL("../../", import.meta.url);
@@ -40,4 +41,12 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.equal(mobilePackage.scripts["export:android:source-maps"], "node scripts/releaseArtifacts.mjs");
   assert.equal(mobileTsconfig.compilerOptions.strict, true);
   assert.doesNotMatch(appConfig, /Fitsho|Fitition/);
+});
+
+test("keeps bundled image basenames unique for Android resources", async () => {
+  const imageDirectory = new URL("mobile/assets/body-analysis/web/", projectRoot);
+  const imageFiles = (await readdir(imageDirectory)).filter((file) => /\.(?:jpg|png|webp)$/u.test(file));
+  const basenames = imageFiles.map((file) => basename(file).replace(/\.[^.]+$/u, ""));
+
+  assert.equal(new Set(basenames).size, basenames.length);
 });
