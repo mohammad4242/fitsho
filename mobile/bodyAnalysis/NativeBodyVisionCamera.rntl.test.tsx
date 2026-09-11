@@ -8,6 +8,7 @@ jest.mock("react-native-vision-camera", () => ({
 }));
 
 import { scheduleOnRN } from "react-native-worklets";
+import { Platform } from "react-native";
 import { Camera, useFrameOutput } from "react-native-vision-camera";
 import type { FiticianBodyVision } from "@fitician/body-vision";
 import { NativeBodyVisionCamera } from "./NativeBodyVisionCamera";
@@ -34,7 +35,39 @@ function createNativeVision(): NativeVisionMock {
 }
 
 beforeEach(() => {
+  jest.restoreAllMocks();
   jest.clearAllMocks();
+});
+
+test.each<["ios" | "android", number, number]>([
+  ["ios", 1_000_001, 1],
+  ["ios", 2, 1],
+  ["android", 2_000_000_000, 1_000_000_000],
+])("throttles %s frames using the platform unit at timestamp %s", (platform, start, scale) => {
+  jest.replaceProperty(Platform, "OS", platform);
+  const nativeVision = createNativeVision();
+  render(
+    <NativeBodyVisionCamera
+      device={device}
+      isActive
+      nativeVision={nativeVision as unknown as FiticianBodyVision}
+      onError={jest.fn()}
+      onNativeResult={jest.fn()}
+      onPreviewStarted={jest.fn()}
+      onPreviewStopped={jest.fn()}
+      photoOutput={photoOutput}
+    />,
+  );
+  const options = jest.mocked(useFrameOutput).mock.calls.at(-1)?.[0] as {
+    onFrame: (frame: { dispose: () => void }) => void;
+  };
+  for (const offset of [0, 0.05, 0.2]) {
+    nativeVision.process.mockReturnValue({ frame: { timestamp: start + offset * scale } });
+    const frame = { dispose: jest.fn() };
+    act(() => options.onFrame(frame));
+    expect(frame.dispose).toHaveBeenCalledTimes(1);
+  }
+  expect(scheduleOnRN).toHaveBeenCalledTimes(2);
 });
 
 test("connects photo and native vision outputs and forwards processed frames", () => {

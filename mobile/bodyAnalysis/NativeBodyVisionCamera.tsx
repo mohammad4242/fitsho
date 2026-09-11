@@ -8,7 +8,7 @@ import {
 import { scheduleOnRN } from "react-native-worklets";
 import type { FiticianBodyVision, NativeBodyVisionResult } from "@fitician/body-vision";
 
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 
 type BodyVisionFrame = Parameters<
   NonNullable<Parameters<typeof useFrameOutput>[0]["onFrame"]>
@@ -46,6 +46,7 @@ export function NativeBodyVisionCamera({
   onPreviewStopped,
   photoOutput,
 }: NativeBodyVisionCameraProps) {
+  const timestampScale = Platform.OS === "android" ? 1_000_000_000 : 1;
   const dispatchState = useMemo(
     () => ({ lastResultTimestampSeconds: Number.NEGATIVE_INFINITY }),
     [],
@@ -59,9 +60,7 @@ export function NativeBodyVisionCamera({
       const result = nativeVision.process(frame);
       // VisionCamera exposes seconds on iOS and nanoseconds on Android. Keep
       // the RN callback bounded without changing the public native contract.
-      const timestampSeconds = result.frame.timestamp > 1_000_000
-        ? result.frame.timestamp / 1_000_000_000
-        : result.frame.timestamp;
+      const timestampSeconds = result.frame.timestamp / timestampScale;
       const shouldDispatch = Number.isFinite(timestampSeconds)
         && (
           dispatchState.lastResultTimestampSeconds === Number.NEGATIVE_INFINITY
@@ -84,7 +83,7 @@ export function NativeBodyVisionCamera({
     } finally {
       frame.dispose();
     }
-  }, [dispatchState, isActive, nativeVision, onNativeError, onNativeResult]);
+  }, [dispatchState, isActive, nativeVision, onNativeError, onNativeResult, timestampScale]);
 
   const onFrameDropped = useCallback(() => {
     "worklet";
