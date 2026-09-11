@@ -17,6 +17,9 @@ it("keeps native tracking on member nutrition contracts", async () => {
   expect(source).toMatch(/createFoodPhotoUploadJob/);
   expect(source).toMatch(/FOOD_PHOTO_PICKER_OPTIONS/);
   expect(source).toMatch(/deletePhotoEstimate/);
+  expect(source).toMatch(/listPhotoEstimates/);
+  expect(source).toMatch(/getPhotoEstimate/);
+  expect(source).toMatch(/photoEstimatePresentation/);
   expect(source).toMatch(/<PageHeading/);
   expect(source).toMatch(/nutritionKeys\.estimate\(\)/);
   expect(source).not.toMatch(/FITICIAN · پیگیری عضو/);

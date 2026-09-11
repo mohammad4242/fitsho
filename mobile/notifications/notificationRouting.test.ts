@@ -15,6 +15,12 @@ it("maps domain notification events to authenticated native destinations", () =>
   expect(notificationPathFromData({ event_type: "nutrition_plan_approved" })).toBe(
     "/member/nutrition",
   );
+  expect(notificationPathFromData({ event_type: "food_photo_analysis_completed" })).toBe(
+    "/member/nutrition",
+  );
+  expect(notificationPathFromData({ event_type: "food_photo_analysis_failed" })).toBe(
+    "/member/nutrition",
+  );
   expect(notificationPathFromData({ event_type: "body_analysis_completed" })).toBe(
     "/member/body-analysis-history",
   );

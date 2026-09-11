@@ -259,3 +259,22 @@ it("keeps private photo and laboratory operations token-bound", async () => {
     },
   ]);
 });
+
+it("reads persisted food photo status and history through member endpoints", async () => {
+  const requests: TransportRequest[] = [];
+  const api = createApi(requests);
+
+  await api.getPhotoEstimate("estimate/1");
+  await api.listPhotoEstimates(12);
+
+  expect(requests).toEqual([
+    {
+      method: "GET",
+      path: "/api/v1/nutrition/tracking/photo-estimates/estimate%2F1",
+    },
+    {
+      method: "GET",
+      path: "/api/v1/nutrition/tracking/photo-estimates?limit=12",
+    },
+  ]);
+});

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react-native";
 import { afterEach, beforeEach, expect, jest, test } from "@jest/globals";
 import * as ImagePicker from "expo-image-picker";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -202,6 +202,8 @@ type TrackingApiDouble = {
   readonly confirmPhoto: jest.Mock<(estimateId: string, input: unknown) => Promise<unknown>>;
   readonly correctPhotoItem: jest.Mock<(estimateId: string, itemId: string, input: unknown) => Promise<unknown>>;
   readonly deletePhotoEstimate: jest.Mock<(estimateId: string) => Promise<unknown>>;
+  readonly getPhotoEstimate: jest.Mock<(estimateId: string) => Promise<unknown>>;
+  readonly listPhotoEstimates: jest.Mock<(limit?: number) => Promise<unknown>>;
 };
 
 let trackingApi: TrackingApiDouble;
@@ -254,6 +256,8 @@ beforeEach(() => {
     confirmPhoto: jest.fn<(estimateId: string, input: unknown) => Promise<unknown>>().mockResolvedValue([]),
     correctPhotoItem: jest.fn<(estimateId: string, itemId: string, input: unknown) => Promise<unknown>>().mockResolvedValue(photoEstimate),
     deletePhotoEstimate: jest.fn<(estimateId: string) => Promise<unknown>>().mockResolvedValue(undefined),
+    getPhotoEstimate: jest.fn<(estimateId: string) => Promise<unknown>>().mockResolvedValue(photoEstimate),
+    listPhotoEstimates: jest.fn<(limit?: number) => Promise<unknown>>().mockResolvedValue([]),
   };
   mockCreateTrackingApi.mockReturnValue(trackingApi as never);
   mockCreateCatalogueApi.mockReturnValue({ getFoodCatalogue: jest.fn() } as never);
@@ -473,6 +477,45 @@ test("renders the photo result with estimated calories and all three macros", as
   expect(photoResult.getByText("پروتئین")).toBeTruthy();
   expect(photoResult.getByText("کربوهیدرات")).toBeTruthy();
   expect(photoResult.getByText("چربی")).toBeTruthy();
+});
+
+test("keeps analysis in the background after upload and refreshes the queued result", async () => {
+  mockRequestCameraPermissionsAsync.mockResolvedValue({ granted: true } as never);
+  mockLaunchCameraAsync.mockResolvedValue({
+    canceled: false,
+    assets: [{ exif: {}, height: 400, mimeType: "image/jpeg", uri: "file:///queued-meal.jpg", width: 400 }],
+  } as never);
+  const queuedPhotoEstimate = {
+    ...photoEstimate,
+    items: [],
+    macro_totals: { calories: 0, carbohydrate_g: 0, fat_g: 0, protein_g: 0 },
+    macro_totals_complete: false,
+    model_id: null,
+    overall_confidence: null,
+    status: "queued" as const,
+  };
+  mockUpload.mockResolvedValue(queuedPhotoEstimate);
+  trackingApi.getPhotoEstimate.mockResolvedValue(photoEstimate);
+  renderTracking();
+  fireEvent.press(screen.getByRole("button", { name: "عکس وعده" }));
+  fireEvent.press(screen.getByRole("checkbox", { name: "با پردازش عکس توسط سرویس ثالث موافقم" }));
+  fireEvent.press(screen.getByRole("button", { name: "گرفتن عکس" }));
+
+  await waitFor(() => {
+    expect(within(screen.getByTestId("nutrition-photo-entry-panel")).getAllByText("تحلیل عکس در صف است").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("nutrition-photo-result")).toBeNull();
+  });
+
+  await act(async () => {
+    jest.advanceTimersByTime(2_500);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  await waitFor(() => {
+    expect(trackingApi.getPhotoEstimate).toHaveBeenCalledWith("photo-estimate-1");
+    expect(screen.getByTestId("nutrition-photo-result")).toBeTruthy();
+  });
 });
 
 test("keeps the adherence accordion closed until opened and preserves its date selector", () => {

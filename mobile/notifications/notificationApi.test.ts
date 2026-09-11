@@ -19,6 +19,7 @@ it("uses the current-device notification and preference endpoints", async () => 
     required_reviews: true,
     body_analysis: false,
     cycle_reminders: true,
+    nutrition_updates: true,
     physician_decisions: false,
   });
   await api.unregisterDevice("device/1");

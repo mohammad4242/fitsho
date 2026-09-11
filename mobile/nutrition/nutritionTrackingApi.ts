@@ -63,11 +63,13 @@ export interface NutritionTrackingApi {
   getAdaptivePreferences(): Promise<NutritionAdaptivePreferences>;
   getAdherence(start: string, end: string): Promise<NutritionAdherence>;
   getDailyTracking(entryDate: string): Promise<NutritionDailyTracking>;
+  getPhotoEstimate(estimateId: string): Promise<NutritionFoodPhotoEstimate>;
   getLabDocuments(): Promise<NutritionLabDocument[]>;
   getLabRequests(): Promise<NutritionLabRequest[]>;
   getRecentFoods(limit?: number): Promise<NutritionRecentFood[]>;
   getSupplementCatalogue(): Promise<NutritionSupplementCatalogue[]>;
   getSupplementOrders(): Promise<NutritionSupplementOrder[]>;
+  listPhotoEstimates(limit?: number): Promise<NutritionFoodPhotoEstimate[]>;
   getTrackingHistory(start: string, end: string): Promise<NutritionDailyTracking[]>;
   grantLabAccess(documentId: string): Promise<PrivateAccessGrant>;
   grantPhotoAccess(estimateId: string): Promise<PrivateAccessGrant>;
@@ -222,6 +224,13 @@ export function createNutritionTrackingApi(
       });
     },
 
+    getPhotoEstimate(estimateId) {
+      return request<NutritionFoodPhotoEstimate>({
+        method: "GET",
+        path: resourcePath("tracking/photo-estimates", estimateId),
+      });
+    },
+
     getLabDocuments() {
       return request<NutritionLabDocument[]>({
         method: "GET",
@@ -255,6 +264,13 @@ export function createNutritionTrackingApi(
       return request<NutritionSupplementOrder[]>({
         method: "GET",
         path: `${nutritionPath}/supplement-orders`,
+      });
+    },
+
+    listPhotoEstimates(limit = 20) {
+      return request<NutritionFoodPhotoEstimate[]>({
+        method: "GET",
+        path: `${nutritionPath}/tracking/photo-estimates?limit=${encodeURIComponent(String(limit))}`,
       });
     },
 

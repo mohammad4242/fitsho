@@ -49,6 +49,7 @@ type TrackingEntry = components["schemas"]["NutritionTrackingEntryResponse"];
 type EntrySource = components["schemas"]["NutritionConsumptionSource"];
 type PhotoItem = components["schemas"]["NutritionFoodPhotoItemResponse"];
 type EntryMode = "manual" | "photo" | null;
+const foodPhotoPollIntervalMs = 2_500;
 
 const checkInOptions: readonly CheckInStatus[] = [
   "on_plan",
@@ -116,6 +117,7 @@ export function NutritionTrackingSection() {
   const [photoConsent, setPhotoConsent] = useState(false);
   const [photoPreviewUri, setPhotoPreviewUri] = useState<string | null>(null);
   const [photoEstimate, setPhotoEstimate] = useState<NutritionFoodPhotoEstimate | null>(null);
+  const [photoHistory, setPhotoHistory] = useState<NutritionFoodPhotoEstimate[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoSuccess, setPhotoSuccess] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -152,6 +154,40 @@ export function NutritionTrackingSection() {
       setSelectedFoodId(catalogueFoods[0].id);
     }
   }, [catalogueFoods, selectedFoodId]);
+
+  useEffect(() => {
+    let active = true;
+    void api.listPhotoEstimates(20).then((estimates) => {
+      if (!active || estimates.length === 0) return;
+      setPhotoHistory(estimates);
+      setPhotoEstimate((current) => current ?? estimates[0] ?? null);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pendingPhotoEstimateId = photoEstimate?.id;
+  const pendingPhotoEstimateStatus = photoEstimate?.status;
+  useEffect(() => {
+    if (!pendingPhotoEstimateId || (pendingPhotoEstimateStatus !== "queued" && pendingPhotoEstimateStatus !== "analyzing")) {
+      return;
+    }
+    let active = true;
+    const poll = async () => {
+      try {
+        const updated = await api.getPhotoEstimate(pendingPhotoEstimateId);
+        if (!active) return;
+        setPhotoEstimate(updated);
+        setPhotoHistory((current) => upsertPhotoHistory(current, updated));
+      } catch {
+        // A later interval retries transient network failures.
+      }
+    };
+    const interval = setInterval(() => void poll(), foodPhotoPollIntervalMs);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [pendingPhotoEstimateId, pendingPhotoEstimateStatus]);
 
   async function refreshDaily(): Promise<void> {
     await queryClient.invalidateQueries({ queryKey: nutritionKeys.tracking(entryDate) });
@@ -325,7 +361,9 @@ export function NutritionTrackingSection() {
       }));
       photoUploadRef.current = handle;
       setPhotoUploading(true);
-      setPhotoEstimate(await handle.promise);
+      const queued = await handle.promise;
+      setPhotoEstimate(queued);
+      setPhotoHistory((current) => upsertPhotoHistory(current, queued));
       setPhotoAmounts({});
       setPhotoFoodIds({});
     } catch (error) {
@@ -339,7 +377,7 @@ export function NutritionTrackingSection() {
   }
 
   async function correctPhotoItem(item: PhotoItem): Promise<void> {
-    if (photoEstimate === null) return;
+    if (photoEstimate === null || !isPhotoEstimateResult(photoEstimate)) return;
     const amount = numericValue(photoAmounts[item.item_id] ?? String(item.estimated_amount));
     const foodId = photoFoodIds[item.item_id];
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -353,11 +391,13 @@ export function NutritionTrackingSection() {
     setPhotoActionBusy(true);
     setPhotoError(null);
     try {
-      setPhotoEstimate(await api.correctPhotoItem(photoEstimate.id, item.item_id, {
+      const updated = await api.correctPhotoItem(photoEstimate.id, item.item_id, {
         estimated_amount: amount,
         food_id: foodId,
         remove: false,
-      }));
+      });
+      setPhotoEstimate(updated);
+      setPhotoHistory((current) => upsertPhotoHistory(current, updated));
     } catch (error) {
       setPhotoError(photoErrorMessage(error));
     } finally {
@@ -366,11 +406,13 @@ export function NutritionTrackingSection() {
   }
 
   async function removePhotoItem(item: PhotoItem): Promise<void> {
-    if (photoEstimate === null) return;
+    if (photoEstimate === null || !isPhotoEstimateResult(photoEstimate)) return;
     setPhotoActionBusy(true);
     setPhotoError(null);
     try {
-      setPhotoEstimate(await api.correctPhotoItem(photoEstimate.id, item.item_id, { remove: true }));
+      const updated = await api.correctPhotoItem(photoEstimate.id, item.item_id, { remove: true });
+      setPhotoEstimate(updated);
+      setPhotoHistory((current) => upsertPhotoHistory(current, updated));
     } catch (error) {
       setPhotoError(photoErrorMessage(error));
     } finally {
@@ -386,6 +428,7 @@ export function NutritionTrackingSection() {
     setPhotoError(null);
     try {
       await api.confirmPhoto(photoEstimate.id, { entry_date: entryDate });
+      setPhotoHistory((current) => upsertPhotoHistory(current, { ...photoEstimate, status: "confirmed", needs_user_confirmation: false }));
       setPhotoEstimate(null);
       setPhotoSuccess("برآورد عکس پس از تأیید تو در ثبت امروز ذخیره شد.");
       await refreshDaily();
@@ -402,6 +445,7 @@ export function NutritionTrackingSection() {
     setPhotoError(null);
     try {
       await api.deletePhotoEstimate(photoEstimate.id);
+      setPhotoHistory((current) => current.filter((item) => item.id !== photoEstimate.id));
       setPhotoEstimate(null);
       setPhotoSuccess("برآورد عکس پاک شد.");
     } catch (error) {
@@ -500,6 +544,7 @@ export function NutritionTrackingSection() {
           catalogueFoods={catalogueFoods}
           consent={photoConsent}
           estimate={photoEstimate}
+          history={photoHistory}
           foodIds={photoFoodIds}
           onAmountChange={(itemId, amount) => setPhotoAmounts((current) => ({ ...current, [itemId]: amount }))}
           onChooseFood={(itemId, foodId) => setPhotoFoodIds((current) => ({ ...current, [itemId]: foodId }))}
@@ -510,6 +555,12 @@ export function NutritionTrackingSection() {
           onPickCamera={() => void choosePhoto("camera")}
           onPickGallery={() => void choosePhoto("gallery")}
           onCorrectItem={(item) => void correctPhotoItem(item)}
+          onSelectHistory={(next) => {
+            setPhotoEstimate(next);
+            setPhotoPreviewUri(null);
+            setPhotoAmounts({});
+            setPhotoFoodIds({});
+          }}
           previewUri={photoPreviewUri}
           uploading={photoUploading}
         />
@@ -895,6 +946,7 @@ function FoodPhotoCard({
   catalogueFoods,
   consent,
   estimate,
+  history,
   foodIds,
   onAmountChange,
   onChooseFood,
@@ -905,6 +957,7 @@ function FoodPhotoCard({
   onPickCamera,
   onPickGallery,
   onCorrectItem,
+  onSelectHistory,
   previewUri,
   uploading,
 }: {
@@ -913,6 +966,7 @@ function FoodPhotoCard({
   readonly catalogueFoods: readonly FoodCatalogueItem[];
   readonly consent: boolean;
   readonly estimate: NutritionFoodPhotoEstimate | null;
+  readonly history: readonly NutritionFoodPhotoEstimate[];
   readonly foodIds: Readonly<Record<string, string>>;
   readonly onAmountChange: (itemId: string, value: string) => void;
   readonly onChooseFood: (itemId: string, foodId: string) => void;
@@ -923,6 +977,7 @@ function FoodPhotoCard({
   readonly onPickCamera: () => void;
   readonly onPickGallery: () => void;
   readonly onCorrectItem: (item: PhotoItem) => void;
+  readonly onSelectHistory: (estimate: NutritionFoodPhotoEstimate) => void;
   readonly previewUri: string | null;
   readonly uploading: boolean;
 }) {
@@ -952,8 +1007,8 @@ function FoodPhotoCard({
           />
         )}
         {uploading ? (
-          <View accessible accessibilityLabel="در حال تحلیل…" accessibilityRole="progressbar" style={styles.photoBusyOverlay}>
-            <Text style={styles.photoBusyText}>در حال تحلیل…</Text>
+          <View accessible accessibilityLabel="در حال آپلود…" accessibilityRole="progressbar" style={styles.photoBusyOverlay}>
+            <Text style={styles.photoBusyText}>در حال آپلود…</Text>
           </View>
         ) : null}
       </View>
@@ -978,7 +1033,43 @@ function FoodPhotoCard({
         <PhotoSourceButton disabled={uploading || !consent} icon="foodLog" label="انتخاب از گالری" onPress={onPickGallery} />
       </View>
 
-      {estimate !== null && presentation !== null ? (
+      {history.length > 0 ? (
+        <View style={styles.photoHistory} testID="nutrition-photo-history">
+          <View style={[styles.photoHistoryHeader, RTL_ROW]}>
+            <Text style={styles.photoHistoryTitle}>سابقه تحلیل عکس</Text>
+            <Text style={styles.photoHistoryCount}>{formatNutritionNumber(history.length)}</Text>
+          </View>
+          <View style={styles.photoHistoryList}>
+            {history.map((item) => {
+              const itemPresentation = photoEstimatePresentation(item);
+              return (
+                <Pressable
+                  accessibilityLabel={itemPresentation.title}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: estimate?.id === item.id }}
+                  key={item.id}
+                  onPress={() => onSelectHistory(item)}
+                  style={[styles.photoHistoryItem, estimate?.id === item.id && styles.photoHistoryItemSelected]}
+                >
+                  <Text style={styles.photoHistoryItemTitle}>{itemPresentation.title}</Text>
+                  <Text style={styles.photoHistoryItemDate}>{formatPhotoHistoryDate(item.created_at) || item.id}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+
+      {estimate !== null && presentation !== null && !isPhotoEstimateResult(estimate) ? (
+        <Notice
+          compact
+          message={presentation.message}
+          title={presentation.title}
+          variant={estimate.status === "failed" ? "danger" : estimate.status === "expired" || estimate.status === "deleted" ? "warning" : "info"}
+        />
+      ) : null}
+
+      {estimate !== null && presentation !== null && isPhotoEstimateResult(estimate) ? (
         <View style={styles.photoResult} testID="nutrition-photo-result">
           <View style={styles.photoSummary}>
             <Text style={styles.photoCaloriesLabel}>کالری تخمینی</Text>
@@ -1205,6 +1296,24 @@ function checkInOptionLabel(status: CheckInStatus): string {
     case "not_recorded":
       return "ثبت نمی‌کنم";
   }
+}
+
+function isPhotoEstimateResult(estimate: NutritionFoodPhotoEstimate): boolean {
+  return estimate.status === "estimated" || estimate.status === "confirmed";
+}
+
+function upsertPhotoHistory(
+  history: NutritionFoodPhotoEstimate[],
+  estimate: NutritionFoodPhotoEstimate,
+): NutritionFoodPhotoEstimate[] {
+  const existingIndex = history.findIndex((item) => item.id === estimate.id);
+  if (existingIndex === -1) return [estimate, ...history];
+  return history.map((item) => (item.id === estimate.id ? estimate : item));
+}
+
+function formatPhotoHistoryDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("fa-IR");
 }
 
 function numericValue(value: string): number {
@@ -1755,6 +1864,60 @@ const styles = StyleSheet.create({
     fontWeight: fiticianTokens.typography.fontWeight.extraBold,
     paddingHorizontal: fiticianTokens.spacing[2],
     paddingVertical: fiticianTokens.spacing[1],
+  },
+  photoHistory: {
+    borderTopColor: fiticianTokens.colors.line,
+    borderTopWidth: 1,
+    gap: fiticianTokens.spacing[2],
+    paddingTop: fiticianTokens.spacing[3],
+  },
+  photoHistoryCount: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+  },
+  photoHistoryHeader: {
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  photoHistoryItem: {
+    ...RTL_ROW,
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.canvas,
+    borderColor: fiticianTokens.colors.line,
+    borderRadius: fiticianTokens.radii.small,
+    borderWidth: 1,
+    justifyContent: "space-between",
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    paddingHorizontal: fiticianTokens.spacing[3],
+    paddingVertical: fiticianTokens.spacing[2],
+  },
+  photoHistoryItemDate: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+  },
+  photoHistoryItemSelected: {
+    borderColor: fiticianTokens.colors.aqua,
+  },
+  photoHistoryItemTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    flex: 1,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+  },
+  photoHistoryList: {
+    gap: fiticianTokens.spacing[2],
+  },
+  photoHistoryTitle: {
+    ...RTL_TEXT,
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.extraBold,
   },
   photoItem: {
     backgroundColor: fiticianTokens.colors.surfaceSubtle,

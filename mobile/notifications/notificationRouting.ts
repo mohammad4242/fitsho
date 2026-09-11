@@ -12,6 +12,8 @@ const notificationRoutes: Readonly<Record<string, NotificationRoutePath>> = {
   body_analysis_completed: "/member/body-analysis-history",
   body_analysis_failed: "/member/body-analysis-history",
   cycle_completion_feedback_due: "/member/workouts",
+  food_photo_analysis_completed: "/member/nutrition",
+  food_photo_analysis_failed: "/member/nutrition",
   nutrition_plan_approved: "/member/nutrition",
   nutrition_review_required: "/physician",
   physician_changes_requested: "/member/nutrition",

@@ -49,6 +49,34 @@ export function photoEstimatePresentation(estimate: NutritionFoodPhotoEstimate):
   readonly message: string;
   readonly title: string;
 } {
+  if (estimate.status === "queued") {
+    return {
+      canConfirm: false,
+      message: "می‌توانی از برنامه استفاده کنی؛ نتیجه بعد از آماده شدن نمایش داده می‌شود.",
+      title: "تحلیل عکس در صف است",
+    };
+  }
+  if (estimate.status === "analyzing") {
+    return {
+      canConfirm: false,
+      message: "تحلیل در پس‌زمینه انجام می‌شود؛ لازم نیست در این صفحه بمانی.",
+      title: "عکس در حال تحلیل است",
+    };
+  }
+  if (estimate.status === "failed") {
+    return {
+      canConfirm: false,
+      message: "تحلیل انجام نشد؛ عکس را دوباره ارسال کن.",
+      title: "تحلیل عکس ناموفق بود",
+    };
+  }
+  if (estimate.status === "expired") {
+    return {
+      canConfirm: false,
+      message: "مهلت این نتیجه تمام شده است؛ عکس را دوباره ارسال کن.",
+      title: "مهلت تحلیل تمام شده است",
+    };
+  }
   if (estimate.status === "deleted") {
     return {
       canConfirm: false,

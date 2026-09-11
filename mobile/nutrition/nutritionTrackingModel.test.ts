@@ -24,6 +24,9 @@ it("rounds adherence only for display", () => {
 
 it("keeps photo estimates visibly estimated until the member confirms them", () => {
   const estimate: components["schemas"]["NutritionFoodPhotoEstimateResponse"] = {
+    created_at: "2026-09-07T00:00:00Z",
+    error_code: null,
+    error_message: null,
     expires_at: "2026-09-08T00:00:00Z",
     id: "estimate-1",
     items: [],
@@ -44,6 +47,9 @@ it("keeps photo estimates visibly estimated until the member confirms them", () 
 
 it("does not offer confirmation for deleted or already confirmed estimates", () => {
   const base: components["schemas"]["NutritionFoodPhotoEstimateResponse"] = {
+    created_at: "2026-09-07T00:00:00Z",
+    error_code: null,
+    error_message: null,
     expires_at: "2026-09-08T00:00:00Z",
     id: "estimate-1",
     items: [],
@@ -63,6 +69,9 @@ it("does not offer confirmation for deleted or already confirmed estimates", () 
 
 it("keeps every estimated photo confirmable after review, even at high confidence", () => {
   const estimate: components["schemas"]["NutritionFoodPhotoEstimateResponse"] = {
+    created_at: "2026-09-07T00:00:00Z",
+    error_code: null,
+    error_message: null,
     expires_at: "2026-09-08T00:00:00Z",
     id: "estimate-1",
     items: [],
@@ -75,4 +84,34 @@ it("keeps every estimated photo confirmable after review, even at high confidenc
   };
 
   expect(photoEstimatePresentation(estimate).canConfirm).toBe(true);
+});
+
+it("keeps queued and failed photo jobs outside the confirmation flow", () => {
+  const base: components["schemas"]["NutritionFoodPhotoEstimateResponse"] = {
+    created_at: "2026-09-07T00:00:00Z",
+    error_code: null,
+    error_message: null,
+    expires_at: "2026-09-08T00:00:00Z",
+    id: "estimate-1",
+    items: [],
+    macro_totals: {},
+    macro_totals_complete: false,
+    model_id: null,
+    needs_user_confirmation: true,
+    overall_confidence: null,
+    status: "queued",
+  };
+
+  expect(photoEstimatePresentation(base)).toMatchObject({
+    canConfirm: false,
+    title: "تحلیل عکس در صف است",
+  });
+  expect(photoEstimatePresentation({ ...base, status: "analyzing" })).toMatchObject({
+    canConfirm: false,
+    title: "عکس در حال تحلیل است",
+  });
+  expect(photoEstimatePresentation({ ...base, status: "failed", error_code: "provider_timeout" })).toMatchObject({
+    canConfirm: false,
+    title: "تحلیل عکس ناموفق بود",
+  });
 });
