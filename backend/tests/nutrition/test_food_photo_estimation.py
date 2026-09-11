@@ -1,8 +1,10 @@
+import asyncio
 import io
 from datetime import date
 from pathlib import Path
 from typing import Any, cast
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -32,6 +34,7 @@ from app.nutrition.food_photo_service import (
     _normalize_image,
     build_food_photo_request,
 )
+from app.nutrition.food_photo_worker import run_food_photo_analysis_once
 from app.nutrition.models import (
     NutritionConsumptionEntry,
     NutritionFoodPhotoEstimate,
@@ -117,6 +120,20 @@ def _image() -> bytes:
     output = io.BytesIO()
     Image.new("RGB", (100, 100), "white").save(output, "PNG")
     return output.getvalue()
+
+
+def _run_worker_once(db: Session, settings: Settings) -> int:
+    async def execute() -> int:
+        async with httpx.AsyncClient() as client:
+            return await run_food_photo_analysis_once(
+                db,
+                settings=settings,
+                ai_client=client,
+                agent_http_client=client,
+                worker_id="test-food-photo-worker",
+            )
+
+    return asyncio.run(execute())
 
 
 def test_food_photo_request_builder_is_the_canonical_task_contract() -> None:
@@ -236,8 +253,13 @@ def test_photo_estimate_maps_catalogue_and_writes_only_after_confirmation(
         },
         files={"file": ("meal.png", _image(), "image/png")},
     )
-    assert estimated.status_code == 201, estimated.text
+    assert estimated.status_code == 202, estimated.text
     body = estimated.json()
+    assert body["status"] == "queued"
+    assert _run_worker_once(db, test_settings) == 1
+    body = client.get(
+        f"/api/v1/nutrition/tracking/photo-estimates/{body['id']}", headers=ORIGIN
+    ).json()
     assert body["needs_user_confirmation"] is True
     assert body["items"][0]["mapping_status"] == "resolved"
     assert db.scalar(select(NutritionConsumptionEntry)) is None
@@ -250,7 +272,7 @@ def test_photo_estimate_maps_catalogue_and_writes_only_after_confirmation(
         },
         files={"file": ("meal.png", _image(), "image/png")},
     )
-    assert replayed.status_code == 201
+    assert replayed.status_code == 202
     assert replayed.json()["id"] == body["id"]
     assert db.scalar(select(func.count()).select_from(NutritionFoodPhotoEstimate)) == 1
 
@@ -331,7 +353,12 @@ def test_agent_photo_estimate_uses_agent_metadata_without_api_credential_decrypt
         files={"file": ("meal.png", _image(), "image/png")},
     )
 
-    assert response.status_code == 201, response.text
+    assert response.status_code == 202, response.text
+    assert provider.requests == []
+    assert _run_worker_once(db, test_settings) == 1
+    body = client.get(
+        f"/api/v1/nutrition/tracking/photo-estimates/{response.json()['id']}", headers=ORIGIN
+    ).json()
     assert provider.requests == [
         build_food_photo_request(
             primary_model="gemini-test",
@@ -352,7 +379,6 @@ def test_agent_photo_estimate_uses_agent_metadata_without_api_credential_decrypt
     stored_path = test_settings.food_photo_storage_root / provider.images[0][0].storage_key
     assert stored_path.is_file()
     assert stored_path.read_bytes() == normalized
-    body = response.json()
     assert body["model_id"] == "gemini-test"
     estimate = db.get(NutritionFoodPhotoEstimate, body["id"])
     assert estimate is not None
@@ -408,9 +434,14 @@ def test_agent_photo_invalid_output_is_rejected_and_stored_photo_removed(
         files={"file": ("meal.png", _image(), "image/png")},
     )
 
-    assert response.status_code == 503, response.text
-    assert response.json()["detail"]["code"] == "FOOD_PHOTO_PROVIDER_UNAVAILABLE"
-    assert db.scalar(select(NutritionFoodPhotoEstimate)) is None
+    assert response.status_code == 202, response.text
+    assert _run_worker_once(db, test_settings) == 1
+    body = client.get(
+        f"/api/v1/nutrition/tracking/photo-estimates/{response.json()['id']}", headers=ORIGIN
+    ).json()
+    assert body["status"] == "failed"
+    assert body["error_code"] == "invalid_output"
+    assert db.scalar(select(NutritionFoodPhotoEstimate)) is not None
     event = db.scalar(
         select(NutritionOperationalEvent).where(
             NutritionOperationalEvent.event_name == "food_photo_estimation",
@@ -418,7 +449,7 @@ def test_agent_photo_invalid_output_is_rejected_and_stored_photo_removed(
         )
     )
     assert event is not None and event.provider == "agent_service:antigravity"
-    assert not any(test_settings.food_photo_storage_root.rglob("*.jpg"))
+    assert any(test_settings.food_photo_storage_root.rglob("*.jpg"))
 
 
 def test_agent_photo_provider_failure_deletes_only_stored_photo(
@@ -429,6 +460,7 @@ def test_agent_photo_provider_failure_deletes_only_stored_photo(
     tmp_path: Path,
 ) -> None:
     test_settings.food_photo_rate_limit = 2
+    test_settings.food_photo_max_attempts = 1
     test_settings.food_photo_storage_root = tmp_path / "food-photos"
     _register(client)
     db.add(
@@ -464,11 +496,16 @@ def test_agent_photo_provider_failure_deletes_only_stored_photo(
         files={"file": ("meal.png", _image(), "image/png")},
     )
 
-    assert response.status_code == 503, response.text
-    assert response.json()["detail"]["code"] == "FOOD_PHOTO_PROVIDER_UNAVAILABLE"
-    assert db.scalar(select(NutritionFoodPhotoEstimate)) is None
+    assert response.status_code == 202, response.text
+    assert _run_worker_once(db, test_settings) == 1
+    body = client.get(
+        f"/api/v1/nutrition/tracking/photo-estimates/{response.json()['id']}", headers=ORIGIN
+    ).json()
+    assert body["status"] == "failed"
+    assert body["error_code"] == "provider_unavailable"
+    assert db.scalar(select(NutritionFoodPhotoEstimate)) is not None
     assert keep.read_text(encoding="utf-8") == "preserve"
-    assert not any(test_settings.food_photo_storage_root.rglob("*.jpg"))
+    assert any(test_settings.food_photo_storage_root.rglob("*.jpg"))
 
 
 # ---------------------------------------------------------------------------
@@ -477,7 +514,10 @@ def test_agent_photo_provider_failure_deletes_only_stored_photo(
 
 
 def _setup_estimate(
-    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+    client: TestClient,
+    db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    test_settings: Settings,
 ) -> dict[str, Any]:
     """Register a user, seed catalogue, configure a fake provider, and run estimation."""
     _register(client)
@@ -505,8 +545,14 @@ def _setup_estimate(
         headers={**ORIGIN, "X-Fitsho-Food-Photo-Consent": "true"},
         files={"file": ("meal.png", _image(), "image/png")},
     )
-    assert response.status_code == 201, response.text
-    return response.json()
+    assert response.status_code == 202, response.text
+    estimate_id = response.json()["id"]
+    assert _run_worker_once(db, test_settings) == 1
+    completed = client.get(
+        f"/api/v1/nutrition/tracking/photo-estimates/{estimate_id}", headers=ORIGIN
+    )
+    assert completed.status_code == 200, completed.text
+    return completed.json()
 
 
 def test_macro_totals_returned_after_estimation(
@@ -514,10 +560,12 @@ def test_macro_totals_returned_after_estimation(
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
+    tmp_path: Path,
 ) -> None:
     """A: Macro totals are returned after estimation with correct scaled values."""
     test_settings.food_photo_rate_limit = 10
-    body = _setup_estimate(client, db, monkeypatch)
+    test_settings.food_photo_storage_root = tmp_path / "food-photos"
+    body = _setup_estimate(client, db, monkeypatch, test_settings)
 
     assert "macro_totals" in body
     assert "macro_totals_complete" in body
@@ -535,10 +583,12 @@ def test_amount_correction_recalculates_macro_totals(
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
+    tmp_path: Path,
 ) -> None:
     """B: Amount correction recalculates totals."""
     test_settings.food_photo_rate_limit = 10
-    body = _setup_estimate(client, db, monkeypatch)
+    test_settings.food_photo_storage_root = tmp_path / "food-photos"
+    body = _setup_estimate(client, db, monkeypatch, test_settings)
     item_id = body["items"][0]["item_id"]
     estimate_id = body["id"]
 
@@ -561,10 +611,12 @@ def test_unresolved_item_produces_incomplete_summary(
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
+    tmp_path: Path,
 ) -> None:
     """C: Unresolved items produce an incomplete summary."""
     test_settings.food_photo_rate_limit = 10
-    body = _setup_estimate(client, db, monkeypatch)
+    test_settings.food_photo_storage_root = tmp_path / "food-photos"
+    body = _setup_estimate(client, db, monkeypatch, test_settings)
     estimate_id = body["id"]
     item_id = body["items"][0]["item_id"]
 
@@ -608,10 +660,12 @@ def test_confirmation_rejects_unresolved_items(
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
+    tmp_path: Path,
 ) -> None:
     """D: Final confirmation rejects unresolved/non-gram items."""
     test_settings.food_photo_rate_limit = 10
-    body = _setup_estimate(client, db, monkeypatch)
+    test_settings.food_photo_storage_root = tmp_path / "food-photos"
+    body = _setup_estimate(client, db, monkeypatch, test_settings)
     estimate_id = body["id"]
 
     # Add an unresolved item
@@ -653,10 +707,12 @@ def test_resolving_unresolved_item_makes_summary_complete(
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
+    tmp_path: Path,
 ) -> None:
     """E: Resolving an unresolved item makes the summary complete."""
     test_settings.food_photo_rate_limit = 10
-    body = _setup_estimate(client, db, monkeypatch)
+    test_settings.food_photo_storage_root = tmp_path / "food-photos"
+    body = _setup_estimate(client, db, monkeypatch, test_settings)
     estimate_id = body["id"]
 
     # Add an unresolved item
@@ -704,10 +760,12 @@ def test_removing_unresolved_item_makes_summary_complete(
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
+    tmp_path: Path,
 ) -> None:
     """F: Removing the unresolved item makes summary complete."""
     test_settings.food_photo_rate_limit = 10
-    body = _setup_estimate(client, db, monkeypatch)
+    test_settings.food_photo_storage_root = tmp_path / "food-photos"
+    body = _setup_estimate(client, db, monkeypatch, test_settings)
     estimate_id = body["id"]
 
     # Add an unresolved item
@@ -748,10 +806,12 @@ def test_free_meal_macro_preview_uses_same_calculation_and_confirms(
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
+    tmp_path: Path,
 ) -> None:
     """G: Free Meal confirmation produces same macros as estimate summary then confirms."""
     test_settings.food_photo_rate_limit = 10
-    body = _setup_estimate(client, db, monkeypatch)
+    test_settings.food_photo_storage_root = tmp_path / "food-photos"
+    body = _setup_estimate(client, db, monkeypatch, test_settings)
     estimate_id = body["id"]
     # The read-only macro_totals from estimation
     read_only_totals = body["macro_totals"]
@@ -779,10 +839,12 @@ def test_macro_totals_do_not_confirm_estimate(
     db: Session,
     monkeypatch: pytest.MonkeyPatch,
     test_settings: Settings,
+    tmp_path: Path,
 ) -> None:
     """H: Receiving macro_totals in estimate response does NOT confirm the estimate."""
     test_settings.food_photo_rate_limit = 10
-    body = _setup_estimate(client, db, monkeypatch)
+    test_settings.food_photo_storage_root = tmp_path / "food-photos"
+    body = _setup_estimate(client, db, monkeypatch, test_settings)
 
     # macro_totals are present in the estimation response
     assert "macro_totals" in body
@@ -948,8 +1010,12 @@ def test_unmapped_food_with_direct_ai_macros_is_complete_and_confirms(
         files={"file": ("joojeh.jpg", _image(), "image/png")},
         headers={**ORIGIN, "X-Fitsho-Food-Photo-Consent": "true"},
     )
-    assert resp.status_code == 201
-    body = resp.json()
+    assert resp.status_code == 202
+    queued = resp.json()
+    assert _run_worker_once(db, test_settings) == 1
+    body = client.get(
+        f"/api/v1/nutrition/tracking/photo-estimates/{queued['id']}", headers=ORIGIN
+    ).json()
     assert body["macro_totals_complete"] is True
     assert body["macro_totals"]["calories"] == 610.0
     assert body["macro_totals"]["protein_g"] == 57.0

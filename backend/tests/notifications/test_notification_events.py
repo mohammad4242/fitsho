@@ -54,6 +54,13 @@ def test_notification_copy_is_static_and_rejects_sensitive_payload_keys() -> Non
             data={"analysis_id": uuid4(), "recipient_role": "admin"},
         )
 
+    food_payload = build_notification_payload(
+        "food_photo_analysis_completed",
+        data={"estimate_id": uuid4()},
+    )
+    assert food_payload["channel_id"] == "fitician-nutrition"
+    assert set(food_payload["data"]) == {"event_type", "estimate_id"}
+
 
 def test_body_analysis_review_notifications_preserve_the_authorized_specialist_role(
     db: Session,

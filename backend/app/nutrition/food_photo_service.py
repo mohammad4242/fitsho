@@ -8,6 +8,7 @@ import tempfile
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
 from typing import BinaryIO
 from uuid import UUID, uuid4
 
@@ -15,11 +16,13 @@ import httpx
 from fastapi import UploadFile
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.body_analysis.admin_config.enums import AIExecutionBackend, AITaskType
+from app.ai.task_provider import ConfiguredAIProvider, build_task_provider
+from app.body_analysis.admin_config.enums import AIExecutionBackend, AIProviderName, AITaskType
 from app.body_analysis.admin_config.models import AITaskConfig
+from app.body_analysis.admin_config.service import decrypted_key
 from app.body_analysis.providers.models import (
     ModelRoute,
     ProviderRoutingPreferences,
@@ -386,6 +389,40 @@ def _food_photo_execution_config(config: AITaskConfig, *, language: str) -> dict
     }
 
 
+def build_food_photo_provider(
+    db: Session,
+    settings: Settings,
+    execution_config: dict[str, object],
+    *,
+    ai_client: httpx.AsyncClient | None,
+    agent_http_client: httpx.AsyncClient | None,
+) -> ConfiguredAIProvider:
+    """Build a provider from the immutable configuration stored with a job."""
+    backend = AIExecutionBackend(str(execution_config.get("execution_backend")))
+    selected_client = ai_client if backend is AIExecutionBackend.API else agent_http_client
+    if not isinstance(selected_client, httpx.AsyncClient):
+        raise ValueError("AI HTTP client is unavailable")
+    task = SimpleNamespace(**execution_config)
+    api_key = (
+        decrypted_key(
+            db,
+            provider=AIProviderName(str(execution_config.get("provider"))),
+            settings=settings,
+        )
+        if backend is AIExecutionBackend.API
+        else None
+    )
+    return build_task_provider(
+        task,
+        settings=settings,
+        http_client=selected_client,
+        agent_http_client=(
+            selected_client if backend is AIExecutionBackend.AGENT_SERVICE else None
+        ),
+        api_key=api_key,
+    )
+
+
 async def enqueue_photo(
     db: Session,
     user_id: UUID,
@@ -446,7 +483,7 @@ async def enqueue_photo(
         db,
         actor_user_id=user_id,
         owner_user_id=user_id,
-        event_type="food_photo_estimated",
+        event_type="food_photo_queued",
         resource_type="food_photo_estimate",
         resource_id=estimate_id,
         metadata={"provider": provider_name, "byte_size": len(normalized)},
@@ -840,11 +877,17 @@ def delete_photo(db: Session, user_id: UUID, estimate_id: UUID, settings: Settin
             NutritionFoodPhotoEstimate.id == estimate_id,
             NutritionFoodPhotoEstimate.user_id == user_id,
         )
+        .with_for_update()
     )
     if row is None:
         raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
     food_photo_storage_path(settings.food_photo_storage_root, row.storage_key).unlink(
         missing_ok=True
+    )
+    db.execute(
+        delete(NutritionFoodPhotoAnalysisJob).where(
+            NutritionFoodPhotoAnalysisJob.estimate_id == row.id
+        )
     )
     row.status = "deleted"
     row.deleted_at = datetime.now(UTC)

@@ -60,6 +60,18 @@ _COPY: dict[str, NotificationCopy] = {
         channel_id="fitician-health",
         allowed_data_keys=frozenset({"analysis_id"}),
     ),
+    "food_photo_analysis_completed": NotificationCopy(
+        title="تحلیل غذا آماده است",
+        body="نتیجه تحلیل عکس غذا برای بررسی آماده است.",
+        channel_id="fitician-nutrition",
+        allowed_data_keys=frozenset({"estimate_id"}),
+    ),
+    "food_photo_analysis_failed": NotificationCopy(
+        title="تحلیل غذا کامل نشد",
+        body="تحلیل عکس غذا کامل نشد؛ دوباره تلاش کنید.",
+        channel_id="fitician-nutrition",
+        allowed_data_keys=frozenset({"estimate_id"}),
+    ),
     "weekly_check_in_due": NotificationCopy(
         title="یادآوری فیتیچیان",
         body="وقت ثبت گزارش هفتگی شماست.",
@@ -105,6 +117,7 @@ PREFERENCE_FIELDS: dict[str, str] = {
     "body_analysis": "body_analysis",
     "cycle_reminders": "cycle_reminders",
     "physician_decisions": "physician_decisions",
+    "nutrition_updates": "nutrition_updates",
 }
 
 

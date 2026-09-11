@@ -139,6 +139,9 @@ class NotificationPreference(Base):
     physician_decisions: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true", nullable=False
     )
+    nutrition_updates: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

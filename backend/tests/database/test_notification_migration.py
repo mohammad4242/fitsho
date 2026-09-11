@@ -33,6 +33,7 @@ def test_notification_tables_are_migrated(db: Session) -> None:
         "body_analysis",
         "cycle_reminders",
         "physician_decisions",
+        "nutrition_updates",
     }.issubset(preference_columns)
 
     outbox_columns = {

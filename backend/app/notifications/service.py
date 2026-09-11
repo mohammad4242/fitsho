@@ -150,6 +150,7 @@ def _preferences_response(
             body_analysis=True,
             cycle_reminders=True,
             physician_decisions=True,
+            nutrition_updates=True,
             updated_at=None,
         )
     return NotificationPreferencesResponse(
@@ -159,6 +160,7 @@ def _preferences_response(
         body_analysis=preferences.body_analysis,
         cycle_reminders=preferences.cycle_reminders,
         physician_decisions=preferences.physician_decisions,
+        nutrition_updates=preferences.nutrition_updates,
         updated_at=preferences.updated_at,
     )
 
@@ -186,6 +188,7 @@ def update_notification_preferences(
     preferences.body_analysis = payload.body_analysis
     preferences.cycle_reminders = payload.cycle_reminders
     preferences.physician_decisions = payload.physician_decisions
+    preferences.nutrition_updates = payload.nutrition_updates
     preferences.updated_at = now
     db.commit()
     db.refresh(preferences)

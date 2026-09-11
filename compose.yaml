@@ -103,6 +103,39 @@ services:
       - -c
       - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  food-photo-worker:
+    build:
+      context: ./backend
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+psycopg://fitsho:fitsho@db:5432/fitsho
+      APP_ENV: local
+      FOOD_PHOTO_STORAGE_ROOT: /var/lib/fitsho/private/food-photos
+      FOOD_PHOTO_WORKER_BATCH_SIZE: ${FOOD_PHOTO_WORKER_BATCH_SIZE:-5}
+      FOOD_PHOTO_WORKER_POLL_SECONDS: ${FOOD_PHOTO_WORKER_POLL_SECONDS:-3}
+      FOOD_PHOTO_WORKER_LEASE_SECONDS: ${FOOD_PHOTO_WORKER_LEASE_SECONDS:-600}
+      FOOD_PHOTO_MAX_ATTEMPTS: ${FOOD_PHOTO_MAX_ATTEMPTS:-3}
+      FOOD_PHOTO_RETRY_BASE_SECONDS: ${FOOD_PHOTO_RETRY_BASE_SECONDS:-30}
+      FOOD_PHOTO_RETRY_MAX_SECONDS: ${FOOD_PHOTO_RETRY_MAX_SECONDS:-1800}
+      AGENT_SERVICE_BASE_URL: http://agent-service:9001
+      AGENT_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN:-}
+      NO_PROXY: agent-service,db,localhost,127.0.0.1
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/var/private/food-photos:/var/lib/fitsho/private/food-photos
+    depends_on:
+      db:
+        condition: service_healthy
+      agent-service:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && python -m app.nutrition.food_photo_worker
+    restart: unless-stopped
+
   notification-worker:
     build:
       context: ./backend

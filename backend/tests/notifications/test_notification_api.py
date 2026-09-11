@@ -153,6 +153,7 @@ def test_notification_preferences_are_user_scoped_and_default_to_enabled(
     assert default.json()["body_analysis"] is True
     assert default.json()["cycle_reminders"] is True
     assert default.json()["physician_decisions"] is True
+    assert default.json()["nutrition_updates"] is True
     assert default.json()["updated_at"] is None
 
     updated = client.put(
@@ -165,6 +166,7 @@ def test_notification_preferences_are_user_scoped_and_default_to_enabled(
             "body_analysis": False,
             "cycle_reminders": True,
             "physician_decisions": False,
+            "nutrition_updates": False,
         },
     )
 
@@ -172,6 +174,7 @@ def test_notification_preferences_are_user_scoped_and_default_to_enabled(
     assert updated.json()["approved_plans"] is False
     assert updated.json()["body_analysis"] is False
     assert updated.json()["physician_decisions"] is False
+    assert updated.json()["nutrition_updates"] is False
     assert updated.json()["updated_at"] is not None
 
     reread = client.get("/api/v1/notifications/preferences", headers=headers)

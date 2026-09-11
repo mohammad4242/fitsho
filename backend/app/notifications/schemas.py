@@ -39,6 +39,7 @@ class NotificationPreferencesUpdateRequest(BaseModel):
     body_analysis: bool
     cycle_reminders: bool
     physician_decisions: bool
+    nutrition_updates: bool = True
 
     model_config = ConfigDict(extra="forbid")
 
@@ -50,4 +51,5 @@ class NotificationPreferencesResponse(BaseModel):
     body_analysis: bool
     cycle_reminders: bool
     physician_decisions: bool
+    nutrition_updates: bool
     updated_at: datetime | None
