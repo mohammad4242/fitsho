@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "appId": "com.fitician.app",
+  "minimumOsVersion": "16.4",
+  "osTracks": ["minimum-supported", "previous-supported", "current-supported"],
+  "deviceTiers": [
+    "small",
+    "standard",
+    "large_dynamic_island",
+    "older_supported",
+    "physical_device"
+  ],
+  "requiredFlows": [
+    "launch",
+    "member",
+    "coach",
+    "physician",
+    "role-boundary",
+    "authentication",
+    "body-analysis-entry"
+  ],
+  "profiles": [
+    {
+      "id": "small-minimum-supported",
+      "deviceFamily": "small iPhone",
+      "tier": "small",
+      "osTrack": "minimum-supported",
+      "execution": "simulator"
+    },
+    {
+      "id": "standard-current-supported",
+      "deviceFamily": "standard iPhone",
+      "tier": "standard",
+      "osTrack": "current-supported",
+      "execution": "simulator"
+    },
+    {
+      "id": "large-dynamic-island-current",
+      "deviceFamily": "large Dynamic Island iPhone",
+      "tier": "large_dynamic_island",
+      "osTrack": "current-supported",
+      "execution": "simulator"
+    },
+    {
+      "id": "older-physical-previous",
+      "deviceFamily": "older supported iPhone",
+      "tier": "older_supported",
+      "osTrack": "previous-supported",
+      "execution": "physical"
+    },
+    {
+      "id": "physical-current",
+      "deviceFamily": "representative physical iPhone",
+      "tier": "physical_device",
+      "osTrack": "current-supported",
+      "execution": "physical"
+    }
+  ]
+}

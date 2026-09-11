@@ -17,10 +17,16 @@ export function validateReleaseConfig(easConfig, appConfig) {
   };
   for (const [name, requirement] of Object.entries(expected)) {
     const profile = profiles[name];
-    assert.equal(profile.environment, requirement.environment, "${name} environment drifted");
-    assert.equal(profile.channel, requirement.channel, "${name} channel drifted");
-    assert.equal(profile.android?.buildType, requirement.buildType, "${name} build type drifted");
-    assert.equal(profile.android?.credentialsSource, "remote", "${name} must use remote signing");
+    assert.equal(profile.environment, requirement.environment, `${name} environment drifted`);
+    assert.equal(profile.channel, requirement.channel, `${name} channel drifted`);
+    assert.equal(profile.android?.buildType, requirement.buildType, `${name} build type drifted`);
+    assert.equal(profile.android?.credentialsSource, "remote", `${name} Android credentials drifted`);
+    assert.equal(profile.ios?.credentialsSource, "remote", `${name} iOS credentials drifted`);
+    assert.equal(
+      profile.distribution,
+      name === "production" ? "store" : "internal",
+      `${name} distribution drifted`,
+    );
     assert.equal(profile.env?.APP_VARIANT, requirement.environment);
   }
   assert.equal(profiles.development.developmentClient, true);
@@ -28,11 +34,17 @@ export function validateReleaseConfig(easConfig, appConfig) {
   assert.equal(profiles.production.autoIncrement, true);
   assert.equal(easConfig.submit?.production?.android?.track, "internal");
   assert.equal(easConfig.submit?.production?.android?.releaseStatus, "draft");
+  assert.ok(easConfig.submit?.production?.ios, "production iOS submit config is missing");
 
   assert.match(appConfig, /runtimeVersion:\s*\{\s*policy:\s*["']appVersion["']/u);
   assert.match(appConfig, /["']expo-updates["']/u);
   assert.match(appConfig, /EXPO_UPDATES_URL/u);
   assert.match(appConfig, /GOOGLE_SERVICES_JSON/u);
+  assert.match(appConfig, /bundleIdentifier:\s*["']com\.fitician\.app["']/u);
+  assert.match(appConfig, /associatedDomains/u);
+  assert.match(appConfig, /EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID/u);
+  assert.match(appConfig, /usesAppleSignIn:\s*true/u);
+  assert.match(appConfig, /withIosHardening/u);
   assert.equal(legacyBrandPattern.test(JSON.stringify(easConfig)), false);
   return easConfig;
 }

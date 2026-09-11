@@ -22,6 +22,18 @@ test("declares the Fitician workspace and native foundation", async () => {
     new URL("mobile/plugins/withIosHardening.ts", projectRoot),
     "utf8",
   );
+  const bodyVisionPodspec = await readFile(
+    new URL("mobile/modules/fitician-body-vision/FiticianBodyVision.podspec", projectRoot),
+    "utf8",
+  );
+  const bodyVisionNitroSpec = await readFile(
+    new URL("mobile/modules/fitician-body-vision/nitro.json", projectRoot),
+    "utf8",
+  );
+  const bodyVisionIosSource = await readFile(
+    new URL("mobile/modules/fitician-body-vision/ios/FiticianBodyVision.swift", projectRoot),
+    "utf8",
+  );
   const mobileTsconfig = await readJson("mobile/tsconfig.json");
 
   assert.deepEqual(rootPackage.workspaces, ["frontend", "mobile", "packages/fitician-core"]);
@@ -49,10 +61,21 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(appConfig, /withAndroidReleaseSymbols/);
   assert.match(appConfig, /withIosHardening/);
   assert.match(appConfig, /bundleIdentifier:\s*["']com\.fitician\.app["']/);
+  assert.match(appConfig, /usesAppleSignIn:\s*true/);
   assert.match(iosHardeningPlugin, /NSCameraUsageDescription/u);
   assert.match(iosHardeningPlugin, /NSExceptionDomains/u);
   assert.match(iosHardeningPlugin, /NSAllowsArbitraryLoads/u);
   assert.match(iosHardeningPlugin, /NSExceptionAllowsInsecureHTTPLoads/u);
+  assert.match(bodyVisionPodspec, /add_nitrogen_files\(s\)/u);
+  assert.match(bodyVisionPodspec, /MediaPipeTasksVision/u);
+  assert.match(bodyVisionPodspec, /pose_landmarker_lite\.task/u);
+  assert.match(bodyVisionPodspec, /selfie_segmenter\.tflite/u);
+  assert.match(bodyVisionNitroSpec, /"iosModuleName":\s*"FiticianBodyVision"/u);
+  assert.match(bodyVisionNitroSpec, /"language":\s*"swift"/u);
+  assert.match(bodyVisionNitroSpec, /"implementationClassName":\s*"FiticianBodyVision"/u);
+  assert.match(bodyVisionIosSource, /PoseLandmarker/u);
+  assert.match(bodyVisionIosSource, /ImageSegmenter/u);
+  assert.match(bodyVisionIosSource, /modelStatus/u);
   assert.match(releaseSymbolsPlugin, /android\.enableMinifyInReleaseBuilds/);
   assert.equal(mobilePackage.scripts["export:android:source-maps"], "node scripts/releaseArtifacts.mjs");
   assert.equal(mobileTsconfig.compilerOptions.strict, true);

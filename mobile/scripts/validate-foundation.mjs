@@ -20,6 +20,22 @@ const androidReleaseSymbols = await readFile(
   resolve(mobileRoot, "plugins/withAndroidReleaseSymbols.ts"),
   "utf8",
 );
+const iosHardening = await readFile(
+  resolve(mobileRoot, "plugins/withIosHardening.ts"),
+  "utf8",
+);
+const bodyVisionPodspec = await readFile(
+  resolve(mobileRoot, "modules/fitician-body-vision/FiticianBodyVision.podspec"),
+  "utf8",
+);
+const bodyVisionNitroSpec = await readFile(
+  resolve(mobileRoot, "modules/fitician-body-vision/nitro.json"),
+  "utf8",
+);
+const bodyVisionIosSource = await readFile(
+  resolve(mobileRoot, "modules/fitician-body-vision/ios/FiticianBodyVision.swift"),
+  "utf8",
+);
 const androidManifestPath = resolve(mobileRoot, "android/app/src/main/AndroidManifest.xml");
 const androidMainActivityPath = resolve(
   mobileRoot,
@@ -46,6 +62,14 @@ assert.equal(
   mobilePackage.scripts["export:android:source-maps"],
   "node scripts/releaseArtifacts.mjs",
 );
+assert.equal(mobilePackage.scripts.ios, "expo run:ios");
+assert.equal(
+  mobilePackage.scripts["export:ios:source-maps"],
+  "node scripts/releaseArtifacts.mjs --platform ios",
+);
+for (const script of ["build:ios:debug", "build:ios:internal", "build:ios:production"]) {
+  assert.match(mobilePackage.scripts[script], /release-build-plan\.mjs --platform ios/u);
+}
 assert.equal(corePackage.name, "@fitician/core");
 assert.match(mobilePackage.dependencies.expo, /^~?57\./);
 assert.match(mobilePackage.dependencies["expo-router"], /^~?57\./);
@@ -70,11 +94,15 @@ for (const required of [
   /["']expo-background-task["']/,
   /["']expo-notifications["']/,
   /["']expo-font["']/,
-  /cameraPermission:\s*["'][^"']+["']/,
+  /cameraPermission:\s*(?:["'][^"']+["']|iosHardening\.IOS_CAMERA_USAGE_DESCRIPTION)/,
   /microphonePermission:\s*false/,
   /photosPermission:\s*false/,
+  /bundleIdentifier:\s*["']com\.fitician\.app["']/,
+  /usesAppleSignIn:\s*true/,
+  /["']expo-apple-authentication["']/,
   /withAndroidHardening/,
   /withAndroidReleaseSymbols/,
+  /withIosHardening/,
 ]) {
   assert.match(appConfig, required);
 }
@@ -88,6 +116,50 @@ for (const required of [
   /FLAG_SECURE/,
 ]) {
   assert.match(androidHardening, required);
+}
+for (const required of [
+  /NSCameraUsageDescription/u,
+  /NSAllowsArbitraryLoads:\s*false/u,
+  /NSExceptionDomains/u,
+  /NSExceptionAllowsInsecureHTTPLoads/u,
+  /NSIncludesSubdomains:\s*false/u,
+]) {
+  assert.match(iosHardening, required);
+}
+for (const required of [
+  /add_nitrogen_files\(s\)/u,
+  /MediaPipeTasksVision/u,
+  /pose_landmarker_lite\.task/u,
+  /selfie_segmenter\.tflite/u,
+]) {
+  assert.match(bodyVisionPodspec, required);
+}
+for (const required of [
+  /"iosModuleName":\s*"FiticianBodyVision"/u,
+  /"ios":\s*\{\s*"language":\s*"swift"/su,
+  /"implementationClassName":\s*"FiticianBodyVision"/u,
+]) {
+  assert.match(bodyVisionNitroSpec, required);
+}
+for (const required of [
+  /PoseLandmarker/u,
+  /ImageSegmenter/u,
+  /modelStatus/u,
+  /pose_landmarker_lite/u,
+  /selfie_segmenter/u,
+]) {
+  assert.match(bodyVisionIosSource, required);
+}
+for (const sourcePath of [
+  "modules/fitician-body-vision/FiticianBodyVision.podspec",
+  "modules/fitician-body-vision/ios/FiticianBodyVision.swift",
+  "modules/fitician-body-vision/nitrogen/generated/ios/FiticianBodyVision+autolinking.rb",
+  "modules/fitician-body-vision/nitrogen/generated/ios/swift/HybridFiticianBodyVisionSpec.swift",
+  "modules/fitician-body-vision/android/src/main/assets/body_vision/pose_landmarker_lite.task",
+  "modules/fitician-body-vision/android/src/main/assets/body_vision/selfie_segmenter.tflite",
+]) {
+  const info = await stat(resolve(mobileRoot, sourcePath));
+  assert.ok(info.isFile() && info.size > 0, `${sourcePath} must be a non-empty source file`);
 }
 try {
   const androidManifest = await readFile(androidManifestPath, "utf8");
@@ -136,6 +208,24 @@ try {
   if (error?.code !== "ENOENT") {
     throw error;
   }
+}
+try {
+  const iosInfoPlist = await readFile(resolve(mobileRoot, "ios/Fitician/Info.plist"), "utf8");
+  assert.match(iosInfoPlist, /NSCameraUsageDescription/u);
+  assert.match(iosInfoPlist, /fitician/u);
+  assert.match(iosInfoPlist, /com\.fitician\.app/u);
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
+}
+try {
+  const iosEntitlements = await readFile(
+    resolve(mobileRoot, "ios/Fitician/Fitician.entitlements"),
+    "utf8",
+  );
+  assert.match(iosEntitlements, /com\.apple\.developer\.associated-domains/u);
+  assert.match(iosEntitlements, /applinks:/u);
+} catch (error) {
+  if (error?.code !== "ENOENT") throw error;
 }
 for (const fontFile of fontFiles) {
   const info = await stat(resolve(mobileRoot, "assets/fonts", fontFile));

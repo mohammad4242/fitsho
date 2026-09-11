@@ -20,3 +20,14 @@ test("keeps EAS profiles isolated and remotely signed", async () => {
   }
   assert.ok(easConfig.submit?.production?.ios);
 });
+
+test("rejects a release profile without remote iOS signing", async () => {
+  const easConfig = JSON.parse(await readFile(resolve(mobileRoot, "eas.json"), "utf8"));
+  const appConfig = await readFile(resolve(mobileRoot, "app.config.ts"), "utf8");
+  delete easConfig.build.preview.ios;
+
+  assert.throws(
+    () => validateReleaseConfig(easConfig, appConfig),
+    /preview iOS credentials/u,
+  );
+});
