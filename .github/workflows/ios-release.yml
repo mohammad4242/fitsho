@@ -74,6 +74,10 @@ jobs:
           xcodebuild -version
           swift --version
       - run: npm ci
+      - name: Patch Swift 6.2 sideload dependency compatibility
+        run: node mobile/scripts/patch-ios-sideload-dependencies.mjs
+        env:
+          IOS_SIDELOAD_BUILD: "1"
       - run: npm run build:core
       - name: Generate sideload iOS project
         run: npm run prebuild --workspace @fitician/mobile -- --platform ios --clean --no-install
