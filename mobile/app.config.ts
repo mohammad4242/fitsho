@@ -193,6 +193,9 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.fitician.app",
     associatedDomains: [`applinks:${appLinkHost}`],
     usesAppleSignIn: true,
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   extra: {
     environment: appVariant,

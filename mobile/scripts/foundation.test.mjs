@@ -65,6 +65,7 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(appConfig, /withAndroidReleaseSymbols/);
   assert.match(appConfig, /withIosHardening/);
   assert.match(appConfig, /bundleIdentifier:\s*["']com\.fitician\.app["']/);
+  assert.match(appConfig, /ITSAppUsesNonExemptEncryption:\s*false/u);
   assert.match(appConfig, /usesAppleSignIn:\s*true/);
   assert.match(iosHardeningPlugin, /NSCameraUsageDescription/u);
   assert.match(iosHardeningPlugin, /NSExceptionDomains/u);
