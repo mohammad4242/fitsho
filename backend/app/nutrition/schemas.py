@@ -1010,14 +1010,17 @@ class NutritionFoodPhotoItemResponse(BaseModel):
 
 class NutritionFoodPhotoEstimateResponse(BaseModel):
     id: UUID
-    status: Literal["estimated", "confirmed", "deleted"]
+    status: Literal["queued", "analyzing", "estimated", "confirmed", "failed", "deleted", "expired"]
     items: list[NutritionFoodPhotoItemResponse]
     overall_confidence: float | None
     needs_user_confirmation: bool
-    model_id: str
+    model_id: str | None
     expires_at: datetime
+    created_at: datetime
     macro_totals: dict[str, float]
     macro_totals_complete: bool
+    error_code: str | None
+    error_message: str | None
 
 
 class NutritionFoodPhotoConfirmationResponse(BaseModel):

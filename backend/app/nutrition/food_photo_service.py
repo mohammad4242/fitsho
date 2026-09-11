@@ -18,13 +18,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.ai.task_provider import build_task_provider
 from app.body_analysis.admin_config.enums import AIExecutionBackend, AITaskType
 from app.body_analysis.admin_config.models import AITaskConfig
-from app.body_analysis.admin_config.service import AIConfigError, decrypted_key
 from app.body_analysis.providers.models import (
-    AIProviderError,
-    ImageInput,
     ModelRoute,
     ProviderRoutingPreferences,
     StructuredGenerationRequest,
@@ -39,6 +35,7 @@ from app.nutrition.food_catalogue import normalize_food_alias
 from app.nutrition.models import (
     NutritionCatalogueFood,
     NutritionConsumptionEntry,
+    NutritionFoodPhotoAnalysisJob,
     NutritionFoodPhotoEstimate,
 )
 from app.nutrition.security import audit_security_event, record_operational_event
@@ -244,6 +241,31 @@ def replay_idempotent_photo(
     return photo_response(previous, db=db) if previous is not None else None
 
 
+def get_photo(db: Session, user_id: UUID, estimate_id: UUID) -> dict[str, object]:
+    row = db.scalar(
+        select(NutritionFoodPhotoEstimate).where(
+            NutritionFoodPhotoEstimate.id == estimate_id,
+            NutritionFoodPhotoEstimate.user_id == user_id,
+        )
+    )
+    if row is None:
+        raise FoodPhotoError("FOOD_PHOTO_ESTIMATE_NOT_FOUND")
+    return photo_response(row, db=db)
+
+
+def list_photos(db: Session, user_id: UUID, *, limit: int = 20) -> list[dict[str, object]]:
+    rows = db.scalars(
+        select(NutritionFoodPhotoEstimate)
+        .where(
+            NutritionFoodPhotoEstimate.user_id == user_id,
+            NutritionFoodPhotoEstimate.deleted_at.is_(None),
+        )
+        .order_by(NutritionFoodPhotoEstimate.created_at.desc())
+        .limit(limit)
+    ).all()
+    return [photo_response(row, db=db) for row in rows]
+
+
 def food_photo_storage_path(root: Path, key: str) -> Path:
     resolved_root = root.resolve()
     relative = PurePosixPath(key)
@@ -327,15 +349,50 @@ def _map_items(db: Session, output: FoodPhotoOutput) -> list[dict[str, object]]:
     return mapped
 
 
-async def estimate_photo(
+def _enum_value(value: object) -> str:
+    raw = getattr(value, "value", value)
+    return str(raw)
+
+
+def _food_photo_provider_name(config: AITaskConfig) -> str:
+    backend = _enum_value(config.execution_backend)
+    if backend == AIExecutionBackend.AGENT_SERVICE.value:
+        agent_name = _enum_value(config.agent_name) if config.agent_name is not None else "unknown"
+        return f"agent_service:{agent_name}"
+    return _enum_value(config.provider)
+
+
+def _food_photo_model_id(config: AITaskConfig) -> str | None:
+    if _enum_value(config.execution_backend) == AIExecutionBackend.AGENT_SERVICE.value:
+        return config.agent_model_id
+    return config.primary_model_id
+
+
+def _food_photo_execution_config(config: AITaskConfig, *, language: str) -> dict[str, object]:
+    return {
+        "task_type": _enum_value(config.task_type),
+        "provider": _enum_value(config.provider),
+        "execution_backend": _enum_value(config.execution_backend),
+        "agent_name": _enum_value(config.agent_name) if config.agent_name is not None else None,
+        "agent_model_id": config.agent_model_id,
+        "agent_profile_id": config.agent_profile_id,
+        "primary_model_id": config.primary_model_id,
+        "fallback_model_ids": list(config.fallback_model_ids or []),
+        "temperature": config.temperature,
+        "max_output_tokens": config.max_output_tokens,
+        "timeout_seconds": config.timeout_seconds,
+        "routing_restrictions": list(config.routing_restrictions or []),
+        "language": language,
+    }
+
+
+async def enqueue_photo(
     db: Session,
     user_id: UUID,
     file: UploadFile,
     consent: bool,
     settings: Settings,
-    client: httpx.AsyncClient,
     idempotency_key: str | None = None,
-    agent_http_client: httpx.AsyncClient | None = None,
     language: str = "fa",
 ) -> dict[str, object]:
     if not consent:
@@ -349,88 +406,41 @@ async def estimate_photo(
     )
     if config is None or not config.enabled:
         raise FoodPhotoError("FOOD_PHOTO_ESTIMATION_DISABLED")
-    try:
-        backend = AIExecutionBackend(config.execution_backend)
-        selected_client = client if backend is AIExecutionBackend.API else agent_http_client
-        if not isinstance(selected_client, httpx.AsyncClient):
-            raise ValueError("AI HTTP client is unavailable")
-        key = (
-            decrypted_key(db, provider=config.provider, settings=settings)
-            if backend is AIExecutionBackend.API
-            else None
-        )
-        configured = build_task_provider(
-            config,
-            settings=settings,
-            http_client=selected_client,
-            agent_http_client=(
-                selected_client if backend is AIExecutionBackend.AGENT_SERVICE else None
-            ),
-            api_key=key,
-        )
-    except (AIConfigError, ValueError) as error:
-        logger.warning("Food photo provider build failed: %s", error, exc_info=True)
-        raise FoodPhotoError("FOOD_PHOTO_PROVIDER_UNAVAILABLE") from error
     content = await file.read(settings.food_photo_max_bytes + 1)
     if len(content) > settings.food_photo_max_bytes:
         raise FoodPhotoError("FOOD_PHOTO_TOO_LARGE")
     normalized, mime_type = _normalize_image(content, settings.food_photo_max_pixels)
     key = _store(settings.food_photo_storage_root, normalized)
-    request = build_food_photo_request(
-        primary_model=configured.primary_model_id,
-        fallback_models=configured.fallback_model_ids,
-        provider_preferences=configured.routing_preferences,
-        temperature=config.temperature,
-        max_output_tokens=config.max_output_tokens,
-        language=language,
-    )
-    try:
-        result = await configured.provider.analyze_images(
-            request,
-            images=(
-                ImageInput(
-                    label="food_photo",
-                    mime_type="image/jpeg",
-                    storage_scope="food",
-                    storage_key=key,
-                ),
-            ),
-        )
-        output = FoodPhotoOutput.model_validate(result.payload)
-    except (AIProviderError, ValueError) as error:
-        logger.warning("Food photo estimation failed: %s", error, exc_info=True)
-        food_photo_storage_path(settings.food_photo_storage_root, key).unlink(missing_ok=True)
-        record_operational_event(
-            db,
-            category="ai",
-            event_name="food_photo_estimation",
-            status="error",
-            provider=configured.provider_name,
-            counters={"requests": 1, "errors": 1},
-        )
-        db.commit()
-        raise FoodPhotoError("FOOD_PHOTO_PROVIDER_UNAVAILABLE") from error
     now = datetime.now(UTC)
+    estimate_id = uuid4()
+    provider_name = _food_photo_provider_name(config)
     row = NutritionFoodPhotoEstimate(
+        id=estimate_id,
         user_id=user_id,
         storage_key=key,
         sha256=hashlib.sha256(normalized).hexdigest(),
         content_type=mime_type,
         byte_size=len(normalized),
         idempotency_key_hash=key_hash,
-        status="estimated",
-        provider=configured.provider_name,
-        model_id=result.model_id,
-        provider_request_id=result.provider_request_id,
-        raw_estimate=output.model_dump(mode="json"),
-        mapped_items=_map_items(db, output),
-        input_tokens=result.input_tokens,
-        output_tokens=result.output_tokens,
-        estimated_cost=result.cost,
+        status="queued",
+        provider=provider_name,
+        model_id=_food_photo_model_id(config),
+        raw_estimate={},
+        mapped_items=[],
         consented_at=now,
         expires_at=now + timedelta(days=settings.food_photo_retention_days),
     )
     db.add(row)
+    db.flush()
+    db.add(
+        NutritionFoodPhotoAnalysisJob(
+            estimate_id=estimate_id,
+            status="queued",
+            available_at=now,
+            max_attempts=settings.food_photo_max_attempts,
+            execution_config=_food_photo_execution_config(config, language=language),
+        )
+    )
     db.flush()
     audit_security_event(
         db,
@@ -438,25 +448,44 @@ async def estimate_photo(
         owner_user_id=user_id,
         event_type="food_photo_estimated",
         resource_type="food_photo_estimate",
-        resource_id=row.id,
-        metadata={"provider": configured.provider_name, "byte_size": len(normalized)},
+        resource_id=estimate_id,
+        metadata={"provider": provider_name, "byte_size": len(normalized)},
     )
     record_operational_event(
         db,
         category="ai",
         event_name="food_photo_estimation",
-        status="success",
-        provider=configured.provider_name,
-        counters={
-            "requests": 1,
-            "errors": 0,
-            "input_tokens": result.input_tokens or 0,
-            "output_tokens": result.output_tokens or 0,
-        },
+        status="queued",
+        provider=provider_name,
+        counters={"requests": 1, "queued": 1},
     )
     db.commit()
     db.refresh(row)
     return photo_response(row, db=db)
+
+
+async def estimate_photo(
+    db: Session,
+    user_id: UUID,
+    file: UploadFile,
+    consent: bool,
+    settings: Settings,
+    client: httpx.AsyncClient,
+    idempotency_key: str | None = None,
+    agent_http_client: httpx.AsyncClient | None = None,
+    language: str = "fa",
+) -> dict[str, object]:
+    """Compatibility wrapper; food-photo estimation is now worker-owned."""
+    del client, agent_http_client
+    return await enqueue_photo(
+        db,
+        user_id,
+        file,
+        consent,
+        settings,
+        idempotency_key=idempotency_key,
+        language=language,
+    )
 
 
 def _item_float(item: dict[str, object], key: str, default: float = 0.0) -> float:
@@ -599,8 +628,11 @@ def photo_response(
         "needs_user_confirmation": True,
         "model_id": row.model_id,
         "expires_at": row.expires_at,
+        "created_at": row.created_at,
         "macro_totals": macro_totals,
         "macro_totals_complete": macro_totals_complete,
+        "error_code": row.error_code,
+        "error_message": row.error_message,
     }
 
 

@@ -15,6 +15,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     SmallInteger,
     String,
@@ -1914,6 +1915,10 @@ class NutritionFoodPhotoEstimate(Base):
         UniqueConstraint(
             "user_id", "idempotency_key_hash", name="uq_nutrition_photo_user_idempotency"
         ),
+        CheckConstraint(
+            "status IN ('queued','analyzing','estimated','confirmed','failed','deleted','expired')",
+            name="ck_nutrition_food_photo_status",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -1929,6 +1934,8 @@ class NutritionFoodPhotoEstimate(Base):
     provider: Mapped[str] = mapped_column(String(32), nullable=False)
     model_id: Mapped[str | None] = mapped_column(String(300))
     provider_request_id: Mapped[str | None] = mapped_column(String(160))
+    error_code: Mapped[str | None] = mapped_column(String(80))
+    error_message: Mapped[str | None] = mapped_column(String(300))
     raw_estimate: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     mapped_items: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
     input_tokens: Mapped[int | None] = mapped_column(BigInteger)
@@ -1938,6 +1945,51 @@ class NutritionFoodPhotoEstimate(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class NutritionFoodPhotoAnalysisJob(Base):
+    __tablename__ = "nutrition_food_photo_analysis_jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued','processing','completed','failed')",
+            name="ck_nutrition_food_photo_analysis_job_status",
+        ),
+        CheckConstraint(
+            "attempt_count >= 0 AND max_attempts BETWEEN 1 AND 10",
+            name="ck_nutrition_food_photo_analysis_job_attempts",
+        ),
+        Index(
+            "ix_nutrition_food_photo_analysis_jobs_claim",
+            "status",
+            "available_at",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    estimate_id: Mapped[UUID] = mapped_column(
+        ForeignKey("nutrition_food_photo_estimates.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), default="queued", server_default="queued", nullable=False
+    )
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_by: Mapped[str | None] = mapped_column(String(128))
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3, server_default="3", nullable=False)
+    execution_config: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    last_error_code: Mapped[str | None] = mapped_column(String(80))
+    last_error_message: Mapped[str | None] = mapped_column(String(300))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

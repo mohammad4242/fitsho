@@ -104,9 +104,10 @@ from app.nutrition.food_photo_service import (
     confirm_photo_macro_preview,
     correct_photo_item,
     delete_photo,
-    estimate_photo,
+    enqueue_photo,
+    get_photo,
+    list_photos,
     open_photo,
-    replay_idempotent_photo,
 )
 from app.nutrition.meal_catalogue import (
     CATEGORY_ORDER,
@@ -2037,11 +2038,10 @@ def _food_photo_error(error: FoodPhotoError) -> HTTPException:
 @router.post(
     "/tracking/photo-estimates",
     response_model=NutritionFoodPhotoEstimateResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_trusted_origin)],
 )
 async def create_food_photo_estimate(
-    request: Request,
     db: DatabaseSession,
     user: CurrentUser,
     settings: AppSettings,
@@ -2054,9 +2054,6 @@ async def create_food_photo_estimate(
     try:
         if idempotency_key is not None and not 8 <= len(idempotency_key) <= 128:
             raise FoodPhotoError("INVALID_IDEMPOTENCY_KEY")
-        replayed = replay_idempotent_photo(db, user.id, idempotency_key)
-        if replayed is not None:
-            return replayed
         consume_rate_limit(
             db,
             actor_user_id=user.id,
@@ -2069,15 +2066,13 @@ async def create_food_photo_estimate(
             if (language == "en" or (accept_language and accept_language.lower().startswith("en")))
             else "fa"
         )
-        return await estimate_photo(
+        return await enqueue_photo(
             db,
             user.id,
             file,
             consent,
             settings,
-            request.app.state.ai_http_client,
             idempotency_key,
-            getattr(request.app.state, "agent_http_client", None),
             language=resolved_lang,
         )
     except RateLimitExceeded as error:
@@ -2086,6 +2081,33 @@ async def create_food_photo_estimate(
             detail={"code": "RATE_LIMIT_EXCEEDED"},
             headers={"Retry-After": str(error.retry_after_seconds)},
         ) from None
+    except FoodPhotoError as error:
+        raise _food_photo_error(error) from None
+
+
+@router.get(
+    "/tracking/photo-estimates",
+    response_model=list[NutritionFoodPhotoEstimateResponse],
+)
+def read_food_photo_estimates(
+    db: DatabaseSession,
+    user: CurrentUser,
+    limit: int = Query(default=20, ge=1, le=100),
+) -> list[NutritionFoodPhotoEstimateResponse]:
+    return list_photos(db, user.id, limit=limit)
+
+
+@router.get(
+    "/tracking/photo-estimates/{estimate_id}",
+    response_model=NutritionFoodPhotoEstimateResponse,
+)
+def read_food_photo_estimate(
+    estimate_id: UUID,
+    db: DatabaseSession,
+    user: CurrentUser,
+) -> NutritionFoodPhotoEstimateResponse:
+    try:
+        return get_photo(db, user.id, estimate_id)
     except FoodPhotoError as error:
         raise _food_photo_error(error) from None
 
