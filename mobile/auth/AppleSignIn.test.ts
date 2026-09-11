@@ -8,6 +8,9 @@ it("uses the native iOS Apple authentication flow and a request nonce", async ()
   expect(source).toMatch(/Platform\.OS\s*===\s*["']ios["']/u);
   expect(source).toMatch(/isAvailableAsync/);
   expect(source).toMatch(/signInAsync/);
-  expect(source).toMatch(/nonce/);
+  expect(source).toMatch(/digestStringAsync/);
+  expect(source).toMatch(/CryptoDigestAlgorithm\.SHA256/);
+  expect(source).toMatch(/nonce:\s*hashedNonce/);
+  expect(source).toMatch(/appleCredentialFromResult\(result, nonce\)/);
   expect(source).toMatch(/requestedScopes/);
 });

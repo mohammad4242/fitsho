@@ -1,5 +1,6 @@
 import base64
 import binascii
+import hashlib
 import hmac
 import json
 import smtplib
@@ -384,7 +385,8 @@ class AppleIdTokenProvider:
         if issued_at is not None and issued_at > self._clock() + self._clock_skew_seconds:
             raise ValueError("Apple identity token is not active")
         token_nonce = _claim_string(claims, "nonce")
-        if token_nonce is None or not hmac.compare_digest(token_nonce, nonce):
+        expected_nonce = hashlib.sha256(nonce.encode("utf-8")).hexdigest()
+        if token_nonce is None or not hmac.compare_digest(token_nonce, expected_nonce):
             raise ValueError("Invalid Apple token nonce")
         subject = _claim_string(claims, "sub")
         if subject is None or not subject or len(subject) > 255:

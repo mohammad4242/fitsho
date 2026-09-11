@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import time
 from collections.abc import Mapping
@@ -30,7 +31,7 @@ def _jwk(public_key: rsa.RSAPublicKey, kid: str = "apple-test") -> dict[str, str
 def _token(
     private_key: rsa.RSAPrivateKey,
     *,
-    nonce: str = "nonce-1",
+    nonce: str = hashlib.sha256(b"nonce-1").hexdigest(),
     subject: str = "apple-sub-1",
     issuer: str = "https://appleid.apple.com",
     audience: str = "com.fitician.app",
@@ -88,6 +89,7 @@ def test_verifies_signed_apple_identity_and_private_relay_email(
         ("audience", "another-client", "nonce-1"),
         ("expires_at", int(time.time()) - 60, "nonce-1"),
         ("nonce", "different-nonce", "nonce-1"),
+        ("nonce", "nonce-1", "nonce-1"),
     ],
 )
 def test_rejects_invalid_apple_claims(
@@ -110,7 +112,8 @@ def test_rejects_tampered_apple_signature(
     private_key, jwks = apple_material
     token = _token(private_key)
     header, claims, signature = token.split(".")
-    tampered = f"{header}.{claims}.{signature[:-1]}A"
+    tampered_signature = ("A" if signature[0] != "A" else "B") + signature[1:]
+    tampered = f"{header}.{claims}.{tampered_signature}"
 
     with pytest.raises(ValueError):
         _provider(jwks).verify(tampered, nonce="nonce-1")

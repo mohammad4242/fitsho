@@ -1,5 +1,5 @@
 import * as AppleAuthentication from "expo-apple-authentication";
-import { randomUUID } from "expo-crypto";
+import { CryptoDigestAlgorithm, digestStringAsync, randomUUID } from "expo-crypto";
 import { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
 
@@ -52,8 +52,9 @@ export function useAppleSignIn(): AppleSignInController {
     }
     const nonce = randomUUID();
     try {
+      const hashedNonce = await digestStringAsync(CryptoDigestAlgorithm.SHA256, nonce);
       const result = await AppleAuthentication.signInAsync({
-        nonce,
+        nonce: hashedNonce,
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
