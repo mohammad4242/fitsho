@@ -35,7 +35,7 @@ export default function VerifyEmailScreen() {
     return () => {
       active = false;
     };
-  }, [auth, token]);
+  }, [auth.verifyEmail, token]);
 
   return (
     <AuthScaffold

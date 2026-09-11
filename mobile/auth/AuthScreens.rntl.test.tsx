@@ -23,6 +23,7 @@ import { useMobileAuth } from "./MobileAuthProvider";
 import { authStyles } from "./authStyles";
 import RegisterScreen from "../app/(auth)/auth/register";
 import SignInScreen from "../app/(auth)/auth/sign-in";
+import VerifyEmailScreen from "../app/(auth)/auth/verify-email";
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -35,6 +36,7 @@ type MockAuth = {
   signInWithApple: jest.Mock<(credential: unknown) => Promise<unknown>>;
   signInWithPassword: jest.Mock<(credentials: { email: string; password: string }) => Promise<unknown>>;
   startupError: string | null;
+  verifyEmail: jest.Mock<(token: string) => Promise<void>>;
   verifyPhoneOtp: jest.Mock<(phoneNumber: string, code: string) => Promise<unknown>>;
 };
 let mockAuth: MockAuth;
@@ -79,6 +81,7 @@ beforeEach(() => {
     signInWithGoogle: jest.fn<MockAuth["signInWithGoogle"]>().mockResolvedValue({}),
     signInWithPassword: jest.fn<MockAuth["signInWithPassword"]>().mockResolvedValue({}),
     startupError: null,
+    verifyEmail: jest.fn<MockAuth["verifyEmail"]>().mockResolvedValue(undefined),
     verifyPhoneOtp: jest.fn<MockAuth["verifyPhoneOtp"]>().mockResolvedValue({}),
   };
   mockGoogleCredential = jest.fn<() => Promise<string>>().mockResolvedValue("google-credential");
@@ -194,6 +197,29 @@ test("uses Google and keeps the public onboarding destination", async () => {
     pathname: "/onboarding",
     params: { source: "public-onboarding" },
   });
+});
+
+test("does not repeat email verification when the auth snapshot changes", async () => {
+  mockUseLocalSearchParams.mockReturnValue({ token: "verification-token" } as never);
+  const firstAuth = mockAuth;
+  const view = renderScreen(<VerifyEmailScreen />);
+
+  await waitFor(() => expect(firstAuth.verifyEmail).toHaveBeenCalledTimes(1));
+
+  mockUseMobileAuth.mockReturnValue({ ...firstAuth, busy: true } as never);
+  view.rerender(
+    <SafeAreaProvider
+      initialMetrics={{
+        frame: { height: 800, width: 390, x: 0, y: 0 },
+        insets: { bottom: 0, left: 0, right: 0, top: 0 },
+      }}
+    >
+      <VerifyEmailScreen />
+    </SafeAreaProvider>,
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(firstAuth.verifyEmail).toHaveBeenCalledTimes(1);
 });
 
 test("keeps Register in the Web field order and validates confirmation", async () => {
