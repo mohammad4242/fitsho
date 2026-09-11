@@ -143,7 +143,10 @@ const config: ExpoConfig = {
       },
     ],
     "expo-background-task",
-    ["expo-notifications", { mode: isProduction ? "production" : "development" }],
+    [
+      "expo-notifications",
+      { mode: appVariant === "development" ? "development" : "production" },
+    ],
     "expo-updates",
     "expo-video",
     [

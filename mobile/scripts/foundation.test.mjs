@@ -60,7 +60,7 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(appConfig, /cameraPermission:\s*iosHardening\.IOS_CAMERA_USAGE_DESCRIPTION/u);
   assert.match(
     appConfig,
-    /\["expo-notifications",\s*\{\s*mode:\s*isProduction\s*\?\s*"production"\s*:\s*"development"\s*\}\]/u,
+    /mode:\s*appVariant\s*===\s*"development"\s*\?\s*"development"\s*:\s*"production"/u,
   );
   assert.match(appConfig, /withAndroidReleaseSymbols/);
   assert.match(appConfig, /withIosHardening/);

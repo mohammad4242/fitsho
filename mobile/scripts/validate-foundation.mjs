@@ -98,6 +98,7 @@ for (const required of [
   /\["expo-sqlite",\s*\{\s*useSQLCipher:\s*true\s*\}\]/,
   /["']expo-background-task["']/,
   /["']expo-notifications["']/,
+  /mode:\s*appVariant\s*===\s*["']development["']\s*\?\s*["']development["']\s*:\s*["']production["']/u,
   /["']expo-font["']/,
   /cameraPermission:\s*(?:["'][^"']+["']|iosHardening\.IOS_CAMERA_USAGE_DESCRIPTION)/,
   /microphonePermission:\s*false/,
