@@ -44,29 +44,29 @@ jobs:
   sideload:
     if: ${{ inputs.profile == 'sideload' }}
     name: Build unsigned iOS sideload IPA
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20.19.4"
           cache: npm
-      - name: Select Swift 6.2 toolchain
+      - name: Select Swift 6.3 toolchain
         run: |
           set -euo pipefail
           xcode_app=""
           for candidate in \
-            /Applications/Xcode_26.3.app \
-            /Applications/Xcode_26.2.app \
-            /Applications/Xcode_26.1.1.app \
-            /Applications/Xcode_26.0.1.app; do
+            /Applications/Xcode_26.5.app \
+            /Applications/Xcode_26.4.1.app \
+            /Applications/Xcode_26.4.app \
+            /Applications/Xcode_26.6.app; do
             if [[ -d "$candidate" ]]; then
               xcode_app="$candidate"
               break
             fi
           done
           if [[ -z "$xcode_app" ]]; then
-            echo "No Xcode 26 toolchain is installed on macos-15" >&2
+            echo "No Xcode 26.4+ toolchain is installed on macos-26" >&2
             ls -d /Applications/Xcode*.app >&2
             exit 1
           fi

@@ -117,9 +117,9 @@ test("protected release workflow exposes all three EAS artifact profiles", async
   assert.match(iosWorkflow, /build:ios:internal/u);
   assert.match(iosWorkflow, /build:ios:production/u);
   assert.match(iosWorkflow, /- sideload\s*$/mu);
-  assert.match(iosWorkflow, /runs-on:\s*macos-15/u);
+  assert.match(iosWorkflow, /runs-on:\s*macos-26/u);
   assert.match(iosWorkflow, /xcode-select -s/u);
-  assert.match(iosWorkflow, /Xcode_26\.3\.app/u);
+  assert.match(iosWorkflow, /Xcode_26\.5\.app/u);
   assert.match(iosWorkflow, /patch-ios-sideload-dependencies\.mjs/u);
   assert.match(iosWorkflow, /IOS_SIDELOAD_BUILD/u);
   assert.match(sideloadBuildScript, /generic\/platform=iOS/u);
