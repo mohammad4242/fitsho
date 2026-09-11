@@ -33,5 +33,5 @@ it("uses safe development defaults when optional Expo extra values are absent", 
 });
 
 it("fails closed to release semantics for an invalid explicit environment", () => {
-  expect(mobileRuntimeConfigFromExtra({ environment: "unexpected" }).environment).toBe("production");
+  expect(() => mobileRuntimeConfigFromExtra({ environment: "unexpected" })).toThrow(/production/u);
 });

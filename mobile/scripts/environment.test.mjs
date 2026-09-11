@@ -14,16 +14,23 @@ test("parses and validates each Fitician mobile environment", () => {
 
   assert.equal(values.APP_VARIANT, "preview");
   assert.doesNotThrow(() => validateEnvironment("preview", values));
+  assert.doesNotThrow(() => validateEnvironment("production", {
+    ...values,
+    APP_VARIANT: "production",
+    EXPO_PUBLIC_API_BASE_URL: "http://100.97.78.5:8001",
+    EXPO_PUBLIC_FRONTEND_ORIGIN: "http://100.97.78.5:5173",
+    FITICIAN_APP_LINK_HOST: "app.fitician.example",
+  }, { allowPlaceholder: true }));
   assert.throws(
     () =>
       validateEnvironment("production", {
         ...values,
         APP_VARIANT: "production",
         EXPO_PUBLIC_API_BASE_URL: "https://api.fitician.example",
-        EXPO_PUBLIC_FRONTEND_ORIGIN: "https://fitician.example",
+        EXPO_PUBLIC_FRONTEND_ORIGIN: "http://100.97.78.5:5173",
         FITICIAN_APP_LINK_HOST: "app.fitician.example",
       }),
-    /verified HTTPS host/,
+    /Tailscale backend/,
   );
 });
 

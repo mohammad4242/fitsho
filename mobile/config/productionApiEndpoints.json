@@ -1,0 +1,7 @@
+{
+  "tailscaleBackendHost": "100.97.78.5",
+  "backendPort": 8001,
+  "frontendPort": 5173,
+  "developmentApiBaseUrl": "http://10.0.2.2:8001",
+  "developmentFrontendOrigin": "http://localhost:5173"
+}

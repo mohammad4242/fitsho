@@ -2,6 +2,11 @@ import { loadModuleSync } from "@expo/require-utils";
 import type { ExpoConfig } from "expo/config";
 import { resolve } from "node:path";
 
+const productionApiConfig = loadModuleSync(
+  resolve(__dirname, "config/productionApiConfig.ts"),
+) as typeof import("./config/productionApiConfig");
+type MobileRuntimeEnvironment = import("./config/productionApiConfig").MobileRuntimeEnvironment;
+
 const withAndroidHardening = loadModuleSync(
   resolve(__dirname, "plugins/withAndroidHardening.ts"),
 ).default;
@@ -83,6 +88,7 @@ function resolveAppLinkHost(rawHost: string | undefined, isProduction: boolean):
 }
 
 const isProduction = appVariant === "production";
+const runtimeEnvironment = appVariant as MobileRuntimeEnvironment;
 const updatesUrl = process.env.EXPO_UPDATES_URL?.trim();
 const easProjectId = process.env.EAS_PROJECT_ID?.trim();
 const googleServicesFile = process.env.GOOGLE_SERVICES_JSON?.trim();
@@ -168,9 +174,15 @@ const config: ExpoConfig = {
   },
   extra: {
     environment: appVariant,
-    apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL || "http://10.0.2.2:8001",
+    apiBaseUrl: productionApiConfig.resolveApiBaseUrl(
+      process.env.EXPO_PUBLIC_API_BASE_URL,
+      runtimeEnvironment,
+    ),
     appLinkHost,
-    frontendOrigin: process.env.EXPO_PUBLIC_FRONTEND_ORIGIN || "http://localhost:5173",
+    frontendOrigin: productionApiConfig.resolveFrontendOrigin(
+      process.env.EXPO_PUBLIC_FRONTEND_ORIGIN,
+      runtimeEnvironment,
+    ),
     googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || null,
     googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || null,
     ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),

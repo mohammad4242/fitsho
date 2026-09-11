@@ -1,5 +1,13 @@
+import {
+  DEVELOPMENT_API_BASE_URL,
+  DEVELOPMENT_FRONTEND_ORIGIN,
+  resolveApiBaseUrl,
+  resolveFrontendOrigin,
+  type MobileRuntimeEnvironment,
+} from "./productionApiConfig";
+
 export const DEFAULT_APP_LINK_HOST = "app.fitician.example";
-export type MobileRuntimeEnvironment = "development" | "preview" | "production";
+export type { MobileRuntimeEnvironment } from "./productionApiConfig";
 
 export interface MobileRuntimeConfig {
   readonly appLinkHost: string;
@@ -21,9 +29,9 @@ export interface MobileRuntimeExtra {
 
 const DEFAULT_RUNTIME_CONFIG: MobileRuntimeConfig = {
   appLinkHost: DEFAULT_APP_LINK_HOST,
-  apiBaseUrl: "http://10.0.2.2:8001",
+  apiBaseUrl: DEVELOPMENT_API_BASE_URL,
   environment: "development",
-  frontendOrigin: "http://localhost:5173",
+  frontendOrigin: DEVELOPMENT_FRONTEND_ORIGIN,
   googleAndroidClientId: null,
   googleIosClientId: null,
 };
@@ -34,10 +42,6 @@ function trimmedString(value: unknown): string | null {
   }
   const result = value.trim();
   return result === "" ? null : result;
-}
-
-function withoutTrailingSlash(value: string): string {
-  return value.replace(/\/+$/, "");
 }
 
 function runtimeEnvironment(value: unknown): MobileRuntimeEnvironment {
@@ -67,9 +71,9 @@ export function mobileRuntimeConfigFromExtra(
   const googleIosClientId = trimmedString(extra?.googleIosClientId);
   return {
     appLinkHost: appLinkHost ?? DEFAULT_RUNTIME_CONFIG.appLinkHost,
-    apiBaseUrl: withoutTrailingSlash(apiBaseUrl ?? DEFAULT_RUNTIME_CONFIG.apiBaseUrl),
+    apiBaseUrl: resolveApiBaseUrl(apiBaseUrl ?? undefined, environment),
     environment,
-    frontendOrigin: withoutTrailingSlash(frontendOrigin ?? DEFAULT_RUNTIME_CONFIG.frontendOrigin),
+    frontendOrigin: resolveFrontendOrigin(frontendOrigin ?? undefined, environment),
     googleAndroidClientId,
     googleIosClientId,
   };

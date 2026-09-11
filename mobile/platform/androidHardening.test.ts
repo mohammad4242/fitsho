@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import type { AndroidManifest } from "expo/config-plugins";
 
 import * as androidHardening from "../plugins/withAndroidHardening";
+import { TAILSCALE_BACKEND_HOST } from "../config/productionApiConfig";
 import {
   ANDROID_BLOCKED_PERMISSIONS,
   FITICIAN_BACKUP_RULES,
@@ -73,6 +74,9 @@ it("excludes all app data from legacy and modern Android backup paths", () => {
 it("requires system-trusted TLS and disallows cleartext traffic in release", () => {
   expect(FITICIAN_NETWORK_SECURITY_CONFIG).toContain("cleartextTrafficPermitted=\"false\"");
   expect(FITICIAN_NETWORK_SECURITY_CONFIG).toContain("certificates src=\"system\"");
+  expect(FITICIAN_NETWORK_SECURITY_CONFIG).toContain(
+    `<domain includeSubdomains=\"false\">${TAILSCALE_BACKEND_HOST}</domain>`,
+  );
 });
 
 it("allows cleartext development traffic while retaining the network security resource", () => {

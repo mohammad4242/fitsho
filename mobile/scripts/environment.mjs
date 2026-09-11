@@ -1,5 +1,15 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 const ENVIRONMENT_NAMES = new Set(["development", "preview", "production"]);
 const APP_LINK_PLACEHOLDER = "app.fitician.example";
+const mobileRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const endpointConfig = JSON.parse(
+  readFileSync(resolve(mobileRoot, "config/productionApiEndpoints.json"), "utf8"),
+);
+const productionApiBaseUrl = `http://${endpointConfig.tailscaleBackendHost}:${endpointConfig.backendPort}`;
+const productionFrontendOrigin = `http://${endpointConfig.tailscaleBackendHost}:${endpointConfig.frontendPort}`;
 
 export function parseEnvFile(contents) {
   const values = {};
@@ -39,7 +49,15 @@ export function validateEnvironment(expectedVariant, values, options = {}) {
   const apiUrl = values.EXPO_PUBLIC_API_BASE_URL;
   if (!apiUrl) throw new Error("EXPO_PUBLIC_API_BASE_URL is required");
   const parsedApiUrl = new URL(apiUrl);
-  if (!parsedApiUrl.hostname || (expectedVariant !== "development" && parsedApiUrl.protocol !== "https:")) {
+  if (expectedVariant === "production" && apiUrl.replace(/\/+$/u, "") !== productionApiBaseUrl) {
+    throw new Error(
+      `EXPO_PUBLIC_API_BASE_URL must equal the configured Tailscale backend ${productionApiBaseUrl}`,
+    );
+  }
+  if (
+    !parsedApiUrl.hostname
+    || (expectedVariant !== "development" && expectedVariant !== "production" && parsedApiUrl.protocol !== "https:")
+  ) {
     throw new Error("EXPO_PUBLIC_API_BASE_URL must use HTTPS outside development");
   }
 
@@ -51,9 +69,21 @@ export function validateEnvironment(expectedVariant, values, options = {}) {
     parsedFrontendOrigin.pathname !== "/" ||
     parsedFrontendOrigin.search ||
     parsedFrontendOrigin.hash ||
-    (expectedVariant !== "development" && parsedFrontendOrigin.protocol !== "https:")
+    (
+      expectedVariant !== "development"
+      && expectedVariant !== "production"
+      && parsedFrontendOrigin.protocol !== "https:"
+    )
   ) {
     throw new Error("EXPO_PUBLIC_FRONTEND_ORIGIN must use HTTPS outside development");
+  }
+  if (
+    expectedVariant === "production"
+    && frontendOrigin.replace(/\/+$/u, "") !== productionFrontendOrigin
+  ) {
+    throw new Error(
+      `EXPO_PUBLIC_FRONTEND_ORIGIN must equal the configured Tailscale origin ${productionFrontendOrigin}`,
+    );
   }
 
   const appLinkHost = values.FITICIAN_APP_LINK_HOST;
