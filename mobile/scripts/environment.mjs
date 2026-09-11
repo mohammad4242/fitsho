@@ -39,6 +39,20 @@ function validateHostname(value) {
   }
 }
 
+function validateGoogleClientIds(values) {
+  const androidClientId = values.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() || "";
+  const iosClientId = values.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || "";
+  for (const [name, clientId] of [
+    ["EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID", androidClientId],
+    ["EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID", iosClientId],
+  ]) {
+    if (!clientId) continue;
+    if (!clientId.endsWith(".apps.googleusercontent.com")) {
+      throw new Error(`${name} must be a Google OAuth client ID`);
+    }
+  }
+}
+
 export function validateEnvironment(expectedVariant, values, options = {}) {
   if (!ENVIRONMENT_NAMES.has(expectedVariant)) {
     throw new Error(`Unsupported environment ${expectedVariant}`);
@@ -88,6 +102,7 @@ export function validateEnvironment(expectedVariant, values, options = {}) {
 
   const appLinkHost = values.FITICIAN_APP_LINK_HOST;
   validateHostname(appLinkHost);
+  validateGoogleClientIds(values);
   if (expectedVariant === "production" && appLinkHost === APP_LINK_PLACEHOLDER && !options.allowPlaceholder) {
     throw new Error(
       "FITICIAN_APP_LINK_HOST must be set to a verified HTTPS host for production builds",

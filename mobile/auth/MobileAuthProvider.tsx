@@ -23,6 +23,7 @@ import { getMobileRuntimeConfig } from "../config/nativeRuntimeConfig";
 import { logDevelopmentDiagnostic } from "../platform/logging";
 import { createSecureRefreshTokenStore } from "./tokenStore";
 import { resolveMobileClientMetadata } from "./deviceMetadata";
+import type { AppleAuthCredential } from "./appleCredential";
 import {
   MobileAuthSession,
   type MobileAuthSessionSnapshot,
@@ -39,6 +40,7 @@ export interface MobileAuthContextValue extends MobileAuthSessionSnapshot {
   readonly resetPassword: (token: string, password: string) => Promise<void>;
   readonly sendEmailVerification: () => Promise<GenericMessage>;
   readonly sendPhoneOtp: (phoneNumber: string) => Promise<GenericMessage & { retry_after_seconds: number }>;
+  readonly signInWithApple: (credential: AppleAuthCredential) => Promise<User>;
   readonly signInWithGoogle: (credential: string) => Promise<User>;
   readonly signInWithPassword: (credentials: Credentials) => Promise<User>;
   readonly verifyEmail: (token: string) => Promise<void>;
@@ -130,6 +132,10 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
     (credential: string) => activeSession.signInWithGoogle(credential),
     [activeSession],
   );
+  const signInWithApple = useCallback(
+    (credential: AppleAuthCredential) => activeSession.signInWithApple(credential),
+    [activeSession],
+  );
   const signInWithPassword = useCallback(
     (credentials: Credentials) => activeSession.signInWithPassword(credentials),
     [activeSession],
@@ -153,6 +159,7 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
       resetPassword,
       sendEmailVerification,
       sendPhoneOtp,
+      signInWithApple,
       signInWithGoogle,
       signInWithPassword,
       verifyEmail,
@@ -169,6 +176,7 @@ export function MobileAuthProvider({ children, session }: MobileAuthProviderProp
       resetPassword,
       sendEmailVerification,
       sendPhoneOtp,
+      signInWithApple,
       signInWithGoogle,
       signInWithPassword,
       snapshot,

@@ -11,19 +11,27 @@ from app.auth.cookies import (
 )
 from app.auth.dependencies import get_current_mobile_session, get_current_user
 from app.auth.exceptions import (
+    AppleAccountConflictError,
     AuthRateLimitError,
     EmailAlreadyRegisteredError,
     GoogleAccountConflictError,
     InvalidCredentialsError,
 )
 from app.auth.models import User
-from app.auth.providers import EmailProvider, GoogleIdentityProvider, SmsProvider
+from app.auth.providers import (
+    AppleIdentityProvider,
+    EmailProvider,
+    GoogleIdentityProvider,
+    SmsProvider,
+)
 from app.auth.schemas import (
+    AppleAuthRequest,
     EmailVerificationRequest,
     ForgotPasswordRequest,
     GenericMessageResponse,
     GoogleAuthRequest,
     LoginRequest,
+    MobileAppleLoginRequest,
     MobileAuthResponse,
     MobileGoogleLoginRequest,
     MobilePasswordLoginRequest,
@@ -40,7 +48,9 @@ from app.auth.schemas import (
 from app.auth.service import (
     MobileAccessContext,
     MobileAuthResult,
+    authenticate_apple,
     authenticate_google,
+    authenticate_mobile_apple,
     authenticate_mobile_google,
     authenticate_mobile_phone_otp,
     authenticate_password_user,
@@ -97,6 +107,16 @@ def get_google_identity_provider(request: Request) -> GoogleIdentityProvider:
 GoogleIdentityDelivery = Annotated[
     GoogleIdentityProvider,
     Depends(get_google_identity_provider),
+]
+
+
+def get_apple_identity_provider(request: Request) -> AppleIdentityProvider:
+    return request.app.state.apple_identity_provider  # type: ignore[no-any-return]
+
+
+AppleIdentityDelivery = Annotated[
+    AppleIdentityProvider,
+    Depends(get_apple_identity_provider),
 ]
 
 
@@ -320,6 +340,94 @@ def mobile_google_auth(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Unable to use this Google account",
+        ) from None
+    return _mobile_auth_response(result)
+
+
+@router.post(
+    "/apple",
+    response_model=UserResponse,
+    dependencies=[Depends(require_trusted_origin)],
+)
+def apple_auth(
+    payload: AppleAuthRequest,
+    request: Request,
+    response: Response,
+    db: DatabaseSession,
+    settings: AppSettings,
+    provider: AppleIdentityDelivery,
+) -> UserResponse:
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="apple",
+        limit=settings.auth_apple_ip_limit,
+    )
+    try:
+        identity = provider.verify(payload.identity_token, payload.nonce)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Apple authentication failed",
+        ) from None
+    try:
+        result = authenticate_apple(db, identity, settings.session_ttl_seconds)
+    except AppleAccountConflictError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Unable to use this Apple account",
+        ) from None
+    set_session_cookie(response, result.raw_token, settings)
+    return UserResponse.model_validate(result.user)
+
+
+@router.post(
+    "/mobile/apple",
+    response_model=MobileAuthResponse,
+)
+def mobile_apple_auth(
+    payload: MobileAppleLoginRequest,
+    request: Request,
+    db: DatabaseSession,
+    settings: AppSettings,
+    provider: AppleIdentityDelivery,
+) -> MobileAuthResponse:
+    if payload.platform != "ios":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Apple authentication is only available on iOS",
+        )
+    _consume_limit(
+        db,
+        settings,
+        actor=f"ip:{_client_actor(request)}",
+        operation="mobile-apple-ip",
+        limit=settings.auth_mobile_apple_ip_limit,
+    )
+    try:
+        identity = provider.verify(payload.identity_token, payload.nonce)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Apple authentication failed",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
+    try:
+        result = authenticate_mobile_apple(
+            db,
+            identity,
+            device_id=payload.device_id,
+            platform=payload.platform,
+            app_version=payload.app_version,
+            device_name=payload.device_name,
+            access_ttl_seconds=settings.mobile_access_token_ttl_seconds,
+            refresh_ttl_seconds=settings.mobile_refresh_token_ttl_seconds,
+        )
+    except AppleAccountConflictError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Unable to use this Apple account",
         ) from None
     return _mobile_auth_response(result)
 

@@ -96,6 +96,13 @@ const updatesUrl = process.env.EXPO_UPDATES_URL?.trim();
 const easProjectId = process.env.EAS_PROJECT_ID?.trim();
 const googleServicesFile = process.env.GOOGLE_SERVICES_JSON?.trim();
 const appLinkHost = resolveAppLinkHost(process.env.FITICIAN_APP_LINK_HOST, isProduction);
+const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim() || "";
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim() || "";
+for (const clientId of [googleAndroidClientId, googleIosClientId]) {
+  if (clientId && !clientId.endsWith(".apps.googleusercontent.com")) {
+    throw new Error("Google client IDs must use the Google OAuth client ID format");
+  }
+}
 
 const config: ExpoConfig = {
   name: "Fitician",
@@ -109,6 +116,7 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-dev-client",
     "expo-web-browser",
+    "expo-apple-authentication",
     [
       "expo-splash-screen",
       {
@@ -188,8 +196,8 @@ const config: ExpoConfig = {
       process.env.EXPO_PUBLIC_FRONTEND_ORIGIN,
       runtimeEnvironment,
     ),
-    googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || null,
-    googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || null,
+    googleAndroidClientId: googleAndroidClientId || null,
+    googleIosClientId: googleIosClientId || null,
     ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
   },
 };

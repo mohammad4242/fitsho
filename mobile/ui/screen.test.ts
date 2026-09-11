@@ -63,6 +63,19 @@ it("wraps scrollable content in safe-area and keyboard-aware native containers",
   expect(flattenStyle(scroll.props.contentContainerStyle)).toMatchObject({ direction: "rtl" });
 });
 
+it("uses iOS padding keyboard avoidance while preserving the shared RTL safe area", () => {
+  native.Platform.OS = "ios";
+
+  const safeArea = element(Screen({ children: "form" }));
+  const keyboard = element(safeArea.props.children);
+
+  expect(keyboard.props.behavior).toBe("padding");
+  expect(keyboard.props.keyboardVerticalOffset).toBe(24);
+  expect(flattenStyle(safeArea.props.style)).toMatchObject({ direction: "rtl" });
+
+  native.Platform.OS = "android";
+});
+
 it("uses tablet gutters and reading width for non-scroll content", () => {
   native.dimensions.width = 1024;
   native.dimensions.height = 768;

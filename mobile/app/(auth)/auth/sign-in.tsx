@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
@@ -9,6 +10,7 @@ import { onboardingRoute, publicOnboardingParams } from "../../../auth/authRoute
 import { authCopy, mobileAuthCopy } from "../../../auth/copy";
 import { authErrorMessage } from "../../../auth/authError";
 import { authStyles } from "../../../auth/authStyles";
+import { useAppleSignIn } from "../../../auth/AppleSignIn";
 import { useGoogleSignIn } from "../../../auth/GoogleSignIn";
 import { useMobileAuth } from "../../../auth/MobileAuthProvider";
 import { normalizePhoneNumber, validateEmail, validateOtpCode, validatePassword, validatePhoneNumber } from "../../../auth/validation";
@@ -33,6 +35,7 @@ interface PhoneSignInFormValues {
 export default function SignInScreen() {
   const router = useRouter();
   const auth = useMobileAuth();
+  const apple = useAppleSignIn();
   const google = useGoogleSignIn();
   const params = useLocalSearchParams<{ reason?: string; source?: string }>();
   const [mode, setMode] = useState<SignInMode>("email");
@@ -40,6 +43,7 @@ export default function SignInScreen() {
   const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [appleBusy, setAppleBusy] = useState(false);
   const emailForm = useForm<EmailSignInFormValues>({ defaultValues: { email: "", password: "" } });
   const phoneForm = useForm<PhoneSignInFormValues>({ defaultValues: { code: "", phoneNumber: "" } });
   const sessionExpired = params.reason === "session-expired" || auth.sessionExpired;
@@ -97,6 +101,19 @@ export default function SignInScreen() {
       setError(authErrorMessage(submissionError, "google"));
     } finally {
       setGoogleBusy(false);
+    }
+  };
+
+  const submitApple = async () => {
+    setError(null);
+    setAppleBusy(true);
+    try {
+      await auth.signInWithApple(await apple.signIn());
+      router.replace(onboardingRoute(params.source));
+    } catch (submissionError) {
+      setError(authErrorMessage(submissionError, "apple"));
+    } finally {
+      setAppleBusy(false);
     }
   };
 
@@ -252,6 +269,19 @@ export default function SignInScreen() {
           onPress={() => void submitGoogle()}
           variant="secondary"
         />
+        {apple.available ? (
+          <AppleAuthentication.AppleAuthenticationButton
+            accessibilityLabel="ادامه با اپل"
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            cornerRadius={8}
+            onPress={() => {
+              if (appleBusy || auth.busy || !apple.ready) return;
+              void submitApple();
+            }}
+            style={[authStyles.appleButton, (appleBusy || auth.busy) && { opacity: 0.6 }]}
+          />
+        ) : null}
         <View style={authStyles.footer}>
           <Text style={authStyles.footerText}>{authCopy.login.noAccount}</Text>
           <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/auth/register", params: publicOnboardingParams(params.source) })}>

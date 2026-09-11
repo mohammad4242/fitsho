@@ -40,6 +40,15 @@ class GoogleAuthRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class AppleAuthRequest(BaseModel):
+    identity_token: str = Field(min_length=1, max_length=8192)
+    nonce: str = Field(min_length=1, max_length=256)
+    email: EmailStr | None = None
+    full_name: str | None = Field(default=None, max_length=256)
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class EmailVerificationRequest(BaseModel):
     token: str = Field(min_length=1, max_length=256)
 
@@ -97,6 +106,13 @@ class MobilePasswordLoginRequest(MobileClientMetadata):
 
 class MobileGoogleLoginRequest(MobileClientMetadata):
     credential: str = Field(min_length=1, max_length=8192)
+
+
+class MobileAppleLoginRequest(MobileClientMetadata):
+    identity_token: str = Field(min_length=1, max_length=8192)
+    nonce: str = Field(min_length=1, max_length=256)
+    email: EmailStr | None = None
+    full_name: str | None = Field(default=None, max_length=256)
 
 
 class MobilePhoneVerifyOtpRequest(MobileClientMetadata):

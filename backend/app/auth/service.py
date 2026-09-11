@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth.exceptions import (
+    AppleAccountConflictError,
     AuthRateLimitError,
     EmailAlreadyRegisteredError,
     GoogleAccountConflictError,
@@ -30,7 +31,7 @@ from app.auth.models import (
     PhoneOtpChallenge,
     User,
 )
-from app.auth.providers import EmailProvider, GoogleIdentity, SmsProvider
+from app.auth.providers import AppleIdentity, EmailProvider, GoogleIdentity, SmsProvider
 from app.auth.schemas import LoginRequest, RegisterRequest
 from app.auth.security import (
     DUMMY_PASSWORD_HASH,
@@ -371,6 +372,116 @@ def authenticate_mobile_google(
     except IntegrityError as error:
         db.rollback()
         raise GoogleAccountConflictError from error
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+
+
+def _authenticate_apple_user(
+    db: Session,
+    identity: AppleIdentity,
+    now: datetime,
+) -> User:
+    normalized_apple_email = (
+        normalize_email(identity.email) if identity.email is not None else None
+    )
+    user = db.scalar(select(User).where(User.apple_sub == identity.sub).with_for_update())
+    if user is None:
+        email_user = (
+            db.scalar(select(User).where(User.email == normalized_apple_email).with_for_update())
+            if normalized_apple_email is not None
+            else None
+        )
+        if identity.email_verified and normalized_apple_email is not None:
+            if email_user is not None:
+                if email_user.apple_sub not in {None, identity.sub}:
+                    raise AppleAccountConflictError
+                user = email_user
+                user.apple_sub = identity.sub
+                user.email_verified_at = user.email_verified_at or now
+            else:
+                user = User(
+                    email=normalized_apple_email,
+                    apple_sub=identity.sub,
+                    email_verified_at=now,
+                )
+                db.add(user)
+                db.flush()
+        else:
+            if email_user is not None:
+                raise AppleAccountConflictError
+            user = User(apple_sub=identity.sub)
+            db.add(user)
+            db.flush()
+    elif identity.email_verified and normalized_apple_email is not None:
+        if user.email == normalized_apple_email:
+            user.email_verified_at = user.email_verified_at or now
+        elif user.email is None:
+            email_user = db.scalar(
+                select(User).where(User.email == normalized_apple_email).with_for_update()
+            )
+            if email_user is not None and email_user.id != user.id:
+                raise AppleAccountConflictError
+            user.email = normalized_apple_email
+            user.email_verified_at = now
+    return user
+
+
+def authenticate_apple(
+    db: Session,
+    identity: AppleIdentity,
+    session_ttl_seconds: int,
+) -> AuthResult:
+    now = datetime.now(UTC)
+    try:
+        user = _authenticate_apple_user(db, identity, now)
+        auth_session, raw_token = _new_session(user, session_ttl_seconds, now)
+        db.add(auth_session)
+        db.commit()
+        db.refresh(user)
+    except AppleAccountConflictError:
+        db.rollback()
+        raise
+    except IntegrityError as error:
+        db.rollback()
+        raise AppleAccountConflictError from error
+    except SQLAlchemyError:
+        db.rollback()
+        raise
+    return AuthResult(user=user, raw_token=raw_token)
+
+
+def authenticate_mobile_apple(
+    db: Session,
+    identity: AppleIdentity,
+    *,
+    device_id: str,
+    platform: str,
+    app_version: str,
+    device_name: str | None,
+    access_ttl_seconds: int,
+    refresh_ttl_seconds: int,
+) -> MobileAuthResult:
+    now = datetime.now(UTC)
+    try:
+        user = _authenticate_apple_user(db, identity, now)
+        return issue_mobile_tokens(
+            db,
+            user,
+            device_id=device_id,
+            platform=platform,
+            app_version=app_version,
+            device_name=device_name,
+            access_ttl_seconds=access_ttl_seconds,
+            refresh_ttl_seconds=refresh_ttl_seconds,
+            now=now,
+        )
+    except AppleAccountConflictError:
+        db.rollback()
+        raise
+    except IntegrityError as error:
+        db.rollback()
+        raise AppleAccountConflictError from error
     except SQLAlchemyError:
         db.rollback()
         raise

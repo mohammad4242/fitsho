@@ -6,10 +6,18 @@ jest.mock("expo-router", () => ({ useLocalSearchParams: jest.fn(), useRouter: je
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
 jest.mock("./MobileAuthProvider", () => ({ useMobileAuth: jest.fn() }));
+jest.mock("./AppleSignIn", () => ({ useAppleSignIn: jest.fn() }));
 jest.mock("./GoogleSignIn", () => ({ useGoogleSignIn: jest.fn() }));
+jest.mock("expo-apple-authentication", () => ({
+  AppleAuthenticationButton: () => null,
+  AppleAuthenticationButtonStyle: { BLACK: "black" },
+  AppleAuthenticationButtonType: { SIGN_IN: "sign-in" },
+}));
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 
+import { useAppleSignIn } from "./AppleSignIn";
+import type { AppleAuthCredential } from "./appleCredential";
 import { useGoogleSignIn } from "./GoogleSignIn";
 import { useMobileAuth } from "./MobileAuthProvider";
 import { authStyles } from "./authStyles";
@@ -24,14 +32,17 @@ type MockAuth = {
   sendPhoneOtp: jest.Mock<(phoneNumber: string) => Promise<{ retry_after_seconds: number }>>;
   sessionExpired: boolean;
   signInWithGoogle: jest.Mock<(credential: string) => Promise<unknown>>;
+  signInWithApple: jest.Mock<(credential: unknown) => Promise<unknown>>;
   signInWithPassword: jest.Mock<(credentials: { email: string; password: string }) => Promise<unknown>>;
   startupError: string | null;
   verifyPhoneOtp: jest.Mock<(phoneNumber: string, code: string) => Promise<unknown>>;
 };
 let mockAuth: MockAuth;
 let mockGoogleCredential: jest.Mock<() => Promise<string>>;
+let mockAppleCredential: jest.Mock<() => Promise<AppleAuthCredential>>;
 const mockUseLocalSearchParams = jest.mocked(useLocalSearchParams);
 const mockUseRouter = jest.mocked(useRouter);
+const mockUseAppleSignIn = jest.mocked(useAppleSignIn);
 const mockUseGoogleSignIn = jest.mocked(useGoogleSignIn);
 const mockUseMobileAuth = jest.mocked(useMobileAuth);
 
@@ -64,18 +75,30 @@ beforeEach(() => {
     register: jest.fn<MockAuth["register"]>().mockResolvedValue({}),
     sendPhoneOtp: jest.fn<MockAuth["sendPhoneOtp"]>().mockResolvedValue({ retry_after_seconds: 2 }),
     sessionExpired: false,
+    signInWithApple: jest.fn<MockAuth["signInWithApple"]>().mockResolvedValue({}),
     signInWithGoogle: jest.fn<MockAuth["signInWithGoogle"]>().mockResolvedValue({}),
     signInWithPassword: jest.fn<MockAuth["signInWithPassword"]>().mockResolvedValue({}),
     startupError: null,
     verifyPhoneOtp: jest.fn<MockAuth["verifyPhoneOtp"]>().mockResolvedValue({}),
   };
   mockGoogleCredential = jest.fn<() => Promise<string>>().mockResolvedValue("google-credential");
+  mockAppleCredential = jest.fn<() => Promise<AppleAuthCredential>>().mockResolvedValue({
+    email: null,
+    fullName: null,
+    identityToken: "apple-credential",
+    nonce: "nonce-1",
+  });
   mockUseRouter.mockReturnValue({ push: mockPush, replace: mockReplace } as never);
   mockUseLocalSearchParams.mockReturnValue({} as never);
   mockUseGoogleSignIn.mockReturnValue({
     available: true,
     ready: true,
     signIn: mockGoogleCredential,
+  });
+  mockUseAppleSignIn.mockReturnValue({
+    available: false,
+    ready: true,
+    signIn: mockAppleCredential,
   });
   mockUseMobileAuth.mockReturnValue(mockAuth as never);
 });

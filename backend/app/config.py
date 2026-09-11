@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     phone_otp_resend_cooldown_seconds: int = Field(default=60, ge=10, le=600)
     phone_otp_max_attempts: int = Field(default=5, ge=1, le=10)
     google_client_id: str | None = None
+    apple_client_id: str | None = None
+    apple_jwks_url: str = "https://appleid.apple.com/auth/keys"
+    apple_jwks_cache_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+    apple_jwks_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    apple_clock_skew_seconds: int = Field(default=60, ge=0, le=300)
     auth_rate_limit_window_seconds: int = Field(default=3600, ge=60, le=86400)
     auth_phone_otp_ip_limit: int = Field(default=10, ge=1, le=1000)
     auth_phone_otp_identifier_limit: int = Field(default=10, ge=1, le=1000)
@@ -65,9 +70,11 @@ class Settings(BaseSettings):
     auth_email_verification_ip_limit: int = Field(default=10, ge=1, le=1000)
     auth_email_verification_user_limit: int = Field(default=5, ge=1, le=1000)
     auth_google_ip_limit: int = Field(default=30, ge=1, le=1000)
+    auth_apple_ip_limit: int = Field(default=30, ge=1, le=1000)
     auth_mobile_password_ip_limit: int = Field(default=20, ge=1, le=1000)
     auth_mobile_password_identifier_limit: int = Field(default=5, ge=1, le=1000)
     auth_mobile_google_ip_limit: int = Field(default=30, ge=1, le=1000)
+    auth_mobile_apple_ip_limit: int = Field(default=30, ge=1, le=1000)
     auth_mobile_refresh_ip_limit: int = Field(default=60, ge=1, le=1000)
     media_root: Path = Path("var/media")
     media_public_path: str = "/media"
@@ -250,6 +257,8 @@ class Settings(BaseSettings):
             raise ValueError("Production requires a Kavenegar verification template")
         if not self.google_client_id:
             raise ValueError("Production requires a Google client ID")
+        if not self.apple_client_id:
+            raise ValueError("Production requires an Apple client ID")
         otp_secret = self.phone_otp_hmac_secret.get_secret_value()
         if otp_secret == "fitsho-local-phone-otp-secret-change-me" or len(otp_secret) < 32:
             raise ValueError("Production requires a strong phone OTP HMAC secret")

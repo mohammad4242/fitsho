@@ -18,6 +18,8 @@ it("keeps auth screens on a quiet Web-aligned native scaffold", async () => {
   expect(signIn).toMatch(/SegmentedControl/);
   expect(signIn).not.toMatch(/AuthFormCard/);
   expect(signIn).toMatch(/useGoogleSignIn/);
+  expect(signIn).toMatch(/useAppleSignIn/);
+  expect(signIn).toMatch(/AppleAuthenticationButton/);
   expect(signIn).toMatch(/publicOnboardingParams/);
   expect(signIn).toMatch(/verifyPhoneOtp/);
   expect(signIn).toMatch(/sendPhoneOtp/);

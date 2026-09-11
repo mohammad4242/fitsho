@@ -15,6 +15,7 @@ PRODUCTION_AUTH_DELIVERY = {
     "kavenegar_api_key": "test-kavenegar-key",
     "phone_otp_hmac_secret": "production-phone-otp-hmac-secret-for-tests",
     "google_client_id": "fitsho-client-id.apps.googleusercontent.com",
+    "apple_client_id": "com.fitician.app",
 }
 
 

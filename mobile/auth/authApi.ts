@@ -8,6 +8,7 @@ import type {
 import type { FiticianTransport, TransportRequest } from "@fitician/core";
 
 import type { MobileClientMetadata } from "./deviceMetadata";
+import type { AppleAuthCredential } from "./appleCredential";
 
 export type { MobileClientMetadata } from "./deviceMetadata";
 
@@ -16,6 +17,7 @@ export interface MobileAuthApi {
   register(credentials: Credentials): Promise<User>;
   resetPassword(token: string, password: string): Promise<void>;
   sendPhoneOtp(phoneNumber: string): Promise<PhoneOtpSent>;
+  signInWithApple(credential: AppleAuthCredential): Promise<MobileAuthTokens>;
   signInWithGoogle(credential: string): Promise<MobileAuthTokens>;
   signInWithPassword(credentials: Credentials): Promise<MobileAuthTokens>;
   verifyEmail(token: string): Promise<void>;
@@ -72,6 +74,21 @@ export function createMobileAuthApi(
         body: { phone_number: phoneNumber },
         method: "POST",
         path: "/api/v1/auth/mobile/phone/send-otp",
+      });
+    },
+
+    async signInWithApple(credential) {
+      const clientMetadata = await resolveMetadata(metadata);
+      return transport.request<MobileAuthTokens>({
+        body: {
+          ...clientMetadata,
+          email: credential.email,
+          full_name: credential.fullName,
+          identity_token: credential.identityToken,
+          nonce: credential.nonce,
+        },
+        method: "POST",
+        path: "/api/v1/auth/mobile/apple",
       });
     },
 

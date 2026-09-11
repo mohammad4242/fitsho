@@ -476,6 +476,23 @@ export type paths = {
         patch: operations["update_training_template_slot_api_v1_admin_training_program_templates__template_id__days__day_id__slots__slot_id__patch"];
         trace?: never;
     };
+    "/api/v1/auth/apple": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apple Auth */
+        post: operations["apple_auth_api_v1_auth_apple_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/email/send-verification": {
         parameters: {
             query?: never;
@@ -589,6 +606,23 @@ export type paths = {
         get: operations["me_api_v1_auth_me_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mobile/apple": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mobile Apple Auth */
+        post: operations["mobile_apple_auth_api_v1_auth_mobile_apple_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3983,6 +4017,17 @@ export type components = {
          * @enum {string}
          */
         AnalysisLimitation: "blur" | "clothing_occlusion" | "excessive_background_clutter" | "incomplete_view" | "inconsistent_pose" | "lighting" | "low_resolution" | "occlusion" | "perspective" | "pose" | "visibility";
+        /** AppleAuthRequest */
+        AppleAuthRequest: {
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** Identity Token */
+            identity_token: string;
+            /** Nonce */
+            nonce: string;
+        };
         /** AthleteState */
         AthleteState: {
             adherence: components["schemas"]["AthleteStateAdherence"];
@@ -6767,6 +6812,28 @@ export type components = {
          * @enum {string}
          */
         MetabolicBasis: "female_coefficient" | "male_coefficient";
+        /** MobileAppleLoginRequest */
+        MobileAppleLoginRequest: {
+            /** App Version */
+            app_version: string;
+            /** Device Id */
+            device_id: string;
+            /** Device Name */
+            device_name?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** Identity Token */
+            identity_token: string;
+            /** Nonce */
+            nonce: string;
+            /**
+             * Platform
+             * @enum {string}
+             */
+            platform: "android" | "ios";
+        };
         /** MobileAuthResponse */
         MobileAuthResponse: {
             /** Access Token */
@@ -12139,6 +12206,39 @@ export interface operations {
             };
         };
     };
+    apple_auth_api_v1_auth_apple_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppleAuthRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     email_send_verification_api_v1_auth_email_send_verification_post: {
         parameters: {
             query?: never;
@@ -12323,6 +12423,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    mobile_apple_auth_api_v1_auth_mobile_apple_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileAppleLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MobileAuthResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

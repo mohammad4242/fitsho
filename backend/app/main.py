@@ -17,6 +17,7 @@ from app.account_deletion.router import router as account_deletion_router
 from app.account_deletion.scheduler import account_deletion_scheduler_loop
 from app.admin.router import router as admin_router
 from app.auth.providers import (
+    build_apple_identity_provider,
     build_email_provider,
     build_google_identity_provider,
     build_sms_provider,
@@ -116,6 +117,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.email_provider = build_email_provider(active_settings)
     app.state.sms_provider = build_sms_provider(active_settings)
     app.state.google_identity_provider = build_google_identity_provider(active_settings)
+    app.state.apple_identity_provider = build_apple_identity_provider(active_settings)
     app.dependency_overrides[get_settings] = lambda: active_settings
     app.add_middleware(
         CORSMiddleware,

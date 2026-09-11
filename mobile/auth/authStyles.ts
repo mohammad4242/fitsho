@@ -70,6 +70,10 @@ export const authStyles = StyleSheet.create({
   heading: {
     marginTop: fiticianTokens.spacing[3],
   },
+  appleButton: {
+    height: 48,
+    width: "100%",
+  },
   inlineLink: {
     color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,

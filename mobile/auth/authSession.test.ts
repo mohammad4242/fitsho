@@ -32,12 +32,35 @@ function api(): MobileAuthApi {
     register: async () => tokens.user,
     resetPassword: async () => undefined,
     sendPhoneOtp: async () => ({ message: "ok", retry_after_seconds: 60 }),
+    signInWithApple: async () => tokens,
     signInWithGoogle: async () => tokens,
     signInWithPassword: async () => tokens,
     verifyEmail: async () => undefined,
     verifyPhoneOtp: async () => tokens,
   };
 }
+
+it("establishes the shared opaque session after Apple authentication", async () => {
+  const session = new MobileAuthSession({
+    api: api(),
+    refreshTokenStorage: {
+      clear: async () => undefined,
+      read: async () => null,
+      write: async () => undefined,
+    },
+    transport: transport(),
+  });
+
+  await expect(
+    session.signInWithApple({
+      email: null,
+      fullName: null,
+      identityToken: "signed-apple-token",
+      nonce: "nonce-1",
+    }),
+  ).resolves.toEqual(tokens.user);
+  expect(session.getSnapshot()).toMatchObject({ status: "signed_in", user: tokens.user });
+});
 
 function transport(): FiticianTransport {
   return {

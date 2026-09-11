@@ -32,7 +32,7 @@ class User(Base):
     __table_args__ = (
         CheckConstraint(
             "(email IS NOT NULL AND password_hash IS NOT NULL) "
-            "OR phone_number IS NOT NULL OR google_sub IS NOT NULL",
+            "OR phone_number IS NOT NULL OR google_sub IS NOT NULL OR apple_sub IS NOT NULL",
             name="ck_users_login_identifier_required",
         ),
     )
@@ -42,6 +42,7 @@ class User(Base):
     phone_number: Mapped[str | None] = mapped_column(String(13), unique=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    apple_sub: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     email_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

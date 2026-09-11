@@ -3080,6 +3080,53 @@
         "title": "AnalysisLimitation",
         "type": "string"
       },
+      "AppleAuthRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "identity_token": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "title": "Identity Token",
+            "type": "string"
+          },
+          "nonce": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Nonce",
+            "type": "string"
+          }
+        },
+        "required": [
+          "identity_token",
+          "nonce"
+        ],
+        "title": "AppleAuthRequest",
+        "type": "object"
+      },
       "AthleteState": {
         "additionalProperties": false,
         "properties": {
@@ -10754,6 +10801,88 @@
         ],
         "title": "MetabolicBasis",
         "type": "string"
+      },
+      "MobileAppleLoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "app_version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "App Version",
+            "type": "string"
+          },
+          "device_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Device Id",
+            "type": "string"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "format": "email",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "identity_token": {
+            "maxLength": 8192,
+            "minLength": 1,
+            "title": "Identity Token",
+            "type": "string"
+          },
+          "nonce": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Nonce",
+            "type": "string"
+          },
+          "platform": {
+            "enum": [
+              "android",
+              "ios"
+            ],
+            "title": "Platform",
+            "type": "string"
+          }
+        },
+        "required": [
+          "device_id",
+          "platform",
+          "app_version",
+          "identity_token",
+          "nonce"
+        ],
+        "title": "MobileAppleLoginRequest",
+        "type": "object"
       },
       "MobileAuthResponse": {
         "properties": {
@@ -24736,6 +24865,47 @@
         ]
       }
     },
+    "/api/v1/auth/apple": {
+      "post": {
+        "operationId": "apple_auth_api_v1_auth_apple_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppleAuthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apple Auth",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/email/send-verification": {
       "post": {
         "operationId": "email_send_verification_api_v1_auth_email_send_verification_post",
@@ -24954,6 +25124,47 @@
           }
         ],
         "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/mobile/apple": {
+      "post": {
+        "operationId": "mobile_apple_auth_api_v1_auth_mobile_apple_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileAppleLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileAuthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mobile Apple Auth",
         "tags": [
           "auth"
         ]

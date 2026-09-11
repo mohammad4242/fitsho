@@ -47,6 +47,33 @@ test("requires a trusted HTTPS frontend origin outside development", () => {
   );
 });
 
+test("validates each configured Google client ID without blocking the other platform", () => {
+  const base = {
+    APP_VARIANT: "preview",
+    EXPO_PUBLIC_API_BASE_URL: "https://api-preview.fitician.example",
+    EXPO_PUBLIC_FRONTEND_ORIGIN: "https://preview.fitician.example",
+    FITICIAN_APP_LINK_HOST: "preview.fitician.example",
+  };
+
+  assert.doesNotThrow(() => validateEnvironment("preview", {
+    ...base,
+    EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: "android.apps.googleusercontent.com",
+  }));
+  assert.throws(
+    () => validateEnvironment("preview", {
+      ...base,
+      EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: "android-client",
+      EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: "ios-client",
+    }),
+    /must be a Google OAuth client ID/u,
+  );
+  assert.doesNotThrow(() => validateEnvironment("preview", {
+    ...base,
+    EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID: "android.apps.googleusercontent.com",
+    EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: "ios.apps.googleusercontent.com",
+  }));
+});
+
 test("documents emulator and physical Android development API targets", async () => {
   const example = await readFile(resolve(mobileRoot, ".env.development.example"), "utf8");
 

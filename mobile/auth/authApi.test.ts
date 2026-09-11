@@ -45,6 +45,36 @@ it("sends native password credentials with device metadata", async () => {
   });
 });
 
+it("sends Apple identity credentials with iOS device metadata", async () => {
+  const nativeTransport = transport([{ user: { id: "member-1" } }]);
+  const api = createMobileAuthApi(
+    nativeTransport,
+    { ...metadata, platform: "ios", device_id: "iphone-device-1" },
+  );
+
+  await api.signInWithApple({
+    email: "member@privaterelay.appleid.com",
+    fullName: "Fitician Member",
+    identityToken: "signed-apple-token",
+    nonce: "nonce-1",
+  });
+
+  expect(nativeTransport.requests[0]).toEqual({
+    body: {
+      app_version: "0.1.0",
+      device_id: "iphone-device-1",
+      device_name: "Pixel",
+      email: "member@privaterelay.appleid.com",
+      full_name: "Fitician Member",
+      identity_token: "signed-apple-token",
+      nonce: "nonce-1",
+      platform: "ios",
+    },
+    method: "POST",
+    path: "/api/v1/auth/mobile/apple",
+  });
+});
+
 it("uses shared public auth routes for registration, OTP, verification, and recovery", async () => {
   const nativeTransport = transport([{}, {}, {}, {}, undefined, {}, undefined]);
   const api = createMobileAuthApi(nativeTransport, metadata, "https://fitician.example");
