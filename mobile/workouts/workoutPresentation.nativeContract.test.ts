@@ -3,7 +3,58 @@ import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 
 import { getResponsiveLayout } from "../ui/layoutMetrics";
+import { formatPersianNumber } from "../ui/locale";
 import * as workoutModel from "./workoutModel";
+import type { WorkoutDay } from "./workoutApi";
+
+type WorkoutDayDisplayTitle = (day: WorkoutDay) => string;
+
+function workoutDay(dayNumber: number, titleFa: string | null, titleEn: string): WorkoutDay {
+  return {
+    day_number: dayNumber,
+    title_fa: titleFa,
+    title_en: titleEn,
+  } as WorkoutDay;
+}
+
+function workoutDayLabel(day: WorkoutDay, getDisplayTitle: WorkoutDayDisplayTitle): string {
+  return `روز ${formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: ${getDisplayTitle(day)}`;
+}
+
+it("normalizes API day prefixes for both visible and accessible labels", async () => {
+  const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");
+  const helperStart = source.indexOf("export function getWorkoutDayDisplayTitle");
+  const helperEnd = source.indexOf("\n}\n\nfunction WorkoutDayCard", helperStart) + 2;
+  const cardStart = source.indexOf("function WorkoutDayCard");
+  const cardEnd = source.indexOf("function formatExerciseNumber", cardStart);
+  const card = source.slice(cardStart, cardEnd);
+  const getDisplayTitle = new Function(
+    `${source.slice(helperStart, helperEnd).replace(
+      "export function getWorkoutDayDisplayTitle(day: WorkoutDay): string",
+      "function getWorkoutDayDisplayTitle(day)",
+    )}; return getWorkoutDayDisplayTitle;`,
+  )() as WorkoutDayDisplayTitle;
+
+  expect(workoutDayLabel(workoutDay(1, "روز 1: سینه + پشت بازو", "Day 1: Chest + Triceps"), getDisplayTitle))
+    .toBe("روز ۱: سینه + پشت بازو");
+  expect(workoutDayLabel(workoutDay(1, "روز 1: سینه + پشت بازو", "Day 1: Chest + Triceps"), getDisplayTitle))
+    .not.toContain("روز ۱: روز 1:");
+  expect(workoutDayLabel(workoutDay(2, "روز ۲: پشت + جلو بازو", "Day 2: Back + Biceps"), getDisplayTitle))
+    .toBe("روز ۲: پشت + جلو بازو");
+  expect(workoutDayLabel(workoutDay(3, "سرشانه + پا", "Shoulders + Legs"), getDisplayTitle))
+    .toBe("روز ۳: سرشانه + پا");
+  const englishFallbackLabel = workoutDayLabel(workoutDay(4, null, "Day 4: Upper Body"), getDisplayTitle);
+  expect(englishFallbackLabel).toBe("روز ۴: Upper Body");
+  expect(englishFallbackLabel.match(/روز|Day/gu)).toHaveLength(1);
+
+  expect(source).toContain("export function getWorkoutDayDisplayTitle(day: WorkoutDay): string");
+  expect(source).toContain("const title = (day.title_fa || day.title_en).trim()");
+  expect(source).toContain("/^(?:روز|Day)\\s+[0-9۰-۹٠-٩]+\\s*:\\s*/u");
+  expect(card.match(/getWorkoutDayDisplayTitle\(day\)/gu)).toHaveLength(1);
+  expect(card).toContain("accessibilityLabel={`روز ${formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: ${displayTitle}`}");
+  expect(card).not.toContain("day.title_fa || day.title_en");
+  expect(card).toContain("روز {formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: {displayTitle}");
+});
 
 it("uses the web-like workout page hierarchy without cinematic overview components", async () => {
   const source = await readFile(new URL("./WorkoutPlansScreen.tsx", import.meta.url), "utf8");

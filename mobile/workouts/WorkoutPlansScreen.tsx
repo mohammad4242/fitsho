@@ -811,6 +811,11 @@ function WorkoutPdfTool({
   );
 }
 
+export function getWorkoutDayDisplayTitle(day: WorkoutDay): string {
+  const title = (day.title_fa || day.title_en).trim();
+  return title.replace(/^(?:روز|Day)\s+[0-9۰-۹٠-٩]+\s*:\s*/u, "").trim();
+}
+
 function WorkoutDayCard({
   activePreviewId,
   day,
@@ -839,9 +844,10 @@ function WorkoutDayCard({
   const leadExercise = mainExercises[0] ?? day.exercises[0];
   const leadName = leadExercise?.exercise.name_fa || leadExercise?.exercise.name_en || "";
   const leadPreviewId = `${day.day_number}:lead`;
+  const displayTitle = getWorkoutDayDisplayTitle(day);
   return (
     <Pressable
-      accessibilityLabel={`روز ${formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: ${day.title_fa || day.title_en}`}
+      accessibilityLabel={`روز ${formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: ${displayTitle}`}
       accessibilityRole="button"
       accessibilityState={{ expanded }}
       onPress={onToggle}
@@ -893,7 +899,7 @@ function WorkoutDayCard({
         <View style={styles.dayHeadingCopy}>
           {showNext ? <Text style={styles.nextSessionLabel}>جلسه بعد</Text> : null}
           <Text numberOfLines={focus ? 2 : 1} style={[styles.dayTitle, !focus && styles.secondaryDayTitle]}>
-            روز {formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: {day.title_fa || day.title_en}
+            روز {formatPersianNumber(day.day_number, { maximumFractionDigits: 0 })}: {displayTitle}
           </Text>
           <Text numberOfLines={1} style={styles.dayMeta}>
             {focus && leadExercise ? `${leadName} · ` : ""}{formatPersianNumber(day.estimated_duration_minutes, { maximumFractionDigits: 0 })} دقیقه
