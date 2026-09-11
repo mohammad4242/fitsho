@@ -68,6 +68,37 @@ def success_output(
     return json.dumps(outer)
 
 
+def stream_success_output(*, payload: dict[str, Any] | None = None) -> str:
+    payload = payload or {"answer": "ok"}
+    return "\n".join(
+        [
+            json.dumps(
+                {
+                    "event": "init",
+                    "conversation_id": "test-conversation",
+                }
+            ),
+            json.dumps(
+                {
+                    "event": "step_update",
+                    "step_update": {"state": "DONE"},
+                }
+            ),
+            json.dumps(
+                {
+                    "event": "result",
+                    "result": {
+                        "status": "SUCCESS",
+                        "structured_output": payload,
+                        "usage": {"input_tokens": 11, "output_tokens": 7},
+                        "duration_seconds": 1.25,
+                    },
+                }
+            ),
+        ]
+    )
+
+
 def test_capabilities_default_to_text_and_no_image_support(tmp_path: Path) -> None:
     executable = tmp_path / "agy"
     executable.write_text("#!/bin/sh\nexit 0\n")
@@ -192,17 +223,56 @@ def test_run_parses_structured_output_and_uses_exact_model_argv(
     assert len(calls) == 1
     command, kwargs = calls[0]
     assert command[0] == "agy-test"
-    assert command[1] == "--print"
-    assert command[3:5] == ["--output-format", "json"]
+    assert command[1:5] == [
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+    ]
     assert command[5] == "--json-schema"
-    assert command[-4:] == [
+    assert command[-6:] == [
         "--model",
         "gemini-test",
+        "--print-timeout",
+        "4s",
         "--sandbox",
         "--dangerously-skip-permissions",
     ]
     assert "shell" not in kwargs
     assert kwargs["workspace"] == tmp_path
+
+
+def test_run_uses_stream_json_protocol_and_sends_prompt_on_stdin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, Any] = {}
+
+    async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
+        captured["command"] = command
+        captured.update(kwargs)
+        return ProcessResult(0, stream_success_output(), "")
+
+    import app.runners.antigravity as antigravity
+
+    monkeypatch.setattr(antigravity, "run_process", fake_run_process)
+    result = run(AntigravityRunner(workspace=tmp_path, executable="agy-test").run(make_request()))
+
+    assert result.payload == {"answer": "ok"}
+    command = captured["command"]
+    assert command[:5] == [
+        "agy-test",
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+    ]
+    assert "--print" not in command
+    assert command[command.index("--model") + 1] == "gemini-test"
+    assert command[command.index("--print-timeout") + 1] == "4s"
+    assert command[-2:] == ["--sandbox", "--dangerously-skip-permissions"]
+    input_event = json.loads(captured["input_text"])
+    assert input_event["event"] == "user"
+    assert input_event["message"]["content"].startswith("Return a concise answer.")
 
 
 def test_live_web_preserves_antigravity_browser_environment_and_prompt(
@@ -225,8 +295,9 @@ def test_live_web_preserves_antigravity_browser_environment_and_prompt(
     assert captured["env"]["PLAYWRIGHT_BROWSERS_PATH"] == (
         "/home/agent/.gemini/antigravity-cli/fitsho-cache/playwright"
     )
-    assert "live web research" in captured["command"][2]
-    assert "browser/web tools" in captured["command"][2]
+    prompt = json.loads(captured["input_text"])["message"]["content"]
+    assert "live web research" in prompt
+    assert "browser/web tools" in prompt
     assert "--sandbox" in captured["command"]
     assert "--dangerously-skip-permissions" in captured["command"]
 
@@ -409,10 +480,10 @@ def test_image_paths_are_added_as_bounded_workspace_filenames_when_opted_in(
 ) -> None:
     image = tmp_path / "photo.jpg"
     image.write_bytes(b"image")
-    captured: list[list[str]] = []
+    captured: list[tuple[list[str], dict[str, Any]]] = []
 
     async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
-        captured.append(command)
+        captured.append((command, kwargs))
         return ProcessResult(0, success_output(), "")
 
     import app.runners.antigravity as antigravity
@@ -424,7 +495,7 @@ def test_image_paths_are_added_as_bounded_workspace_filenames_when_opted_in(
         )
     )
 
-    assert "photo.jpg" in captured[0][2]
+    assert "photo.jpg" in json.loads(captured[0][1]["input_text"])["message"]["content"]
 
 
 def test_shared_media_image_path_is_listed_for_antigravity_transport(
@@ -436,11 +507,10 @@ def test_shared_media_image_path_is_listed_for_antigravity_transport(
     image = shared_root / "body/ab/image.jpg"
     image.parent.mkdir(parents=True)
     image.write_bytes(b"image")
-    captured: list[list[str]] = []
+    captured: list[tuple[list[str], dict[str, Any]]] = []
 
     async def fake_run_process(command: list[str], **kwargs: Any) -> ProcessResult:
-        del kwargs
-        captured.append(command)
+        captured.append((command, kwargs))
         return ProcessResult(0, success_output(), "")
 
     import app.runners.antigravity as antigravity
@@ -454,8 +524,9 @@ def test_shared_media_image_path_is_listed_for_antigravity_transport(
         ).run(make_request(image_paths=(image,)))
     )
 
-    assert f"- {image.resolve()}" in captured[0][2]
-    assert "Do not inspect or modify unrelated files." in captured[0][2]
+    prompt = json.loads(captured[0][1]["input_text"])["message"]["content"]
+    assert f"- {image.resolve()}" in prompt
+    assert "Do not inspect or modify unrelated files." in prompt
 
 
 def test_images_are_rejected_by_default_without_invoking_process(

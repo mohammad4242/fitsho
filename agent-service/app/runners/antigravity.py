@@ -203,14 +203,16 @@ class AntigravityRunner(AgentRunner):
 
             command = [
                 self.executable,
-                "--print",
-                prompt,
+                "--input-format",
+                "stream-json",
                 "--output-format",
-                "json",
+                "stream-json",
                 "--json-schema",
                 str(schema_path),
                 "--model",
                 request.model_id,
+                "--print-timeout",
+                f"{max(1, math.ceil(request.timeout_seconds))}s",
             ]
             if request.effort is not None:
                 effort = "high" if request.effort == "thinking" else request.effort
@@ -225,6 +227,11 @@ class AntigravityRunner(AgentRunner):
                 command,
                 workspace=workspace,
                 timeout_seconds=request.timeout_seconds,
+                input_text=json.dumps(
+                    {"event": "user", "message": {"content": prompt}},
+                    ensure_ascii=False,
+                )
+                + "\n",
                 env=self._subprocess_environment(),
                 inherit_environment=False,
             )
@@ -381,11 +388,38 @@ class AntigravityRunner(AgentRunner):
     def _parse_outer(stdout: str) -> dict[str, Any]:
         try:
             outer = json.loads(stdout)
-        except (json.JSONDecodeError, TypeError) as exc:
-            raise RunnerError("invalid_output", "invalid runner output") from exc
+        except (json.JSONDecodeError, TypeError):
+            return AntigravityRunner._parse_stream_output(stdout)
         if not isinstance(outer, dict):
             raise RunnerError("invalid_output", "invalid runner output")
+        if outer.get("event") == "result":
+            result = outer.get("result")
+            if not isinstance(result, dict):
+                raise RunnerError("invalid_output", "invalid runner output")
+            return result
         return outer
+
+    @staticmethod
+    def _parse_stream_output(stdout: str) -> dict[str, Any]:
+        result: dict[str, Any] | None = None
+        for line in stdout.splitlines():
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except (json.JSONDecodeError, TypeError) as exc:
+                raise RunnerError("invalid_output", "invalid runner output") from exc
+            if not isinstance(event, dict):
+                raise RunnerError("invalid_output", "invalid runner output")
+            if event.get("event") != "result":
+                continue
+            candidate = event.get("result")
+            if not isinstance(candidate, dict):
+                raise RunnerError("invalid_output", "invalid runner output")
+            result = candidate
+        if result is None:
+            raise RunnerError("invalid_output", "invalid runner output")
+        return result
 
     @classmethod
     def _parse_payload(cls, outer: dict[str, Any]) -> dict[str, Any]:
