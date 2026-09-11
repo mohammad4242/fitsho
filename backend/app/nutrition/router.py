@@ -108,6 +108,7 @@ from app.nutrition.food_photo_service import (
     get_photo,
     list_photos,
     open_photo,
+    replay_idempotent_photo,
 )
 from app.nutrition.meal_catalogue import (
     CATEGORY_ORDER,
@@ -2054,6 +2055,9 @@ async def create_food_photo_estimate(
     try:
         if idempotency_key is not None and not 8 <= len(idempotency_key) <= 128:
             raise FoodPhotoError("INVALID_IDEMPOTENCY_KEY")
+        replayed = replay_idempotent_photo(db, user.id, idempotency_key)
+        if replayed is not None:
+            return replayed
         consume_rate_limit(
             db,
             actor_user_id=user.id,
