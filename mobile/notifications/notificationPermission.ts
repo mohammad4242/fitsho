@@ -188,7 +188,15 @@ export async function getNativePushToken(): Promise<NativePushToken | null> {
   if (Platform.OS !== "android" && Platform.OS !== "ios") {
     return null;
   }
-  const token = await Notifications.getDevicePushTokenAsync();
+  return nativePushTokenFromDevicePushToken(await Notifications.getDevicePushTokenAsync());
+}
+
+export function nativePushTokenFromDevicePushToken(
+  token: Notifications.DevicePushToken,
+): NativePushToken | null {
+  if (Platform.OS !== "android" && Platform.OS !== "ios") {
+    return null;
+  }
   const expectedType = Platform.OS;
   if (token.type !== expectedType || typeof token.data !== "string" || !token.data.trim()) {
     return null;

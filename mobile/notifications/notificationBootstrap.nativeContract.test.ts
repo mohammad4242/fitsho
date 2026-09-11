@@ -10,6 +10,8 @@ it("uses the shared platform-aware notification bootstrap at the root", async ()
 
   expect(source).toContain("prepareNotifications");
   expect(source).toContain("getNativePushToken");
+  expect(source).toContain("addPushTokenListener");
+  expect(source).toContain("nativePushTokenFromDevicePushToken");
   expect(source).toContain("registerNotifications");
   expect(source).not.toContain("prepareAndroidNotifications");
   expect(source).not.toContain("getAndroidFcmToken");

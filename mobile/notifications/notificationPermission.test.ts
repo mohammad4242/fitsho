@@ -32,6 +32,7 @@ import {
   getIosApnsToken,
   getAndroidFcmToken,
   getNativePushToken,
+  nativePushTokenFromDevicePushToken,
   NOTIFICATION_PERMISSION_REQUESTED_KEY,
   prepareNotifications,
   requestAndroidNotificationPermission,
@@ -121,6 +122,15 @@ it("requests iOS permission and returns the native APNs token without relabeling
   });
   await expect(getIosApnsToken()).resolves.toBe("apns-token");
   expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+});
+
+it("maps push-token rotation callbacks to the active native provider", () => {
+  platform.OS = "ios";
+  expect(nativePushTokenFromDevicePushToken({ type: "ios", data: "rotated-apns-token" })).toEqual({
+    provider: "apns",
+    token: "rotated-apns-token",
+  });
+  expect(nativePushTokenFromDevicePushToken({ type: "android", data: "wrong-platform" })).toBeNull();
 });
 
 it("treats provisional iOS notification permission as usable", async () => {

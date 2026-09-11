@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import * as Notifications from "expo-notifications";
 import { Stack, usePathname } from "expo-router";
 import { InteractionManager, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -17,6 +18,7 @@ import {
 } from "../platform/performance";
 import {
   getNativePushToken,
+  nativePushTokenFromDevicePushToken,
   prepareNotifications,
 } from "../notifications/notificationPermission";
 import { createNotificationApi } from "../notifications/notificationApi";
@@ -40,13 +42,25 @@ function NotificationPermissionBootstrap() {
     if (auth.status !== "signed_in") {
       return;
     }
+    let active = true;
+    const registerToken = async ({ provider, token }: { provider: "fcm" | "apns"; token: string }) => {
+      if (!active) return;
+      await notificationApi.registerCurrentDevice(token, provider);
+    };
+    const tokenSubscription = Notifications.addPushTokenListener((token) => {
+      const nativeToken = nativePushTokenFromDevicePushToken(token);
+      if (nativeToken === null) return;
+      void registerToken(nativeToken).catch(() => undefined);
+    });
     void registerNotifications({
       prepare: prepareNotifications,
       getToken: getNativePushToken,
-      register: async ({ provider, token }) => {
-        await notificationApi.registerCurrentDevice(token, provider);
-      },
+      register: registerToken,
     }).catch(() => undefined);
+    return () => {
+      active = false;
+      tokenSubscription.remove();
+    };
   }, [auth.status, notificationApi]);
 
   return null;
