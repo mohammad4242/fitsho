@@ -75,12 +75,14 @@ describe("iOS body vision module wiring", () => {
     expect(packageJson.files).toEqual(expect.arrayContaining(["ios", "FiticianBodyVision.podspec"]));
     expect(podspec).toContain("add_nitrogen_files");
     expect(podspec).toContain("MediaPipeTasksVision");
+    expect(podspec).toMatch(/s\.source\s*=\s*\{/u);
     expect(podspec).toContain("pose_landmarker_lite.task");
     expect(podspec).toContain("selfie_segmenter.tflite");
     expect(swift).toContain("HybridFiticianBodyVisionSpec");
     expect(swift).toContain("PoseLandmarker");
     expect(swift).toContain("ImageSegmenter");
     expect(swift).toContain("MODEL_STATUS_NOT_PACKAGED");
+    expect(swift).not.toMatch(/override\s+func\s+dispose\s*\(/u);
   });
 
   it("uses the non-optional image-mode MediaPipe result APIs", async () => {

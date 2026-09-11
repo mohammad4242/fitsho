@@ -10,6 +10,7 @@ Pod::Spec.new do |s|
   s.homepage     = "https://github.com/mohammad4242/fitsho"
   s.license      = { :type => "UNLICENSED" }
   s.author       = { "Fitician" => "engineering@fitician.app" }
+  s.source       = { :git => "https://github.com/mohammad4242/fitsho.git", :branch => "main" }
 
   s.platforms    = { :ios => min_ios_version_supported }
   s.source_files = [

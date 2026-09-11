@@ -110,7 +110,7 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
     )
   }
 
-  public override func dispose() {
+  public func dispose() {
     processingLock.lock()
     poseLandmarker = nil
     imageSegmenter = nil
