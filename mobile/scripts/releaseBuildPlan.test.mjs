@@ -88,9 +88,10 @@ test("release artifact validation requires all three non-empty files", () => {
 
 test("protected release workflow exposes all three EAS artifact profiles", async () => {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-  const [androidWorkflow, iosWorkflow] = await Promise.all([
+  const [androidWorkflow, iosWorkflow, sideloadBuildScript] = await Promise.all([
     readFile(resolve(root, ".github/workflows/android-release.yml"), "utf8"),
     readFile(resolve(root, ".github/workflows/ios-release.yml"), "utf8"),
+    readFile(resolve(root, "mobile/scripts/build-ios-sideload.sh"), "utf8"),
   ]);
   const packageJson = JSON.parse(await readFile(resolve(root, "mobile/package.json"), "utf8"));
   assert.match(androidWorkflow, /workflow_dispatch:/u);
@@ -115,4 +116,12 @@ test("protected release workflow exposes all three EAS artifact profiles", async
   assert.match(iosWorkflow, /build:ios:debug/u);
   assert.match(iosWorkflow, /build:ios:internal/u);
   assert.match(iosWorkflow, /build:ios:production/u);
+  assert.match(iosWorkflow, /- sideload\s*$/mu);
+  assert.match(iosWorkflow, /runs-on:\s*macos-15/u);
+  assert.match(iosWorkflow, /IOS_SIDELOAD_BUILD/u);
+  assert.match(sideloadBuildScript, /generic\/platform=iOS/u);
+  assert.match(sideloadBuildScript, /CODE_SIGNING_ALLOWED=NO/u);
+  assert.match(iosWorkflow, /Fitician-unsigned\.ipa/u);
+  assert.match(iosWorkflow, /fitician-ios-unsigned/u);
+  assert.match(iosWorkflow, /actions\/upload-artifact@v4/u);
 });

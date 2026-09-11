@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: EAS release profile
+        description: iOS release profile
         required: true
         type: choice
         default: preview
@@ -12,12 +12,14 @@ on:
           - development
           - preview
           - production
+          - sideload
 
 permissions:
   contents: read
 
 jobs:
   build:
+    if: ${{ inputs.profile != 'sideload' }}
     name: Build ${{ inputs.profile }} iOS artifact
     runs-on: ubuntu-latest
     environment: ${{ inputs.profile }}
@@ -38,3 +40,43 @@ jobs:
             production) npm run build:ios:production --workspace @fitician/mobile ;;
             *) echo "Unsupported release profile" >&2; exit 2 ;;
           esac
+
+  sideload:
+    if: ${{ inputs.profile == 'sideload' }}
+    name: Build unsigned iOS sideload IPA
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20.19.4"
+          cache: npm
+      - run: npm ci
+      - run: npm run build:core
+      - name: Generate sideload iOS project
+        run: npm run prebuild --workspace @fitician/mobile -- --platform ios --clean --no-install
+        env:
+          CI: "1"
+          APP_VARIANT: development
+          IOS_SIDELOAD_BUILD: "1"
+          EXPO_PUBLIC_API_BASE_URL: http://100.97.78.5:8001
+          EXPO_PUBLIC_FRONTEND_ORIGIN: http://100.97.78.5:5173
+      - name: Install CocoaPods dependencies
+        working-directory: mobile/ios
+        run: pod install
+      - name: Build and verify unsigned device IPA
+        run: ./mobile/scripts/build-ios-sideload.sh
+        env:
+          CI: "1"
+          APP_VARIANT: development
+          IOS_SIDELOAD_BUILD: "1"
+          EXPO_PUBLIC_API_BASE_URL: http://100.97.78.5:8001
+          EXPO_PUBLIC_FRONTEND_ORIGIN: http://100.97.78.5:5173
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fitician-ios-unsigned
+          path: |
+            dist/ios/Fitician-unsigned.ipa
+            dist/ios/fitician-ios-build-info.txt
+          if-no-files-found: error
+          retention-days: 14

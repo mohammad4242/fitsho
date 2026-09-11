@@ -20,10 +20,15 @@ const iosHardening = loadModuleSync(
   resolve(__dirname, "plugins/withIosHardening.ts"),
 ) as typeof import("./plugins/withIosHardening");
 const withIosHardening = iosHardening.default;
+const iosSideload = loadModuleSync(
+  resolve(__dirname, "plugins/withIosSideload.ts"),
+) as typeof import("./plugins/withIosSideload");
+const withIosSideloadEntitlements = iosSideload.default;
 
 const FITICIAN_APP_LINK_PLACEHOLDER = "app.fitician.example";
 const supportedAppVariants = new Set(["development", "preview", "production"]);
 const appVariant = process.env.APP_VARIANT?.trim() || "development";
+const isIosSideloadBuild = process.env.IOS_SIDELOAD_BUILD?.trim() === "1";
 if (!supportedAppVariants.has(appVariant)) {
   throw new Error("APP_VARIANT must be development, preview, or production");
 }
@@ -122,7 +127,8 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-dev-client",
     "expo-web-browser",
-    "expo-apple-authentication",
+    ...(isIosSideloadBuild ? [withIosSideloadEntitlements as never] : []),
+    ...(isIosSideloadBuild ? [] : ["expo-apple-authentication"]),
     [
       "expo-splash-screen",
       {
@@ -191,8 +197,8 @@ const config: ExpoConfig = {
   },
   ios: {
     bundleIdentifier: "com.fitician.app",
-    associatedDomains: [`applinks:${appLinkHost}`],
-    usesAppleSignIn: true,
+    associatedDomains: isIosSideloadBuild ? undefined : [`applinks:${appLinkHost}`],
+    ...(isIosSideloadBuild ? {} : { usesAppleSignIn: true }),
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },
