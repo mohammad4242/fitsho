@@ -82,6 +82,8 @@ describe("iOS body vision module wiring", () => {
     expect(swift).toContain("PoseLandmarker");
     expect(swift).toContain("ImageSegmenter");
     expect(swift).toContain("MODEL_STATUS_NOT_PACKAGED");
+    expect(swift).toContain("visibility: Double(landmark.visibility ?? 0)");
+    expect(swift).not.toContain("landmark.visibility?.doubleValue");
     expect(swift).not.toMatch(/override\s+func\s+dispose\s*\(/u);
   });
 

@@ -63,7 +63,7 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
             x: Double(landmark.x),
             y: Double(landmark.y),
             z: Double(landmark.z),
-            visibility: Double(landmark.visibility?.doubleValue ?? 0),
+            visibility: Double(landmark.visibility ?? 0),
           )
         }
       },
