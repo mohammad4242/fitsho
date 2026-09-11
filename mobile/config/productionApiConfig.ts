@@ -35,8 +35,9 @@ function requireConfiguredUrl(
   value: unknown,
   environment: MobileRuntimeEnvironment,
   label: string,
+  fallback?: string,
 ): string {
-  const configured = normalizedString(value);
+  const configured = normalizedString(value) ?? fallback ?? null;
   if (configured === null) {
     const target = environment === "production" ? ` and must be the Tailscale value ${PRODUCTION_API_BASE_URL}` : "";
     throw new Error(`${label} is required for ${environment} builds${target}`);
@@ -66,7 +67,12 @@ export function resolveApiBaseUrl(
     return configured;
   }
 
-  return requireConfiguredUrl(value, environment, "EXPO_PUBLIC_API_BASE_URL");
+  return requireConfiguredUrl(
+    value,
+    environment,
+    "EXPO_PUBLIC_API_BASE_URL",
+    PRODUCTION_API_BASE_URL,
+  );
 }
 
 export function resolveFrontendOrigin(
@@ -91,5 +97,10 @@ export function resolveFrontendOrigin(
     return configured;
   }
 
-  return requireConfiguredUrl(value, environment, "EXPO_PUBLIC_FRONTEND_ORIGIN");
+  return requireConfiguredUrl(
+    value,
+    environment,
+    "EXPO_PUBLIC_FRONTEND_ORIGIN",
+    PRODUCTION_FRONTEND_ORIGIN,
+  );
 }

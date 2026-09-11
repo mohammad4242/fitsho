@@ -16,9 +16,10 @@ const withAndroidRtl = loadModuleSync(
 const withAndroidReleaseSymbols = loadModuleSync(
   resolve(__dirname, "plugins/withAndroidReleaseSymbols.ts"),
 ).default;
-const withIosHardening = loadModuleSync(
+const iosHardening = loadModuleSync(
   resolve(__dirname, "plugins/withIosHardening.ts"),
-).default;
+) as typeof import("./plugins/withIosHardening");
+const withIosHardening = iosHardening.default;
 
 const FITICIAN_APP_LINK_PLACEHOLDER = "app.fitician.example";
 const supportedAppVariants = new Set(["development", "preview", "production"]);
@@ -133,13 +134,13 @@ const config: ExpoConfig = {
     [
       "expo-image-picker",
       {
-        cameraPermission: "اجازه بده فیتیچیان برای ثبت عکس غذا از دوربین استفاده کند.",
+        cameraPermission: iosHardening.IOS_CAMERA_USAGE_DESCRIPTION,
         microphonePermission: false,
         photosPermission: false,
       },
     ],
     "expo-background-task",
-    "expo-notifications",
+    ["expo-notifications", { mode: isProduction ? "production" : "development" }],
     "expo-updates",
     "expo-video",
     [
@@ -200,7 +201,7 @@ const config: ExpoConfig = {
     ),
     googleAndroidClientId: googleAndroidClientId || null,
     googleIosClientId: googleIosClientId || null,
-    ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
+    eas: { projectId: easProjectId },
   },
 };
 

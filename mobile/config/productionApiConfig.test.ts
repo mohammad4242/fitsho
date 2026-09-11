@@ -39,7 +39,7 @@ it("keeps development configuration explicit while allowing local development ta
   );
 });
 
-it("fails closed when development configuration is missing", () => {
-  expect(() => resolveApiBaseUrl(undefined, "development")).toThrow(/required/u);
-  expect(() => resolveFrontendOrigin(undefined, "development")).toThrow(/required/u);
+it("uses the repository development endpoints when configuration is missing", () => {
+  expect(resolveApiBaseUrl(undefined, "development")).toBe(PRODUCTION_API_BASE_URL);
+  expect(resolveFrontendOrigin(undefined, "development")).toBe(PRODUCTION_FRONTEND_ORIGIN);
 });

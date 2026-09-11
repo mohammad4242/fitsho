@@ -40,6 +40,12 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(appConfig, /scheme:\s*["']https["']/);
   assert.match(appConfig, /associatedDomains/);
   assert.match(appConfig, /EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID/);
+  assert.match(appConfig, /eas:\s*\{\s*projectId:\s*easProjectId\s*\}/u);
+  assert.match(appConfig, /cameraPermission:\s*iosHardening\.IOS_CAMERA_USAGE_DESCRIPTION/u);
+  assert.match(
+    appConfig,
+    /\["expo-notifications",\s*\{\s*mode:\s*isProduction\s*\?\s*"production"\s*:\s*"development"\s*\}\]/u,
+  );
   assert.match(appConfig, /withAndroidReleaseSymbols/);
   assert.match(appConfig, /withIosHardening/);
   assert.match(appConfig, /bundleIdentifier:\s*["']com\.fitician\.app["']/);

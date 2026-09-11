@@ -1,5 +1,9 @@
 import { expect, it } from "vitest";
 
+import {
+  PRODUCTION_API_BASE_URL,
+  PRODUCTION_FRONTEND_ORIGIN,
+} from "./productionApiConfig";
 import { mobileRuntimeConfigFromExtra } from "./runtimeConfig";
 
 it("normalizes the native API, trusted web origin, and optional Google client config", () => {
@@ -21,8 +25,15 @@ it("normalizes the native API, trusted web origin, and optional Google client co
   });
 });
 
-it("fails closed when development API configuration is absent", () => {
-  expect(() => mobileRuntimeConfigFromExtra({})).toThrow(/required/u);
+it("uses repository development endpoints when configuration is absent", () => {
+  expect(mobileRuntimeConfigFromExtra({})).toEqual({
+    appLinkHost: "app.fitician.example",
+    apiBaseUrl: PRODUCTION_API_BASE_URL,
+    environment: "development",
+    frontendOrigin: PRODUCTION_FRONTEND_ORIGIN,
+    googleAndroidClientId: null,
+    googleIosClientId: null,
+  });
 });
 
 it("fails closed to release semantics for an invalid explicit environment", () => {
