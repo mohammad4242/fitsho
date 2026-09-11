@@ -30,7 +30,7 @@ it("keeps the website indicator order and normalizes display scores", () => {
     "upper_lower_balance",
   ]);
   expect(indicators.map((item) => item.score)).toEqual([88, 91, 64]);
-  expect(indicators[2]?.caption).toBe("نیازمند توجه بیشتر");
+  expect(indicators[2]?.caption).toBe("نیازمند بهبود");
 });
 
 it("uses the body shape fallback and keeps missing scores unset", () => {

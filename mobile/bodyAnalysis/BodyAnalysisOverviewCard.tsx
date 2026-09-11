@@ -10,7 +10,6 @@ import {
 import type { BodyAnalysisExperienceV4, BodyPhotoView } from "@fitician/core/body-photos";
 
 import { AppIcon, Card, MetricRing, ProgressBar, SectionHeader } from "../ui/components";
-import type { FiticianIconName } from "../ui/icons";
 import { fiticianTokens } from "../ui/tokens";
 import {
   buildBodyAnalysisExperienceCopy,
@@ -20,12 +19,13 @@ import {
   type BodyIndicatorPresentation,
   type BodyIndicatorTone,
 } from "./bodyAnalysisPresentation";
-import { bodyAssets } from "./bodyAnalysisAssets";
+import { bodyResultAssets } from "./bodyAnalysisAssets";
+import { bodyAnalysisCopy } from "./bodyAnalysisCopy";
 
 const viewLabels: Record<BodyPhotoView, string> = {
   back: "پشت",
   front: "روبه‌رو",
-  side: "نیمرخ",
+  side: "نیم‌رخ",
 };
 
 const toneColors: Record<BodyIndicatorTone, string> = {
@@ -41,6 +41,7 @@ export function BodyAnalysisOverviewCard({
 }) {
   const [activeView, setActiveView] = useState<BodyPhotoView>("front");
   const sex = experience.input_snapshot.sex === "female" ? "female" : "male";
+  const sexLabel = sex === "female" ? "زن" : "مرد";
   const bodyFat = experience.body_composition.estimated_body_fat_percent;
   const bmi = experience.body_composition.bmi;
   const indicators = buildBodyIndicatorSummary(experience);
@@ -48,7 +49,7 @@ export function BodyAnalysisOverviewCard({
 
   return (
     <View style={styles.container}>
-      <SectionHeader eyebrow="اسکن و شاخص‌ها" title="تصویر کلی بدن" />
+      <SectionHeader eyebrow="اسکن و شاخص‌ها" title={bodyAnalysisCopy.topOverview.title} />
       <Card variant="hero" style={styles.heroCard}>
         <View style={styles.heroHeader}>
           <View style={styles.heroCopy}>
@@ -64,10 +65,11 @@ export function BodyAnalysisOverviewCard({
         <View style={styles.mediaFrame}>
           <View style={styles.mediaGlow} />
           <Image
-            accessibilityLabel={`نمای ${viewLabels[activeView]} آنالیز بدن`}
+            accessibilityLabel={`نمای ${viewLabels[activeView]} آنالیز بدن ${sexLabel}`}
             resizeMode="contain"
-            source={bodyAssets[sex][activeView]}
+            source={bodyResultAssets.overview[sex][activeView]}
             style={styles.bodyImage}
+            testID="body-analysis-overview-image"
           />
           <View style={styles.mediaTag}>
             <Text style={styles.mediaTagText}>{viewLabels[activeView]}</Text>
@@ -104,17 +106,19 @@ export function BodyAnalysisOverviewCard({
 
       <View style={styles.metricGrid}>
         <BodyMetricCard
-          icon="target"
-          label="درصد چربی تخمینی"
-          note={experience.body_composition.body_fat_is_estimate ? "تخمینی بر پایه اندازه‌های بدنی" : ""}
+          badge={bodyAnalysisCopy.topOverview.bodyFatMethod}
+          info={bodyAnalysisCopy.topOverview.infoTooltipBodyFat}
+          label={bodyAnalysisCopy.topOverview.bodyFatTitle}
           progress={bodyMetricProgress(bodyFat, 10, 35)}
+          trackHint={bodyAnalysisCopy.topOverview.estimateNotice}
           value={bodyFat === null ? "—" : `${formatMetric(bodyFat)}٪`}
         />
         <BodyMetricCard
-          icon="bodyAnalysis"
-          label="شاخص توده بدنی"
-          note={bmi === null ? "ثبت نشده" : bodyBmiLabel(bmi)}
+          badge={bmi === null ? "" : bodyBmiLabel(bmi)}
+          info={bodyAnalysisCopy.topOverview.infoTooltipBmi}
+          label={bodyAnalysisCopy.topOverview.bmiTitle}
           progress={bodyMetricProgress(bmi, 15, 35)}
+          trackHint={bodyAnalysisCopy.topOverview.bmiCategory}
           value={bmi === null ? "—" : formatMetric(bmi)}
         />
       </View>
@@ -145,29 +149,42 @@ export function BodyAnalysisOverviewCard({
 }
 
 function BodyMetricCard({
-  icon,
+  badge,
+  info,
   label,
-  note,
   progress,
+  trackHint,
   value,
 }: {
-  readonly icon: FiticianIconName;
+  readonly badge: string;
+  readonly info: string;
   readonly label: string;
-  readonly note: string;
   readonly progress: number;
+  readonly trackHint: string;
   readonly value: string;
 }) {
+  const [showInfo, setShowInfo] = useState(false);
+
   return (
     <Card style={styles.metricCard}>
-      <View style={styles.metricIconRow}>
-        <Text style={styles.metricLabel}>{label}</Text>
-        <View style={styles.metricIconTile}>
-          <AppIcon color={fiticianTokens.colors.aqua} name={icon} size={18} />
+      <View style={styles.metricHeader}>
+        <View style={styles.metricTitleRow}>
+          <Text style={styles.metricLabel}>{label}</Text>
+          <Pressable
+            accessibilityLabel={`اطلاعات ${label}`}
+            accessibilityRole="button"
+            onPress={() => setShowInfo((visible) => !visible)}
+            style={styles.metricInfoButton}
+          >
+            <AppIcon color={fiticianTokens.colors.muted} name="info" size={15} />
+          </Pressable>
         </View>
+        {badge ? <Text style={styles.metricBadge}>{badge}</Text> : null}
       </View>
       <Text style={styles.metricValue}>{value}</Text>
+      {showInfo ? <Text style={styles.metricInfoText}>{info}</Text> : null}
       <ProgressBar label={`پیشرفت ${label}`} progress={progress} />
-      <Text style={styles.metricNote}>{note}</Text>
+      <Text style={styles.metricNote}>{trackHint}</Text>
     </Card>
   );
 }
@@ -177,9 +194,10 @@ function IndicatorCard({ indicator }: { readonly indicator: BodyIndicatorPresent
   return (
     <Card style={[styles.indicatorCard, { borderColor: `${color}42` }]}>
       <View style={styles.indicatorHeading}>
-        <View style={styles.indicatorCopy}>
+      <View style={styles.indicatorCopy}>
           <Text style={styles.indicatorTitle}>{indicator.title}</Text>
-          <Text style={styles.indicatorCaption}>{indicator.caption}</Text>
+          {indicator.caption ? <Text style={styles.indicatorCaption}>{indicator.caption}</Text> : null}
+          <Text style={styles.indicatorSubtitle}>{indicator.subtitle}</Text>
         </View>
         <View style={[styles.indicatorIconTile, { backgroundColor: `${color}1A` }]}>
           <AppIcon color={color} name={indicator.icon} size={18} />
@@ -317,6 +335,14 @@ const styles = StyleSheet.create({
     textAlign: "auto",
     writingDirection: "rtl",
   },
+  indicatorSubtitle: {
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 11,
+    lineHeight: 18,
+    textAlign: "auto",
+    writingDirection: "rtl",
+  },
   indicatorCard: {
     gap: fiticianTokens.spacing[3],
     padding: fiticianTokens.spacing[3],
@@ -403,22 +429,32 @@ const styles = StyleSheet.create({
     minWidth: 0,
     padding: fiticianTokens.spacing[3],
   },
+  metricHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[2],
+    justifyContent: "space-between",
+  },
   metricGrid: {
     flexDirection: "column",
     gap: fiticianTokens.spacing[3],
   },
-  metricIconRow: {
+  metricInfoButton: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[2],
-  },
-  metricIconTile: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    borderRadius: fiticianTokens.radii.small,
-    height: 32,
     justifyContent: "center",
-    width: 32,
+    minHeight: fiticianTokens.layout.minimumTouchTarget,
+    minWidth: fiticianTokens.layout.minimumTouchTarget,
+  },
+  metricInfoText: {
+    backgroundColor: fiticianTokens.colors.canvas,
+    borderRadius: fiticianTokens.radii.small,
+    color: fiticianTokens.colors.muted,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    lineHeight: 20,
+    padding: fiticianTokens.spacing[2],
+    textAlign: "auto",
+    writingDirection: "rtl",
   },
   metricLabel: {
     color: fiticianTokens.colors.muted,
@@ -428,6 +464,26 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textAlign: "auto",
     writingDirection: "rtl",
+  },
+  metricBadge: {
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    color: fiticianTokens.colors.aqua,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: 10,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
+  metricTitleRow: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[1],
   },
   metricNote: {
     color: fiticianTokens.colors.muted,

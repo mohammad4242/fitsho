@@ -59,7 +59,7 @@ export function BodyAnalysisExperienceTabs({
               ]}
             >
               <AppIcon
-                color={selected ? fiticianTokens.colors.aqua : fiticianTokens.colors.muted}
+                color={selected ? fiticianTokens.colors.ink : fiticianTokens.colors.muted}
                 name={tab.icon}
                 size={18}
               />
@@ -93,16 +93,16 @@ const styles = StyleSheet.create({
   tab: {
     ...RTL_LAYOUT,
     alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surface,
-    borderColor: fiticianTokens.colors.line,
-    borderRadius: fiticianTokens.radii.medium,
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    borderRadius: fiticianTokens.radii.pill,
     borderWidth: 1,
     flex: 1,
     gap: fiticianTokens.spacing[1],
     justifyContent: "center",
     minHeight: fiticianTokens.layout.minimumTouchTarget,
-    paddingHorizontal: fiticianTokens.spacing[1],
-    paddingVertical: fiticianTokens.spacing[2],
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
   },
   tabLabel: {
     color: fiticianTokens.colors.muted,
@@ -113,12 +113,20 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   tabLabelSelected: {
-    color: fiticianTokens.colors.aqua,
+    color: fiticianTokens.colors.ink,
   },
   tabList: {
     ...RTL_LAYOUT,
     ...RTL_ROW,
+    alignSelf: "center",
+    backgroundColor: "rgba(8,22,27,0.85)",
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
     gap: fiticianTokens.spacing[1],
+    maxWidth: "100%",
+    padding: fiticianTokens.spacing[1],
+    width: "100%",
   },
   tabPressed: {
     opacity: 0.82,
@@ -127,5 +135,8 @@ const styles = StyleSheet.create({
   tabSelected: {
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
     borderColor: fiticianTokens.colors.aqua,
+    shadowColor: fiticianTokens.colors.aqua,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
 });

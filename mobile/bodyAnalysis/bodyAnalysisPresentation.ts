@@ -8,6 +8,7 @@ import type {
 } from "@fitician/core/body-photos";
 
 import type { FiticianIconName } from "../ui/icons";
+import { bodyAnalysisCopy } from "./bodyAnalysisCopy";
 
 export type BodyIndicatorTone = "aqua" | "amber" | "blue";
 
@@ -16,6 +17,7 @@ export type BodyIndicatorPresentation = {
   readonly icon: FiticianIconName;
   readonly id: "muscle_balance" | "visible_symmetry" | "upper_lower_balance";
   readonly score: number | null;
+  readonly subtitle: string;
   readonly title: string;
   readonly tone: BodyIndicatorTone;
 };
@@ -48,14 +50,19 @@ export function buildBodyIndicatorSummary(
   experience: BodyAnalysisExperienceV4,
 ): readonly BodyIndicatorPresentation[] {
   const indicators = experience.indicators;
+  const muscleBalance = indicators.muscle_balance ?? indicators.body_shape;
+  const muscleBalanceScore = normalizeScore(muscleBalance?.score_percent);
   return [
     indicator(
       "muscle_balance",
       "تناسب عضلات",
-      "توسعه متوازن عضلات",
-      indicators.muscle_balance ?? indicators.body_shape,
+      muscleBalanceScore !== null && muscleBalanceScore >= 80
+        ? bodyAnalysisCopy.indicators.states.balanced
+        : "",
+      muscleBalance,
       "training",
       "aqua",
+      bodyAnalysisCopy.indicators.muscleBalance.message,
     ),
     indicator(
       "visible_symmetry",
@@ -64,6 +71,7 @@ export function buildBodyIndicatorSummary(
       indicators.visible_symmetry,
       "bodyAnalysis",
       "blue",
+      "هماهنگی و تقارن مطلوب",
     ),
     indicator(
       "upper_lower_balance",
@@ -72,6 +80,7 @@ export function buildBodyIndicatorSummary(
       indicators.upper_lower_balance,
       "target",
       "amber",
+      "توازن بالا و پایین‌تنه",
     ),
   ];
 }
@@ -147,12 +156,14 @@ function indicator(
   source: BodyAnalysisExperienceIndicator | undefined,
   icon: FiticianIconName,
   tone: BodyIndicatorTone,
+  subtitle: string,
 ): BodyIndicatorPresentation {
   return {
     caption,
     icon,
     id,
     score: normalizeScore(source?.score_percent),
+    subtitle,
     title,
     tone,
   };
@@ -163,10 +174,15 @@ function indicatorCaption(
   fallback: string,
 ): string {
   if (source?.status === "balanced" || source?.status === "no_clear_difference") {
-    return "در محدوده‌ی متعادل";
+    return source.status === "balanced"
+      ? bodyAnalysisCopy.indicators.states.balanced
+      : bodyAnalysisCopy.indicators.states.no_clear_difference;
   }
-  if (source?.status === "needs_improvement" || source?.status === "asymmetrical") {
-    return "نیازمند توجه بیشتر";
+  if (source?.status === "needs_improvement") {
+    return "نیازمند بهبود";
+  }
+  if (source?.status === "asymmetrical") {
+    return bodyAnalysisCopy.indicators.states.clear_visible_difference;
   }
   return fallback;
 }

@@ -1,11 +1,22 @@
 import { useMemo, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Defs,
+  Mask,
+  Path,
+  Rect,
+  Svg,
+} from "react-native-svg";
 
-import type {
-  BodyAnalysisExperienceRegion,
-  BodyAnalysisExperienceV4,
-  BodyPhotoView,
-} from "@fitician/core/body-photos";
+import type { BodyAnalysisExperienceRegion, BodyAnalysisExperienceV4 } from "@fitician/core/body-photos";
+import {
+  bodyMapHitRegions,
+  bodyMapRegions,
+  bodyMapSex,
+  bodyMapVisualMask,
+  type BodyMapSex,
+  type BodyMapView,
+} from "./bodyAnalysisMap";
 
 import {
   AppIcon,
@@ -14,26 +25,35 @@ import {
   SegmentedControl,
 } from "../ui/components";
 import { fiticianTokens } from "../ui/tokens";
-import { bodyAssets } from "./bodyAnalysisAssets";
+import { bodyResultAssets } from "./bodyAnalysisAssets";
 import {
   bodyAreaLabel,
   bodyRegionClassificationLabel,
   bodyRegionInsight,
 } from "./bodyAnalysisPresentation";
 
-type MapView = Extract<BodyPhotoView, "front" | "back">;
+const BODY_MAP_HEIGHT = 1280;
+const BODY_MAP_VIEWBOX = "0 0 853 1280";
+const BODY_MAP_WIDTH = 853;
+const BODY_MAP_AQUA = "#50DFCE";
 
-const mapViews: readonly { label: string; value: MapView }[] = [
+const mapViews: readonly { label: string; value: BodyMapView }[] = [
   { label: "نمای روبه‌رو", value: "front" },
   { label: "نمای پشت", value: "back" },
 ];
 
-const viewLabels: Record<MapView, string> = {
+const viewLabels: Record<BodyMapView, string> = {
   back: "پشت",
   front: "روبه‌رو",
 };
 
-const allViewLabels: Record<BodyPhotoView, string> = {
+const sexLabels: Record<BodyMapSex, string> = {
+  female: "زن",
+  male: "مرد",
+  neutral: "خنثی",
+};
+
+const allViewLabels: Record<"back" | "front" | "side", string> = {
   back: "پشت",
   front: "روبه‌رو",
   side: "نیمرخ",
@@ -44,14 +64,38 @@ export function BodyAnalysisMuscleSection({
 }: {
   readonly experience: BodyAnalysisExperienceV4;
 }) {
-  const [activeView, setActiveView] = useState<MapView>("front");
-  const [selectedArea, setSelectedArea] = useState<string | null>(null);
-  const sex = experience.input_snapshot.sex === "female" ? "female" : "male";
+  const [activeView, setActiveView] = useState<BodyMapView>("front");
+  const [selectedArea, setSelectedArea] = useState<BodyAnalysisExperienceRegion["area"] | null>(null);
+  const sex = bodyMapSex(experience.input_snapshot.sex);
+  const assetSex = sex === "female" ? "female" : "male";
+  const regionsByArea = useMemo(
+    () => new Map(experience.regions.map((region) => [region.area, region] as const)),
+    [experience.regions],
+  );
+  const layoutsByArea = useMemo(
+    () => new Map(bodyMapRegions.map((layout) => [layout.area, layout] as const)),
+    [],
+  );
   const visibleRegions = useMemo(
     () => experience.regions.filter((region) => region.supporting_views.includes(activeView)),
     [activeView, experience.regions],
   );
-  const selectedRegion = experience.regions.find((region) => region.area === selectedArea);
+  const hitRegions = useMemo(
+    () => bodyMapHitRegions(sex, activeView).filter((hitRegion) => {
+      const layout = layoutsByArea.get(hitRegion.area);
+      return layout !== undefined
+        && layout.availableViews.includes(activeView)
+        && regionsByArea.has(hitRegion.area);
+    }),
+    [activeView, layoutsByArea, regionsByArea, sex],
+  );
+  const selectedRegion = selectedArea === null ? undefined : regionsByArea.get(selectedArea);
+  const selectedVisualMask = selectedArea === null
+    ? undefined
+    : bodyMapVisualMask(sex, activeView, selectedArea);
+  const selectedVisualMaskId = selectedArea === null
+    ? undefined
+    : `body-analysis-map-mask-${sex}-${activeView}-${selectedArea}`;
 
   function changeView(value: string) {
     if (value !== "front" && value !== "back") return;
@@ -59,10 +103,16 @@ export function BodyAnalysisMuscleSection({
     setSelectedArea(null);
   }
 
+  function selectArea(area: BodyAnalysisExperienceRegion["area"]) {
+    setSelectedArea(area);
+  }
+
+  const mapImageLabel = `نمای ${viewLabels[activeView]} نقشه بدن ${sexLabels[sex]}`;
+
   return (
     <View style={styles.container}>
       <SectionHeader eyebrow="نقشهٔ بدن" title="یافته‌های همین تحلیل" />
-      <Text style={styles.intro}>برای دیدن یک ناحیه، روی نام آن بزن.</Text>
+      <Text style={styles.intro}>برای دیدن یک ناحیه، روی خود بدن بزن.</Text>
 
       <Card variant="hero" style={styles.mapCard}>
         <View style={styles.mapHeader}>
@@ -70,29 +120,98 @@ export function BodyAnalysisMuscleSection({
             <Text style={styles.mapEyebrow}>BODY MAP</Text>
             <Text style={styles.mapTitle}>روی هر ناحیه بزن تا جزئیاتش رو ببینی</Text>
           </View>
-          <View style={styles.viewBadge}>
-            <Text style={styles.viewBadgeText}>{viewLabels[activeView]}</Text>
-            <AppIcon color={fiticianTokens.colors.aqua} name="bodyAnalysis" size={16} />
+          <View style={styles.sexBadge}>
+            <Text style={styles.viewBadgeText}>{sexLabels[sex]}</Text>
+            <AppIcon color={BODY_MAP_AQUA} name="bodyAnalysis" size={16} />
           </View>
         </View>
+
+        <SegmentedControl
+          accessibilityLabel="نمای نقشهٔ بدن"
+          onChange={changeView}
+          options={mapViews}
+          selectedValue={activeView}
+          testID="body-analysis-map-views"
+        />
+
         <View style={styles.figureFrame}>
           <View style={styles.figureGlow} />
           <Image
-            accessibilityLabel={`تصویر بدن از ${viewLabels[activeView]}`}
-            resizeMode="contain"
-            source={bodyAssets[sex][activeView]}
+            accessibilityLabel={mapImageLabel}
+            resizeMode="stretch"
+            source={bodyResultAssets.map[assetSex][activeView]}
             style={styles.figure}
+            testID="body-analysis-map-image"
           />
+
+          {selectedVisualMask !== undefined && selectedVisualMaskId !== undefined ? (
+            <Svg
+              pointerEvents="none"
+              preserveAspectRatio="none"
+              style={styles.mapLayer}
+              testID={`body-analysis-map-mask-${selectedArea}`}
+              viewBox={BODY_MAP_VIEWBOX}
+            >
+              <Defs>
+                <Mask
+                  id={selectedVisualMaskId}
+                  maskContentUnits="userSpaceOnUse"
+                  maskUnits="userSpaceOnUse"
+                  x={0}
+                  y={0}
+                  width={BODY_MAP_WIDTH}
+                  height={BODY_MAP_HEIGHT}
+                >
+                  <Rect fill="black" height={BODY_MAP_HEIGHT} width={BODY_MAP_WIDTH} x={0} y={0} />
+                  {selectedVisualMask.paths.map((path, index) => (
+                    <Path
+                      d={path.d}
+                      fill="white"
+                      key={`${selectedVisualMask.file}-${index}`}
+                      transform={path.transform}
+                    />
+                  ))}
+                </Mask>
+              </Defs>
+              <Rect
+                fill={BODY_MAP_AQUA}
+                fillOpacity={0.78}
+                height={BODY_MAP_HEIGHT}
+                mask={`url(#${selectedVisualMaskId})`}
+                width={BODY_MAP_WIDTH}
+                x={0}
+                y={0}
+              />
+            </Svg>
+          ) : null}
+
+          <Svg
+            accessibilityLabel={`ناحیه‌های تعاملی ${mapImageLabel}`}
+            pointerEvents="box-none"
+            preserveAspectRatio="none"
+            style={styles.mapLayer}
+            viewBox={BODY_MAP_VIEWBOX}
+          >
+            {hitRegions.map((hitRegion) => {
+              const region = regionsByArea.get(hitRegion.area);
+              if (region === undefined) return null;
+              const selected = selectedArea === hitRegion.area;
+              return (
+                <Path
+                  accessibilityLabel={`${bodyAreaLabel(region.area)} — ${bodyRegionClassificationLabel(region.display_classification)}`}
+                  d={hitRegion.d}
+                  fill={BODY_MAP_AQUA}
+                  fillOpacity={selected ? 0.04 : 0.01}
+                  id={hitRegion.id}
+                  key={hitRegion.id}
+                  onPress={() => selectArea(region.area)}
+                  testID={`body-analysis-map-hit-region-${region.area}`}
+                />
+              );
+            })}
+          </Svg>
         </View>
       </Card>
-
-      <SegmentedControl
-        accessibilityLabel="نمای نقشهٔ بدن"
-        onChange={changeView}
-        options={mapViews}
-        selectedValue={activeView}
-        testID="body-analysis-map-views"
-      />
 
       <View accessibilityRole="list" style={styles.regionList}>
         {visibleRegions.length === 0 ? (
@@ -102,7 +221,7 @@ export function BodyAnalysisMuscleSection({
         ) : visibleRegions.map((region) => (
           <RegionButton
             key={region.area}
-            onPress={() => setSelectedArea(region.area)}
+            onPress={() => selectArea(region.area)}
             region={region}
             selected={selectedArea === region.area}
           />
@@ -123,15 +242,15 @@ export function BodyAnalysisMuscleSection({
       <View style={styles.summaryStack}>
         <RegionSummaryCard
           emptyText="فعلاً نقطه‌ضعف واضحی ثبت نشده."
-          regions={experience.regions.filter((region) => (
-            region.display_classification === "primary_priority"
-            || region.display_classification === "room_to_grow"
-          ))}
+          regions={[
+            ...experience.regions.filter((region) => region.display_classification === "primary_priority"),
+            ...experience.regions.filter((region) => region.display_classification === "room_to_grow"),
+          ].slice(0, 3)}
           title="نقاط نیازمند تمرکز"
         />
         <RegionSummaryCard
           emptyText="فعلاً نقطه‌قوت مشخصی ثبت نشده."
-          regions={experience.regions.filter((region) => region.display_classification === "stronger")}
+          regions={experience.regions.filter((region) => region.display_classification === "stronger").slice(0, 3)}
           title="نقاط قوت مهم"
         />
       </View>
@@ -156,12 +275,12 @@ function RegionButton({
       onPress={onPress}
       style={({ pressed }) => [styles.regionButton, selected && styles.regionButtonSelected, pressed && styles.pressed]}
     >
-      <View style={styles.regionDot} />
+      <View style={[styles.regionDot, selected && styles.regionDotSelected]} />
       <View style={styles.regionCopy}>
         <Text style={styles.regionTitle}>{bodyAreaLabel(region.area)}</Text>
         <Text style={styles.regionStatus}>{bodyRegionClassificationLabel(region.display_classification)}</Text>
       </View>
-      <AppIcon color={selected ? fiticianTokens.colors.aqua : fiticianTokens.colors.muted} name="arrowLeft" size={20} />
+      <AppIcon color={selected ? BODY_MAP_AQUA : fiticianTokens.colors.muted} name="arrowLeft" size={20} />
     </Pressable>
   );
 }
@@ -182,7 +301,7 @@ function RegionSummaryCard({
         <Text style={styles.body}>{emptyText}</Text>
       ) : (
         <View style={styles.summaryChips}>
-          {regions.slice(0, 3).map((region) => (
+          {regions.map((region) => (
             <View key={region.area} style={styles.summaryChip}>
               <Text style={styles.summaryChipText}>{bodyAreaLabel(region.area)}</Text>
               <View style={styles.summaryDot} />
@@ -211,25 +330,28 @@ const styles = StyleSheet.create({
   },
   figure: {
     height: "100%",
+    position: "absolute",
     width: "100%",
   },
   figureFrame: {
-    alignItems: "center",
+    alignSelf: "center",
     backgroundColor: fiticianTokens.colors.canvas,
     borderColor: fiticianTokens.colors.lineStrong,
     borderRadius: fiticianTokens.radii.large,
     borderWidth: 1,
-    height: 280,
-    justifyContent: "center",
     overflow: "hidden",
     position: "relative",
+    width: "100%",
+    aspectRatio: BODY_MAP_WIDTH / BODY_MAP_HEIGHT,
   },
   figureGlow: {
-    backgroundColor: "rgba(80,223,206,0.06)",
+    backgroundColor: "rgba(80,223,206,0.12)",
     borderRadius: 180,
-    height: 250,
+    height: 300,
+    left: "20%",
     position: "absolute",
-    width: 170,
+    top: "30%",
+    width: "60%",
   },
   intro: {
     color: fiticianTokens.colors.muted,
@@ -241,6 +363,7 @@ const styles = StyleSheet.create({
   },
   mapCard: {
     gap: fiticianTokens.spacing[3],
+    overflow: "hidden",
     padding: fiticianTokens.spacing[3],
   },
   mapCopy: {
@@ -248,7 +371,7 @@ const styles = StyleSheet.create({
     gap: fiticianTokens.spacing[1],
   },
   mapEyebrow: {
-    color: fiticianTokens.colors.muted,
+    color: fiticianTokens.colors.aqua,
     fontFamily: fiticianTokens.typography.fontFamily.displayEnglish,
     fontSize: 10,
     letterSpacing: 1.4,
@@ -259,6 +382,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: fiticianTokens.spacing[2],
     justifyContent: "space-between",
+  },
+  mapLayer: {
+    height: "100%",
+    left: 0,
+    position: "absolute",
+    top: 0,
+    width: "100%",
   },
   mapTitle: {
     color: fiticianTokens.colors.ink,
@@ -294,17 +424,20 @@ const styles = StyleSheet.create({
   },
   regionButtonSelected: {
     backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    borderColor: fiticianTokens.colors.aqua,
+    borderColor: BODY_MAP_AQUA,
   },
   regionCopy: {
     flex: 1,
     gap: 2,
   },
   regionDot: {
-    backgroundColor: fiticianTokens.colors.aqua,
+    backgroundColor: fiticianTokens.colors.muted,
     borderRadius: fiticianTokens.radii.pill,
     height: 8,
     width: 8,
+  },
+  regionDotSelected: {
+    backgroundColor: BODY_MAP_AQUA,
   },
   regionList: {
     gap: fiticianTokens.spacing[2],
@@ -325,10 +458,12 @@ const styles = StyleSheet.create({
     writingDirection: "rtl",
   },
   selectionCard: {
+    borderRightColor: BODY_MAP_AQUA,
+    borderRightWidth: 4,
     gap: fiticianTokens.spacing[2],
   },
   selectionEyebrow: {
-    color: fiticianTokens.colors.aqua,
+    color: BODY_MAP_AQUA,
     fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
     fontSize: fiticianTokens.typography.fontSize.xs,
     fontWeight: fiticianTokens.typography.fontWeight.bold,
@@ -343,6 +478,25 @@ const styles = StyleSheet.create({
     textAlign: "auto",
     writingDirection: "rtl",
   },
+  sexBadge: {
+    alignItems: "center",
+    backgroundColor: fiticianTokens.colors.surfaceInteractive,
+    borderColor: fiticianTokens.colors.lineStrong,
+    borderRadius: fiticianTokens.radii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: fiticianTokens.spacing[1],
+    paddingHorizontal: fiticianTokens.spacing[2],
+    paddingVertical: fiticianTokens.spacing[1],
+  },
+  viewBadgeText: {
+    color: BODY_MAP_AQUA,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.xs,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "center",
+    writingDirection: "rtl",
+  },
   summaryCard: {
     gap: fiticianTokens.spacing[2],
     padding: fiticianTokens.spacing[3],
@@ -352,13 +506,11 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: fiticianTokens.spacing[2],
   },
-  summaryTitle: {
-    color: fiticianTokens.colors.ink,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.body,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "auto",
-    writingDirection: "rtl",
+  summaryDot: {
+    backgroundColor: BODY_MAP_AQUA,
+    borderRadius: fiticianTokens.radii.pill,
+    height: 6,
+    width: 6,
   },
   summaryChip: {
     alignItems: "center",
@@ -379,32 +531,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
     writingDirection: "rtl",
   },
-  summaryDot: {
-    backgroundColor: fiticianTokens.colors.aqua,
-    borderRadius: fiticianTokens.radii.pill,
-    height: 6,
-    width: 6,
+  summaryTitle: {
+    color: fiticianTokens.colors.ink,
+    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
+    fontSize: fiticianTokens.typography.fontSize.body,
+    fontWeight: fiticianTokens.typography.fontWeight.bold,
+    textAlign: "auto",
+    writingDirection: "rtl",
   },
   summaryStack: {
     gap: fiticianTokens.spacing[2],
-  },
-  viewBadge: {
-    alignItems: "center",
-    backgroundColor: fiticianTokens.colors.surfaceInteractive,
-    borderColor: fiticianTokens.colors.lineStrong,
-    borderRadius: fiticianTokens.radii.pill,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: fiticianTokens.spacing[1],
-    paddingHorizontal: fiticianTokens.spacing[2],
-    paddingVertical: fiticianTokens.spacing[1],
-  },
-  viewBadgeText: {
-    color: fiticianTokens.colors.aqua,
-    fontFamily: fiticianTokens.typography.fontFamily.bodyPersian,
-    fontSize: fiticianTokens.typography.fontSize.xs,
-    fontWeight: fiticianTokens.typography.fontWeight.bold,
-    textAlign: "center",
-    writingDirection: "rtl",
   },
 });
