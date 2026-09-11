@@ -4,6 +4,7 @@ import asyncio
 import logging
 import socket
 from datetime import UTC, datetime, timedelta
+from importlib import import_module
 from uuid import UUID, uuid4
 
 import httpx
@@ -23,6 +24,8 @@ from app.notifications.outbox import enqueue_notification_event
 from . import food_photo_service
 from .models import NutritionFoodPhotoAnalysisJob, NutritionFoodPhotoEstimate
 from .security import audit_security_event, record_operational_event
+
+import_module("app.main")  # Ensure all SQLAlchemy models and relationships are registered
 
 logger = logging.getLogger(__name__)
 
