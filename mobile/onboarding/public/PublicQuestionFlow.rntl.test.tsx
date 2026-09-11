@@ -7,7 +7,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 jest.mock("@expo/vector-icons", () => ({ MaterialCommunityIcons: () => null }));
 jest.mock("expo-video", () => ({ VideoView: () => null, useVideoPlayer: () => ({}) }));
 
-import { emptyProfileFormValues } from "../onboardingForms";
+import { emptyProfileFormValues, profileInputForOnboarding } from "../onboardingForms";
+import type { ProfileFormValues } from "@fitician/core/profile";
 import { GuidedSharedProfileQuestions } from "./GuidedSharedProfileQuestions";
 import { GuidedTrainingQuestions } from "./GuidedTrainingQuestions";
 
@@ -169,8 +170,16 @@ test("uses the Web gender card scale, body range hints, and goal labels", () => 
   expect(screen.getByRole("radio", { name: "چربی‌سوزی + عضله‌سازی 🔥💪" })).toBeTruthy();
 });
 
-function TrainingHarness({ onComplete, onBack }: { onComplete?: () => void; onBack?: () => void }) {
-  const [values, setValues] = useState(emptyProfileFormValues);
+function TrainingHarness({
+  initialValues,
+  onComplete,
+  onBack,
+}: {
+  initialValues?: ProfileFormValues;
+  onComplete?: (values: ProfileFormValues) => void;
+  onBack?: () => void;
+}) {
+  const [values, setValues] = useState(initialValues ?? emptyProfileFormValues());
   return (
     <GuidedTrainingQuestions
       onBack={onBack ?? jest.fn()}
@@ -259,4 +268,42 @@ test("keeps Web duration, intensity, priority, caution, and week choices", () =>
   fireEvent.press(screen.getByRole("radio", { name: "۶ هفته" }));
   advance();
   expect(onComplete).toHaveBeenCalledTimes(1);
+});
+
+test("maps home equipment before the final public training submission", () => {
+  const initialValues = emptyProfileFormValues();
+  Object.assign(initialValues, {
+    birth_date: "1992-05-12",
+    current_weight_kg: "64",
+    display_name: "Sara",
+    fitness_goal: "build_muscle",
+    height_cm: "168",
+    sex: "female",
+  });
+  const onComplete = jest.fn<(values: ProfileFormValues) => void>();
+  renderWithSafeArea(<TrainingHarness initialValues={initialValues} onComplete={onComplete} />);
+
+  fireEvent.press(screen.getByRole("radio", { name: "مبتدی (زیر ۶ ماه)" }));
+  advance();
+  fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
+  fireEvent.press(screen.getByRole("radio", { name: "۳ روز در هفته" }));
+  advance();
+  fireEvent.press(screen.getByRole("radio", { name: "خانه" }));
+  advance();
+  fireEvent.press(screen.getByRole("radio", { name: "فقط وزن بدن" }));
+  advance();
+  fireEvent.press(screen.getByRole("radio", { name: "۳۰ تا ۴۵ دقیقه" }));
+  advance();
+  fireEvent.press(screen.getByRole("radio", { name: "متوسط" }));
+  advance();
+  fireEvent.press(screen.getByRole("radio", { name: "تمرکز ویژه‌ای ندارم" }));
+  advance();
+  fireEvent.press(screen.getByRole("button", { name: "رد کردن این سؤال" }));
+  fireEvent.press(screen.getByRole("radio", { name: "۶ هفته" }));
+  advance();
+
+  expect(onComplete).toHaveBeenCalledTimes(1);
+  const completedValues = onComplete.mock.calls[0]?.[0];
+  expect(completedValues).toBeDefined();
+  expect(() => profileInputForOnboarding(completedValues!, new Date("2026-09-11T00:00:00Z"))).not.toThrow();
 });

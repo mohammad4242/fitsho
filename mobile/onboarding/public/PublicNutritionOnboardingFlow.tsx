@@ -157,7 +157,10 @@ export function PublicNutritionOnboardingFlow({
     onCompleteRef.current = onComplete;
   }, [onComplete]);
 
-  function updateTraining(field: keyof ProfileFormValues, value: string | ProfileFormValues["training_cautions"]) {
+  function updateTraining(
+    field: keyof ProfileFormValues,
+    value: string | ProfileFormValues["training_cautions"] | ProfileFormValues["available_equipment"],
+  ) {
     setTrainingValues((current) => ({
       ...current,
       [field]: value,

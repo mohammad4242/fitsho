@@ -19,6 +19,7 @@ type TrainingField =
   | "training_days_per_week"
   | "training_location"
   | "home_training_setup"
+  | "available_equipment"
   | "session_duration_minutes"
   | "training_intensity"
   | "priority_muscle"
@@ -41,7 +42,7 @@ export interface GuidedTrainingQuestionsProps {
   readonly onBack: () => void;
   readonly onChange: (
     field: TrainingField,
-    value: string | ProfileFormValues["training_cautions"],
+    value: string | ProfileFormValues["training_cautions"] | ProfileFormValues["available_equipment"],
   ) => void;
   readonly onComplete: (values: ProfileFormValues) => void;
   readonly onRegisterBack?: (handler: () => void) => () => void;
@@ -281,7 +282,10 @@ export function GuidedTrainingQuestions({
           <PublicChoiceCard
             label="فقط وزن بدن"
             onPress={() => selectAndAdvance(
-              () => onChange("home_training_setup", "bodyweight_only"),
+              () => {
+                onChange("home_training_setup", "bodyweight_only");
+                onChange("available_equipment", ["bodyweight", "pull_up_bar"]);
+              },
               () => setIndex((current) => current + 1),
             )}
             selected={values.home_training_setup === "bodyweight_only"}
@@ -290,7 +294,10 @@ export function GuidedTrainingQuestions({
           <PublicChoiceCard
             label="دمبل دارم"
             onPress={() => selectAndAdvance(
-              () => onChange("home_training_setup", "dumbbells_available"),
+              () => {
+                onChange("home_training_setup", "dumbbells_available");
+                onChange("available_equipment", ["bodyweight", "dumbbell"]);
+              },
               () => setIndex((current) => current + 1),
             )}
             selected={values.home_training_setup === "dumbbells_available"}
