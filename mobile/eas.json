@@ -15,6 +15,9 @@
       "android": {
         "buildType": "apk",
         "credentialsSource": "remote"
+      },
+      "ios": {
+        "credentialsSource": "remote"
       }
     },
     "preview": {
@@ -27,17 +30,24 @@
       "android": {
         "buildType": "app-bundle",
         "credentialsSource": "remote"
+      },
+      "ios": {
+        "credentialsSource": "remote"
       }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
+      "distribution": "store",
       "environment": "production",
       "env": {
         "APP_VARIANT": "production"
       },
       "android": {
         "buildType": "app-bundle",
+        "credentialsSource": "remote"
+      },
+      "ios": {
         "credentialsSource": "remote"
       }
     }
@@ -47,7 +57,8 @@
       "android": {
         "releaseStatus": "draft",
         "track": "internal"
-      }
+      },
+      "ios": {}
     }
   }
 }

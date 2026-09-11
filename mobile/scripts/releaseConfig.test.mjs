@@ -13,4 +13,10 @@ test("keeps EAS profiles isolated and remotely signed", async () => {
   const appConfig = await readFile(resolve(mobileRoot, "app.config.ts"), "utf8");
 
   assert.doesNotThrow(() => validateReleaseConfig(easConfig, appConfig));
+  for (const [name, profile] of Object.entries(easConfig.build)) {
+    assert.equal(profile.ios?.credentialsSource, "remote", `${name} iOS signing drifted`);
+    assert.equal(profile.distribution, name === "production" ? "store" : "internal");
+    assert.equal(profile.env?.APP_VARIANT, name);
+  }
+  assert.ok(easConfig.submit?.production?.ios);
 });

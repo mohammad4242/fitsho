@@ -16,6 +16,9 @@ const withAndroidRtl = loadModuleSync(
 const withAndroidReleaseSymbols = loadModuleSync(
   resolve(__dirname, "plugins/withAndroidReleaseSymbols.ts"),
 ).default;
+const withIosHardening = loadModuleSync(
+  resolve(__dirname, "plugins/withIosHardening.ts"),
+).default;
 
 const FITICIAN_APP_LINK_PLACEHOLDER = "app.fitician.example";
 const supportedAppVariants = new Set(["development", "preview", "production"]);
@@ -142,6 +145,7 @@ const config: ExpoConfig = {
     withAndroidHardening as never,
     withAndroidRtl as never,
     withAndroidReleaseSymbols as never,
+    withIosHardening as never,
   ],
   runtimeVersion: { policy: "appVersion" },
   updates: updatesUrl
@@ -171,6 +175,7 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier: "com.fitician.app",
     associatedDomains: [`applinks:${appLinkHost}`],
+    usesAppleSignIn: true,
   },
   extra: {
     environment: appVariant,

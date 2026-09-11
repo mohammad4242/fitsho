@@ -18,6 +18,10 @@ test("declares the Fitician workspace and native foundation", async () => {
     new URL("mobile/plugins/withAndroidReleaseSymbols.ts", projectRoot),
     "utf8",
   );
+  const iosHardeningPlugin = await readFile(
+    new URL("mobile/plugins/withIosHardening.ts", projectRoot),
+    "utf8",
+  );
   const mobileTsconfig = await readJson("mobile/tsconfig.json");
 
   assert.deepEqual(rootPackage.workspaces, ["frontend", "mobile", "packages/fitician-core"]);
@@ -37,6 +41,12 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(appConfig, /associatedDomains/);
   assert.match(appConfig, /EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID/);
   assert.match(appConfig, /withAndroidReleaseSymbols/);
+  assert.match(appConfig, /withIosHardening/);
+  assert.match(appConfig, /bundleIdentifier:\s*["']com\.fitician\.app["']/);
+  assert.match(iosHardeningPlugin, /NSCameraUsageDescription/u);
+  assert.match(iosHardeningPlugin, /NSExceptionDomains/u);
+  assert.match(iosHardeningPlugin, /NSAllowsArbitraryLoads/u);
+  assert.match(iosHardeningPlugin, /NSExceptionAllowsInsecureHTTPLoads/u);
   assert.match(releaseSymbolsPlugin, /android\.enableMinifyInReleaseBuilds/);
   assert.equal(mobilePackage.scripts["export:android:source-maps"], "node scripts/releaseArtifacts.mjs");
   assert.equal(mobileTsconfig.compilerOptions.strict, true);
