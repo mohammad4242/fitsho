@@ -8,8 +8,8 @@ import NitroModules
 import UIKit
 import VisionCamera
 
-public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
-  public let contractVersion = "1.0"
+final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
+  let contractVersion = "1.0"
 
   private static let MODEL_STATUS_READY = "ready"
   private static let MODEL_STATUS_NOT_PACKAGED = "not-packaged"
@@ -30,18 +30,18 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
   private var totalFrameDurationNanoseconds: UInt64 = 0
   private var maxFrameDurationNanoseconds: UInt64 = 0
 
-  public override init() {
+  override init() {
     super.init()
     configureModels()
   }
 
-  public var modelStatus: String {
+  var modelStatus: String {
     metricsLock.lock()
     defer { metricsLock.unlock() }
     return nativeModelStatus
   }
 
-  public func process(frame: any HybridFrameSpec) throws -> NativeBodyVisionResult {
+  func process(frame: any HybridFrameSpec) throws -> NativeBodyVisionResult {
     processingLock.lock()
     defer { processingLock.unlock() }
 
@@ -84,13 +84,13 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
     return result
   }
 
-  public func recordDroppedFrame() throws {
+  func recordDroppedFrame() throws {
     metricsLock.lock()
     droppedFrameCount += 1
     metricsLock.unlock()
   }
 
-  public func benchmark() throws -> NativeBodyVisionBenchmark {
+  func benchmark() throws -> NativeBodyVisionBenchmark {
     metricsLock.lock()
     let processed = processedFrameCount
     let dropped = droppedFrameCount
@@ -111,7 +111,7 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
     )
   }
 
-  public func dispose() {
+  func dispose() {
     processingLock.lock()
     poseLandmarker = nil
     imageSegmenter = nil

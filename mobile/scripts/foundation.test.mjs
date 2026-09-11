@@ -87,6 +87,8 @@ test("declares the Fitician workspace and native foundation", async () => {
   assert.match(bodyVisionIosSource, /MPImage\(pixelBuffer: normalizedPixelBuffer, orientation: \.up\)/u);
   assert.doesNotMatch(bodyVisionIosSource, /uiImageOrientation\(from: frame\.orientation, mirrored: frame\.isMirrored\)/u);
   assert.match(bodyVisionIosSource, /modelStatus/u);
+  assert.match(bodyVisionIosSource, /(?<!public )final class FiticianBodyVision: HybridFiticianBodyVisionSpec/u);
+  assert.doesNotMatch(bodyVisionIosSource, /public final class FiticianBodyVision/u);
   assert.match(releaseSymbolsPlugin, /android\.enableMinifyInReleaseBuilds/);
   assert.equal(mobilePackage.scripts["export:android:source-maps"], "node scripts/releaseArtifacts.mjs");
   assert.equal(mobileTsconfig.compilerOptions.strict, true);
