@@ -37,3 +37,29 @@ it("does not create a broad HTTP exception for HTTPS runtimes", () => {
   expect(result.NSCameraUsageDescription).toBe(IOS_CAMERA_USAGE_DESCRIPTION);
   expect(result.NSAppTransportSecurity).toEqual({ NSAllowsArbitraryLoads: false });
 });
+
+it("removes Expo development local-network exceptions from release plists", () => {
+  const result = applyIosHardening(
+    {
+      NSAppTransportSecurity: {
+        NSAllowsLocalNetworking: true,
+      },
+      NSBonjourServices: ["_expo._tcp"],
+      NSLocalNetworkUsageDescription: "development only",
+    },
+    "http://100.97.78.5:8001",
+    "production",
+  );
+
+  expect(result.NSAppTransportSecurity).toEqual({
+    NSAllowsArbitraryLoads: false,
+    NSExceptionDomains: {
+      "100.97.78.5": {
+        NSExceptionAllowsInsecureHTTPLoads: true,
+        NSIncludesSubdomains: false,
+      },
+    },
+  });
+  expect(result.NSBonjourServices).toBeUndefined();
+  expect(result.NSLocalNetworkUsageDescription).toBeUndefined();
+});

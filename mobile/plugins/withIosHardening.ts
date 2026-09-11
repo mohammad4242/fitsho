@@ -6,6 +6,7 @@ export const IOS_CAMERA_USAGE_DESCRIPTION =
   "فیتیچیان برای ثبت عکس غذا و عکس‌های تحلیل بدن به دسترسی دوربین نیاز دارد.";
 
 type PlistRecord = Record<string, JSONValue | undefined>;
+type IosHardeningEnvironment = "development" | "preview" | "production";
 
 function record(value: JSONValue | undefined): PlistRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -26,8 +27,16 @@ function httpHost(apiBaseUrl: unknown): string | null {
 export function applyIosHardening(
   infoPlist: InfoPlist,
   apiBaseUrl: unknown,
+  environment: IosHardeningEnvironment = "development",
 ): InfoPlist {
   const existingTransportSecurity = record(infoPlist.NSAppTransportSecurity);
+  const transportSecurity = { ...existingTransportSecurity };
+  const hardenedInfoPlist = { ...infoPlist };
+  if (environment !== "development") {
+    delete transportSecurity.NSAllowsLocalNetworking;
+    delete hardenedInfoPlist.NSBonjourServices;
+    delete hardenedInfoPlist.NSLocalNetworkUsageDescription;
+  }
   const existingExceptionDomains = record(existingTransportSecurity.NSExceptionDomains);
   const host = httpHost(apiBaseUrl);
   const exceptionDomains = host === null
@@ -42,10 +51,10 @@ export function applyIosHardening(
       };
 
   return {
-    ...infoPlist,
+    ...hardenedInfoPlist,
     NSCameraUsageDescription: IOS_CAMERA_USAGE_DESCRIPTION,
     NSAppTransportSecurity: {
-      ...existingTransportSecurity,
+      ...transportSecurity,
       NSAllowsArbitraryLoads: false,
       ...(Object.keys(exceptionDomains).length > 0
         ? { NSExceptionDomains: exceptionDomains }
@@ -55,7 +64,12 @@ export function applyIosHardening(
 }
 
 const withIosHardening: ConfigPlugin = (config) => withInfoPlist(config, (mod) => {
-  mod.modResults = applyIosHardening(mod.modResults, mod.extra?.apiBaseUrl);
+  const environment = mod.extra?.environment === "development"
+    ? "development"
+    : mod.extra?.environment === "preview"
+      ? "preview"
+      : "production";
+  mod.modResults = applyIosHardening(mod.modResults, mod.extra?.apiBaseUrl, environment);
   return mod;
 });
 
