@@ -89,12 +89,13 @@ if [[ ! -s "$executable_path" ]]; then
   exit 1
 fi
 
-if ! xcrun otool -l "$executable_path" | grep -Eq 'platform IOS([[:space:]]|$)'; then
+build_platforms="$(xcrun otool -l "$executable_path" | awk '$1 == "platform" { print $2 }')"
+if ! grep -Eq '(^|[[:space:]])2([[:space:]]|$)' <<< "$build_platforms"; then
   echo "The app executable is not an iOS device binary" >&2
   xcrun otool -l "$executable_path" | grep -A4 -B1 'LC_BUILD_VERSION' >&2 || true
   exit 1
 fi
-if xcrun otool -l "$executable_path" | grep -q 'platform IOSSIMULATOR'; then
+if grep -Eq '(^|[[:space:]])7([[:space:]]|$)' <<< "$build_platforms"; then
   echo "The app executable contains an iOS simulator platform" >&2
   exit 1
 fi

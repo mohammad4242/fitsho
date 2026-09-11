@@ -124,6 +124,9 @@ test("protected release workflow exposes all three EAS artifact profiles", async
   assert.match(iosWorkflow, /IOS_SIDELOAD_BUILD/u);
   assert.match(sideloadBuildScript, /generic\/platform=iOS/u);
   assert.match(sideloadBuildScript, /CODE_SIGNING_ALLOWED=NO/u);
+  assert.match(sideloadBuildScript, /awk '\$1 == "platform" \{ print \$2 \}'/u);
+  assert.match(sideloadBuildScript, /grep -Eq .*\)2\(/u);
+  assert.match(sideloadBuildScript, /grep -Eq .*\)7\(/u);
   assert.match(iosWorkflow, /Fitician-unsigned\.ipa/u);
   assert.match(iosWorkflow, /fitician-ios-unsigned/u);
   assert.match(iosWorkflow, /actions\/upload-artifact@v4/u);
