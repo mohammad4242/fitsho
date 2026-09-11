@@ -19,5 +19,9 @@ it("uses photo capture without mounting the crashing live frame processor", asyn
   expect(source).toMatch(/outputs=\{\[photoOutput\]\}/);
   expect(source).toMatch(/orientationSource="device"/);
   expect(source).toMatch(/mirrorMode="off"/);
+  expect(source).toMatch(/containerFormat: "jpeg"/);
+  expect(source).toMatch(/mediaTypes: \["images"\]/);
+  expect(source).toMatch(/base64: false/);
+  expect(source).toMatch(/exif: false/);
   expect(source).not.toMatch(/getPixelBuffer|console\.|Log\./);
 });
