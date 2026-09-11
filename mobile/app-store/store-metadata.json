@@ -1,0 +1,43 @@
+{
+  "platform": "ios",
+  "applicationId": "com.fitician.app",
+  "applicationName": "Fitician",
+  "developerName": "Fitician",
+  "locales": {
+    "fa": {
+      "title": "فیتیچیان: تمرین و تغذیه",
+      "subtitle": "تمرین، تغذیه و پیگیری پیشرفت",
+      "description": "فیتیچیان همراه شما برای ساختن عادت‌های پایدار تمرین و تغذیه است.\n\nبرنامه تمرینی شخصی، آموزش حرکت‌ها، پیگیری چرخه تمرین و بازخورد هفتگی را در یک تجربه منظم دنبال کنید. هدف‌ها و ترجیح‌های غذایی خود را ثبت کنید و پیشرفت بدن را با کنترل حریم خصوصی پیگیری کنید.\n\nفیتیچیان ابزار سلامتی و تناسب‌اندام است و جایگزین تشخیص یا درمان پزشکی نیست. قابلیت‌های متخصص فقط از مسیر رسمی و با دسترسی معتبر ارائه می‌شوند."
+    },
+    "en": {
+      "title": "Fitician: Fitness & Nutrition",
+      "subtitle": "Training, nutrition, and progress tracking",
+      "description": "Fitician helps you build consistent training and nutrition habits in one focused experience.\n\nFollow a personal workout plan, learn each movement, track your training cycle, and use weekly feedback to stay on course. Record your goals and food preferences, and keep body-progress records under your privacy controls.\n\nFitician is a health and fitness companion, not a substitute for medical diagnosis or treatment. Specialist features require valid authorization through the official workflow."
+    }
+  },
+  "links": {
+    "publicWebOriginEnv": "FITICIAN_PUBLIC_WEB_ORIGIN",
+    "privacyPath": "/privacy",
+    "accountDeletionPath": "/delete-account",
+    "supportUrlEnv": "FITICIAN_SUPPORT_URL",
+    "supportEmailEnv": "FITICIAN_SUPPORT_EMAIL"
+  },
+  "identifiers": {
+    "appleTeamIdEnv": "APPLE_TEAM_ID",
+    "appStoreConnectAppIdEnv": "APPLE_APP_STORE_CONNECT_APP_ID"
+  },
+  "review": {
+    "signInRequired": true,
+    "demoAccountEnv": "FITICIAN_APP_REVIEW_ACCOUNT",
+    "demoPasswordEnv": "FITICIAN_APP_REVIEW_PASSWORD"
+  },
+  "contentRating": {
+    "status": "draft",
+    "basis": "General fitness and nutrition companion; no gambling, sexual content, violence, or public user-generated feed."
+  },
+  "screenshots": {
+    "phoneDirectory": "screenshots/phone",
+    "requiredLocales": ["fa", "en"],
+    "requiredViews": ["member-home", "workout-plan", "nutrition-plan", "body-progress"]
+  }
+}

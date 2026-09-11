@@ -70,12 +70,20 @@ test("release artifact validation requires all three non-empty files", () => {
 
 test("protected release workflow exposes all three EAS artifact profiles", async () => {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-  const workflow = await readFile(resolve(root, ".github/workflows/android-release.yml"), "utf8");
+  const [androidWorkflow, iosWorkflow] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/android-release.yml"), "utf8"),
+    readFile(resolve(root, ".github/workflows/ios-release.yml"), "utf8"),
+  ]);
   const packageJson = JSON.parse(await readFile(resolve(root, "mobile/package.json"), "utf8"));
-  assert.match(workflow, /workflow_dispatch:/u);
-  assert.match(workflow, /EAS_TOKEN/u);
+  assert.match(androidWorkflow, /workflow_dispatch:/u);
+  assert.match(androidWorkflow, /EAS_TOKEN/u);
+  assert.match(iosWorkflow, /name: Fitician iOS release/u);
+  assert.match(iosWorkflow, /workflow_dispatch:/u);
+  assert.match(iosWorkflow, /EAS_TOKEN/u);
+  assert.match(iosWorkflow, /node-version:\s*["']20\.19\.4["']/u);
   for (const profile of ["development", "preview", "production"]) {
-    assert.match(workflow, new RegExp(profile, "u"));
+    assert.match(androidWorkflow, new RegExp(profile, "u"));
+    assert.match(iosWorkflow, new RegExp(profile, "u"));
   }
   assert.match(packageJson.scripts["build:android:debug"], /--profile development/u);
   assert.match(packageJson.scripts["build:android:internal"], /--profile preview/u);
@@ -83,5 +91,9 @@ test("protected release workflow exposes all three EAS artifact profiles", async
   assert.match(packageJson.scripts["build:ios:debug"], /--platform ios/u);
   assert.match(packageJson.scripts["build:ios:internal"], /--platform ios/u);
   assert.match(packageJson.scripts["build:ios:production"], /--platform ios/u);
-  assert.match(workflow, /environment:\s*\$\{\{ inputs\.profile \}\}/u);
+  assert.match(androidWorkflow, /environment:\s*\$\{\{ inputs\.profile \}\}/u);
+  assert.match(iosWorkflow, /environment:\s*\$\{\{ inputs\.profile \}\}/u);
+  assert.match(iosWorkflow, /build:ios:debug/u);
+  assert.match(iosWorkflow, /build:ios:internal/u);
+  assert.match(iosWorkflow, /build:ios:production/u);
 });

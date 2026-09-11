@@ -16,6 +16,7 @@
     "test:foundation": "node --test scripts/*.test.mjs",
     "validate:device-matrix": "node scripts/validate-device-matrix.mjs",
     "validate:ios-device-matrix": "node scripts/validate-ios-device-matrix.mjs",
+    "validate:app-store-readiness": "node scripts/validate-app-store-readiness.mjs",
     "validate:maestro": "node scripts/validate-maestro.mjs",
     "validate:release-config": "node scripts/validate-release-config.mjs",
     "validate:store-readiness": "node scripts/validate-store-readiness.mjs",
@@ -29,7 +30,7 @@
     "export:ios:source-maps": "node scripts/releaseArtifacts.mjs --platform ios",
     "audit:dependencies": "node scripts/dependency-audit.mjs",
     "typecheck": "tsc --noEmit",
-    "validate": "node scripts/validate-foundation.mjs && node scripts/validate-environments.mjs && node scripts/validate-dependencies.mjs && node scripts/validate-device-matrix.mjs && node scripts/validate-ios-device-matrix.mjs && node scripts/validate-maestro.mjs && node scripts/validate-release-config.mjs && node scripts/validate-store-readiness.mjs"
+    "validate": "node scripts/validate-foundation.mjs && node scripts/validate-environments.mjs && node scripts/validate-dependencies.mjs && node scripts/validate-device-matrix.mjs && node scripts/validate-ios-device-matrix.mjs && node scripts/validate-maestro.mjs && node scripts/validate-release-config.mjs && node scripts/validate-store-readiness.mjs && node scripts/validate-app-store-readiness.mjs"
   },
   "dependencies": {
     "@expo/require-utils": "~57.0.5",
