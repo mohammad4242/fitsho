@@ -7136,9 +7136,9 @@ export type components = {
             /**
              * Provider
              * @default fcm
-             * @constant
+             * @enum {string}
              */
-            provider: "fcm";
+            provider: "fcm" | "apns";
             /** Token */
             token: string;
         };

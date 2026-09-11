@@ -11,6 +11,13 @@ export type NotificationPermissionStatus =
   | "not_required"
   | "not_supported";
 
+export type NotificationProvider = "fcm" | "apns";
+
+export interface NativePushToken {
+  readonly provider: NotificationProvider;
+  readonly token: string;
+}
+
 export interface NotificationPermissionRequestStore {
   read(): Promise<string | null>;
   write(value: string): Promise<void>;
@@ -132,12 +139,63 @@ export async function prepareAndroidNotifications(
   return requestAndroidNotificationPermission(storage);
 }
 
-export async function getAndroidFcmToken(): Promise<string | null> {
-  if (Platform.OS !== "android") {
+export async function requestNotificationPermission(
+  storage: NotificationPermissionRequestStore = securePermissionRequestStore,
+): Promise<NotificationPermissionStatus> {
+  if (Platform.OS !== "android" && Platform.OS !== "ios") {
+    return "not_supported";
+  }
+  if (Platform.OS === "android" && !androidNotificationPermissionRequired()) {
+    return "not_required";
+  }
+
+  const current = await Notifications.getPermissionsAsync();
+  if (current.granted) {
+    return "granted";
+  }
+  if (!current.canAskAgain) {
+    return "blocked";
+  }
+  if ((await storage.read()) === "1") {
+    return "denied";
+  }
+
+  const requested = await Notifications.requestPermissionsAsync();
+  await storage.write("1");
+  if (requested.granted) {
+    return "granted";
+  }
+  return requested.canAskAgain ? "denied" : "blocked";
+}
+
+export async function prepareNotifications(
+  storage: NotificationPermissionRequestStore = securePermissionRequestStore,
+): Promise<NotificationPermissionStatus> {
+  await configureAndroidNotificationChannels();
+  return requestNotificationPermission(storage);
+}
+
+export async function getNativePushToken(): Promise<NativePushToken | null> {
+  if (Platform.OS !== "android" && Platform.OS !== "ios") {
     return null;
   }
   const token = await Notifications.getDevicePushTokenAsync();
-  return token.type === "android" && typeof token.data === "string" && token.data.trim()
-    ? token.data
-    : null;
+  const expectedType = Platform.OS;
+  if (token.type !== expectedType || typeof token.data !== "string" || !token.data.trim()) {
+    return null;
+  }
+  return {
+    provider: expectedType === "ios" ? "apns" : "fcm",
+    token: token.data,
+  };
+}
+
+export async function getAndroidFcmToken(): Promise<string | null> {
+  const token = await getNativePushToken();
+  return token?.provider === "fcm" ? token.token : null;
+}
+
+export async function getIosApnsToken(): Promise<string | null> {
+  const token = await getNativePushToken();
+  return token?.provider === "apns" ? token.token : null;
 }

@@ -16,11 +16,11 @@ import {
   type PerformanceMeasurement,
 } from "../platform/performance";
 import {
-  getAndroidFcmToken,
-  prepareAndroidNotifications,
+  getNativePushToken,
+  prepareNotifications,
 } from "../notifications/notificationPermission";
 import { createNotificationApi } from "../notifications/notificationApi";
-import { registerAndroidNotifications } from "../notifications/notificationRegistration";
+import { registerNotifications } from "../notifications/notificationRegistration";
 import { configureNotificationRuntime } from "../notifications/notificationRuntime";
 import { NotificationRoutingBootstrap } from "../notifications/NotificationRoutingBootstrap";
 import { MobileRouteStateProviderFromAuth } from "../ui/navigation/RouteGuards";
@@ -40,11 +40,11 @@ function NotificationPermissionBootstrap() {
     if (auth.status !== "signed_in") {
       return;
     }
-    void registerAndroidNotifications({
-      prepare: prepareAndroidNotifications,
-      getToken: getAndroidFcmToken,
-      register: async (token) => {
-        await notificationApi.registerCurrentDevice(token);
+    void registerNotifications({
+      prepare: prepareNotifications,
+      getToken: getNativePushToken,
+      register: async ({ provider, token }) => {
+        await notificationApi.registerCurrentDevice(token, provider);
       },
     }).catch(() => undefined);
   }, [auth.status, notificationApi]);

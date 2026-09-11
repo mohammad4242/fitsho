@@ -74,7 +74,7 @@ class NotificationDeviceToken(Base):
             name="uq_notification_device_tokens_provider_hash",
         ),
         CheckConstraint(
-            "provider IN ('fcm')",
+            "provider IN ('fcm', 'apns')",
             name="ck_notification_device_tokens_provider",
         ),
         CheckConstraint(

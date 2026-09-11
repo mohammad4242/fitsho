@@ -28,8 +28,11 @@ import * as Notifications from "expo-notifications";
 
 import {
   configureAndroidNotificationChannels,
+  getIosApnsToken,
   getAndroidFcmToken,
+  getNativePushToken,
   NOTIFICATION_PERMISSION_REQUESTED_KEY,
+  prepareNotifications,
   requestAndroidNotificationPermission,
   type NotificationPermissionRequestStore,
 } from "./notificationPermission";
@@ -40,6 +43,7 @@ const store: NotificationPermissionRequestStore = {
 };
 
 afterEach(() => {
+  platform.OS = "android";
   platform.Version = 35;
   vi.clearAllMocks();
 });
@@ -101,4 +105,27 @@ it("does not request permission on Android versions below 33 and returns the nat
 
   mocks.getDevicePushTokenAsync.mockResolvedValue({ type: "android", data: "fcm-token" });
   await expect(getAndroidFcmToken()).resolves.toBe("fcm-token");
+});
+
+it("requests iOS permission and returns the native APNs token without relabeling it", async () => {
+  platform.OS = "ios";
+  mocks.getPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: true });
+  mocks.requestPermissionsAsync.mockResolvedValue({ granted: true, canAskAgain: true });
+  mocks.getDevicePushTokenAsync.mockResolvedValue({ type: "ios", data: "apns-token" });
+
+  await expect(prepareNotifications(store)).resolves.toBe("granted");
+  await expect(getNativePushToken()).resolves.toEqual({
+    provider: "apns",
+    token: "apns-token",
+  });
+  await expect(getIosApnsToken()).resolves.toBe("apns-token");
+  expect(mocks.setNotificationChannelAsync).not.toHaveBeenCalled();
+});
+
+it("classifies denied and blocked iOS notification permission", async () => {
+  platform.OS = "ios";
+  mocks.getPermissionsAsync.mockResolvedValue({ granted: false, canAskAgain: false });
+
+  await expect(prepareNotifications(store)).resolves.toBe("blocked");
+  expect(mocks.requestPermissionsAsync).not.toHaveBeenCalled();
 });

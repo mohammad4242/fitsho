@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     notification_fcm_service_account_json: SecretStr | None = Field(default=None, repr=False)
     notification_fcm_base_url: str = "https://fcm.googleapis.com"
     notification_fcm_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
+    notification_apns_enabled: bool = False
+    notification_apns_team_id: str | None = None
+    notification_apns_key_id: str | None = None
+    notification_apns_private_key: SecretStr | None = Field(default=None, repr=False)
+    notification_apns_bundle_id: str = "com.fitician.app"
+    notification_apns_base_url: str = "https://api.push.apple.com"
+    notification_apns_timeout_seconds: float = Field(default=15.0, gt=0, le=60)
     notification_max_delivery_attempts: int = Field(default=5, ge=1, le=10)
     notification_retry_base_seconds: int = Field(default=30, ge=1, le=3600)
     notification_retry_max_seconds: int = Field(default=1800, ge=1, le=86400)

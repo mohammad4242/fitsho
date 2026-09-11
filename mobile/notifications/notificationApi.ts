@@ -3,6 +3,7 @@ import type { components, TransportRequest } from "@fitician/core";
 export type NotificationDevice = components["schemas"]["NotificationDeviceResponse"];
 export type NotificationPreferences = components["schemas"]["NotificationPreferencesResponse"];
 export type NotificationPreferencesUpdate = components["schemas"]["NotificationPreferencesUpdateRequest"];
+export type NotificationTokenProvider = "fcm" | "apns";
 
 export type AuthenticatedNotificationRequest = <TResponse>(
   request: TransportRequest,
@@ -11,7 +12,7 @@ export type AuthenticatedNotificationRequest = <TResponse>(
 export interface NotificationApi {
   getPreferences(): Promise<NotificationPreferences>;
   listDevices(): Promise<NotificationDevice[]>;
-  registerCurrentDevice(token: string): Promise<NotificationDevice>;
+  registerCurrentDevice(token: string, provider?: NotificationTokenProvider): Promise<NotificationDevice>;
   unregisterDevice(deviceId: string): Promise<void>;
   updatePreferences(input: NotificationPreferencesUpdate): Promise<NotificationPreferences>;
 }
@@ -32,8 +33,8 @@ export function createNotificationApi(
       method: "GET",
       path: "/api/v1/notifications/devices",
     }),
-    registerCurrentDevice: (token) => request<NotificationDevice>({
-      body: jsonBody({ provider: "fcm", token }),
+    registerCurrentDevice: (token, provider = "fcm") => request<NotificationDevice>({
+      body: jsonBody({ provider, token }),
       method: "PUT",
       path: "/api/v1/notifications/devices/current",
     }),

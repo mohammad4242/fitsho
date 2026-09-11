@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class NotificationDeviceTokenUpsertRequest(BaseModel):
-    provider: Literal["fcm"] = "fcm"
+    provider: Literal["fcm", "apns"] = "fcm"
     token: str = Field(min_length=1, max_length=4096)
 
     model_config = ConfigDict(extra="forbid")

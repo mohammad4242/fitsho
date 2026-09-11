@@ -16,6 +16,7 @@ from .schemas import (
 )
 from .service import (
     NotificationDeviceNotFoundError,
+    NotificationProviderMismatchError,
     delete_notification_device,
     get_notification_preferences,
     list_notification_devices,
@@ -42,12 +43,18 @@ def upsert_current_notification_device(
     db: DatabaseSession,
     session: CurrentMobileSession,
 ) -> NotificationDeviceResponse:
-    return register_current_device_token(
-        db,
-        session,
-        provider=payload.provider,
-        token_value=payload.token,
-    )
+    try:
+        return register_current_device_token(
+            db,
+            session,
+            provider=payload.provider,
+            token_value=payload.token,
+        )
+    except NotificationProviderMismatchError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Notification provider does not match the device platform",
+        ) from None
 
 
 @router.delete("/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT)

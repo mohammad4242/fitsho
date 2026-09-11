@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import socket
 import time
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import cast
 from uuid import UUID, uuid4
@@ -14,14 +15,9 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.database.session import get_engine
 
+from .apns import ApnsConfigurationError, build_apns_provider
 from .content import PREFERENCE_FIELDS
-from .fcm import (
-    FcmConfigurationError,
-    FcmProvider,
-    FcmSendOutcome,
-    NotificationProvider,
-    build_fcm_provider,
-)
+from .fcm import FcmConfigurationError, build_fcm_provider
 from .models import (
     NotificationDevice,
     NotificationDeviceToken,
@@ -29,9 +25,15 @@ from .models import (
     NotificationOutboxEvent,
     NotificationPreference,
 )
+from .provider import NotificationProvider, NotificationProviderName, NotificationSendOutcome
 from .reminders import enqueue_due_cycle_reminders
 
 logger = logging.getLogger(__name__)
+
+NotificationProviders = NotificationProvider | Mapping[
+    NotificationProviderName,
+    NotificationProvider,
+]
 
 
 def claim_outbox_events(
@@ -111,7 +113,7 @@ def process_outbox_event(
         .join(NotificationDevice, NotificationDevice.id == NotificationDeviceToken.device_id)
         .where(
             NotificationDevice.user_id == event.user_id,
-            NotificationDeviceToken.provider == "fcm",
+            NotificationDeviceToken.provider.in_(("fcm", "apns")),
             NotificationDeviceToken.invalid_at.is_(None),
         )
     ).all()
@@ -177,8 +179,12 @@ def claim_notification_deliveries(
     now: datetime,
     lease_seconds: int,
     batch_size: int,
+    provider_names: Collection[str] | None = None,
 ) -> list[UUID]:
     stale_before = now - timedelta(seconds=lease_seconds)
+    token_conditions = [NotificationDeviceToken.invalid_at.is_(None)]
+    if provider_names is not None:
+        token_conditions.append(NotificationDeviceToken.provider.in_(provider_names))
     deliveries = db.scalars(
         select(NotificationEventDelivery)
         .join(
@@ -186,7 +192,7 @@ def claim_notification_deliveries(
             NotificationDeviceToken.id == NotificationEventDelivery.token_id,
         )
         .where(
-            NotificationDeviceToken.invalid_at.is_(None),
+            *token_conditions,
             or_(
                 (
                     (NotificationEventDelivery.status == "pending")
@@ -217,7 +223,7 @@ def process_notification_delivery(
     db: Session,
     delivery_id: UUID,
     *,
-    provider: NotificationProvider,
+    provider: NotificationProviders,
     worker_id: str,
     now: datetime,
     max_attempts: int,
@@ -247,16 +253,25 @@ def process_notification_delivery(
         db.commit()
         return True
 
+    selected_provider = _provider_for_token(provider, token.provider)
+    if selected_provider is None:
+        delivery.status = "pending"
+        delivery.locked_at = None
+        delivery.locked_by = None
+        delivery.last_error = "PROVIDER_UNAVAILABLE"
+        db.commit()
+        return True
+
     delivery.attempt_count += 1
     try:
-        outcome = provider.send(
+        outcome = selected_provider.send(
             token_value=token.token_value,
             event_type=event.event_type,
             payload=event.payload,
         )
     except Exception:
         logger.exception("Notification provider delivery failed")
-        outcome = FcmSendOutcome.retryable("PROVIDER_EXCEPTION")
+        outcome = NotificationSendOutcome.retryable("PROVIDER_EXCEPTION")
 
     delivery.locked_at = None
     delivery.locked_by = None
@@ -290,7 +305,7 @@ def process_notification_delivery(
 def run_delivery_once(
     db: Session,
     *,
-    provider: NotificationProvider,
+    provider: NotificationProviders,
     worker_id: str,
     now: datetime | None = None,
     lease_seconds: int = 60,
@@ -299,6 +314,9 @@ def run_delivery_once(
     retry_base_seconds: int = 30,
     retry_max_seconds: int = 1800,
 ) -> int:
+    provider_names = tuple(provider.keys()) if isinstance(provider, Mapping) else ("fcm",)
+    if not provider_names:
+        return 0
     current = now or datetime.now(UTC)
     delivery_ids = claim_notification_deliveries(
         db,
@@ -306,6 +324,7 @@ def run_delivery_once(
         now=current,
         lease_seconds=lease_seconds,
         batch_size=batch_size,
+        provider_names=provider_names,
     )
     processed = 0
     for delivery_id in delivery_ids:
@@ -332,7 +351,7 @@ def run_notification_once(
     db: Session,
     *,
     worker_id: str,
-    provider: NotificationProvider | None,
+    provider: NotificationProviders | None,
     now: datetime | None = None,
     lease_seconds: int = 60,
     batch_size: int = 100,
@@ -368,23 +387,47 @@ def _worker_id() -> str:
     return f"{socket.gethostname()}:{uuid4()}"
 
 
+def _provider_for_token(
+    provider: NotificationProviders,
+    provider_name: str,
+) -> NotificationProvider | None:
+    if isinstance(provider, Mapping):
+        if provider_name not in {"fcm", "apns"}:
+            return None
+        return provider.get(cast(NotificationProviderName, provider_name))
+    return provider if provider_name == "fcm" else None
+
+
+def _close_provider(provider: NotificationProvider) -> None:
+    close = getattr(provider, "close", None)
+    if callable(close):
+        close()
+
+
 def run_worker(settings: Settings) -> None:
     worker_id = _worker_id()
     engine = get_engine(settings.database_url)
-    provider: FcmProvider | None = None
+    providers: dict[NotificationProviderName, NotificationProvider] = {}
     try:
         try:
-            provider = build_fcm_provider(settings)
+            fcm_provider = build_fcm_provider(settings)
+            if fcm_provider is not None:
+                providers["fcm"] = fcm_provider
         except FcmConfigurationError:
             logger.exception("FCM provider configuration is invalid")
-            provider = None
+        try:
+            apns_provider = build_apns_provider(settings)
+            if apns_provider is not None:
+                providers["apns"] = apns_provider
+        except ApnsConfigurationError:
+            logger.exception("APNs provider configuration is invalid")
         while True:
             try:
                 with Session(engine) as db:
                     run_notification_once(
                         db,
                         worker_id=worker_id,
-                        provider=provider,
+                        provider=providers or None,
                         lease_seconds=settings.notification_worker_lease_seconds,
                         batch_size=settings.notification_worker_batch_size,
                         max_attempts=settings.notification_max_delivery_attempts,
@@ -395,8 +438,8 @@ def run_worker(settings: Settings) -> None:
                 logger.exception("Notification worker iteration failed")
             time.sleep(settings.notification_worker_poll_seconds)
     finally:
-        if provider is not None:
-            provider.close()
+        for provider in providers.values():
+            _close_provider(provider)
 
 
 if __name__ == "__main__":

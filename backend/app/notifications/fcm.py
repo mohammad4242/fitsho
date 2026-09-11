@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Literal
 from urllib.parse import quote
 
 import httpx
@@ -14,41 +13,11 @@ from google.oauth2 import service_account
 
 from app.config import Settings
 
+from .provider import NotificationSendOutcome
+
 FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging"
 FcmOutcomeKind = Literal["sent", "retryable", "invalid_token", "permanent"]
-
-
-@dataclass(frozen=True)
-class FcmSendOutcome:
-    kind: FcmOutcomeKind
-    error_code: str | None = None
-    provider_message_id: str | None = None
-
-    @classmethod
-    def sent(cls, provider_message_id: str) -> FcmSendOutcome:
-        return cls(kind="sent", provider_message_id=provider_message_id)
-
-    @classmethod
-    def retryable(cls, error_code: str) -> FcmSendOutcome:
-        return cls(kind="retryable", error_code=error_code)
-
-    @classmethod
-    def invalid_token(cls, error_code: str) -> FcmSendOutcome:
-        return cls(kind="invalid_token", error_code=error_code)
-
-    @classmethod
-    def permanent(cls, error_code: str) -> FcmSendOutcome:
-        return cls(kind="permanent", error_code=error_code)
-
-
-class NotificationProvider(Protocol):
-    def send(
-        self,
-        *,
-        token_value: str,
-        event_type: str,
-        payload: dict[str, object],
-    ) -> FcmSendOutcome: ...
+FcmSendOutcome = NotificationSendOutcome
 
 
 class FcmConfigurationError(Exception):

@@ -23,14 +23,19 @@ def _register(client: TestClient, email: str) -> None:
     client.post("/api/v1/auth/logout", headers=ORIGIN)
 
 
-def _login(client: TestClient, email: str, device_id: str = "android-device-1") -> dict[str, str]:
+def _login(
+    client: TestClient,
+    email: str,
+    device_id: str = "android-device-1",
+    platform: str = "android",
+) -> dict[str, str]:
     response = client.post(
         "/api/v1/auth/mobile/password",
         json={
             "email": email,
             "password": "long password",
             "device_id": device_id,
-            "platform": "android",
+            "platform": platform,
             "app_version": "1.0.0",
             "device_name": "Pixel",
         },
@@ -198,3 +203,26 @@ def test_notification_registration_rejects_unknown_provider(client: TestClient) 
     )
 
     assert response.status_code == 422
+
+
+def test_ios_notification_registration_requires_and_stores_an_apns_token(
+    client: TestClient,
+) -> None:
+    _register(client, "ios-member@example.com")
+    auth = _login(client, "ios-member@example.com", platform="ios")
+    headers = {"Authorization": f"Bearer {auth['access_token']}"}
+
+    apns = client.put(
+        "/api/v1/notifications/devices/current",
+        headers=headers,
+        json={"provider": "apns", "token": "apns-device-token"},
+    )
+    assert apns.status_code == 200
+    assert apns.json()["platform"] == "ios"
+
+    mismatched = client.put(
+        "/api/v1/notifications/devices/current",
+        headers=headers,
+        json={"provider": "fcm", "token": "fcm-token"},
+    )
+    assert mismatched.status_code == 422

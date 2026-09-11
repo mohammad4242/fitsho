@@ -11652,8 +11652,11 @@
         "additionalProperties": false,
         "properties": {
           "provider": {
-            "const": "fcm",
             "default": "fcm",
+            "enum": [
+              "fcm",
+              "apns"
+            ],
             "title": "Provider",
             "type": "string"
           },

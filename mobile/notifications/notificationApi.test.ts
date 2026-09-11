@@ -12,6 +12,7 @@ it("uses the current-device notification and preference endpoints", async () => 
 
   await api.listDevices();
   await api.registerCurrentDevice("fcm-token");
+  await api.registerCurrentDevice("apns-token", "apns");
   await api.getPreferences();
   await api.updatePreferences({
     enabled: true,
@@ -27,6 +28,7 @@ it("uses the current-device notification and preference endpoints", async () => 
   expect(request.mock.calls.map(([input]) => input.path)).toEqual([
     "/api/v1/notifications/devices",
     "/api/v1/notifications/devices/current",
+    "/api/v1/notifications/devices/current",
     "/api/v1/notifications/preferences",
     "/api/v1/notifications/preferences",
     "/api/v1/notifications/devices/device%2F1",
@@ -34,9 +36,11 @@ it("uses the current-device notification and preference endpoints", async () => 
   expect(request.mock.calls.map(([input]) => input.method)).toEqual([
     "GET",
     "PUT",
+    "PUT",
     "GET",
     "PUT",
     "DELETE",
   ]);
   expect(request.mock.calls[1][0].body).toEqual({ provider: "fcm", token: "fcm-token" });
+  expect(request.mock.calls[2][0].body).toEqual({ provider: "apns", token: "apns-token" });
 });

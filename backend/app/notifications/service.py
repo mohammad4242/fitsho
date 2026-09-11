@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.auth.service import MobileAccessContext
 
 from .models import NotificationDevice, NotificationDeviceToken, NotificationPreference
+from .provider import NotificationProviderName
 from .schemas import (
     NotificationDeviceResponse,
     NotificationPreferencesResponse,
@@ -18,6 +19,10 @@ from .schemas import (
 
 
 class NotificationDeviceNotFoundError(Exception):
+    pass
+
+
+class NotificationProviderMismatchError(Exception):
     pass
 
 
@@ -39,11 +44,14 @@ def register_current_device_token(
     db: Session,
     context: MobileAccessContext,
     *,
-    provider: str,
+    provider: NotificationProviderName,
     token_value: str,
 ) -> NotificationDeviceResponse:
     now = datetime.now(UTC)
     family = context.family
+    expected_provider: NotificationProviderName = "fcm" if family.platform == "android" else "apns"
+    if provider != expected_provider:
+        raise NotificationProviderMismatchError
     device = db.scalar(
         select(NotificationDevice)
         .where(

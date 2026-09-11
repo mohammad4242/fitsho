@@ -167,3 +167,20 @@ def test_retry_exhaustion_moves_delivery_to_dead_letter(db: Session) -> None:
     assert delivery.attempt_count == 2
     assert delivery.dead_letter_at is not None
     assert provider.calls == ["delivery-token", "delivery-token"]
+
+
+def test_delivery_routes_each_token_to_its_provider(db: Session) -> None:
+    delivery, token = _pending_delivery(db)
+    token.provider = "apns"
+    db.commit()
+    provider = FakeProvider(FcmSendOutcome.sent("apns-message"))
+
+    assert run_delivery_once(
+        db,
+        provider={"apns": provider},
+        worker_id="sender-apns",
+    ) == 1
+
+    db.refresh(delivery)
+    assert delivery.status == "sent"
+    assert provider.calls == ["delivery-token"]

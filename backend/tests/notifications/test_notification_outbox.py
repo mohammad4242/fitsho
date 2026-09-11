@@ -87,6 +87,52 @@ def test_outbox_worker_fans_out_once_and_deduplicates_deliveries(db: Session) ->
     assert deliveries[0].status == "pending"
 
 
+def test_outbox_worker_fans_out_both_fcm_and_apns_tokens(db: Session) -> None:
+    user = _user(db)
+    android = NotificationDevice(
+        user_id=user.id,
+        device_id="android-device",
+        platform="android",
+        app_version="1.0.0",
+    )
+    ios = NotificationDevice(
+        user_id=user.id,
+        device_id="ios-device",
+        platform="ios",
+        app_version="1.0.0",
+    )
+    db.add_all([android, ios])
+    db.flush()
+    db.add_all(
+        [
+            NotificationDeviceToken(
+                device_id=android.id,
+                provider="fcm",
+                token_hash=sha256(b"fcm-token").hexdigest(),
+                token_value="fcm-token",
+            ),
+            NotificationDeviceToken(
+                device_id=ios.id,
+                provider="apns",
+                token_hash=sha256(b"apns-token").hexdigest(),
+                token_value="apns-token",
+            ),
+        ]
+    )
+    enqueue_notification_event(
+        db,
+        user_id=user.id,
+        event_type="body_analysis_completed",
+        category="body_analysis",
+        deduplication_key="analysis:both-platforms",
+        payload={"analysis_id": "analysis-1"},
+    )
+    db.commit()
+
+    assert run_outbox_once(db, worker_id="worker-both") == 1
+    assert len(db.scalars(select(NotificationEventDelivery)).all()) == 2
+
+
 def test_stale_outbox_lease_can_be_reclaimed(db: Session) -> None:
     user = _user(db)
     event = enqueue_notification_event(
