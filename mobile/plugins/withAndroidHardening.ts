@@ -31,8 +31,6 @@ export const FITICIAN_BACKUP_RULES = `<?xml version="1.0" encoding="utf-8"?>
     <exclude domain="database" path="."/>
     <exclude domain="sharedpref" path="."/>
     <exclude domain="external" path="."/>
-    <exclude domain="cache" path="."/>
-    <exclude domain="noBackup" path="."/>
 </full-backup-content>
 `;
 
@@ -44,8 +42,6 @@ export const FITICIAN_DATA_EXTRACTION_RULES = `<?xml version="1.0" encoding="utf
         <exclude domain="database" path="."/>
         <exclude domain="sharedpref" path="."/>
         <exclude domain="external" path="."/>
-        <exclude domain="cache" path="."/>
-        <exclude domain="noBackup" path="."/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="root" path="."/>
@@ -53,8 +49,6 @@ export const FITICIAN_DATA_EXTRACTION_RULES = `<?xml version="1.0" encoding="utf
         <exclude domain="database" path="."/>
         <exclude domain="sharedpref" path="."/>
         <exclude domain="external" path="."/>
-        <exclude domain="cache" path="."/>
-        <exclude domain="noBackup" path="."/>
     </device-transfer>
 </data-extraction-rules>
 `;

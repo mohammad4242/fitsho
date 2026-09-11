@@ -69,6 +69,10 @@ it("excludes all app data from legacy and modern Android backup paths", () => {
   expect(FITICIAN_DATA_EXTRACTION_RULES).toMatch(/<device-transfer>/);
   expect(FITICIAN_DATA_EXTRACTION_RULES).toMatch(/domain="database" path="\."/);
   expect(FITICIAN_DATA_EXTRACTION_RULES).toMatch(/domain="sharedpref" path="\."/);
+  expect(FITICIAN_BACKUP_RULES).not.toContain('domain="cache"');
+  expect(FITICIAN_BACKUP_RULES).not.toContain('domain="noBackup"');
+  expect(FITICIAN_DATA_EXTRACTION_RULES).not.toContain('domain="cache"');
+  expect(FITICIAN_DATA_EXTRACTION_RULES).not.toContain('domain="noBackup"');
 });
 
 it("requires system-trusted TLS and disallows cleartext traffic in release", () => {
