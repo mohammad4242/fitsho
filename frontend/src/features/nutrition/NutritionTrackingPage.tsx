@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppIcon } from "../../shared/AppIcon";
 import * as api from "./api";
-import type { FoodPhotoEstimate, FoodPhotoEstimateItem } from "./api";
+import type { FoodPhotoEstimate, FoodPhotoEstimateItem, FoodPhotoEstimateStatus } from "./api";
 import type { DailyTrackingSummary } from "./types";
 import type { NutritionAdherence } from "./types";
 import "./nutritionEstimate.css";
@@ -13,6 +13,45 @@ type EntryMode = "manual" | "photo" | null;
 
 const today = new Date().toISOString().slice(0, 10);
 const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+const foodPhotoPollIntervalMs = 2_500;
+
+function isFoodPhotoProcessing(estimate: FoodPhotoEstimate): boolean {
+  return estimate.status === "queued" || estimate.status === "analyzing";
+}
+
+function isFoodPhotoResult(estimate: FoodPhotoEstimate): boolean {
+  return estimate.status === undefined || estimate.status === "estimated" || estimate.status === "confirmed";
+}
+
+function upsertFoodPhotoHistory(
+  history: FoodPhotoEstimate[],
+  estimate: FoodPhotoEstimate,
+): FoodPhotoEstimate[] {
+  const existingIndex = history.findIndex((item) => item.id === estimate.id);
+  if (existingIndex === -1) return [estimate, ...history];
+  return history.map((item) => (item.id === estimate.id ? estimate : item));
+}
+
+function foodPhotoStatusLabel(
+  status: FoodPhotoEstimateStatus | undefined,
+  l: (persian: string, english: string) => string,
+): string {
+  switch (status) {
+    case "queued": return l("تحلیل عکس در صف قرار گرفت", "Photo analysis is queued");
+    case "analyzing": return l("عکس در حال تحلیل است", "Photo is being analyzed");
+    case "failed": return l("تحلیل عکس ناموفق بود", "Photo analysis failed");
+    case "expired": return l("مهلت تحلیل عکس تمام شده است", "Photo analysis expired");
+    case "confirmed": return l("عکس ثبت شده است", "Photo was confirmed");
+    case "deleted": return l("عکس حذف شده است", "Photo was deleted");
+    default: return l("نتیجه آماده بررسی است", "Result is ready for review");
+  }
+}
+
+function formatFoodPhotoDate(value: string | undefined, locale: string): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date);
+}
 
 export function NutritionTrackingPage() {
   const { i18n } = useTranslation();
@@ -29,6 +68,8 @@ export function NutritionTrackingPage() {
   const [calories, setCalories] = useState("");
   const [photoConsent, setPhotoConsent] = useState(false);
   const [photoEstimate, setPhotoEstimate] = useState<FoodPhotoEstimate | null>(null);
+  const [photoHistory, setPhotoHistory] = useState<FoodPhotoEstimate[]>([]);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [adherence, setAdherence] = useState<NutritionAdherence | null>(null);
   const [rangeStart, setRangeStart] = useState(weekAgo);
   const [foods, setFoods] = useState<api.CatalogueFood[]>([]);
@@ -50,6 +91,36 @@ export function NutritionTrackingPage() {
   useEffect(() => { void api.listCatalogueFoods().then((items) => { setFoods(items); setFoodId(items[0]?.id ?? ""); }); }, []);
   useEffect(() => { void api.listRecentFoods().then(setRecentFoods); }, []);
   useEffect(() => { void api.getTrackingHistory(rangeStart, today).then(setHistory); }, [rangeStart]);
+  useEffect(() => {
+    let active = true;
+    void api.listFoodPhotoEstimates().then((items) => {
+      if (!active) return;
+      setPhotoHistory(items);
+      setPhotoEstimate((current) => current ?? items[0] ?? null);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const pendingPhotoEstimateId = photoEstimate?.id;
+  const pendingPhotoEstimateStatus = photoEstimate?.status;
+  useEffect(() => {
+    if (!pendingPhotoEstimateId || (pendingPhotoEstimateStatus !== "queued" && pendingPhotoEstimateStatus !== "analyzing")) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const updated = await api.getFoodPhotoEstimate(pendingPhotoEstimateId);
+        if (!active) return;
+        setPhotoEstimate(updated);
+        setPhotoHistory((current) => upsertFoodPhotoHistory(current, updated));
+      } catch {
+        // A later interval retries transient network failures.
+      }
+    };
+    const interval = window.setInterval(() => void poll(), foodPhotoPollIntervalMs);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [pendingPhotoEstimateId, pendingPhotoEstimateStatus]);
 
   async function checkIn(status: DailyTrackingSummary["check_in_status"]) {
     setBusy(true); setError(null);
@@ -77,10 +148,14 @@ export function NutritionTrackingPage() {
     const reader = new FileReader();
     reader.addEventListener("load", () => setPhotoPreview(typeof reader.result === "string" ? reader.result : null), { once: true });
     reader.readAsDataURL(file);
-    setBusy(true);
-    try { setPhotoEstimate(await api.estimateFoodPhoto(file, fa ? "fa" : "en")); }
+    setPhotoUploading(true);
+    try {
+      const queued = await api.estimateFoodPhoto(file, fa ? "fa" : "en");
+      setPhotoEstimate(queued);
+      setPhotoHistory((current) => upsertFoodPhotoHistory(current, queued));
+    }
     catch { setError(l("برآورد عکس فعلاً در دسترس نیست؛ ثبت دستی همچنان کار می‌کند.", "Photo estimation is unavailable; manual tracking still works.")); }
-    finally { setBusy(false); }
+    finally { setPhotoUploading(false); }
   }
 
   async function addCatalogueFood() {
@@ -99,7 +174,7 @@ export function NutritionTrackingPage() {
   }
 
   async function confirmPhoto() {
-    if (!photoEstimate) return;
+    if (!photoEstimate || !isFoodPhotoResult(photoEstimate) || photoEstimate.status === "confirmed") return;
     setBusy(true);
     try {
       if (freeMealId) {
@@ -107,7 +182,10 @@ export function NutritionTrackingPage() {
         sessionStorage.setItem(`fitsho-free-meal:${freeMealId}`, JSON.stringify(macros));
         navigate(`${returnPath}?freeMealId=${freeMealId}`);
       } else {
-        await api.confirmFoodPhoto(photoEstimate.id, entryDate); setPhotoEstimate(null); await load();
+        await api.confirmFoodPhoto(photoEstimate.id, entryDate);
+        setPhotoHistory((current) => upsertFoodPhotoHistory(current, { ...photoEstimate, status: "confirmed", needs_user_confirmation: false }));
+        setPhotoEstimate(null);
+        await load();
       }
     }
     catch { setError(l("موارد نامشخص را اول ویرایش یا حذف کن.", "Review or remove the unresolved items before confirming.")); }
@@ -115,19 +193,24 @@ export function NutritionTrackingPage() {
   }
 
   async function correctPhotoAmount(itemId: string, amount: number) {
-    if (!photoEstimate || amount <= 0) return;
+    if (!photoEstimate || !isFoodPhotoResult(photoEstimate) || amount <= 0) return;
     setBusy(true);
-    try { setPhotoEstimate(await api.correctFoodPhotoItem(photoEstimate.id, itemId, { estimated_amount: amount })); }
+    try {
+      const updated = await api.correctFoodPhotoItem(photoEstimate.id, itemId, { estimated_amount: amount });
+      setPhotoEstimate(updated);
+      setPhotoHistory((current) => upsertFoodPhotoHistory(current, updated));
+    }
     catch { setError(l("اصلاح عکس ذخیره نشد.", "Photo correction was not saved.")); }
     finally { setBusy(false); }
   }
 
   async function removePhotoItem(itemId: string) {
-    if (!photoEstimate) return;
+    if (!photoEstimate || !isFoodPhotoResult(photoEstimate)) return;
     setBusy(true);
     try {
       const updated = await api.correctFoodPhotoItem(photoEstimate.id, itemId, { remove: true });
       setPhotoEstimate(updated);
+      setPhotoHistory((current) => upsertFoodPhotoHistory(current, updated));
       setItemFoodSelections((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
       setItemGramInputs((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
     }
@@ -136,7 +219,7 @@ export function NutritionTrackingPage() {
   }
 
   async function resolvePhotoItem(itemId: string) {
-    if (!photoEstimate) return;
+    if (!photoEstimate || !isFoodPhotoResult(photoEstimate)) return;
     const selectedFoodId = itemFoodSelections[itemId];
     const gramStr = itemGramInputs[itemId];
     if (!selectedFoodId || !gramStr || Number(gramStr) <= 0) return;
@@ -147,6 +230,7 @@ export function NutritionTrackingPage() {
         estimated_amount: Number(gramStr),
       });
       setPhotoEstimate(updated);
+      setPhotoHistory((current) => upsertFoodPhotoHistory(current, updated));
       setItemFoodSelections((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
       setItemGramInputs((prev) => { const n = { ...prev }; delete n[itemId]; return n; });
     }
@@ -180,6 +264,8 @@ export function NutritionTrackingPage() {
       (item.carbohydrate_g ?? 0) > 0 ||
       (item.fat_g ?? 0) > 0);
   const fmt = (n: number) => Math.round(n).toLocaleString(fa ? "fa-IR" : "en-US");
+  const photoIsProcessing = photoEstimate !== null && isFoodPhotoProcessing(photoEstimate);
+  const photoIsResult = photoEstimate !== null && isFoodPhotoResult(photoEstimate);
 
   function toggleEntryMode(mode: Exclude<EntryMode, null>) {
     setEntryMode((current) => current === mode ? null : mode);
@@ -236,15 +322,41 @@ export function NutritionTrackingPage() {
       <header><div><p className="eyebrow eyebrow--accent">{l("تخمین تصویری", "Photo estimate")}</p><h2 id="nutrition-photo-panel-title">{l("عکس وعده", "Meal photo")}</h2></div></header>
       <div className="nutrition-photo-stage">
         {photoPreview ? <img alt={l("پیش‌نمایش عکس وعده", "Meal photo preview")} src={photoPreview} /> : <div><AppIcon name="camera" /><strong>{l("عکس غذا را انتخاب کن", "Choose a meal photo")}</strong></div>}
-        {busy && <span className="nutrition-photo-stage__busy" role="status">{l("در حال تحلیل…", "Analyzing…")}</span>}
+        {photoUploading && <span className="nutrition-photo-stage__busy" role="status">{l("در حال آپلود…", "Uploading…")}</span>}
       </div>
       <p className="nutrition-photo-disclosure">{l(
         "عکس فقط برای شناسایی تقریبی غذا از طریق سرویس هوش مصنوعی تنظیم‌شده پردازش می‌شود؛ اطلاعات حساب یا پزشکی همراه آن ارسال نمی‌شود.",
         "The image is sent only for approximate food recognition through the configured AI service. Account and medical information are not included."
       )}</p>
       <label className="nutrition-photo-consent"><input type="checkbox" checked={photoConsent} onChange={(event) => setPhotoConsent(event.target.checked)} /> {l("با پردازش عکس توسط سرویس ثالث موافقم", "I consent to third-party image processing")}</label>
-      <label className={`nutrition-photo-picker${photoConsent ? " is-enabled" : ""}`}><span>{photoPreview ? l("تغییر عکس", "Change photo") : l("انتخاب عکس", "Choose photo")}</span><input aria-label={l("انتخاب عکس غذا", "Choose food photo")} type="file" accept="image/jpeg,image/png,image/webp" disabled={!photoConsent || busy} onChange={(event) => void analyzePhoto(event.target.files?.[0])} /></label>
-      {photoEstimate && (() => {
+      <label className={`nutrition-photo-picker${photoConsent ? " is-enabled" : ""}`}><span>{photoPreview ? l("تغییر عکس", "Change photo") : l("انتخاب عکس", "Choose photo")}</span><input aria-label={l("انتخاب عکس غذا", "Choose food photo")} type="file" accept="image/jpeg,image/png,image/webp" disabled={!photoConsent || photoUploading} onChange={(event) => void analyzePhoto(event.target.files?.[0])} /></label>
+      {photoHistory.length > 0 && <section className="nutrition-photo-history" aria-labelledby="nutrition-photo-history-title">
+        <div className="nutrition-photo-history__heading">
+          <h3 id="nutrition-photo-history-title">{l("سابقه تحلیل عکس", "Photo analysis history")}</h3>
+          <span>{photoHistory.length}</span>
+        </div>
+        <ul>
+          {photoHistory.map((item) => <li key={item.id}>
+            <button
+              aria-current={photoEstimate?.id === item.id ? "true" : undefined}
+              onClick={() => { setPhotoEstimate(item); setPhotoPreview(null); setItemFoodSelections({}); setItemGramInputs({}); }}
+              type="button"
+            >
+              <strong>{foodPhotoStatusLabel(item.status, l)}</strong>
+              <span>{formatFoodPhotoDate(item.created_at, fa ? "fa-IR" : "en-US") || item.id}</span>
+            </button>
+          </li>)}
+        </ul>
+      </section>}
+      {photoEstimate && photoIsProcessing && <div className="nutrition-photo-status nutrition-photo-status--pending" role="status">
+        <strong>{foodPhotoStatusLabel(photoEstimate.status, l)}</strong>
+        <p>{l("می‌توانی به استفاده از صفحه ادامه بدهی؛ نتیجه بعد از آماده شدن همین‌جا نمایش داده می‌شود.", "You can keep using this page; the result will appear here when it is ready.")}</p>
+      </div>}
+      {photoEstimate && (photoEstimate.status === "failed" || photoEstimate.status === "expired") && <div className="nutrition-photo-status nutrition-photo-status--error" role="alert">
+        <strong>{foodPhotoStatusLabel(photoEstimate.status, l)}</strong>
+        <p>{l("عکس را دوباره ارسال کن تا تحلیل جدید در صف قرار بگیرد.", "Upload the photo again to queue a new analysis.")}</p>
+      </div>}
+      {photoEstimate && photoIsResult && (() => {
         const macroTotals = photoEstimate.macro_totals ?? { calories: 0, protein_g: 0, carbohydrate_g: 0, fat_g: 0 };
         return <>
         <div className="nutrition-photo-summary">

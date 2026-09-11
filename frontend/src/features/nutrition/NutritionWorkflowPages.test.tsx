@@ -86,6 +86,8 @@ beforeEach(async () => {
     { id: "food-2", slug: "lentils", name_fa: "عدس", name_en: "Lentils", canonical_unit: "g" },
   ]);
   vi.mocked(api.listRecentFoods).mockResolvedValue([]);
+  vi.mocked(api.listFoodPhotoEstimates).mockResolvedValue([]);
+  vi.mocked(api.getFoodPhotoEstimate).mockResolvedValue({} as api.FoodPhotoEstimate);
   vi.mocked(api.getTrackingHistory).mockResolvedValue([summary]);
   vi.mocked(api.listLabDocuments).mockResolvedValue([]);
   vi.mocked(api.listLabRequests).mockResolvedValue([]);
@@ -423,6 +425,32 @@ describe("Food photo nutrition estimation redesigned flow", () => {
     expect(screen.getByText("≈ 20 g")).toBeInTheDocument();
     expect(screen.getByText("≈ 10 g")).toBeInTheDocument();
     expect(screen.queryByText(/Partial estimate/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps queued analysis interactive and refreshes the result in the background", async () => {
+    const user = userEvent.setup();
+    const queuedEstimate: api.FoodPhotoEstimate = {
+      id: "estimate-queued",
+      status: "queued",
+      items: [],
+      overall_confidence: null,
+      needs_user_confirmation: true,
+      macro_totals: { calories: 0, protein_g: 0, carbohydrate_g: 0, fat_g: 0 },
+      macro_totals_complete: false,
+    };
+    const completedEstimate = { ...completeEstimate, id: "estimate-queued", status: "estimated" as const };
+    vi.mocked(api.estimateFoodPhoto).mockResolvedValue(queuedEstimate);
+    vi.mocked(api.getFoodPhotoEstimate).mockResolvedValue(completedEstimate);
+    render(<MemoryRouter><NutritionTrackingPage /></MemoryRouter>);
+
+    await openAndUpload(user);
+    await waitFor(() => expect(document.querySelector(".nutrition-photo-status")).toHaveTextContent("Photo analysis is queued"));
+    expect(screen.queryByText("Estimated calories")).not.toBeInTheDocument();
+
+    await waitFor(() => expect(api.getFoodPhotoEstimate).toHaveBeenCalledWith("estimate-queued"), { timeout: 4_000 });
+    expect(await screen.findByText("Estimated calories")).toBeInTheDocument();
+    expect(screen.getByText("≈ 350 kcal")).toBeInTheDocument();
+    expect(api.getFoodPhotoEstimate).toHaveBeenCalledWith("estimate-queued");
   });
 
   it("B: keeps detection details collapsed by default", async () => {

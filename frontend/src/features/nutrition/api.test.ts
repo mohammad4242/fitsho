@@ -10,9 +10,11 @@ import {
   getMealFeedback,
   getMealReplacementOptions,
   getFoodReplacementOptions,
+  getFoodPhotoEstimate,
   getMealCatalogue,
   getSafetyDecision,
   getStructuredExercise,
+  listFoodPhotoEstimates,
   saveNutritionProfile,
   saveSafetyProfile,
   saveStructuredExercise,
@@ -97,6 +99,28 @@ it("uploads a catalogue food image as multipart form data", async () => {
   expect(requestInit.body).toBeInstanceOf(FormData);
   expect((requestInit.body as FormData).get("file")).toBe(file);
   expect(new Headers(requestInit.headers).has("Content-Type")).toBe(false);
+});
+
+it("fetches persisted food photo status and history", async () => {
+  const queued = { id: "estimate/1", status: "queued" };
+  const history = [queued];
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(Response.json(queued))
+    .mockResolvedValueOnce(Response.json(history));
+
+  await expect(getFoodPhotoEstimate("estimate/1")).resolves.toEqual(queued);
+  await expect(listFoodPhotoEstimates(12)).resolves.toEqual(history);
+
+  expect(fetch).toHaveBeenNthCalledWith(
+    1,
+    "/api/v1/nutrition/tracking/photo-estimates/estimate%2F1",
+    expect.objectContaining({ method: "GET", credentials: "include" }),
+  );
+  expect(fetch).toHaveBeenNthCalledWith(
+    2,
+    "/api/v1/nutrition/tracking/photo-estimates?limit=12",
+    expect.objectContaining({ method: "GET", credentials: "include" }),
+  );
 });
 
 it("deletes a catalogue food through the admin endpoint", async () => {

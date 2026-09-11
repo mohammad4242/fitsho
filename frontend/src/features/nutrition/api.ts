@@ -513,14 +513,28 @@ export type FoodPhotoEstimateItem = {
   fat_g?: number;
 };
 
+export type FoodPhotoEstimateStatus =
+  | "queued"
+  | "analyzing"
+  | "estimated"
+  | "confirmed"
+  | "failed"
+  | "deleted"
+  | "expired";
+
 export type FoodPhotoEstimate = {
   id: string;
-  status?: string;
+  status?: FoodPhotoEstimateStatus;
   items: FoodPhotoEstimateItem[];
-  overall_confidence: number;
-  needs_user_confirmation: true;
+  overall_confidence: number | null;
+  needs_user_confirmation: boolean;
   macro_totals: FoodPhotoMacroTotals;
   macro_totals_complete: boolean;
+  model_id?: string | null;
+  expires_at?: string;
+  created_at?: string;
+  error_code?: string | null;
+  error_message?: string | null;
 };
 
 export function estimateFoodPhoto(file: File, language: string = "fa"): Promise<FoodPhotoEstimate> {
@@ -535,6 +549,18 @@ export function estimateFoodPhoto(file: File, language: string = "fa"): Promise<
     },
     body,
   });
+}
+
+export function getFoodPhotoEstimate(estimateId: string): Promise<FoodPhotoEstimate> {
+  return request<FoodPhotoEstimate>(
+    `${nutritionPath}/tracking/photo-estimates/${encodeURIComponent(estimateId)}`,
+  );
+}
+
+export function listFoodPhotoEstimates(limit: number = 20): Promise<FoodPhotoEstimate[]> {
+  return request<FoodPhotoEstimate[]>(
+    `${nutritionPath}/tracking/photo-estimates?limit=${encodeURIComponent(String(limit))}`,
+  );
 }
 
 export function correctFoodPhotoItem(
