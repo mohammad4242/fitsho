@@ -3,6 +3,7 @@ import CoreImage
 import Foundation
 import MediaPipeTasksVision
 import NitroModules
+import UIKit
 import VisionCamera
 
 public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
