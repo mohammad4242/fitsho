@@ -2607,7 +2607,8 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Read Food Photo Estimates */
+        get: operations["read_food_photo_estimates_api_v1_nutrition_tracking_photo_estimates_get"];
         put?: never;
         /** Create Food Photo Estimate */
         post: operations["create_food_photo_estimate_api_v1_nutrition_tracking_photo_estimates_post"];
@@ -2624,7 +2625,8 @@ export type paths = {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Read Food Photo Estimate */
+        get: operations["read_food_photo_estimate_api_v1_nutrition_tracking_photo_estimates__estimate_id__get"];
         put?: never;
         post?: never;
         /** Remove Food Photo Estimate */
@@ -7083,6 +7085,8 @@ export type components = {
             cycle_reminders: boolean;
             /** Enabled */
             enabled: boolean;
+            /** Nutrition Updates */
+            nutrition_updates: boolean;
             /** Physician Decisions */
             physician_decisions: boolean;
             /** Required Reviews */
@@ -7100,6 +7104,11 @@ export type components = {
             cycle_reminders: boolean;
             /** Enabled */
             enabled: boolean;
+            /**
+             * Nutrition Updates
+             * @default true
+             */
+            nutrition_updates: boolean;
             /** Physician Decisions */
             physician_decisions: boolean;
             /** Required Reviews */
@@ -7282,6 +7291,15 @@ export type components = {
         /** NutritionFoodPhotoEstimateResponse */
         NutritionFoodPhotoEstimateResponse: {
             /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
              * Expires At
              * Format: date-time
              */
@@ -7300,7 +7318,7 @@ export type components = {
             /** Macro Totals Complete */
             macro_totals_complete: boolean;
             /** Model Id */
-            model_id: string;
+            model_id: string | null;
             /** Needs User Confirmation */
             needs_user_confirmation: boolean;
             /** Overall Confidence */
@@ -7309,7 +7327,7 @@ export type components = {
              * Status
              * @enum {string}
              */
-            status: "estimated" | "confirmed" | "deleted";
+            status: "queued" | "analyzing" | "estimated" | "confirmed" | "failed" | "deleted" | "expired";
         };
         /** NutritionFoodPhotoItemResponse */
         NutritionFoodPhotoItemResponse: {
@@ -16340,6 +16358,37 @@ export interface operations {
             };
         };
     };
+    read_food_photo_estimates_api_v1_nutrition_tracking_photo_estimates_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionFoodPhotoEstimateResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_food_photo_estimate_api_v1_nutrition_tracking_photo_estimates_post: {
         parameters: {
             query?: {
@@ -16360,7 +16409,38 @@ export interface operations {
         };
         responses: {
             /** @description Successful Response */
-            201: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionFoodPhotoEstimateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_food_photo_estimate_api_v1_nutrition_tracking_photo_estimates__estimate_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                estimate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
