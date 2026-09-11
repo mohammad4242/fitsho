@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreImage
 import Foundation
+import ImageIO
 import MediaPipeTasksVision
 import NitroModules
 import UIKit
@@ -171,10 +172,20 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
     }
 
     let pixelBuffer = try makeBgraPixelBuffer(from: sourcePixelBuffer)
-    return try MPImage(
-      pixelBuffer: pixelBuffer,
-      orientation: uiImageOrientation(from: frame.orientation, mirrored: frame.isMirrored),
+    guard frame.isMirrored else {
+      return try MPImage(
+        pixelBuffer: pixelBuffer,
+        orientation: uiImageOrientation(from: frame.orientation),
+      )
+    }
+
+    // MediaPipe Tasks rejects mirrored orientations. Materialize the camera
+    // transform before inference so front-camera frames keep Android parity.
+    let normalizedPixelBuffer = try makeBgraPixelBuffer(
+      from: pixelBuffer,
+      applying orientation: cgImageOrientation(from: frame.orientation, mirrored: true),
     )
+    return try MPImage(pixelBuffer: normalizedPixelBuffer, orientation: .up)
   }
 
   private func makeBgraPixelBuffer(from source: CVPixelBuffer) throws -> CVPixelBuffer {
@@ -202,6 +213,47 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
     }
 
     imageContext.render(CIImage(cvPixelBuffer: source), to: destination)
+    return destination
+  }
+
+  private func makeBgraPixelBuffer(
+    from source: CVPixelBuffer,
+    applying orientation: CGImagePropertyOrientation,
+  ) throws -> CVPixelBuffer {
+    let orientedImage = CIImage(cvPixelBuffer: source).oriented(orientation)
+    let extent = orientedImage.extent.integral
+    let width = Int(extent.width)
+    let height = Int(extent.height)
+    guard width > 0, height > 0 else {
+      throw BodyVisionError.pixelBufferConversionFailed
+    }
+
+    var destination: CVPixelBuffer?
+    let attributes: CFDictionary = [
+      kCVPixelBufferCGImageCompatibilityKey as String: true,
+      kCVPixelBufferCGBitmapContextCompatibilityKey as String: true,
+    ] as CFDictionary
+    let status = CVPixelBufferCreate(
+      kCFAllocatorDefault,
+      width,
+      height,
+      kCVPixelFormatType_32BGRA,
+      attributes,
+      &destination,
+    )
+    guard status == kCVReturnSuccess, let destination else {
+      throw BodyVisionError.pixelBufferConversionFailed
+    }
+
+    let translatedImage = orientedImage.transformed(
+      by: CGAffineTransform(translationX: -extent.minX, y: -extent.minY),
+    )
+    imageContext.render(
+      translatedImage,
+      to: destination,
+      bounds: CGRect(origin: .zero, size: extent.size),
+      colorSpace: CGColorSpaceCreateDeviceRGB(),
+    )
     return destination
   }
 
@@ -262,8 +314,23 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
 
   private func uiImageOrientation(
     from orientation: CameraOrientation,
-    mirrored: Bool,
   ) -> UIImage.Orientation {
+    switch orientation {
+    case .up:
+      return .up
+    case .right:
+      return .right
+    case .down:
+      return .down
+    case .left:
+      return .left
+    }
+  }
+
+  private func cgImageOrientation(
+    from orientation: CameraOrientation,
+    mirrored: Bool,
+  ) -> CGImagePropertyOrientation {
     switch orientation {
     case .up:
       return mirrored ? .upMirrored : .up
