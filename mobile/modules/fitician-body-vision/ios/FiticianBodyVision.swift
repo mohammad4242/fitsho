@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreGraphics
 import CoreImage
 import Foundation
 import ImageIO
@@ -284,12 +285,25 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
           withExtension: fileExtension,
           subdirectory: modelDirectory,
         ),
+        bundle.url(
+          forResource: name,
+          withExtension: fileExtension,
+          subdirectory: "android/src/main/assets/\(modelDirectory)",
+        ),
       ]
       for candidate in candidates {
         guard let candidate, FileManager.default.fileExists(atPath: candidate.path) else {
           continue
         }
         return candidate.path
+      }
+
+      if let packagedPath = bundle
+        .paths(forResourcesOfType: fileExtension, inDirectory: nil)
+        .first(where: { path in
+          URL(fileURLWithPath: path).lastPathComponent == "\(name).\(fileExtension)"
+        }), FileManager.default.fileExists(atPath: packagedPath) {
+        return packagedPath
       }
     }
     return nil
