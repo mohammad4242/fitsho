@@ -83,6 +83,15 @@ describe("iOS body vision module wiring", () => {
     expect(swift).toContain("MODEL_STATUS_NOT_PACKAGED");
   });
 
+  it("uses the non-optional image-mode MediaPipe result APIs", async () => {
+    const swift = await read("ios/FiticianBodyVision.swift");
+
+    expect(swift).toContain("let poseResult = try poseLandmarker.detect(image: image)");
+    expect(swift).toContain("let segmentationResult = try imageSegmenter.segment(image: image)");
+    expect(swift).not.toContain("guard let poseResult = try poseLandmarker.detect");
+    expect(swift).not.toContain("guard let segmentationResult = try imageSegmenter.segment");
+  });
+
   it("regenerates the iOS Nitrogen bridge instead of hand-writing it", async () => {
     const generatedIos = await readdir(resolve(bodyVisionRoot, "nitrogen/generated/ios"));
 

@@ -50,11 +50,9 @@ public final class FiticianBodyVision: HybridFiticianBodyVisionSpec {
 
     let startedAt = DispatchTime.now().uptimeNanoseconds
     let image = try makeMediaPipeImage(from: frame)
-    guard let poseResult = try poseLandmarker.detect(image: image) else {
-      throw BodyVisionError.poseResultMissing
-    }
-    guard let segmentationResult = try imageSegmenter.segment(image: image),
-          let segmentationMask = segmentationResult.confidenceMasks?.first else {
+    let poseResult = try poseLandmarker.detect(image: image)
+    let segmentationResult = try imageSegmenter.segment(image: image)
+    guard let segmentationMask = segmentationResult.confidenceMasks?.first else {
       throw BodyVisionError.segmentationMaskMissing
     }
 
@@ -349,6 +347,5 @@ private enum BodyVisionError: Error {
   case nativePixelBufferMissing
   case pixelBufferConversionFailed
   case modelsNotPackaged
-  case poseResultMissing
   case segmentationMaskMissing
 }
