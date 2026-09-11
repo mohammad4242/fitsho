@@ -50,6 +50,13 @@ export function buildEasArgs(platformOrProfile, maybeProfile) {
   ];
 }
 
+export function buildEasEnvironment(environment, platform) {
+  artifactsForPlatform(platform);
+  const token = environment.EXPO_TOKEN?.trim() || environment.EAS_TOKEN?.trim();
+  assert.ok(token, "EXPO_TOKEN (or legacy EAS_TOKEN) is required for non-interactive EAS builds");
+  return { ...environment, EXPO_TOKEN: token, EAS_BUILD_PLATFORM: platform, CI: "1" };
+}
+
 export function validateReleaseArtifactSet(artifacts, platform = "android") {
   const paths = {};
   for (const [name, requirement] of Object.entries(artifactsForPlatform(platform))) {
@@ -70,13 +77,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const platform = platformIndex === -1 ? "android" : process.argv[platformIndex + 1];
   assert.ok(profile, "Use --profile development, preview, or production");
   assert.ok(platform, "Use --platform android or ios");
-  assert.ok(process.env.EAS_TOKEN, "EAS_TOKEN is required for non-interactive EAS builds");
+  const environment = buildEasEnvironment(process.env, platform);
 
   const command = process.platform === "win32" ? "npx.cmd" : "npx";
   const args = ["--yes", "eas-cli@latest", ...buildEasArgs(platform, profile).slice(1)];
   const result = spawnSync(command, args, {
     cwd: mobileRoot,
-    env: { ...process.env, CI: "1" },
+    env: environment,
     stdio: "inherit",
   });
   if (result.error !== undefined) throw result.error;

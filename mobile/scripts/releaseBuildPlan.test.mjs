@@ -10,6 +10,19 @@ import {
   buildEasArgs,
   validateReleaseArtifactSet,
 } from "./release-build-plan.mjs";
+import * as releasePlan from "./release-build-plan.mjs";
+
+test("release CLI accepts the standard Expo token and preserves legacy CI secrets", () => {
+  const { buildEasEnvironment } = releasePlan;
+  assert.equal(typeof buildEasEnvironment, "function");
+  assert.deepEqual(buildEasEnvironment({ EXPO_TOKEN: "test-standard" }, "ios"), {
+    EXPO_TOKEN: "test-standard", EAS_BUILD_PLATFORM: "ios", CI: "1",
+  });
+  assert.equal(buildEasEnvironment({ EAS_TOKEN: "test-legacy" }, "android").EXPO_TOKEN, "test-legacy");
+  assert.equal(buildEasEnvironment({ EXPO_TOKEN: "test-standard", EAS_TOKEN: "test-legacy" }, "ios").EXPO_TOKEN, "test-standard");
+  assert.throws(() => buildEasEnvironment({}, "ios"), /EXPO_TOKEN/u);
+  assert.throws(() => buildEasEnvironment({ EXPO_TOKEN: " " }, "ios"), /EXPO_TOKEN/u);
+});
 
 test("release plan maps every Android artifact to the locked EAS profile", () => {
   assert.deepEqual(RELEASE_ARTIFACTS, {

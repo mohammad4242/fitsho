@@ -78,7 +78,8 @@ npm --prefix mobile run build:ios:internal
 npm --prefix mobile run build:ios:production
 ```
 
-Each command requires `EAS_TOKEN` and remote Apple signing configured in the
+Each command requires `EXPO_TOKEN` (the legacy `EAS_TOKEN` name is also accepted
+and forwarded to EAS CLI as `EXPO_TOKEN`) and remote Apple signing configured in the
 matching EAS environment. Apple Team ID, App Store Connect App ID, bundle
 identifier, provisioning, and distribution certificates are managed by EAS;
 no Apple credential belongs in this repository. The production profile uses
