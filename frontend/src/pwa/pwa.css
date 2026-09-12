@@ -23,6 +23,7 @@
 .pwa-install-card__actions .fitsho-button-secondary,
 .pwa-update-prompt__actions .fitsho-button,
 .pwa-update-prompt__actions .fitsho-button-secondary { min-height: 2.75rem; padding-inline: 1rem; }
+.pwa-update-prompt__actions button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .pwa-update-prompt {
   position: fixed;

@@ -60,6 +60,32 @@ test("registers the production service worker without critical console errors", 
   ))).toEqual([]);
 });
 
+test("keeps initial service worker activation non-reloading", async ({ page }) => {
+  await page.route("**/api/**", (route) => route.fulfill({
+    status: 401,
+    contentType: "application/json",
+    body: JSON.stringify({ detail: "Not authenticated in the browser fixture" }),
+  }));
+  await page.goto("/", { waitUntil: "networkidle" });
+
+  const postLoadNavigations: string[] = [];
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) postLoadNavigations.push(frame.url());
+  });
+
+  await expect.poll(() => page.evaluate(async () => {
+    const registration = (await navigator.serviceWorker.getRegistrations())
+      .find((candidate) => candidate.scope.endsWith("/"));
+    return {
+      activeState: registration?.active?.state ?? null,
+      waitingState: registration?.waiting?.state ?? null,
+    };
+  }), { timeout: 15_000 }).toEqual({ activeState: "activated", waitingState: null });
+
+  await page.waitForTimeout(300);
+  expect(postLoadNavigations).toEqual([]);
+});
+
 test("production shell does not precache private or large public data", async ({ request }) => {
   const serviceWorker = await (await request.get("/sw.js")).text();
   expect(serviceWorker).not.toContain("fitsho_1000_profiles_audit_report");
