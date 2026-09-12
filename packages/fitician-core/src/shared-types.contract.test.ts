@@ -30,7 +30,7 @@ const form: ProfileFormValues = {
   priority_muscle: "chest",
   training_location: "home",
   home_training_setup: "bodyweight_only",
-  available_equipment: ["bodyweight"],
+  available_equipment: ["bodyweight", "pull_up_bar"],
   session_duration_minutes: "45",
   training_intensity: "moderate",
   training_cautions: [],

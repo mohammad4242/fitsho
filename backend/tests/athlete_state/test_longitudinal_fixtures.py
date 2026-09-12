@@ -72,7 +72,10 @@ def test_each_scenario_builds_athlete_state_and_exposes_defining_signals(
             assert state.recovery_trend.summary.value == "poor"
         elif scenario.key == "home_equipment_limited":
             assert state.schedule.training_location is TrainingLocation.HOME
-            assert state.schedule.home_training_setup is HomeTrainingSetup.BODYWEIGHT_ONLY
+            assert (
+                state.schedule.home_training_setup
+                is HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE
+            )
         elif scenario.key == "persistent_discomfort":
             assert state.uncomfortable_exercises
         elif scenario.key == "pain_safety":

@@ -54,6 +54,10 @@ from app.workout_cycles.models import (
 )
 from app.workouts.enums import WorkoutPlanStatus
 from app.workouts.models import WorkoutDay, WorkoutPlan, WorkoutPlanExercise
+from app.workouts.program_engine.equipment import (
+    equipment_for_home_training_setup,
+    ordered_available_equipment,
+)
 
 _NAMESPACE = UUID("8f6ab0b0-85b8-5f2f-99e0-3d1707b4e7ad")
 _BASE_TIME = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
@@ -396,12 +400,16 @@ def longitudinal_scenarios() -> tuple[LongitudinalScenario, ...]:
                 FitnessGoal.IMPROVE_FITNESS,
                 3,
                 TrainingLocation.HOME,
-                HomeTrainingSetup.BODYWEIGHT_ONLY,
+                HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
                 45,
-                (Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND),
+                ordered_available_equipment(
+                    equipment_for_home_training_setup(
+                        HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE
+                    )
+                ),
             ),
             cycles=(CycleFixture(4), CycleFixture(4)),
-            defining_signals=frozenset({"home", "bodyweight_only", "equipment_limited"}),
+            defining_signals=frozenset({"home", "resistance_bands_available", "equipment_limited"}),
         ),
         LongitudinalScenario(
             key="persistent_discomfort",
