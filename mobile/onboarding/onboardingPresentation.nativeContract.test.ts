@@ -31,6 +31,10 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(source).toMatch(/برنامه شخصی براساس بدن، هدف، سطح، زمان و تجهیزات/);
   expect(source).toMatch(/getOnboardingStageProgress/);
   expect(source).toMatch(/logout/);
+  expect(source).toMatch(/equipmentForHomeTrainingSetup/);
+  expect(source).toMatch(/resistance_bands_available/);
+  expect(source).toMatch(/dumbbells_and_resistance_bands_available/);
+  expect(source).not.toMatch(/const equipmentOptions/);
   expect(publicSource).toMatch(/SecurePublicOnboardingDraftStore/);
   expect(publicSource).toMatch(/PUBLIC_ONBOARDING_SOURCE/);
   expect(publicSource).toMatch(/StateSkeleton/);
@@ -61,6 +65,9 @@ it("keeps onboarding guided, native, and RTL-friendly", async () => {
   expect(publicTrainingSource).toMatch(/first_month/);
   expect(publicTrainingSource).toMatch(/training_location/);
   expect(publicTrainingSource).toMatch(/bodyweight_only/);
+  expect(publicTrainingSource).toMatch(/equipmentForHomeTrainingSetup/);
+  expect(publicTrainingSource).toMatch(/resistance_bands_available/);
+  expect(publicTrainingSource).toMatch(/dumbbells_and_resistance_bands_available/);
   expect(publicTrainingSource).toMatch(/userSelectablePriorityMuscles/);
   expect(publicTrainingSource).toMatch(/training_cautions/);
   expect(publicNutritionSource).toMatch(/در حال حاضر تمرین منظم داری؟/);

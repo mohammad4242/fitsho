@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 
 import type { NutritionProfile } from "@fitician/core/nutrition";
-import type { Profile } from "@fitician/core/profile";
+import type { Equipment, HomeTrainingSetup, Profile } from "@fitician/core/profile";
 
 import {
   nutritionFormsForProfile,
@@ -13,7 +13,7 @@ import {
 } from "./profileModel";
 
 const profile = {
-  available_equipment: ["bodyweight", "dumbbell"],
+  available_equipment: ["bodyweight", "dumbbell", "pull_up_bar"],
   birth_date: "1992-05-12",
   circumferences_measured_at: "2026-08-01T10:00:00Z",
   created_at: "2026-08-01T10:00:00Z",
@@ -114,6 +114,44 @@ it("shares the existing core validation rules for native sections", () => {
   values.training_days_per_week = "1";
   expect(validateProfileSection(values, "training", new Date("2026-09-07T00:00:00Z"))).toMatchObject({
     training_days_per_week: "trainingDaysRange",
+  });
+});
+
+it("hydrates every home preset with its canonical inventory", () => {
+  const expected: Record<HomeTrainingSetup, readonly Equipment[]> = {
+    bodyweight_only: ["bodyweight", "pull_up_bar"],
+    dumbbells_available: ["bodyweight", "dumbbell", "pull_up_bar"],
+    resistance_bands_available: ["bodyweight", "resistance_band", "pull_up_bar"],
+    dumbbells_and_resistance_bands_available: ["bodyweight", "dumbbell", "resistance_band", "pull_up_bar"],
+  };
+
+  for (const [setup, equipment] of Object.entries(expected) as [HomeTrainingSetup, readonly Equipment[]][]) {
+    const values = profileFormValuesForProfile({
+      ...profile,
+      available_equipment: ["bodyweight"],
+      home_training_setup: setup,
+    });
+    expect(values.home_training_setup).toBe(setup);
+    expect(values.available_equipment).toEqual(equipment);
+  }
+
+  const legacyValues = profileFormValuesForProfile({
+    ...profile,
+    available_equipment: ["bodyweight"],
+    home_training_setup: null,
+  });
+  expect(legacyValues.home_training_setup).toBe("bodyweight_only");
+  expect(legacyValues.available_equipment).toEqual(["bodyweight", "pull_up_bar"]);
+});
+
+it("patches both home fields when the selected preset changes", () => {
+  const values = profileFormValuesForProfile(profile);
+  values.home_training_setup = "resistance_bands_available";
+  values.available_equipment = ["bodyweight", "resistance_band", "pull_up_bar"];
+
+  expect(profilePatchForSection(values, profile, "training")).toEqual({
+    available_equipment: ["bodyweight", "resistance_band", "pull_up_bar"],
+    home_training_setup: "resistance_bands_available",
   });
 });
 

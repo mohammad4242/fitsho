@@ -1,7 +1,7 @@
 import {
   availableEquipment,
-  deriveHomeTrainingSetupFromEquipment,
   equipmentForHomeTrainingSetup,
+  resolveHomeTrainingSetup,
   sessionDurations,
   type Equipment,
   type ExperienceLevel,
@@ -256,9 +256,10 @@ export function validateAll(
 
 export function toProfileInput(values: ProfileFormValues): ProfileInput {
   const homeTrainingSetup = values.training_location === "home"
-    ? values.home_training_setup !== ""
-      ? values.home_training_setup
-      : deriveHomeTrainingSetupFromEquipment(values.available_equipment)
+    ? resolveHomeTrainingSetup(
+      values.home_training_setup !== "" ? values.home_training_setup : null,
+      values.available_equipment,
+    )
     : null;
   const homeEquipment = values.training_location === "home"
     ? homeTrainingSetup === null
@@ -305,6 +306,9 @@ export function toProfileInput(values: ProfileFormValues): ProfileInput {
 }
 
 export function profileToFormValues(profile: Profile): ProfileFormValues {
+  const homeSetup = profile.training_location === "home"
+    ? resolveHomeTrainingSetup(profile.home_training_setup, profile.available_equipment)
+    : null;
   return {
     display_name: profile.display_name,
     birth_date: profile.birth_date,
@@ -331,18 +335,9 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
       ? profile.priority_muscles[0]
       : "",
     training_location: profile.training_location,
-    home_training_setup: profile.training_location === "home"
-      ? profile.home_training_setup
-        ?? deriveHomeTrainingSetupFromEquipment(profile.available_equipment)
-        ?? (profile.available_equipment?.length ? "bodyweight_only" : "")
-      : "",
+    home_training_setup: homeSetup ?? "",
     available_equipment: profile.training_location === "home"
-      ? (() => {
-        const setup = profile.home_training_setup
-          ?? deriveHomeTrainingSetupFromEquipment(profile.available_equipment)
-          ?? (profile.available_equipment?.length ? "bodyweight_only" : null);
-        return setup === null ? [] : equipmentForHomeTrainingSetup(setup);
-      })()
+      ? homeSetup === null ? [] : equipmentForHomeTrainingSetup(homeSetup)
       : profile.available_equipment === null
         ? []
         : [...(profile.available_equipment ?? [])],

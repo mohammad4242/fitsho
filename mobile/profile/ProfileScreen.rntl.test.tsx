@@ -217,6 +217,31 @@ test("keeps progress limited to sections available for the loaded mode", async (
   expect(screen.getByText("مرحله ۱ از ۲")).toBeTruthy();
 });
 
+test("edits home training through four canonical presets", async () => {
+  renderProfile();
+
+  await screen.findByRole("header", { name: "پروفایل ورزشی" });
+  fireEvent.press(screen.getByRole("radio", { name: "تمرینی" }));
+
+  for (const label of ["وزن بدن", "دمبل", "کش", "دمبل + کش"]) {
+    expect(screen.getByRole("radio", { name: label })).toBeTruthy();
+  }
+  expect(screen.getByRole("radio", { name: "وزن بدن" }).props.accessibilityState).toMatchObject({ selected: true });
+  expect(screen.queryByRole("checkbox", { name: "میله بارفیکس" })).toBeNull();
+  expect(screen.queryByText("تجهیزات موجود")).toBeNull();
+
+  fireEvent.press(screen.getByRole("radio", { name: "کش" }));
+  fireEvent.press(screen.getByRole("button", { name: "ذخیره تغییرات" }));
+
+  const api = mockCreateProfileApi.mock.results[mockCreateProfileApi.mock.results.length - 1]?.value as {
+    readonly updateProfile: jest.Mock;
+  };
+  await waitFor(() => expect(api.updateProfile).toHaveBeenCalledWith({
+    available_equipment: ["bodyweight", "resistance_band", "pull_up_bar"],
+    home_training_setup: "resistance_bands_available",
+  }));
+});
+
 test("saves personal edits through the existing updateProfile API", async () => {
   renderProfile();
 

@@ -13,7 +13,14 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import type { NutritionProfileInput, SafetyProfileInput, StructuredExerciseInput } from "@fitician/core/nutrition";
 import { getOnboardingSteps } from "@fitician/core/onboarding";
 import type { NutritionBasicsDraft, OnboardingState } from "@fitician/core/onboarding";
-import type { ProfileFormValues, ProfileInput, ProductMode } from "@fitician/core/profile";
+import {
+  equipmentForHomeTrainingSetup,
+  homeTrainingSetups,
+  type HomeTrainingSetup,
+  type ProfileFormValues,
+  type ProfileInput,
+  type ProductMode,
+} from "@fitician/core/profile";
 import { validateStep } from "@fitician/core/profile-validation";
 
 import { useMobileAuth } from "../auth/MobileAuthProvider";
@@ -97,21 +104,16 @@ const trainingLocationOptions: readonly ChoiceOption[] = [
   { label: "خانه", value: "home" },
 ];
 
-const homeSetupOptions: readonly ChoiceOption[] = [
-  { label: "فقط وزن بدن", value: "bodyweight_only" },
-  { label: "دمبل دارم", value: "dumbbells_available" },
-];
-
-const equipmentOptions: readonly ChoiceOption[] = [
-  { label: "وزن بدن", value: "bodyweight" },
-  { label: "دمبل", value: "dumbbell" },
-  { label: "هالتر", value: "barbell" },
-  { label: "کابل", value: "cable" },
-  { label: "دستگاه", value: "machine" },
-  { label: "کش", value: "resistance_band" },
-  { label: "نیمکت", value: "bench" },
-  { label: "میله بارفیکس", value: "pull_up_bar" },
-];
+const homeSetupLabels: Record<HomeTrainingSetup, string> = {
+  bodyweight_only: "وزن بدن",
+  dumbbells_available: "دمبل",
+  resistance_bands_available: "کش",
+  dumbbells_and_resistance_bands_available: "دمبل + کش",
+};
+const homeSetupOptions: readonly ChoiceOption[] = homeTrainingSetups.map((setup) => ({
+  label: homeSetupLabels[setup],
+  value: setup,
+}));
 
 const cautionOptions: readonly ChoiceOption[] = [
   { label: "کمر", value: "lower_back" },
@@ -711,7 +713,18 @@ export function TrainingProfileStage({
               textDirection="ltr"
               normalizeInput
             />
-            <ControlledChoice control={control} label="محل تمرین" name="training_location" options={trainingLocationOptions} />
+            <ControlledChoice
+              control={control}
+              label="محل تمرین"
+              name="training_location"
+              onChangeValue={(value) => {
+                if (value === "gym") {
+                  setValue("home_training_setup", "");
+                  setValue("available_equipment", []);
+                }
+              }}
+              options={trainingLocationOptions}
+            />
             {location === "home" ? (
               <>
                 <ControlledChoice
@@ -720,18 +733,11 @@ export function TrainingProfileStage({
                   name="home_training_setup"
                   options={homeSetupOptions}
                   onChangeValue={(value) => {
-                    if (value === "bodyweight_only") {
-                      setValue("available_equipment", ["bodyweight", "pull_up_bar"]);
-                    } else if (value === "dumbbells_available") {
-                      setValue("available_equipment", ["bodyweight", "dumbbell"]);
-                    }
+                    setValue(
+                      "available_equipment",
+                      equipmentForHomeTrainingSetup(value as HomeTrainingSetup),
+                    );
                   }}
-                />
-                <ControlledMultiChoice
-                  control={control}
-                  label="تجهیزات در دسترس"
-                  name="available_equipment"
-                  options={equipmentOptions}
                 />
               </>
             ) : null}

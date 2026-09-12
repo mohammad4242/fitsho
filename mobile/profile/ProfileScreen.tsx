@@ -11,10 +11,13 @@ import {
 import { useRouter } from "expo-router";
 
 import type { NutritionProfile } from "@fitician/core/nutrition";
+import {
+  equipmentForHomeTrainingSetup,
+  homeTrainingSetups,
+} from "@fitician/core/profile";
 import type {
   FitnessGoal,
   HomeTrainingSetup,
-  Equipment,
   Profile,
   ProfileFormValues,
   ProductMode,
@@ -93,10 +96,16 @@ const locationOptions = [
   { label: "خانه", value: "home" },
 ] as const;
 
-const homeSetupOptions = [
-  { label: "فقط وزن بدن", value: "bodyweight_only" },
-  { label: "دمبل دارم", value: "dumbbells_available" },
-] as const;
+const homeSetupLabels: Record<HomeTrainingSetup, string> = {
+  bodyweight_only: "وزن بدن",
+  dumbbells_available: "دمبل",
+  resistance_bands_available: "کش",
+  dumbbells_and_resistance_bands_available: "دمبل + کش",
+};
+const homeSetupOptions = homeTrainingSetups.map((setup) => ({
+  label: homeSetupLabels[setup],
+  value: setup,
+}));
 
 const intensityOptions = [
   { label: "سبک", value: "light" },
@@ -127,17 +136,6 @@ const weekdayOptions = [
   { label: "چهارشنبه", value: "4" },
   { label: "پنجشنبه", value: "5" },
   { label: "جمعه", value: "6" },
-] as const;
-
-const equipmentOptions = [
-  { label: "وزن بدن", value: "bodyweight" },
-  { label: "دمبل", value: "dumbbell" },
-  { label: "هالتر", value: "barbell" },
-  { label: "کابل", value: "cable" },
-  { label: "دستگاه", value: "machine" },
-  { label: "کش", value: "resistance_band" },
-  { label: "نیمکت", value: "bench" },
-  { label: "میله بارفیکس", value: "pull_up_bar" },
 ] as const;
 
 const cautionOptions = [
@@ -745,21 +743,10 @@ function TrainingSection({
             label="امکانات خانه"
             options={homeSetupOptions}
             selected={values.home_training_setup}
-            onSelect={(value) => onChange("home_training_setup", value as HomeTrainingSetup)}
-          />
-          <MultiChoiceField
-            label="تجهیزات موجود"
-            options={equipmentOptions}
-            selected={values.available_equipment ?? []}
-            onToggle={(value) => {
-              const equipment = value as Equipment;
-              const current = new Set(values.available_equipment ?? []);
-              if (current.has(equipment)) current.delete(equipment);
-              else current.add(equipment);
-              if (equipment === "bodyweight" && !current.has(equipment)) current.delete("pull_up_bar");
-              onChange("available_equipment", equipmentOptions
-                .map((option) => option.value)
-                .filter((item) => current.has(item)));
+            onSelect={(value) => {
+              const setup = value as HomeTrainingSetup;
+              onChange("home_training_setup", setup);
+              onChange("available_equipment", equipmentForHomeTrainingSetup(setup));
             }}
           />
         </>

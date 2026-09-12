@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 
 import {
+  equipmentForHomeTrainingSetup,
+  homeTrainingSetups,
   userSelectablePriorityMuscles,
+  type HomeTrainingSetup,
   type ProfileFormValues,
   type TrainingCaution,
   type UserSelectablePriorityMuscle,
@@ -84,6 +87,12 @@ const cautionLabels: Record<TrainingCaution, string> = {
   neck: "احتیاط برای گردن",
   wrist: "احتیاط برای مچ",
   other: "مورد احتیاط دیگر",
+};
+const homeSetupLabels: Record<HomeTrainingSetup, string> = {
+  bodyweight_only: "وزن بدن",
+  dumbbells_available: "دمبل",
+  resistance_bands_available: "کش",
+  dumbbells_and_resistance_bands_available: "دمبل + کش",
 };
 const priorityLabels: Record<UserSelectablePriorityMuscle, string> = {
   back: "پشت",
@@ -279,30 +288,21 @@ export function GuidedTrainingQuestions({
       ) : null}
       {question === "home" ? (
         <View style={styles.choiceGrid}>
-          <PublicChoiceCard
-            label="فقط وزن بدن"
-            onPress={() => selectAndAdvance(
-              () => {
-                onChange("home_training_setup", "bodyweight_only");
-                onChange("available_equipment", ["bodyweight", "pull_up_bar"]);
-              },
-              () => setIndex((current) => current + 1),
-            )}
-            selected={values.home_training_setup === "bodyweight_only"}
-            value="bodyweight_only"
-          />
-          <PublicChoiceCard
-            label="دمبل دارم"
-            onPress={() => selectAndAdvance(
-              () => {
-                onChange("home_training_setup", "dumbbells_available");
-                onChange("available_equipment", ["bodyweight", "dumbbell"]);
-              },
-              () => setIndex((current) => current + 1),
-            )}
-            selected={values.home_training_setup === "dumbbells_available"}
-            value="dumbbells_available"
-          />
+          {homeTrainingSetups.map((setup) => (
+            <PublicChoiceCard
+              label={homeSetupLabels[setup]}
+              key={setup}
+              onPress={() => selectAndAdvance(
+                () => {
+                  onChange("home_training_setup", setup);
+                  onChange("available_equipment", equipmentForHomeTrainingSetup(setup));
+                },
+                () => setIndex((current) => current + 1),
+              )}
+              selected={values.home_training_setup === setup}
+              value={setup}
+            />
+          ))}
         </View>
       ) : null}
       {question === "duration" ? (

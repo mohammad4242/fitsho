@@ -3,7 +3,14 @@ import {
   validateAll,
   type ProfileValidationErrors,
 } from "@fitician/core/profile-validation";
-import type { ProductMode, ProfileFormValues, ProfileInput, SharedProfileInput } from "@fitician/core/profile";
+import {
+  equipmentForHomeTrainingSetup,
+  resolveHomeTrainingSetup,
+  type ProductMode,
+  type ProfileFormValues,
+  type ProfileInput,
+  type SharedProfileInput,
+} from "@fitician/core/profile";
 
 export const profileFormFields = [
   "display_name",
@@ -100,10 +107,13 @@ export function profileFormValuesForTrainingProfile(input: ProfileInput): Profil
     ? input.priority_muscles[0]
     : "";
   values.training_location = input.training_location;
-  values.home_training_setup = input.home_training_setup ?? "";
-  values.available_equipment = input.available_equipment == null
-    ? []
-    : [...input.available_equipment];
+  const homeSetup = input.training_location === "home"
+    ? resolveHomeTrainingSetup(input.home_training_setup, input.available_equipment)
+    : null;
+  values.home_training_setup = homeSetup ?? "";
+  values.available_equipment = input.training_location === "home"
+    ? homeSetup === null ? [] : equipmentForHomeTrainingSetup(homeSetup)
+    : input.available_equipment == null ? [] : [...input.available_equipment];
   values.session_duration_minutes = String(input.session_duration_minutes);
   values.training_intensity = input.training_intensity ?? "";
   values.training_cautions = [...input.training_cautions];

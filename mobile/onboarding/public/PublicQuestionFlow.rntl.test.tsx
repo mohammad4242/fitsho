@@ -174,16 +174,21 @@ function TrainingHarness({
   initialValues,
   onComplete,
   onBack,
+  onChange,
 }: {
   initialValues?: ProfileFormValues;
   onComplete?: (values: ProfileFormValues) => void;
   onBack?: () => void;
+  onChange?: (field: string, value: unknown) => void;
 }) {
   const [values, setValues] = useState(initialValues ?? emptyProfileFormValues());
   return (
     <GuidedTrainingQuestions
       onBack={onBack ?? jest.fn()}
-      onChange={(field, value) => setValues((current) => ({ ...current, [field]: value }))}
+      onChange={(field, value) => {
+        onChange?.(field, value);
+        setValues((current) => ({ ...current, [field]: value }));
+      }}
       onComplete={onComplete ?? jest.fn()}
       values={values}
     />
@@ -223,10 +228,47 @@ test("home inserts the home-equipment question and cautions keep skip behavior",
   fireEvent.press(screen.getByRole("radio", { name: "خانه" }));
   advance();
   expect(screen.getByRole("header", { name: "در خانه چه امکاناتی داری؟" })).toBeTruthy();
-  expect(screen.getByRole("radio", { name: "فقط وزن بدن" })).toBeTruthy();
-  fireEvent.press(screen.getByRole("radio", { name: "فقط وزن بدن" }));
+  expect(screen.getByRole("radio", { name: "وزن بدن" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "دمبل" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "کش" })).toBeTruthy();
+  expect(screen.getByRole("radio", { name: "دمبل + کش" })).toBeTruthy();
+  fireEvent.press(screen.getByRole("radio", { name: "وزن بدن" }));
   advance();
   expect(screen.getByText("۲۰ تا ۳۰ دقیقه")).toBeTruthy();
+});
+
+test("each home preset synchronizes its setup and canonical equipment", () => {
+  const cases = [
+    ["وزن بدن", "bodyweight_only", ["bodyweight", "pull_up_bar"]],
+    ["دمبل", "dumbbells_available", ["bodyweight", "dumbbell", "pull_up_bar"]],
+    ["کش", "resistance_bands_available", ["bodyweight", "resistance_band", "pull_up_bar"]],
+    ["دمبل + کش", "dumbbells_and_resistance_bands_available", ["bodyweight", "dumbbell", "resistance_band", "pull_up_bar"]],
+  ] as const;
+
+  for (const [label, setup, equipment] of cases) {
+    const changes: Array<[string, unknown]> = [];
+    const rendered = renderWithSafeArea(
+      <TrainingHarness onChange={(field, value) => changes.push([field, value])} />,
+    );
+
+    fireEvent.press(screen.getByRole("radio", { name: "ماه اولمه" }));
+    advance();
+    fireEvent.press(screen.getByRole("button", { name: "ادامه" }));
+    fireEvent.press(screen.getByRole("radio", { name: "۳ روز در هفته" }));
+    advance();
+    fireEvent.press(screen.getByRole("radio", { name: "خانه" }));
+    advance();
+
+    expect(screen.getAllByRole("radio")).toHaveLength(4);
+    fireEvent.press(screen.getByRole("radio", { name: label }));
+    expect(changes.slice(-2)).toEqual([
+      ["home_training_setup", setup],
+      ["available_equipment", equipment],
+    ]);
+
+    rendered.unmount();
+    jest.clearAllTimers();
+  }
 });
 
 test("keeps Web duration, intensity, priority, caution, and week choices", () => {
@@ -290,7 +332,7 @@ test("maps home equipment before the final public training submission", () => {
   advance();
   fireEvent.press(screen.getByRole("radio", { name: "خانه" }));
   advance();
-  fireEvent.press(screen.getByRole("radio", { name: "فقط وزن بدن" }));
+  fireEvent.press(screen.getByRole("radio", { name: "وزن بدن" }));
   advance();
   fireEvent.press(screen.getByRole("radio", { name: "۳۰ تا ۴۵ دقیقه" }));
   advance();

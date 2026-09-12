@@ -13,6 +13,10 @@ import type {
   ProfilePatch,
   SharedProfileInput,
 } from "@fitician/core/profile";
+import {
+  equipmentForHomeTrainingSetup,
+  resolveHomeTrainingSetup,
+} from "@fitician/core/profile";
 
 import {
   emptyNutritionBasicsFormValues,
@@ -58,12 +62,17 @@ const trainingFields: ReadonlySet<keyof ProfilePatch> = new Set([
 ]);
 
 export function profileFormValuesForProfile(profile: Profile): ProfileFormValues {
+  const homeSetup = profile.training_location === "home"
+    ? resolveHomeTrainingSetup(profile.home_training_setup, profile.available_equipment)
+    : null;
   return {
     ...profileFormValuesForSharedProfile(profile),
-    available_equipment: [...(profile.available_equipment ?? [])],
+    available_equipment: profile.training_location === "home"
+      ? homeSetup === null ? [] : equipmentForHomeTrainingSetup(homeSetup)
+      : [...(profile.available_equipment ?? [])],
     experience_level: profile.experience_level,
     hip_circumference_cm: profile.hip_circumference_cm === null ? "" : String(profile.hip_circumference_cm),
-    home_training_setup: profile.home_training_setup ?? "",
+    home_training_setup: homeSetup ?? "",
     plan_duration_weeks: String(profile.plan_duration_weeks),
     preferred_weekdays: [...(profile.preferred_weekdays ?? [])],
     priority_muscle: profile.priority_muscles?.length === 1 ? profile.priority_muscles[0] : "",
