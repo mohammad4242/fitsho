@@ -3,7 +3,12 @@ import { useTranslation } from "react-i18next";
 
 import { AppIcon } from "../../shared/AppIcon";
 import {
+  equipmentForHomeTrainingSetup,
+  homeTrainingSetups,
+} from "@fitician/core/profile";
+import {
   userSelectablePriorityMuscles,
+  type ProfileFormValue,
   type ProfileFormValues,
   type TrainingCaution,
   type UserSelectablePriorityMuscle,
@@ -12,7 +17,10 @@ import { useAutoAdvance } from "./useAutoAdvance";
 
 type Props = {
   values: ProfileFormValues;
-  onChange: (field: keyof ProfileFormValues, value: string | ProfileFormValues["training_cautions"]) => void;
+  onChange: (
+    field: keyof ProfileFormValues,
+    value: ProfileFormValue,
+  ) => void;
   onBack: () => void;
   onComplete: () => void;
   allowNoTraining?: boolean;
@@ -188,13 +196,16 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
         )}
         {question === "home" && (
           <div className="guided-choice-grid">
-            {["bodyweight_only", "dumbbells_available"].map((value) => (
+            {homeTrainingSetups.map((value) => (
               <button
                 className={values.home_training_setup === value ? "is-selected" : ""}
                 key={value}
                 type="button"
                 onClick={() => selectAndAdvance(
-                  () => onChange("home_training_setup", value),
+                  () => {
+                    onChange("home_training_setup", value);
+                    onChange("available_equipment", equipmentForHomeTrainingSetup(value));
+                  },
                   () => setIndex((current) => current + 1),
                 )}
               >
@@ -317,4 +328,3 @@ export function GuidedTrainingQuestions({ values, onChange, onBack, onComplete, 
     </section>
   );
 }
-

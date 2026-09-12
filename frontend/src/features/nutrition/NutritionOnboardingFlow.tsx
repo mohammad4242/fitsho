@@ -8,7 +8,7 @@ import {
   validateStep,
   type ProfileValidationErrors,
 } from "../profile/profileValidation";
-import type { ProductMode, Profile, ProfileFormValues, ProfileInput } from "../profile/types";
+import type { ProductMode, Profile, ProfileFormValue, ProfileFormValues, ProfileInput } from "../profile/types";
 import * as nutritionApi from "./api";
 import type {
   MedicalConditionCode,
@@ -273,7 +273,7 @@ export function NutritionOnboardingFlow({
 
   function updateProfileValue(
     field: keyof ProfileFormValues,
-    value: string | ProfileFormValues["training_cautions"],
+    value: ProfileFormValue,
   ) {
     setValues((current) => ({
       ...current,
@@ -1367,4 +1367,3 @@ function Actions({
     </div>
   );
 }
-

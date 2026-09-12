@@ -298,28 +298,15 @@ it("shows home setup only for home training and clears it after switching to gym
     screen.queryByLabelText("برای تمرین در خانه چه امکاناتی داری؟"),
   ).not.toBeInTheDocument();
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "home");
-  expect(screen.getByLabelText("وزن بدن")).toBeInTheDocument();
-  expect(screen.getByLabelText("دمبل")).toBeInTheDocument();
-  expect(screen.getByLabelText("هالتر")).toBeInTheDocument();
-  expect(screen.getByLabelText("دستگاه سیم‌کش")).toBeInTheDocument();
-  expect(screen.getByLabelText("دستگاه بدنسازی")).toBeInTheDocument();
-  expect(screen.getByLabelText("کش تمرینی")).toBeInTheDocument();
-  expect(screen.getByLabelText("نیمکت")).toBeInTheDocument();
-  expect(screen.getByLabelText("میله بارفیکس")).toBeInTheDocument();
-  await user.click(screen.getByLabelText("وزن بدن"));
-  expect(screen.getByLabelText("وزن بدن")).toBeChecked();
-  expect(screen.getByLabelText("میله بارفیکس")).toBeChecked();
-  await user.click(screen.getByLabelText("میله بارفیکس"));
-  expect(screen.getByLabelText("وزن بدن")).toBeChecked();
-  expect(screen.getByLabelText("میله بارفیکس")).not.toBeChecked();
-  await user.click(screen.getByLabelText("وزن بدن"));
-  expect(screen.getByLabelText("وزن بدن")).not.toBeChecked();
-  expect(screen.getByLabelText("میله بارفیکس")).not.toBeChecked();
-  await user.click(screen.getByLabelText("میله بارفیکس"));
-  expect(screen.getByLabelText("وزن بدن")).toBeChecked();
-  expect(screen.getByLabelText("میله بارفیکس")).toBeChecked();
-  await user.click(screen.getByLabelText("دمبل"));
-  await user.click(screen.getByLabelText("نیمکت"));
+  const homeGroup = screen.getByRole("group", { name: "برای تمرین در خانه چه امکاناتی داری؟" });
+  for (const label of ["وزن بدن", "دمبل", "کش", "دمبل + کش"]) {
+    expect(within(homeGroup).getByRole("radio", { name: label })).toBeInTheDocument();
+  }
+  expect(within(homeGroup).queryByLabelText("میله بارفیکس")).not.toBeInTheDocument();
+  expect(within(homeGroup).queryByLabelText("نیمکت")).not.toBeInTheDocument();
+  await user.click(within(homeGroup).getByRole("radio", { name: "دمبل + کش" }));
+  expect(within(homeGroup).getByRole("radio", { name: "دمبل + کش" })).toBeChecked();
+  expect(within(homeGroup).getByRole("radio", { name: "دمبل" })).not.toBeChecked();
   await user.selectOptions(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟"), "60");
   await user.selectOptions(screen.getByLabelText("شدت معمول تمرین"), "moderate");
   await user.click(screen.getByLabelText("ندارم"));
@@ -417,32 +404,27 @@ it("submits one normalized typed profile payload", async () => {
   });
 });
 
-it("keeps bodyweight and pull-up-bar equipment toggles synchronized", async () => {
+it("keeps the four home presets mutually exclusive", async () => {
   const user = userEvent.setup();
   renderOnboarding();
   await reachExperienceStep(user);
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "home");
 
-  const bodyweight = screen.getByRole("checkbox", { name: "وزن بدن" });
-  const pullUpBar = screen.getByRole("checkbox", { name: "میله بارفیکس" });
-  expect(bodyweight).not.toBeChecked();
-  expect(pullUpBar).not.toBeChecked();
+  const homeGroup = screen.getByRole("group", { name: "برای تمرین در خانه چه امکاناتی داری؟" });
+  const bodyweight = within(homeGroup).getByRole("radio", { name: "وزن بدن" });
+  const dumbbells = within(homeGroup).getByRole("radio", { name: "دمبل" });
+  const bands = within(homeGroup).getByRole("radio", { name: "کش" });
+  const combined = within(homeGroup).getByRole("radio", { name: "دمبل + کش" });
 
   await user.click(bodyweight);
   expect(bodyweight).toBeChecked();
-  expect(pullUpBar).toBeChecked();
+  expect(dumbbells).not.toBeChecked();
+  expect(bands).not.toBeChecked();
+  expect(combined).not.toBeChecked();
 
-  await user.click(pullUpBar);
-  expect(bodyweight).toBeChecked();
-  expect(pullUpBar).not.toBeChecked();
-
-  await user.click(bodyweight);
+  await user.click(bands);
   expect(bodyweight).not.toBeChecked();
-  expect(pullUpBar).not.toBeChecked();
-
-  await user.click(pullUpBar);
-  expect(bodyweight).toBeChecked();
-  expect(pullUpBar).toBeChecked();
+  expect(bands).toBeChecked();
 });
 
 it("offers the optional photo flow after successful profile creation", async () => {

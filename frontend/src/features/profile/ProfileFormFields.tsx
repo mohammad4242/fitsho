@@ -1,5 +1,9 @@
 import { useTranslation } from "react-i18next";
 import type { InputHTMLAttributes } from "react";
+import {
+  equipmentForHomeTrainingSetup,
+  homeTrainingSetups,
+} from "@fitician/core/profile";
 
 import { AppIcon, type IconName } from "../../shared/AppIcon";
 
@@ -18,10 +22,9 @@ import {
   trainingIntensities,
   userSelectablePriorityMuscles,
   preferredWeekdays,
-  availableEquipment,
   type TrainingCaution,
   type UserSelectablePriorityMuscle,
-  type Equipment,
+  type HomeTrainingSetup,
   type ProfileFormValue,
   type MeasurementField,
   type MeasurementFormValues,
@@ -403,29 +406,9 @@ export function ExperienceFields({
     onChange("priority_muscle", muscle);
   }
 
-  function toggleEquipment(equipment: Equipment) {
-    const selected = new Set(values.available_equipment ?? []);
-    if (equipment === "bodyweight") {
-      if (selected.has(equipment)) {
-        selected.delete("bodyweight");
-        selected.delete("pull_up_bar");
-      } else {
-        selected.add("bodyweight");
-        selected.add("pull_up_bar");
-      }
-    } else if (equipment === "pull_up_bar") {
-      if (selected.has(equipment)) {
-        selected.delete("pull_up_bar");
-      } else {
-        selected.add("bodyweight");
-        selected.add("pull_up_bar");
-      }
-    } else if (selected.has(equipment)) {
-      selected.delete(equipment);
-    } else {
-      selected.add(equipment);
-    }
-    onChange("available_equipment", availableEquipment.filter((item) => selected.has(item)));
+  function selectHomeTrainingSetup(setup: HomeTrainingSetup) {
+    onChange("home_training_setup", setup);
+    onChange("available_equipment", equipmentForHomeTrainingSetup(setup));
   }
 
   return (
@@ -601,15 +584,16 @@ export function ExperienceFields({
           </FieldLegend>
           <p className="profile-field__hint">{t("onboarding.hints.homeTrainingSetup")}</p>
           <div className="profile-checkboxes">
-            {availableEquipment.map((equipment) => (
-              <label key={equipment}>
+            {homeTrainingSetups.map((setup) => (
+              <label key={setup}>
                 <input
-                  type="checkbox"
-                  name="available_equipment"
-                  checked={values.available_equipment?.includes(equipment) ?? false}
-                  onChange={() => toggleEquipment(equipment)}
+                  type="radio"
+                  name="home_training_setup"
+                  value={setup}
+                  checked={values.home_training_setup === setup}
+                  onChange={() => selectHomeTrainingSetup(setup)}
                 />
-                {t(`onboarding.options.equipment.${equipment}`)}
+                {t(`onboarding.options.homeTrainingSetup.${setup}`)}
               </label>
             ))}
           </div>

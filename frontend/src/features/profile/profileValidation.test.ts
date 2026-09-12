@@ -185,7 +185,7 @@ describe("profile validation", () => {
     ).toEqual({});
   });
 
-  it("requires a non-empty home inventory and accepts supported durations", () => {
+  it("requires a home preset and accepts supported durations", () => {
     expect(
       validateStep(
         { ...validValues, training_location: "home", available_equipment: [] },
@@ -201,7 +201,8 @@ describe("profile validation", () => {
         {
           ...validValues,
           training_location: "home",
-          available_equipment: ["bodyweight", "dumbbell", "bench"],
+          home_training_setup: "dumbbells_and_resistance_bands_available",
+          available_equipment: [],
           session_duration_minutes: "90",
         },
         3,
@@ -315,6 +316,7 @@ describe("profile validation", () => {
         {
           ...validValues,
           training_location: "home",
+          home_training_setup: "resistance_bands_available",
           available_equipment: ["bodyweight", "bench"],
           session_duration_minutes: "75",
         },
@@ -322,7 +324,8 @@ describe("profile validation", () => {
       ),
     ).toEqual({
       training_location: "home",
-      available_equipment: ["bodyweight", "bench"],
+      home_training_setup: "resistance_bands_available",
+      available_equipment: ["bodyweight", "resistance_band", "pull_up_bar"],
       session_duration_minutes: 75,
     });
   });
@@ -347,7 +350,7 @@ describe("profile validation", () => {
       }),
     ).toMatchObject({
       home_training_setup: "dumbbells_available",
-      available_equipment: ["bodyweight", "dumbbell"],
+      available_equipment: ["bodyweight", "dumbbell", "pull_up_bar"],
     });
     expect(
       toProfileInput({

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   MemoryRouter,
@@ -68,7 +68,7 @@ const savedProfile: Profile = {
   training_days_per_week: 3,
   training_location: "home",
   home_training_setup: "dumbbells_available",
-  available_equipment: ["bodyweight", "dumbbell", "bench"],
+  available_equipment: ["bodyweight", "dumbbell", "pull_up_bar"],
   priority_muscles: ["chest"],
   session_duration_minutes: 75,
   training_intensity: "moderate",
@@ -208,9 +208,13 @@ it("renders every saved profile value in its editable profile page", async () =>
   expect(screen.getByLabelText("روزهای تمرین در هفته")).toHaveValue(3);
   expect(screen.getByLabelText("کجا تمرین می‌کنی؟")).toHaveValue("home");
   expect(screen.getByRole("group", { name: "برای تمرین در خانه چه امکاناتی داری؟" })).toBeInTheDocument();
-  expect(screen.getByLabelText("وزن بدن")).toBeChecked();
-  expect(screen.getByLabelText("دمبل")).toBeChecked();
-  expect(screen.getByLabelText("نیمکت")).toBeChecked();
+  const homeGroup = screen.getByRole("group", { name: "برای تمرین در خانه چه امکاناتی داری؟" });
+  expect(within(homeGroup).getByRole("radio", { name: "وزن بدن" })).not.toBeChecked();
+  expect(within(homeGroup).getByRole("radio", { name: "دمبل" })).toBeChecked();
+  expect(within(homeGroup).getByRole("radio", { name: "کش" })).not.toBeChecked();
+  expect(within(homeGroup).getByRole("radio", { name: "دمبل + کش" })).not.toBeChecked();
+  expect(within(homeGroup).queryByLabelText("میله بارفیکس")).not.toBeInTheDocument();
+  expect(within(homeGroup).queryByLabelText("نیمکت")).not.toBeInTheDocument();
   expect(screen.getByLabelText("معمولاً برای هر جلسه چقدر زمان داری؟")).toHaveValue(
     "75",
   );
@@ -345,22 +349,23 @@ it("does not expose or patch legacy free-text limitations", async () => {
   expect(context.updateProfile).not.toHaveBeenCalled();
 });
 
-it("updates the canonical home equipment inventory and derived legacy setup", async () => {
+it("updates the selected home preset and canonical inventory", async () => {
   context.updateProfile.mockResolvedValue({
     ...savedProfile,
-    available_equipment: ["bodyweight", "dumbbell"],
-    home_training_setup: "dumbbells_available",
+    available_equipment: ["bodyweight", "resistance_band", "pull_up_bar"],
+    home_training_setup: "resistance_bands_available",
   });
   const user = userEvent.setup();
   renderProfilePage();
 
   await openTrainingPage(user);
-  await user.click(screen.getByLabelText("نیمکت"));
+  await user.click(screen.getByRole("radio", { name: "کش" }));
   await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
 
   await waitFor(() =>
     expect(context.updateProfile).toHaveBeenCalledWith({
-      available_equipment: ["bodyweight", "dumbbell"],
+      home_training_setup: "resistance_bands_available",
+      available_equipment: ["bodyweight", "resistance_band", "pull_up_bar"],
     }),
   );
 });
@@ -378,8 +383,9 @@ it("does not carry a gym inventory into home training", async () => {
   await openTrainingPage(user);
   await user.selectOptions(screen.getByLabelText("کجا تمرین می‌کنی؟"), "home");
 
-  expect(screen.getByLabelText("وزن بدن")).not.toBeChecked();
-  expect(screen.getByLabelText("دمبل")).not.toBeChecked();
+  const homeGroup = screen.getByRole("group", { name: "برای تمرین در خانه چه امکاناتی داری؟" });
+  expect(within(homeGroup).getByRole("radio", { name: "وزن بدن" })).not.toBeChecked();
+  expect(within(homeGroup).getByRole("radio", { name: "دمبل" })).not.toBeChecked();
   await user.click(screen.getByRole("button", { name: "ذخیره تغییرات" }));
   expect(screen.getByText("این فیلد الزامی است.")).toBeInTheDocument();
   expect(context.updateProfile).not.toHaveBeenCalled();

@@ -13,6 +13,7 @@ const values = {
   experience_level: "" as const, training_days_per_week: "", preferred_weekdays: [], priority_muscle: "" as const,
   training_location: "" as const,
   home_training_setup: "" as const, session_duration_minutes: "",
+  available_equipment: [],
   training_intensity: "" as const,
   training_age_months: "",
   training_cautions: null, plan_duration_weeks: "4",
@@ -30,6 +31,9 @@ function TrainingHarness({ allowNoTraining = false, onNoTraining = vi.fn() }: { 
       allowNoTraining={allowNoTraining}
       onNoTraining={onNoTraining}
     />
+    <output data-testid="home-state">
+      {formValues.home_training_setup}:{formValues.available_equipment?.join(",")}
+    </output>
     {formValues.training_cautions !== null && <p>cautions-set</p>}
     {completed && <p>completed</p>}
   </>;
@@ -94,7 +98,7 @@ it("uses fixed experience, weekly-day, and workout-time choices with auto-advanc
   expect(await screen.findByText("completed")).toBeInTheDocument();
 });
 
-it("advances to home-equipment question when home location is chosen", async () => {
+it("renders all home presets and synchronizes setup and inventory", async () => {
   await i18n.changeLanguage("fa");
   const user = userEvent.setup();
   render(<TrainingHarness />);
@@ -109,7 +113,29 @@ it("advances to home-equipment question when home location is chosen", async () 
   // Home equipment question appears and auto-advances
   expect(await screen.findByRole("heading", { name: "در خانه چه امکاناتی داری؟" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "ادامه" })).not.toBeInTheDocument();
-  await user.click(await screen.findByRole("button", { name: "فقط وزن بدن" }));
+
+  const presets = [
+    ["وزن بدن", "bodyweight_only", "bodyweight,pull_up_bar"],
+    ["دمبل", "dumbbells_available", "bodyweight,dumbbell,pull_up_bar"],
+    ["کش", "resistance_bands_available", "bodyweight,resistance_band,pull_up_bar"],
+    [
+      "دمبل + کش",
+      "dumbbells_and_resistance_bands_available",
+      "bodyweight,dumbbell,resistance_band,pull_up_bar",
+    ],
+  ] as const;
+  for (const [label, setup, equipment] of presets) {
+    for (const [nextLabel] of presets) {
+      expect(screen.getByRole("button", { name: nextLabel })).toBeInTheDocument();
+    }
+    await user.click(screen.getByRole("button", { name: label }));
+    expect(screen.getByTestId("home-state")).toHaveTextContent(`${setup}:${equipment}`);
+    if (setup !== "dumbbells_and_resistance_bands_available") {
+      await screen.findByRole("heading", { name: "برای هر جلسه چقدر زمان داری؟" });
+      await user.click(screen.getByRole("button", { name: "بازگشت" }));
+      await screen.findByRole("heading", { name: "در خانه چه امکاناتی داری؟" });
+    }
+  }
 
   expect(await screen.findByRole("heading", { name: "برای هر جلسه چقدر زمان داری؟" })).toBeInTheDocument();
 });
