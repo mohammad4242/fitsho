@@ -79,8 +79,10 @@ FA_TRANSLATIONS = {
     "maintain_weight": "تثبیت وزن",
     "gym": "باشگاه ورزشی (تجهیزات کامل)",
     "home": "منزل",
-    "bodyweight_only": "فقط وزن بدن (بدون تجهیزات)",
-    "dumbbells_available": "دمبل خانگی + وزن بدن",
+    "bodyweight_only": "وزن بدن",
+    "dumbbells_available": "دمبل",
+    "resistance_bands_available": "کش",
+    "dumbbells_and_resistance_bands_available": "دمبل + کش",
     "chest": "سینه",
     "back": "پشت و زیربغل",
     "shoulders": "سرشانه",
@@ -177,6 +179,11 @@ def generate_100_diverse_profiles(seed: int = 20260901) -> list[ProfileSpec]:
         (TrainingLocation.GYM, None),
         (TrainingLocation.HOME, HomeTrainingSetup.BODYWEIGHT_ONLY),
         (TrainingLocation.HOME, HomeTrainingSetup.DUMBBELLS_AVAILABLE),
+        (TrainingLocation.HOME, HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE),
+        (
+            TrainingLocation.HOME,
+            HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
+        ),
     ]
     caution_options: list[list[TrainingCaution]] = [
         [],

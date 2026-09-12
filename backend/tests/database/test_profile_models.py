@@ -75,6 +75,29 @@ def test_first_month_experience_is_stored_in_profile(db: Session) -> None:
     assert stored.experience_level is ExperienceLevel.FIRST_MONTH
 
 
+@pytest.mark.parametrize(
+    "setup",
+    [
+        HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
+        HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
+    ],
+)
+def test_new_home_training_setups_are_stored_in_profile(
+    db: Session, setup: HomeTrainingSetup
+) -> None:
+    user = make_user(db, f"new-home-setup-{setup.value}@example.com")
+    profile = make_profile(user)
+    profile.home_training_setup = setup
+    db.add(profile)
+    db.flush()
+    db.expire(profile)
+
+    stored = db.scalar(select(UserProfile).where(UserProfile.user_id == user.id))
+
+    assert stored is not None
+    assert stored.home_training_setup is setup
+
+
 def test_training_age_months_is_stored_in_profile(db: Session) -> None:
     user = make_user(db, "training-age@example.com")
     profile = make_profile(user)

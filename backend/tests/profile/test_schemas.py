@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
+from app.profile.enums import HomeTrainingSetup
 from app.profile.schemas import ProfileCreate, ProfileUpdate, calculate_age
 
 
@@ -223,7 +224,52 @@ def test_explicit_home_equipment_replaces_legacy_setup_and_is_canonicalized() ->
 
     profile = ProfileCreate.model_validate(payload)
 
-    assert profile.available_equipment == ("bench", "bodyweight", "resistance_band")
+    assert profile.home_training_setup is HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE
+    assert profile.available_equipment == (
+        "bodyweight",
+        "resistance_band",
+        "pull_up_bar",
+    )
+
+
+@pytest.mark.parametrize(
+    ("setup", "expected_equipment"),
+    [
+        ("bodyweight_only", ("bodyweight", "pull_up_bar")),
+        ("dumbbells_available", ("bodyweight", "dumbbell", "pull_up_bar")),
+        ("resistance_bands_available", ("bodyweight", "resistance_band", "pull_up_bar")),
+        (
+            "dumbbells_and_resistance_bands_available",
+            ("bodyweight", "dumbbell", "resistance_band", "pull_up_bar"),
+        ),
+    ],
+)
+def test_selected_home_setup_is_authoritative_for_equipment(
+    setup: str, expected_equipment: tuple[str, ...]
+) -> None:
+    profile = ProfileCreate.model_validate(
+        {
+            **valid_payload(),
+            "training_location": "home",
+            "home_training_setup": setup,
+            "available_equipment": ["bodyweight", "resistance_band"],
+        }
+    )
+
+    assert profile.available_equipment == expected_equipment
+
+
+def test_bodyweight_home_payload_without_pull_up_bar_is_normalized() -> None:
+    profile = ProfileCreate.model_validate(
+        {
+            **valid_payload(),
+            "training_location": "home",
+            "home_training_setup": "bodyweight_only",
+            "available_equipment": ["bodyweight"],
+        }
+    )
+
+    assert profile.available_equipment == ("bodyweight", "pull_up_bar")
 
 
 @pytest.mark.parametrize(
@@ -265,3 +311,28 @@ def test_profile_update_normalizes_home_setup_for_gym() -> None:
     )
 
     assert update.home_training_setup is None
+
+
+@pytest.mark.parametrize(
+    ("setup", "expected_equipment"),
+    [
+        ("bodyweight_only", ("bodyweight", "pull_up_bar")),
+        ("dumbbells_available", ("bodyweight", "dumbbell", "pull_up_bar")),
+        ("resistance_bands_available", ("bodyweight", "resistance_band", "pull_up_bar")),
+        (
+            "dumbbells_and_resistance_bands_available",
+            ("bodyweight", "dumbbell", "resistance_band", "pull_up_bar"),
+        ),
+    ],
+)
+def test_profile_update_normalizes_equipment_from_selected_home_setup(
+    setup: str, expected_equipment: tuple[str, ...]
+) -> None:
+    update = ProfileUpdate.model_validate(
+        {
+            "home_training_setup": setup,
+            "available_equipment": ["bodyweight", "dumbbell"],
+        }
+    )
+
+    assert update.available_equipment == expected_equipment

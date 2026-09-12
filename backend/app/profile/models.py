@@ -147,6 +147,7 @@ class UserProfile(Base):
             native_enum=False,
             create_constraint=True,
             validate_strings=True,
+            length=64,
             values_callable=lambda members: [member.value for member in members],
             name="ck_user_profiles_home_training_setup_values",
         ),

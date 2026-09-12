@@ -145,8 +145,10 @@ LOCATION_FA = {
 }
 
 HOME_SETUP_FA = {
-    HomeTrainingSetup.BODYWEIGHT_ONLY: "فقط وزن بدن (بدون تجهیزات)",
-    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل‌های متغیر خانگی",
+    HomeTrainingSetup.BODYWEIGHT_ONLY: "وزن بدن",
+    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل",
+    HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE: "کش",
+    HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE: "دمبل + کش",
 }
 
 INTENSITY_FA = {
@@ -209,8 +211,8 @@ TEST_PROFILES_BATCH2 = [
         "experience_level": ExperienceLevel.BEGINNER,
         "training_age_months": 5,
         "training_days_per_week": 2,
-        "training_location": TrainingLocation.GYM,
-        "home_setup": None,
+        "training_location": TrainingLocation.HOME,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
         "session_duration_minutes": 60,
         "plan_duration_weeks": 6,
         "training_intensity": TrainingIntensity.MODERATE,
@@ -279,7 +281,7 @@ TEST_PROFILES_BATCH2 = [
         "training_age_months": 16,
         "training_days_per_week": 3,
         "training_location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
         "session_duration_minutes": 60,
         "plan_duration_weeks": 6,
         "training_intensity": TrainingIntensity.MODERATE,
@@ -394,7 +396,7 @@ TEST_PROFILES_BATCH2 = [
         "training_age_months": 24,
         "training_days_per_week": 4,
         "training_location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
         "session_duration_minutes": 60,
         "plan_duration_weeks": 6,
         "training_intensity": TrainingIntensity.MODERATE,

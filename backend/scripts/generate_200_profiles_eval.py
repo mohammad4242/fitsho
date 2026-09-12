@@ -78,8 +78,10 @@ FA_TRANSLATIONS = {
     "maintain_weight": "تثبیت وزن",
     "gym": "باشگاه ورزشی",
     "home": "منزل",
-    "bodyweight_only": "فقط وزن بدن",
-    "dumbbells_available": "همراه با دمبل",
+    "bodyweight_only": "وزن بدن",
+    "dumbbells_available": "دمبل",
+    "resistance_bands_available": "کش",
+    "dumbbells_and_resistance_bands_available": "دمبل + کش",
     "chest": "سینه",
     "back": "پشت / زیربغل",
     "shoulders": "سرشانه",
@@ -158,7 +160,7 @@ def generate_200_stratified_profiles(seed: int = 20260901) -> list[ProfileSpec]:
     - Balanced gender distribution (Male, Female)
     - All experience levels (First Month, Beginner, Intermediate, Advanced)
     - All fitness goals (Lose Weight, Gain Weight, Fat Loss, Build Muscle, Recomp, Strength, General Fitness)
-    - All locations and equipment setups (Gym, Home Bodyweight, Home Dumbbells)
+    - All locations and equipment setups (Gym, Home Bodyweight, Home Dumbbells, Home Bands, Home Dumbbells + Bands)
     - All session durations (30, 45, 60, 75, 90, 120 mins)
     - Training days (2, 3, 4, 5, 6 days) with both supported combinations and intentional edge cases
     - Priority muscles coverage and diverse caution combinations
@@ -186,6 +188,11 @@ def generate_200_stratified_profiles(seed: int = 20260901) -> list[ProfileSpec]:
         (TrainingLocation.GYM, None),
         (TrainingLocation.HOME, HomeTrainingSetup.BODYWEIGHT_ONLY),
         (TrainingLocation.HOME, HomeTrainingSetup.DUMBBELLS_AVAILABLE),
+        (TrainingLocation.HOME, HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE),
+        (
+            TrainingLocation.HOME,
+            HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
+        ),
     ]
     caution_options: list[list[TrainingCaution]] = [
         [],

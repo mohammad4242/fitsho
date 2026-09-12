@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import select
@@ -8,7 +9,12 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.nutrition.enums import SafetyOutcome
 from app.nutrition.models import NutritionProfile, NutritionSafetyDecision
-from app.profile.enums import ProductMode, ProfileCompletionState, TrainingLocation
+from app.profile.enums import (
+    HomeTrainingSetup,
+    ProductMode,
+    ProfileCompletionState,
+    TrainingLocation,
+)
 from app.profile.exceptions import (
     AgeNotSupportedError,
     AgeOutOfRangeError,
@@ -27,12 +33,32 @@ from app.profile.models import (
 from app.profile.schemas import ProfileCreate, ProfileUpdate, SharedProfileUpsert, calculate_age
 from app.profile.training_compatibility import require_supported_resistance_training_days
 from app.workout_cycles.models import WorkoutCycle
+from app.workouts.program_engine.equipment import (
+    derive_home_training_setup,
+    equipment_for_home_training_setup,
+    ordered_available_equipment,
+)
 
 
 @dataclass(frozen=True)
 class ProfileSnapshot:
     profile: UserProfile
     measurement: BodyMeasurement
+
+
+def normalize_profile_workout_setup(
+    training_location: TrainingLocation,
+    home_training_setup: HomeTrainingSetup | None,
+    available_equipment: list[str] | None,
+) -> tuple[HomeTrainingSetup | None, list[str] | None]:
+    if training_location is TrainingLocation.GYM:
+        return None, None
+
+    setup = home_training_setup or derive_home_training_setup(available_equipment)
+    if setup is None:
+        raise InvalidWorkoutSetupError
+    canonical_equipment = ordered_available_equipment(equipment_for_home_training_setup(setup))
+    return setup, [item.value for item in canonical_equipment]
 
 
 def ensure_supported_age(birth_date: date) -> None:
@@ -115,6 +141,13 @@ def create_profile(
     if profile is None:
         profile = UserProfile(user_id=user_id, product_mode=ProductMode.TRAINING)
         db.add(profile)
+    normalized_setup, normalized_equipment = normalize_profile_workout_setup(
+        payload.training_location,
+        payload.home_training_setup,
+        [item.value for item in payload.available_equipment]
+        if payload.available_equipment is not None
+        else None,
+    )
     for field_name, value in {
         "display_name": payload.display_name,
         "birth_date": payload.birth_date,
@@ -133,12 +166,8 @@ def create_profile(
         ),
         "training_days_per_week": payload.training_days_per_week,
         "training_location": payload.training_location,
-        "home_training_setup": payload.home_training_setup,
-        "available_equipment": (
-            [item.value for item in payload.available_equipment]
-            if payload.available_equipment is not None
-            else None
-        ),
+        "home_training_setup": normalized_setup,
+        "available_equipment": normalized_equipment,
         "session_duration_minutes": payload.session_duration_minutes,
         "training_intensity": payload.training_intensity,
         "plan_duration_weeks": payload.plan_duration_weeks,
@@ -270,15 +299,25 @@ def update_profile(
         if field_name in supplied_fields
     }
 
-    final_location = supplied_fields.get("training_location", profile.training_location)
-    final_home_setup = supplied_fields.get("home_training_setup", profile.home_training_setup)
-    final_equipment = supplied_fields.get("available_equipment", profile.available_equipment)
-    if final_location == TrainingLocation.GYM:
-        supplied_fields["home_training_setup"] = None
-        if "training_location" in supplied_fields and "available_equipment" not in supplied_fields:
-            supplied_fields["available_equipment"] = None
-    elif final_home_setup is None and final_equipment is None:
-        raise InvalidWorkoutSetupError
+    final_location = cast(
+        TrainingLocation,
+        supplied_fields.get("training_location", profile.training_location),
+    )
+    final_home_setup = cast(
+        HomeTrainingSetup | None,
+        supplied_fields.get("home_training_setup", profile.home_training_setup),
+    )
+    final_equipment = cast(
+        list[str] | None,
+        supplied_fields.get("available_equipment", profile.available_equipment),
+    )
+    normalized_setup, normalized_equipment = normalize_profile_workout_setup(
+        final_location,
+        final_home_setup,
+        final_equipment,
+    )
+    supplied_fields["home_training_setup"] = normalized_setup
+    supplied_fields["available_equipment"] = normalized_equipment
 
     final_training_days = supplied_fields.get(
         "training_days_per_week", profile.training_days_per_week
@@ -381,19 +420,25 @@ def apply_profile_update_without_commit(
             else None
         )
 
-    final_location = supplied_fields.get("training_location", profile.training_location)
-    final_home_setup = supplied_fields.get("home_training_setup", profile.home_training_setup)
-    final_equipment = supplied_fields.get("available_equipment", profile.available_equipment)
-    if final_location == TrainingLocation.GYM:
-        supplied_fields["home_training_setup"] = None
-        if "training_location" in supplied_fields and "available_equipment" not in supplied_fields:
-            supplied_fields["available_equipment"] = None
-    elif (
-        final_location == TrainingLocation.HOME
-        and final_home_setup is None
-        and final_equipment is None
-    ):
-        raise InvalidWorkoutSetupError
+    final_location = cast(
+        TrainingLocation,
+        supplied_fields.get("training_location", profile.training_location),
+    )
+    final_home_setup = cast(
+        HomeTrainingSetup | None,
+        supplied_fields.get("home_training_setup", profile.home_training_setup),
+    )
+    final_equipment = cast(
+        list[str] | None,
+        supplied_fields.get("available_equipment", profile.available_equipment),
+    )
+    normalized_setup, normalized_equipment = normalize_profile_workout_setup(
+        final_location,
+        final_home_setup,
+        final_equipment,
+    )
+    supplied_fields["home_training_setup"] = normalized_setup
+    supplied_fields["available_equipment"] = normalized_equipment
 
     final_training_days = supplied_fields.get(
         "training_days_per_week", profile.training_days_per_week

@@ -1745,24 +1745,16 @@ def test_pure_bodyweight_unsupported_days_are_rejected_before_normal_engine(
     assert error.value.error_code == "BODYWEIGHT_TEMPLATE_DAYS_NOT_SUPPORTED"
 
 
-def test_explicit_bodyweight_without_pull_up_bar_is_rejected_without_fallback(
-    db: Session,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_explicit_bodyweight_without_pull_up_bar_is_normalized(db: Session) -> None:
     user = _user_with_profile(db)
     profile = get_profile(db, user.id).profile
     profile.available_equipment = [Equipment.BODYWEIGHT.value]
-    _seed_bodyweight_template_catalog(db)
 
-    def fail_if_called(*args: object, **kwargs: object) -> object:
-        raise AssertionError("generate_program must not be called")
+    request = _service(db)._to_program_request(get_profile(db, user.id), None)
 
-    monkeypatch.setattr(workout_service_module, "generate_program", fail_if_called)
-
-    with pytest.raises(ProgramGenerationRejectedError) as error:
-        asyncio.run(_service(db).generate(user.id))
-
-    assert error.value.error_code == "BODYWEIGHT_PULL_UP_BAR_REQUIRED"
+    assert request.available_equipment == frozenset(
+        {Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR}
+    )
 
 
 def test_bodyweight_route_precedes_ai_provider(db: Session) -> None:

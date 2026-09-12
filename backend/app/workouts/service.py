@@ -94,6 +94,7 @@ from app.workouts.program_engine.enums import (
 )
 from app.workouts.program_engine.equipment import (
     effective_required_equipment,
+    ordered_available_equipment,
     resolve_available_equipment,
 )
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET, ProgramRuleset
@@ -983,14 +984,16 @@ class WorkoutGenerationService:
             "training_days_per_week": profile.training_days_per_week,
             "session_duration_minutes": profile.session_duration_minutes,
             "training_location": profile.training_location.value,
-            "available_equipment": sorted(
+            "available_equipment": [
                 item.value
-                for item in resolve_available_equipment(
-                    profile.training_location,
-                    profile.home_training_setup,
-                    profile.available_equipment,
+                for item in ordered_available_equipment(
+                    resolve_available_equipment(
+                        profile.training_location,
+                        profile.home_training_setup,
+                        profile.available_equipment,
+                    )
                 )
-            ),
+            ],
             "training_cautions": [item.value for item in profile.training_cautions],
             "body_analysis_priorities": (
                 [priority.model_dump(mode="json") for priority in body_analysis.priorities]

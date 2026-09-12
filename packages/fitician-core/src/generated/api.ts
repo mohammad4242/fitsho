@@ -6523,7 +6523,7 @@ export type components = {
          * HomeTrainingSetup
          * @enum {string}
          */
-        HomeTrainingSetup: "bodyweight_only" | "dumbbells_available";
+        HomeTrainingSetup: "bodyweight_only" | "dumbbells_available" | "resistance_bands_available" | "dumbbells_and_resistance_bands_available";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */

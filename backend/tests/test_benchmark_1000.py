@@ -25,7 +25,10 @@ from app.workouts.bodyweight_routing import (
     BodyweightRoutingStatus,
     resolve_fixed_bodyweight_route,
 )
-from app.workouts.program_engine.equipment import resolve_available_equipment
+from app.workouts.program_engine.equipment import (
+    equipment_for_home_training_setup,
+    resolve_available_equipment,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 
 
@@ -46,6 +49,7 @@ def test_reproducibility_same_seed_produces_identical_profiles():
         assert p1.training_days_per_week == p2.training_days_per_week
         assert p1.training_location == p2.training_location
         assert p1.home_training_setup == p2.home_training_setup
+        assert p1.resolved_equipment == p2.resolved_equipment
         assert p1.training_cautions == p2.training_cautions
         assert p1.fitness_goal == p2.fitness_goal
         assert p1.session_duration_minutes == p2.session_duration_minutes
@@ -82,6 +86,21 @@ def test_independent_sampling_no_modulo_correlations():
         if TrainingCaution.WRIST in p.training_cautions or TrainingCaution.LOWER_BACK in p.training_cautions
     )
     assert 0 < wrist_lb < len(first_month_bw)
+
+
+def test_cohort_covers_all_home_training_presets_with_canonical_equipment():
+    profiles = generate_1000_profiles(BENCHMARK_SEED)
+
+    home_profiles = [profile for profile in profiles if profile.training_location is TrainingLocation.HOME]
+    home_setups = {profile.home_training_setup for profile in home_profiles}
+
+    assert home_setups == set(HomeTrainingSetup)
+    for profile in home_profiles:
+        assert profile.home_training_setup is not None
+        expected = equipment_for_home_training_setup(profile.home_training_setup)
+        assert set(profile.resolved_equipment) == {item.value for item in expected}
+        if "bodyweight" in profile.resolved_equipment:
+            assert "pull_up_bar" in profile.resolved_equipment
 
 
 def test_unsupported_does_not_count_as_failed():

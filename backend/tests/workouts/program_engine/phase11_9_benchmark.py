@@ -45,6 +45,7 @@ from app.workouts.program_engine.enums import (
     PhysicalJobDemand,
     RecoveryRating,
 )
+from app.workouts.program_engine.equipment import equipment_for_home_training_setup
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
 
 PHASE = "11.9"
@@ -105,7 +106,9 @@ def _persona(
             "equipment_label": "dumbbells_only",
             "training_location": TrainingLocation.HOME,
             "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-            "available_equipment_override": frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL}),
+            "available_equipment_override": equipment_for_home_training_setup(
+                HomeTrainingSetup.DUMBBELLS_AVAILABLE
+            ),
             "blocked_caution_tags": (ExerciseCautionTag.OVERHEAD_POSITION,),
             "overhead_limit": LoadLimit.LOW,
             "stress_level": RecoveryRating.POOR,
@@ -118,9 +121,9 @@ def _persona(
             "duration_minutes": 30,
             "equipment_label": "bands_bodyweight",
             "training_location": TrainingLocation.HOME,
-            "home_setup": HomeTrainingSetup.BODYWEIGHT_ONLY,
-            "available_equipment_override": frozenset(
-                {Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND}
+            "home_setup": HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
+            "available_equipment_override": equipment_for_home_training_setup(
+                HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE
             ),
             "training_cautions": (TrainingCaution.KNEE,),
             "blocked_caution_tags": (ExerciseCautionTag.DEEP_KNEE_FLEXION,),
@@ -160,9 +163,9 @@ def _persona(
             "equipment_label": "dumbbells_bench",
             "training_location": TrainingLocation.HOME,
             "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-            "available_equipment_override": frozenset(
-                {Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.BENCH}
-            ),
+            "available_equipment_override": equipment_for_home_training_setup(
+                HomeTrainingSetup.DUMBBELLS_AVAILABLE
+            ) | {Equipment.BENCH},
             "blocked_movement_patterns": (MovementPattern.VERTICAL_PULL,),
             "sleep_quality": RecoveryRating.GOOD,
         },
@@ -178,7 +181,9 @@ def _persona(
             "equipment_label": "dumbbells_only",
             "training_location": TrainingLocation.HOME,
             "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-            "available_equipment_override": frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL}),
+            "available_equipment_override": equipment_for_home_training_setup(
+                HomeTrainingSetup.DUMBBELLS_AVAILABLE
+            ),
             "blocked_caution_tags": (
                 ExerciseCautionTag.OVERHEAD_POSITION,
                 ExerciseCautionTag.SHOULDER_INTERNAL_ROTATION,
@@ -194,9 +199,9 @@ def _persona(
             "duration_minutes": 45,
             "equipment_label": "bands_bodyweight",
             "training_location": TrainingLocation.HOME,
-            "home_setup": HomeTrainingSetup.BODYWEIGHT_ONLY,
-            "available_equipment_override": frozenset(
-                {Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND}
+            "home_setup": HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
+            "available_equipment_override": equipment_for_home_training_setup(
+                HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE
             ),
             "training_cautions": (TrainingCaution.LOWER_BACK,),
             "blocked_movement_patterns": (MovementPattern.HIP_HINGE,),
@@ -232,7 +237,9 @@ def _persona(
             "equipment_label": "home_limited",
             "training_location": TrainingLocation.HOME,
             "home_setup": HomeTrainingSetup.BODYWEIGHT_ONLY,
-            "available_equipment_override": frozenset({Equipment.BODYWEIGHT}),
+            "available_equipment_override": equipment_for_home_training_setup(
+                HomeTrainingSetup.BODYWEIGHT_ONLY
+            ),
             "impact_limit": ImpactLimit.LOW,
             "balance_requirement": BalanceAbility.LIMITED,
             "physical_job_demand": PhysicalJobDemand.HIGH,

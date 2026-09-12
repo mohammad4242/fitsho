@@ -72,8 +72,10 @@ LOCATION_FA = {
 }
 
 HOME_SETUP_FA = {
-    HomeTrainingSetup.BODYWEIGHT_ONLY: "فقط وزن بدن (بدون تجهیزات)",
-    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل‌های متغیر خانگی",
+    HomeTrainingSetup.BODYWEIGHT_ONLY: "وزن بدن",
+    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل",
+    HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE: "کش",
+    HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE: "دمبل + کش",
 }
 
 INTENSITY_FA = {
@@ -122,7 +124,7 @@ PROGRESSION_FA = {
 TEST_PROFILES = [
     {
         "num": 1,
-        "name": "سهراب نادری (تست خانه بدون تجهیزات + زانو و کمر)",
+        "name": "سهراب نادری (تست خانه با وزن بدن + زانو و کمر)",
         "sex": Sex.MALE,
         "birth_date": date(1985, 5, 20),
         "height_cm": 177,
@@ -158,7 +160,7 @@ TEST_PROFILES = [
         "training_age_months": 0,
         "training_days_per_week": 4,
         "training_location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
         "session_duration_minutes": 45,
         "plan_duration_weeks": 4,
         "training_intensity": TrainingIntensity.MODERATE,
@@ -214,7 +216,7 @@ TEST_PROFILES = [
     },
     {
         "num": 5,
-        "name": "فاطمه معتمدی (تست وزن بدن خانه ۴ روزه با آسیب مچ)",
+        "name": "فاطمه معتمدی (تست دمبل خانگی ۴ روزه با آسیب مچ)",
         "sex": Sex.FEMALE,
         "birth_date": date(1989, 4, 17),
         "height_cm": 166,
@@ -227,7 +229,7 @@ TEST_PROFILES = [
         "training_age_months": 4,
         "training_days_per_week": 4,
         "training_location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.BODYWEIGHT_ONLY,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
         "session_duration_minutes": 45,
         "plan_duration_weeks": 4,
         "training_intensity": TrainingIntensity.MODERATE,
@@ -296,7 +298,7 @@ TEST_PROFILES = [
         "training_age_months": 0,
         "training_days_per_week": 3,
         "training_location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
         "session_duration_minutes": 30,
         "plan_duration_weeks": 4,
         "training_intensity": TrainingIntensity.MODERATE,

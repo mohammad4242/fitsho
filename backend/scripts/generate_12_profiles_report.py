@@ -114,13 +114,13 @@ PROFILES_DATA = [
         "training_age_months": 2,
         "days": 2,
         "location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
         "cautions": [TrainingCaution.SHOULDER],
         "priority_muscles": None,
         "duration": 45,
         "plan_weeks": 6,
         "measurements": {"waist": Decimal("98.0"), "shoulder": Decimal("112.0"), "hip": Decimal("104.0")},
-        "notes": "تمرین در خانه با دمبل، ۲ روز در هفته، کاهش وزن با احتیاط شانه (حذف حرکات پرسی بالای سر)."
+        "notes": "تمرین در خانه با کش، ۲ روز در هفته، کاهش وزن با احتیاط شانه (حذف حرکات پرسی بالای سر)."
     },
     {
         "id": 6,
@@ -174,13 +174,13 @@ PROFILES_DATA = [
         "training_age_months": 16,
         "days": 3,
         "location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
         "cautions": [],
         "priority_muscles": [MuscleGroup.BICEPS.value],
         "duration": 60,
         "plan_weeks": 6,
         "measurements": {"waist": Decimal("63.0"), "shoulder": Decimal("96.0"), "hip": Decimal("90.0")},
-        "notes": "عضله‌سازی در خانه با دمبل، ۳ روز در هفته، اولویت بازو، بدون محدودیت فیزیکی."
+        "notes": "عضله‌سازی در خانه با دمبل و کش، ۳ روز در هفته، اولویت بازو، بدون محدودیت فیزیکی."
     },
     {
         "id": 9,
@@ -254,13 +254,13 @@ PROFILES_DATA = [
         "training_age_months": 0,
         "days": 2,
         "location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.BODYWEIGHT_ONLY,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
         "cautions": [],
         "priority_muscles": None,
         "duration": 45,
         "plan_weeks": 4,
         "measurements": {"waist": Decimal("72.0"), "shoulder": Decimal("94.0"), "hip": Decimal("97.0")},
-        "notes": "ماه اول در خانه بدون تجهیزات (فقط وزن بدن)، ۲ روز در هفته، چربی‌سوزی و تناسب اندام عمومی."
+        "notes": "ماه اول در خانه با دمبل، ۲ روز در هفته، چربی‌سوزی و تناسب اندام عمومی."
     }
 ]
 
@@ -282,8 +282,10 @@ FA_GOAL = {
 FA_LOCATION = {TrainingLocation.GYM: "باشگاه ورزشی", TrainingLocation.HOME: "خانه"}
 FA_EQUIPMENT = {
     None: "تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش)",
-    HomeTrainingSetup.BODYWEIGHT_ONLY: "فقط وزن بدن (بدون تجهیزات)",
-    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل خانگی + وزن بدن",
+    HomeTrainingSetup.BODYWEIGHT_ONLY: "وزن بدن",
+    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل",
+    HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE: "کش",
+    HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE: "دمبل + کش",
 }
 FA_CAUTION = {
     TrainingCaution.LOWER_BACK: "آسیب کمر (پرهیز از لود سنگین محوری ستون فقرات)",

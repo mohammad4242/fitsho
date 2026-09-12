@@ -300,7 +300,7 @@ def test_confirmed_end_cycle_changes_update_only_confirmed_profile_fields(db: Se
             next_preferred_weekdays=[1, 3, 5, 6],
             equipment_changed=True,
             next_training_location=TrainingLocation.HOME,
-            next_home_training_setup=HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+            next_home_training_setup=HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
             new_limitation="Avoid deep knee flexion.",
         ),
     )
@@ -312,13 +312,14 @@ def test_confirmed_end_cycle_changes_update_only_confirmed_profile_fields(db: Se
     assert profile.session_duration_minutes == 75
     assert profile.preferred_weekdays == [1, 3, 5, 6]
     assert profile.training_location is TrainingLocation.HOME
-    assert profile.home_training_setup is HomeTrainingSetup.DUMBBELLS_AVAILABLE
+    assert profile.home_training_setup is HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE
+    assert profile.available_equipment == ["bodyweight", "resistance_band", "pull_up_bar"]
     assert profile.physical_limitations == "Avoid deep knee flexion."
     stored = cycle.completion_feedback
     assert stored is not None
     assert stored.next_preferred_weekdays == [1, 3, 5, 6]
     assert stored.next_training_location is TrainingLocation.HOME
-    assert stored.next_home_training_setup is HomeTrainingSetup.DUMBBELLS_AVAILABLE
+    assert stored.next_home_training_setup is HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE
 
 
 def test_unconfirmed_end_cycle_values_do_not_change_profile(db: Session) -> None:

@@ -10158,7 +10158,9 @@
       "HomeTrainingSetup": {
         "enum": [
           "bodyweight_only",
-          "dumbbells_available"
+          "dumbbells_available",
+          "resistance_bands_available",
+          "dumbbells_and_resistance_bands_available"
         ],
         "title": "HomeTrainingSetup",
         "type": "string"

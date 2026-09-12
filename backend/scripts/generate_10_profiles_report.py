@@ -134,13 +134,13 @@ PROFILES_DATA = [
         "training_age_months": 2,
         "days": 3,
         "location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
         "cautions": [],
         "priority_muscles": None,
         "duration": 45,
         "plan_weeks": 6,
         "measurements": {"waist": Decimal("74.0"), "shoulder": Decimal("94.0"), "hip": Decimal("99.0")},
-        "notes": "مبتدی در خانه با دمبل، هدف کاهش وزن و تناسب اندام کل بدن در ۳ روز."
+        "notes": "مبتدی در خانه با کش، هدف کاهش وزن و تناسب اندام کل بدن در ۳ روز."
     },
     {
         "id": 7,
@@ -194,13 +194,13 @@ PROFILES_DATA = [
         "training_age_months": 20,
         "days": 3,
         "location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
         "cautions": [TrainingCaution.LOWER_BACK],
         "priority_muscles": [MuscleGroup.BICEPS.value],
         "duration": 60,
         "plan_weeks": 6,
         "measurements": {"waist": Decimal("83.0"), "shoulder": Decimal("116.0"), "hip": Decimal("97.0")},
-        "notes": "متوسط در خانه با دمبل، ۳ روز در هفته، اولویت جلو بازو، احتیاط کمردرد."
+        "notes": "متوسط در خانه با دمبل و کش، ۳ روز در هفته، اولویت جلو بازو، احتیاط کمردرد."
     },
     {
         "id": 10,
@@ -242,8 +242,10 @@ FA_GOAL = {
 FA_LOCATION = {TrainingLocation.GYM: "باشگاه ورزشی", TrainingLocation.HOME: "خانه"}
 FA_EQUIPMENT = {
     None: "تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش)",
-    HomeTrainingSetup.BODYWEIGHT_ONLY: "فقط وزن بدن (بدون تجهیزات)",
-    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل خانگی + وزن بدن",
+    HomeTrainingSetup.BODYWEIGHT_ONLY: "وزن بدن",
+    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل",
+    HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE: "کش",
+    HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE: "دمبل + کش",
 }
 FA_CAUTION = {
     TrainingCaution.LOWER_BACK: "آسیب کمر (پرهیز از لود سنگین محوری ستون فقرات)",
@@ -517,7 +519,7 @@ def build_pdf_html(results_data):
         <strong>بررسی دقیق کیفیت و خروجی‌های موتور (Engine Validation & Diagnostic Report):</strong><br>
         • <strong>تطابق اسپلیت و سطح ورزشی:</strong> موتور به درستی برای سطوح مبتدی و ماه اول، برنامه‌های فول‌بادی و بالاتنه/پایین‌تنه ۲ و ۳ روزه و برای افراد متوسط و پیشرفته برنامه‌های ۴ و ۵ روزه (Push/Pull/Legs و Upper/Lower) با توزیع ریکاوری دقیق تجویز کرد.<br>
         • <strong>اعمال محدودیت‌های آسیب‌دیدگی (Safety & Substitution):</strong> در تمامی پروفایل‌های آسیب‌دیده (کمر، زانو، شانه، گردن و مچ)، تمرینات ممنوعه حذف شده و جایگزین‌های ایمن با لود محوری پایین و الگوی پایدار قرار گرفتند.<br>
-        • <strong>فیلتر محیط و تجهیزات (Home vs Gym):</strong> برای افراد تمرین‌کننده در خانه (فقط وزن بدن یا دمبل)، به هیچ عنوان تمرینات نیازمند هالتر یا دستگاه انتخاب نشد و حجم عضلانی با حرکات دمبل و بادی‌ویت بهینه‌سازی گردید.<br>
+        • <strong>فیلتر محیط و تجهیزات (Home vs Gym):</strong> برای افراد تمرین‌کننده در خانه (وزن بدن، دمبل، کش یا دمبل و کش)، به هیچ عنوان تمرینات نیازمند هالتر یا دستگاه انتخاب نشد و حجم عضلانی با حرکات سازگار با تجهیزات انتخابی بهینه‌سازی گردید.<br>
         • <strong>نسخه‌نویسی بار، استراحت و RIR:</strong> ست‌ها، دامنه‌های تکرار (۶-۱۲ برای هایپرتروفی/قدرت و ۱۰-۲۰ برای ایزولاسیون)، زمان‌های استراحت (۷۵ و ۱۲۰ ثانیه) و متد پیشرفت دوگانه (Double Progression) با دقت بسیار بالا اعمال شدند.
     </div>
 </div>

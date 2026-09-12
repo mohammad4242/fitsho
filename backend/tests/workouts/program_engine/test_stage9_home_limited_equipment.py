@@ -21,7 +21,10 @@ from app.workouts.program_engine.enums import (
     LoadLimit,
     TrainingExperience,
 )
-from app.workouts.program_engine.equipment import effective_required_equipment
+from app.workouts.program_engine.equipment import (
+    effective_required_equipment,
+    resolve_available_equipment,
+)
 from app.workouts.program_engine.exercise_semantics import ExerciseRoleSignature
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -41,7 +44,7 @@ from tests.workouts.program_engine.golden_fixtures import exercise, full_catalog
 EQUIPMENT_CASES = (
     pytest.param(
         "bodyweight_only",
-        (Equipment.BODYWEIGHT,),
+        (Equipment.BODYWEIGHT, Equipment.PULL_UP_BAR),
         TrainingExperience.BEGINNER,
         Goal.STRENGTH,
         2,
@@ -50,16 +53,16 @@ EQUIPMENT_CASES = (
     ),
     pytest.param(
         "dumbbells_only",
-        (Equipment.DUMBBELL,),
+        (Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.PULL_UP_BAR),
         TrainingExperience.INTERMEDIATE,
         Goal.MUSCLE_GAIN,
         4,
-        False,
+        True,
         id="dumbbells-only-intermediate-muscle-gain-4d",
     ),
     pytest.param(
         "bodyweight_dumbbells",
-        (Equipment.BODYWEIGHT, Equipment.DUMBBELL),
+        (Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.PULL_UP_BAR),
         TrainingExperience.BEGINNER,
         Goal.MUSCLE_GAIN,
         3,
@@ -68,29 +71,34 @@ EQUIPMENT_CASES = (
     ),
     pytest.param(
         "dumbbells_bench",
-        (Equipment.DUMBBELL, Equipment.BENCH),
+        (Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.BENCH, Equipment.PULL_UP_BAR),
         TrainingExperience.INTERMEDIATE,
         Goal.STRENGTH,
         4,
-        False,
+        True,
         id="dumbbells-bench-intermediate-strength-4d",
     ),
     pytest.param(
         "bands_only",
-        (Equipment.RESISTANCE_BAND,),
+        (Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND, Equipment.PULL_UP_BAR),
         TrainingExperience.BEGINNER,
         Goal.STRENGTH,
         3,
-        False,
+        True,
         id="bands-beginner-strength-3d",
     ),
     pytest.param(
         "bands_dumbbells",
-        (Equipment.RESISTANCE_BAND, Equipment.DUMBBELL),
+        (
+            Equipment.BODYWEIGHT,
+            Equipment.RESISTANCE_BAND,
+            Equipment.DUMBBELL,
+            Equipment.PULL_UP_BAR,
+        ),
         TrainingExperience.INTERMEDIATE,
         Goal.MUSCLE_GAIN,
         2,
-        False,
+        True,
         id="bands-dumbbells-intermediate-muscle-gain-2d",
     ),
     pytest.param(
@@ -105,6 +113,7 @@ EQUIPMENT_CASES = (
     pytest.param(
         "complete_home",
         (
+            Equipment.BODYWEIGHT,
             Equipment.DUMBBELL,
             Equipment.BENCH,
             Equipment.RESISTANCE_BAND,
@@ -113,7 +122,7 @@ EQUIPMENT_CASES = (
         TrainingExperience.BEGINNER,
         Goal.MUSCLE_GAIN,
         2,
-        False,
+        True,
         id="complete-home-beginner-muscle-gain-2d",
     ),
 )
@@ -126,8 +135,13 @@ def _build_request(
     days: int,
     **overrides: object,
 ):
+    resolved_equipment = resolve_available_equipment(
+        TrainingLocation.HOME,
+        None,
+        equipment,
+    )
     return request(
-        available_equipment=list(equipment),
+        available_equipment=list(resolved_equipment),
         training_location=TrainingLocation.HOME,
         training_experience=experience,
         training_age_months=36 if experience is TrainingExperience.INTERMEDIATE else 3,
@@ -249,6 +263,40 @@ def test_home_equipment_matrix_preserves_safe_deterministic_roles(
     )
     assert first_ids == second_ids
     _assert_safe_home_program(first, source, catalog)
+
+
+def test_resistance_band_candidate_survives_filtering_and_generation() -> None:
+    band = exercise(
+        "resistance-band-row",
+        MovementPattern.HORIZONTAL_PULL,
+        MuscleGroup.BACK,
+        equipment=frozenset({Equipment.RESISTANCE_BAND}),
+        secondary=(MuscleGroup.BICEPS,),
+    )
+    catalog = [
+        item for item in full_catalog()
+        if item.movement_pattern is not MovementPattern.HORIZONTAL_PULL
+    ] + [band]
+    source = _build_request(
+        (Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND),
+        TrainingExperience.BEGINNER,
+        Goal.GENERAL_FITNESS,
+        2,
+    )
+
+    eligible = filter_eligible_exercises(normalize_request(source), catalog).eligible
+    assert band in eligible
+
+    result = generate_program(source, catalog, RULESET)
+
+    assert result.is_success, result.errors
+    assert result.program is not None
+    assert any(
+        item.exercise_id == band.id
+        for day in result.program.weekly_schedule
+        for item in day.exercises
+    )
+    _assert_safe_home_program(result, source, catalog)
 
 
 @pytest.mark.parametrize(
@@ -379,7 +427,7 @@ def test_home_limitation_matrix_never_weakens_safety(
     _assert_safe_home_program(result, source, full_catalog())
 
 
-def test_historical_bodyweight_home_paths_keep_exact_days_and_no_pull_up_bar_leak() -> None:
+def test_historical_bodyweight_home_paths_keep_exact_days_and_pull_up_bar_access() -> None:
     catalog = full_catalog()
     source = _build_request(
         (Equipment.BODYWEIGHT,),
@@ -392,9 +440,4 @@ def test_historical_bodyweight_home_paths_keep_exact_days_and_no_pull_up_bar_lea
 
     assert result.is_success, result.errors
     _assert_safe_home_program(result, source, catalog)
-    assert all(
-        Equipment.PULL_UP_BAR
-        not in effective_required_equipment(item.equipment, item.movement_pattern)
-        for day in result.program.weekly_schedule
-        for item in day.exercises
-    )
+    assert Equipment.PULL_UP_BAR in source.available_equipment

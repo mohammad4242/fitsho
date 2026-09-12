@@ -19,7 +19,7 @@ from app.profile.enums import (
 from app.exercises.enums import MuscleGroup, PrescriptionMode
 from app.workouts.service import WorkoutGenerationService, WorkoutGenerationSettings
 
-# 11 Diverse and Realistic User Profiles (2, 3, 4, 5, 6 days)
+# 11 Diverse and Realistic User Profiles (all four home presets plus gym)
 PROFILES_DATA = [
     {
         "id": 1,
@@ -33,13 +33,13 @@ PROFILES_DATA = [
         "training_age_months": 0,
         "days": 2,
         "location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
         "cautions": [TrainingCaution.LOWER_BACK],
         "priority_muscles": None,
         "duration": 45,
         "plan_weeks": 4,
         "measurements": {"waist": Decimal("88.0"), "shoulder": Decimal("94.0"), "hip": Decimal("108.0")},
-        "notes": "بانوی ۳۸ ساله در خانه با دمبل، ۲ روز در هفته، هدف کاهش وزن و تقویت عمومی با احتیاط کمردرد."
+        "notes": "بانوی ۳۸ ساله در خانه با کش، ۲ روز در هفته، هدف کاهش وزن و تقویت عمومی با احتیاط کمردرد."
     },
     {
         "id": 2,
@@ -52,14 +52,14 @@ PROFILES_DATA = [
         "level": ExperienceLevel.BEGINNER,
         "training_age_months": 4,
         "days": 2,
-        "location": TrainingLocation.GYM,
-        "home_setup": None,
+        "location": TrainingLocation.HOME,
+        "home_setup": HomeTrainingSetup.BODYWEIGHT_ONLY,
         "cautions": [],
         "priority_muscles": None,
         "duration": 60,
         "plan_weeks": 6,
         "measurements": {"waist": Decimal("74.0"), "shoulder": Decimal("114.0"), "hip": Decimal("91.0")},
-        "notes": "جوان لاغراندام در باشگاه، ۲ روز در هفته تقسیم فول‌بادی، هدف افزایش وزن و عضله‌سازی پایه."
+        "notes": "جوان لاغراندام در خانه با وزن بدن، ۲ روز در هفته، هدف افزایش وزن و عضله‌سازی پایه."
     },
     {
         "id": 3,
@@ -73,13 +73,13 @@ PROFILES_DATA = [
         "training_age_months": 18,
         "days": 3,
         "location": TrainingLocation.HOME,
-        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
         "cautions": [TrainingCaution.KNEE],
         "priority_muscles": [MuscleGroup.GLUTES.value],
         "duration": 60,
         "plan_weeks": 6,
         "measurements": {"waist": Decimal("66.0"), "shoulder": Decimal("98.0"), "hip": Decimal("97.0")},
-        "notes": "تمرین در خانه با دمبل، ۳ روز در هفته، ریکامپوزیشن و فرم‌دهی با اولویت باسن و احتیاط زانو."
+        "notes": "تمرین در خانه با دمبل و کش، ۳ روز در هفته، ریکامپوزیشن و فرم‌دهی با اولویت باسن و احتیاط زانو."
     },
     {
         "id": 4,
@@ -92,14 +92,14 @@ PROFILES_DATA = [
         "level": ExperienceLevel.FIRST_MONTH,
         "training_age_months": 0,
         "days": 3,
-        "location": TrainingLocation.GYM,
-        "home_setup": None,
+        "location": TrainingLocation.HOME,
+        "home_setup": HomeTrainingSetup.DUMBBELLS_AVAILABLE,
         "cautions": [TrainingCaution.SHOULDER],
         "priority_muscles": None,
         "duration": 60,
         "plan_weeks": 4,
         "measurements": {"waist": Decimal("102.0"), "shoulder": Decimal("118.0"), "hip": Decimal("107.0")},
-        "notes": "آقای ۴۲ ساله ماه اول تمرین در باشگاه، ۳ روز در هفته، چربی‌سوزی با محدودیت شانه."
+        "notes": "آقای ۴۲ ساله ماه اول تمرین در خانه با دمبل، ۳ روز در هفته، چربی‌سوزی با محدودیت شانه."
     },
     {
         "id": 5,
@@ -261,8 +261,10 @@ FA_GOAL = {
 FA_LOCATION = {TrainingLocation.GYM: "باشگاه ورزشی", TrainingLocation.HOME: "خانه"}
 FA_EQUIPMENT = {
     None: "تجهیزات کامل باشگاه (هالتر، دمبل، دستگاه‌ها، سیم‌کش)",
-    HomeTrainingSetup.BODYWEIGHT_ONLY: "فقط وزن بدن (بدون تجهیزات)",
-    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل خانگی + وزن بدن",
+    HomeTrainingSetup.BODYWEIGHT_ONLY: "وزن بدن",
+    HomeTrainingSetup.DUMBBELLS_AVAILABLE: "دمبل",
+    HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE: "کش",
+    HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE: "دمبل + کش",
 }
 FA_CAUTION = {
     TrainingCaution.LOWER_BACK: "آسیب کمر (پرهیز از لود سنگین محوری ستون فقرات)",

@@ -60,6 +60,7 @@ from app.workouts.program_engine.enums import (
     PhysicalJobDemand,
     RecoveryRating,
 )
+from app.workouts.program_engine.equipment import equipment_for_home_training_setup
 from app.workouts.program_engine.normalization import normalize_request
 from app.workouts.program_engine.recovery import recovery_spacing_is_valid
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET
@@ -201,43 +202,42 @@ def _variant_profile(experience: ExperienceLevel, days: int, variant: int) -> Be
     location = locations[variant % 2]
 
     home_setups = (
-        ("home_bw", HomeTrainingSetup.BODYWEIGHT_ONLY, frozenset({Equipment.BODYWEIGHT})),
+        (
+            "home_bw",
+            HomeTrainingSetup.BODYWEIGHT_ONLY,
+            equipment_for_home_training_setup(HomeTrainingSetup.BODYWEIGHT_ONLY),
+        ),
         (
             "home_db",
             HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-            frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL}),
+            equipment_for_home_training_setup(HomeTrainingSetup.DUMBBELLS_AVAILABLE),
         ),
         (
             "home_band",
-            HomeTrainingSetup.BODYWEIGHT_ONLY,
-            frozenset({Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND}),
+            HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
+            equipment_for_home_training_setup(HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE),
         ),
         (
             "home_db_bench",
             HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-            frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.BENCH}),
+            equipment_for_home_training_setup(HomeTrainingSetup.DUMBBELLS_AVAILABLE)
+            | {Equipment.BENCH},
         ),
         (
             "home_db_pullup",
             HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-            frozenset({Equipment.BODYWEIGHT, Equipment.DUMBBELL, Equipment.PULL_UP_BAR}),
+            equipment_for_home_training_setup(HomeTrainingSetup.DUMBBELLS_AVAILABLE),
         ),
         (
             "home_band_pullup",
-            HomeTrainingSetup.BODYWEIGHT_ONLY,
-            frozenset({Equipment.BODYWEIGHT, Equipment.RESISTANCE_BAND, Equipment.PULL_UP_BAR}),
+            HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE,
+            equipment_for_home_training_setup(HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE),
         ),
         (
             "home_all",
-            HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-            frozenset(
-                {
-                    Equipment.BODYWEIGHT,
-                    Equipment.DUMBBELL,
-                    Equipment.RESISTANCE_BAND,
-                    Equipment.BENCH,
-                    Equipment.PULL_UP_BAR,
-                }
+            HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
+            equipment_for_home_training_setup(
+                HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE
             ),
         ),
     )

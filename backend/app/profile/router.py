@@ -58,7 +58,10 @@ from app.profile.training_compatibility import (
     UnsupportedResistanceTrainingCombinationError,
     resistance_training_day_status,
 )
-from app.workouts.program_engine.equipment import resolve_available_equipment
+from app.workouts.program_engine.equipment import (
+    ordered_available_equipment,
+    resolve_available_equipment,
+)
 
 router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 
@@ -185,14 +188,11 @@ def to_response(
         ),
         training_location=profile.training_location,
         home_training_setup=profile.home_training_setup,
-        available_equipment=tuple(
-            sorted(
-                resolve_available_equipment(
-                    profile.training_location,
-                    profile.home_training_setup,
-                    profile.available_equipment,
-                ),
-                key=lambda item: item.value,
+        available_equipment=ordered_available_equipment(
+            resolve_available_equipment(
+                profile.training_location,
+                profile.home_training_setup,
+                profile.available_equipment,
             )
         ),
         session_duration_minutes=profile.session_duration_minutes,

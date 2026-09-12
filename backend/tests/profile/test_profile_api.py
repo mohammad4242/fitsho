@@ -107,7 +107,12 @@ def test_profile_response_exposes_allowed_training_schedule_status(
     ("home_training_setup", "expected_equipment"),
     [
         ("bodyweight_only", ["bodyweight", "pull_up_bar"]),
-        ("dumbbells_available", ["bodyweight", "dumbbell"]),
+        ("dumbbells_available", ["bodyweight", "dumbbell", "pull_up_bar"]),
+        ("resistance_bands_available", ["bodyweight", "resistance_band", "pull_up_bar"]),
+        (
+            "dumbbells_and_resistance_bands_available",
+            ["bodyweight", "dumbbell", "resistance_band", "pull_up_bar"],
+        ),
     ],
 )
 def test_create_home_profile_stores_selected_setup(

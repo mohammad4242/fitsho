@@ -63,7 +63,10 @@ from app.workouts.program_engine.enums import (
     SafetyStatus,
     TrainingExperience,
 )
-from app.workouts.program_engine.equipment import resolve_available_equipment
+from app.workouts.program_engine.equipment import (
+    ordered_available_equipment,
+    resolve_available_equipment,
+)
 from app.workouts.program_engine.rulesets.resistance_training_v1 import RULESET, ProgramRuleset
 from app.workouts.program_engine.safety import screen_safety
 from app.workouts.program_engine.schemas import (
@@ -117,8 +120,10 @@ FA_TRANSLATIONS = {
     "maintain_weight": "تثبیت وزن",
     "gym": "باشگاه ورزشی (تجهیزات کامل)",
     "home": "منزل",
-    "bodyweight_only": "فقط وزن بدن (بدون تجهیزات)",
-    "dumbbells_available": "دمبل خانگی + وزن بدن",
+    "bodyweight_only": "وزن بدن",
+    "dumbbells_available": "دمبل",
+    "resistance_bands_available": "کش",
+    "dumbbells_and_resistance_bands_available": "دمبل + کش",
     "chest": "سینه",
     "back": "پشت و زیربغل",
     "shoulders": "سرشانه",
@@ -331,6 +336,7 @@ def generate_1000_profiles(seed: int = BENCHMARK_SEED) -> list[ProfileSpec]:
         pregnancy_or_postpartum = False
         is_deliberate_unsupported = False
         deliberate_unsupported_reason = None
+        home_setup: HomeTrainingSetup | None = None
 
         if profile_id in unsupported_type_map:
             is_deliberate_unsupported = True
@@ -361,8 +367,7 @@ def generate_1000_profiles(seed: int = BENCHMARK_SEED) -> list[ProfileSpec]:
                 home_setup = (
                     rng.choice(
                         [
-                            HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-                            HomeTrainingSetup.BODYWEIGHT_ONLY,
+                            *HomeTrainingSetup,
                         ]
                     )
                     if training_location is TrainingLocation.HOME
@@ -380,8 +385,7 @@ def generate_1000_profiles(seed: int = BENCHMARK_SEED) -> list[ProfileSpec]:
                 home_setup = (
                     rng.choice(
                         [
-                            HomeTrainingSetup.DUMBBELLS_AVAILABLE,
-                            HomeTrainingSetup.BODYWEIGHT_ONLY,
+                            *HomeTrainingSetup,
                         ]
                     )
                     if training_location is TrainingLocation.HOME
@@ -397,7 +401,7 @@ def generate_1000_profiles(seed: int = BENCHMARK_SEED) -> list[ProfileSpec]:
                     [TrainingLocation.GYM, TrainingLocation.HOME]
                 )
                 home_setup = (
-                    HomeTrainingSetup.DUMBBELLS_AVAILABLE
+                    rng.choice(tuple(HomeTrainingSetup))
                     if training_location is TrainingLocation.HOME
                     else None
                 )
@@ -455,7 +459,9 @@ def generate_1000_profiles(seed: int = BENCHMARK_SEED) -> list[ProfileSpec]:
         equipment_set = resolve_available_equipment(
             training_location, home_setup, None
         )
-        resolved_equipment = sorted([item.value for item in equipment_set])
+        resolved_equipment = [
+            item.value for item in ordered_available_equipment(equipment_set)
+        ]
 
         profiles.append(
             ProfileSpec(
@@ -510,15 +516,22 @@ def _sample_supported_location(
         roll = rng.random()
         if roll < 0.40:
             return TrainingLocation.GYM, None
-        elif roll < 0.70:
+        elif roll < 0.55:
             return TrainingLocation.HOME, HomeTrainingSetup.DUMBBELLS_AVAILABLE
+        elif roll < 0.70:
+            return TrainingLocation.HOME, HomeTrainingSetup.RESISTANCE_BANDS_AVAILABLE
+        elif roll < 0.85:
+            return (
+                TrainingLocation.HOME,
+                HomeTrainingSetup.DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE,
+            )
         else:
             return TrainingLocation.HOME, HomeTrainingSetup.BODYWEIGHT_ONLY
     else:
         if rng.random() < 0.55:
             return TrainingLocation.GYM, None
         else:
-            return TrainingLocation.HOME, HomeTrainingSetup.DUMBBELLS_AVAILABLE
+            return TrainingLocation.HOME, rng.choice(tuple(HomeTrainingSetup))
 
 
 def _sample_supported_days(

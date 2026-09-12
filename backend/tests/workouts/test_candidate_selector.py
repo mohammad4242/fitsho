@@ -128,7 +128,9 @@ def test_explicit_inventory_requires_complete_multi_equipment_subset(db: Session
     assert dumbbell_bench.id not in result.ids
 
 
-def test_home_rejects_vertical_pull_with_incomplete_bodyweight_metadata(db: Session) -> None:
+def test_home_bodyweight_inventory_allows_vertical_pull_with_conservative_metadata(
+    db: Session,
+) -> None:
     pull_up = exercise(
         db,
         "metadata-pull-up",
@@ -146,10 +148,10 @@ def test_home_rejects_vertical_pull_with_incomplete_bodyweight_metadata(db: Sess
     )
 
     assert safe.id in result.ids
-    assert pull_up.id not in result.ids
+    assert pull_up.id in result.ids
 
 
-def test_home_dumbbells_do_not_imply_pull_up_bar(db: Session) -> None:
+def test_home_dumbbells_include_pull_up_bar(db: Session) -> None:
     pull_up = exercise(
         db,
         "pull-up-bar-required",
@@ -168,7 +170,7 @@ def test_home_dumbbells_do_not_imply_pull_up_bar(db: Session) -> None:
     )
 
     assert dumbbell_row.id in result.ids
-    assert pull_up.id not in result.ids
+    assert pull_up.id in result.ids
 
 
 @pytest.mark.parametrize(
@@ -178,7 +180,6 @@ def test_home_dumbbells_do_not_imply_pull_up_bar(db: Session) -> None:
         Equipment.BARBELL,
         Equipment.CABLE,
         Equipment.MACHINE,
-        Equipment.PULL_UP_BAR,
         Equipment.BENCH,
     ],
 )
@@ -201,7 +202,7 @@ def test_bodyweight_home_excludes_every_unavailable_equipment(
 
 @pytest.mark.parametrize(
     "required_equipment",
-    [Equipment.BARBELL, Equipment.CABLE, Equipment.MACHINE, Equipment.PULL_UP_BAR],
+    [Equipment.BARBELL, Equipment.CABLE, Equipment.MACHINE],
 )
 def test_dumbbell_home_excludes_non_dumbbell_equipment(
     db: Session,

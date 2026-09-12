@@ -40,6 +40,45 @@ def create_profile(client: TestClient) -> None:
     assert response.status_code == 201
 
 
+@pytest.mark.parametrize(
+    ("setup", "expected_equipment"),
+    [
+        ("bodyweight_only", ["bodyweight", "pull_up_bar"]),
+        ("dumbbells_available", ["bodyweight", "dumbbell", "pull_up_bar"]),
+        ("resistance_bands_available", ["bodyweight", "resistance_band", "pull_up_bar"]),
+        (
+            "dumbbells_and_resistance_bands_available",
+            ["bodyweight", "dumbbell", "resistance_band", "pull_up_bar"],
+        ),
+    ],
+)
+def test_profile_api_returns_canonical_home_inventory(
+    client: TestClient,
+    setup: str,
+    expected_equipment: list[str],
+) -> None:
+    user_id = register(client, f"profile-api-{setup}@example.com")
+    response = client.post(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={
+            **VALID_PROFILE,
+            "home_training_setup": setup,
+            "available_equipment": ["bodyweight"],
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["available_equipment"] == expected_equipment
+
+    fetched = client.get("/api/v1/profile", headers=ORIGIN)
+
+    assert fetched.status_code == 200
+    assert fetched.json()["user_id"] == str(user_id)
+    assert fetched.json()["home_training_setup"] == setup
+    assert fetched.json()["available_equipment"] == expected_equipment
+
+
 def test_patch_updates_stable_fields_and_appends_changed_weight(
     client: TestClient, db: Session
 ) -> None:
@@ -219,9 +258,10 @@ def test_patch_switching_to_gym_clears_home_training_setup(
     profile = db.get(UserProfile, user_id)
     assert profile is not None
     assert profile.home_training_setup is None
+    assert profile.available_equipment is None
 
 
-def test_patch_persists_explicit_equipment_inventory(
+def test_patch_home_setup_replaces_stale_equipment_inventory(
     client: TestClient,
     db: Session,
 ) -> None:
@@ -231,21 +271,47 @@ def test_patch_persists_explicit_equipment_inventory(
     response = client.patch(
         "/api/v1/profile",
         headers=ORIGIN,
-        json={
-            "home_training_setup": None,
-            "available_equipment": ["pull_up_bar", "bodyweight", "resistance_band"],
-        },
+        json={"home_training_setup": "resistance_bands_available"},
     )
 
     assert response.status_code == 200
     assert response.json()["available_equipment"] == [
         "bodyweight",
-        "pull_up_bar",
         "resistance_band",
+        "pull_up_bar",
     ]
     profile = db.get(UserProfile, user_id)
     assert profile is not None
-    assert profile.available_equipment == ["bodyweight", "pull_up_bar", "resistance_band"]
+    assert profile.home_training_setup.value == "resistance_bands_available"
+    assert profile.available_equipment == ["bodyweight", "resistance_band", "pull_up_bar"]
+
+
+def test_patch_legacy_home_inventory_derives_supported_preset(
+    client: TestClient,
+    db: Session,
+) -> None:
+    user_id = register(client, "profile-legacy-equipment@example.com")
+    create_profile(client)
+
+    response = client.patch(
+        "/api/v1/profile",
+        headers=ORIGIN,
+        json={
+            "home_training_setup": None,
+            "available_equipment": ["bodyweight", "resistance_band"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["home_training_setup"] == "resistance_bands_available"
+    assert response.json()["available_equipment"] == [
+        "bodyweight",
+        "resistance_band",
+        "pull_up_bar",
+    ]
+    profile = db.get(UserProfile, user_id)
+    assert profile is not None
+    assert profile.available_equipment == ["bodyweight", "resistance_band", "pull_up_bar"]
 
 
 def test_patch_switching_to_home_requires_setup(client: TestClient) -> None:

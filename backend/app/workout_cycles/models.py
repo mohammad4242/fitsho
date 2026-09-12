@@ -257,6 +257,7 @@ class WorkoutCycleFeedback(Base):
             native_enum=False,
             create_constraint=True,
             validate_strings=True,
+            length=64,
             values_callable=enum_values,
             name="ck_workout_cycle_feedback_next_home_training_setup_values",
         )

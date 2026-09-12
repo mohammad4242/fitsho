@@ -25,6 +25,11 @@ from app.profile.training_compatibility import (
     require_supported_resistance_training_days,
 )
 from app.profile.training_focus import validate_user_priority_muscles
+from app.workouts.program_engine.equipment import (
+    derive_home_training_setup,
+    equipment_for_home_training_setup,
+    ordered_available_equipment,
+)
 
 SessionDurationMinutes = Literal[30, 45, 60, 75, 90, 120]
 PlanDurationWeeks = Literal[4, 6, 8]
@@ -133,7 +138,7 @@ class ProfileCreate(BaseModel):
             return None
         if not equipment or len(equipment) != len(set(equipment)) or Equipment.OTHER in equipment:
             raise ValueError("Available equipment must be non-empty, unique, and categorized")
-        return tuple(sorted(equipment, key=lambda item: item.value))
+        return ordered_available_equipment(equipment)
 
     @field_validator("birth_date")
     @classmethod
@@ -144,8 +149,15 @@ class ProfileCreate(BaseModel):
     def normalize_workout_setup(self) -> "ProfileCreate":
         if self.training_location == TrainingLocation.GYM:
             self.home_training_setup = None
-        elif self.home_training_setup is None and self.available_equipment is None:
-            raise ValueError("Home training setup is required for home training")
+            self.available_equipment = None
+        else:
+            setup = self.home_training_setup or derive_home_training_setup(self.available_equipment)
+            if setup is None:
+                raise ValueError("Home training setup is required for home training")
+            self.home_training_setup = setup
+            self.available_equipment = ordered_available_equipment(
+                equipment_for_home_training_setup(setup)
+            )
         if (
             self.preferred_weekdays is not None
             and len(self.preferred_weekdays) > self.training_days_per_week
@@ -245,7 +257,7 @@ class ProfileUpdate(BaseModel):
             return None
         if not equipment or len(equipment) != len(set(equipment)) or Equipment.OTHER in equipment:
             raise ValueError("Available equipment must be non-empty, unique, and categorized")
-        return tuple(sorted(equipment, key=lambda item: item.value))
+        return ordered_available_equipment(equipment)
 
     @field_validator("birth_date")
     @classmethod
@@ -275,12 +287,27 @@ class ProfileUpdate(BaseModel):
             raise ValueError("Profile fields cannot be null")
         if self.training_location == TrainingLocation.GYM:
             self.home_training_setup = None
-        elif (
-            self.training_location == TrainingLocation.HOME
-            and self.home_training_setup is None
-            and self.available_equipment is None
-        ):
-            raise ValueError("Home training setup is required for home training")
+            self.available_equipment = None
+        elif self.training_location == TrainingLocation.HOME:
+            setup = self.home_training_setup or derive_home_training_setup(self.available_equipment)
+            if setup is not None:
+                self.home_training_setup = setup
+                self.available_equipment = ordered_available_equipment(
+                    equipment_for_home_training_setup(setup)
+                )
+            elif self.home_training_setup is None and self.available_equipment is None:
+                raise ValueError("Home training setup is required for home training")
+        elif self.home_training_setup is not None:
+            self.available_equipment = ordered_available_equipment(
+                equipment_for_home_training_setup(self.home_training_setup)
+            )
+        elif self.available_equipment is not None:
+            setup = derive_home_training_setup(self.available_equipment)
+            if setup is not None:
+                self.home_training_setup = setup
+                self.available_equipment = ordered_available_equipment(
+                    equipment_for_home_training_setup(setup)
+                )
         if (
             self.training_days_per_week is not None
             and self.preferred_weekdays is not None

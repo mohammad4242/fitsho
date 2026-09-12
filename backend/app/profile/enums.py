@@ -60,6 +60,8 @@ class TrainingLocation(StrEnum):
 class HomeTrainingSetup(StrEnum):
     BODYWEIGHT_ONLY = "bodyweight_only"
     DUMBBELLS_AVAILABLE = "dumbbells_available"
+    RESISTANCE_BANDS_AVAILABLE = "resistance_bands_available"
+    DUMBBELLS_AND_RESISTANCE_BANDS_AVAILABLE = "dumbbells_and_resistance_bands_available"
 
 
 class TrainingCaution(StrEnum):

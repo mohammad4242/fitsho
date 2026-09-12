@@ -185,9 +185,39 @@ def build_persian_pdf_html(
     cohort_gym_fail = sum(1 for r in results if r["profile"]["training_location"] == "gym" and r["result_class"] == "FAILED")
     cohort_gym_total = cohort_gym_succ + cohort_gym_fail
 
-    cohort_db_succ = sum(1 for r in results if r["profile"]["training_location"] == "home" and r["profile"]["home_training_setup"] == "dumbbells_available" and r["result_class"] == "SUCCESS")
-    cohort_db_fail = sum(1 for r in results if r["profile"]["training_location"] == "home" and r["profile"]["home_training_setup"] == "dumbbells_available" and r["result_class"] == "FAILED")
-    cohort_db_total = cohort_db_succ + cohort_db_fail
+    cohort_home_rows = ""
+    for setup in (
+        "bodyweight_only",
+        "dumbbells_available",
+        "resistance_bands_available",
+        "dumbbells_and_resistance_bands_available",
+    ):
+        setup_success = sum(
+            1
+            for r in results
+            if r["profile"]["training_location"] == "home"
+            and r["profile"]["home_training_setup"] == setup
+            and r["result_class"] == "SUCCESS"
+        )
+        setup_failed = sum(
+            1
+            for r in results
+            if r["profile"]["training_location"] == "home"
+            and r["profile"]["home_training_setup"] == setup
+            and r["result_class"] == "FAILED"
+        )
+        setup_total = setup_success + setup_failed
+        setup_label = FA_TRANSLATIONS[setup]
+        setup_rate = setup_success / setup_total * 100 if setup_total else 0
+        cohort_home_rows += f"""
+            <tr>
+                <td><strong>منزل + {setup_label}</strong></td>
+                <td style="text-align: center;">{setup_total}</td>
+                <td style="text-align: center; color: #166534; font-weight: bold;">{setup_success}</td>
+                <td style="text-align: center; color: #991b1b;">{setup_failed}</td>
+                <td style="text-align: center; font-weight: bold;">{setup_rate:.2f}٪</td>
+            </tr>
+        """
 
     # Cohort breakdown: Experience Level (supported only)
     level_stats: dict[str, dict[str, int]] = {}
@@ -704,20 +734,7 @@ def build_persian_pdf_html(
                 <td style="text-align: center; color: #991b1b;">{cohort_gym_fail}</td>
                 <td style="text-align: center; font-weight: bold;">{(cohort_gym_succ / cohort_gym_total * 100) if cohort_gym_total > 0 else 0:.2f}٪</td>
             </tr>
-            <tr>
-                <td><strong>منزل + دمبل (HOME + DUMBBELLS)</strong></td>
-                <td style="text-align: center;">{cohort_db_total}</td>
-                <td style="text-align: center; color: #166534; font-weight: bold;">{cohort_db_succ}</td>
-                <td style="text-align: center; color: #991b1b;">{cohort_db_fail}</td>
-                <td style="text-align: center; font-weight: bold;">{(cohort_db_succ / cohort_db_total * 100) if cohort_db_total > 0 else 0:.2f}٪</td>
-            </tr>
-            <tr>
-                <td><strong>منزل + فقط وزن بدن (HOME + BODYWEIGHT)</strong></td>
-                <td style="text-align: center;">{bw_total_supported}</td>
-                <td style="text-align: center; color: #166534; font-weight: bold;">{bw_succ}</td>
-                <td style="text-align: center; color: #991b1b;">{bw_fail}</td>
-                <td style="text-align: center; font-weight: bold;">{bw_success_rate:.2f}٪</td>
-            </tr>
+            {cohort_home_rows}
             <tr style="background: #f8fafc;">
                 <td>سطح: ماه اول (First Month)</td>
                 <td style="text-align: center;">{level_stats['first_month']['total']}</td>
