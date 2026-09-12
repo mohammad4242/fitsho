@@ -9,6 +9,7 @@ import { ProfilePhotoAvatar } from "../features/profile/ProfilePhoto";
 import { verifyCoachAccess } from "../features/workoutReviews/api";
 import { LanguageSwitcher } from "../shared/LanguageSwitcher";
 import { AppIcon, type IconName } from "../shared/AppIcon";
+import { PwaInstallCard } from "../pwa/PwaInstallCard";
 import "./more.css";
 
 export function MorePage() {
@@ -99,6 +100,8 @@ export function MorePage() {
             </MoreGroup>
           )}
         </div>
+
+        <PwaInstallCard />
 
         {error && <p className="fitsho-status fitsho-status--danger" role="alert">{l("خروج انجام نشد. دوباره تلاش کن.", "Could not sign out. Try again.")}</p>}
         <button className="more-page__logout" type="button" disabled={busy} onClick={handleLogout}>

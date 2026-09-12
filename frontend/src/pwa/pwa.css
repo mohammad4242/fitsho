@@ -1,0 +1,55 @@
+.pwa-install-card {
+  display: grid;
+  gap: 1rem;
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--fitsho-line-strong);
+  border-radius: var(--fitsho-radius-lg);
+  color: var(--fitsho-ink);
+  background: linear-gradient(135deg, rgb(80 223 206 / 10%), var(--fitsho-surface));
+}
+
+.pwa-install-card p,
+.pwa-install-card h2 { margin: 0; }
+.pwa-install-card > div:first-child { display: grid; gap: 0.35rem; }
+.pwa-install-card > div:first-child > p:first-child { color: var(--fitsho-aqua); font-size: 0.72rem; font-weight: 850; }
+.pwa-install-card h2 { font-size: 1rem; }
+.pwa-install-card ol { display: grid; gap: 0.25rem; margin: 0.25rem 0 0; padding-inline-start: 1.25rem; color: var(--fitsho-muted); font-size: 0.82rem; line-height: 1.65; }
+.pwa-install-card > div:first-child > p:last-child { color: var(--fitsho-muted); font-size: 0.82rem; line-height: 1.65; }
+
+.pwa-install-card__actions,
+.pwa-update-prompt__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.pwa-install-card__actions .fitsho-button,
+.pwa-install-card__actions .fitsho-button-secondary,
+.pwa-update-prompt__actions .fitsho-button,
+.pwa-update-prompt__actions .fitsho-button-secondary { min-height: 2.75rem; padding-inline: 1rem; }
+
+.pwa-update-prompt {
+  position: fixed;
+  z-index: 100;
+  left: max(1rem, env(safe-area-inset-left));
+  right: max(1rem, env(safe-area-inset-right));
+  inset-block-end: max(1rem, env(safe-area-inset-bottom));
+  width: min(calc(100% - 2rem), 31rem);
+  display: grid;
+  gap: 0.8rem;
+  margin-inline: auto;
+  padding: 0.9rem;
+  border: 1px solid var(--fitsho-line-strong);
+  border-radius: var(--fitsho-radius-lg);
+  color: var(--fitsho-ink);
+  background: rgb(8 18 17 / 96%);
+  box-shadow: var(--fitsho-shadow);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.pwa-update-prompt > div:first-child { display: grid; gap: 0.25rem; }
+.pwa-update-prompt strong { font-size: 0.9rem; }
+.pwa-update-prompt span { color: var(--fitsho-muted); font-size: 0.76rem; }
+
+@media (max-width: 767px) {
+  .pwa-update-prompt {
+    inset-block-end: var(--fitsho-bottom-nav-space);
+  }
+}

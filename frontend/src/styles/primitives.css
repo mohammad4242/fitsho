@@ -5,7 +5,7 @@
 }
 
 .fitsho-container {
-  width: min(calc(100% - 2rem), var(--fitsho-content));
+  width: min(calc(100% - var(--fitsho-page-gutter) - var(--fitsho-page-gutter)), var(--fitsho-content));
   min-width: 0;
   margin-inline: auto;
 }
@@ -84,11 +84,13 @@
     transform var(--fitsho-duration-fast) var(--fitsho-ease);
 }
 
-.fitsho-card--interactive:hover {
-  border-color: var(--fitsho-line-strong);
-  background: var(--fitsho-surface-interactive);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .fitsho-card--interactive:hover {
+    border-color: var(--fitsho-line-strong);
+    background: var(--fitsho-surface-interactive);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+    transform: translateY(-2px);
+  }
 }
 
 .fitsho-card--interactive:active {
@@ -152,24 +154,28 @@
   background: rgb(255 255 255 / 2%);
 }
 
-.fitsho-button:hover:not(:disabled) {
-  background: #61e5d5;
-  border-color: #61e5d5;
-  box-shadow: 0 4px 18px rgb(80 223 206 / 32%);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .fitsho-button:hover:not(:disabled) {
+    background: #61e5d5;
+    border-color: #61e5d5;
+    box-shadow: 0 4px 18px rgb(80 223 206 / 32%);
+    transform: translateY(-1px);
+  }
+
+  .fitsho-button-secondary:hover:not(:disabled) {
+    border-color: var(--fitsho-aqua);
+    color: var(--fitsho-aqua);
+    background: rgb(80 223 206 / 8%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 20%);
+  }
+
+  .fitsho-input:hover { border-color: var(--fitsho-line-strong); }
 }
 
 .fitsho-button:active:not(:disabled) {
   transform: translateY(0) scale(0.985);
   box-shadow: 0 2px 6px rgb(80 223 206 / 20%);
-}
-
-.fitsho-button-secondary:hover:not(:disabled) {
-  border-color: var(--fitsho-aqua);
-  color: var(--fitsho-aqua);
-  background: rgb(80 223 206 / 8%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgb(0 0 0 / 20%);
 }
 
 .fitsho-button-secondary:active:not(:disabled) {
@@ -201,10 +207,6 @@
 
 .fitsho-input::placeholder {
   color: rgb(148 171 165 / 60%);
-}
-
-.fitsho-input:hover {
-  border-color: var(--fitsho-line-strong);
 }
 
 .fitsho-input:focus {
@@ -299,10 +301,6 @@
 
 @keyframes route-loading-spin {
   to { transform: rotate(1turn); }
-}
-
-@media (max-width: 620px) {
-  .fitsho-container { width: min(calc(100% - 1.5rem), var(--fitsho-content)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,32 +1,24 @@
-# React + TypeScript + Vite
+# Fitician Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The existing `frontend/` package is the Fitician Web App. Run commands from the repository root with npm workspaces:
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm run dev --workspace frontend
+npm run build --workspace frontend
+npm run preview --workspace frontend
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The production build includes an installable PWA manifest, icons, and a generated service worker. Updates are prompted in-app and never reload an active form automatically.
+
+PWA installation and camera access require a reachable HTTPS origin in production. On iPhone or iPad Safari: open the site, use Share, choose **Add to Home Screen**, enable **Open as Web App**, then choose **Add**.
+
+Browser regression tests use a production preview:
+
+```bash
+npm run test:e2e --workspace frontend
+npm run test:e2e:webkit --workspace frontend
+```
+
+Install the Playwright Chromium and WebKit browsers once with `npx playwright install chromium webkit`.
+
+Caching is deliberately conservative. The service worker precaches only the application shell, generated JavaScript/CSS, fonts, manifest, and PWA icons. `/api`, `/media`, uploads, body-analysis data, profile/nutrition photos, and large reports or exercise/MediaPipe assets are network-only and are never stored as runtime user-data cache.

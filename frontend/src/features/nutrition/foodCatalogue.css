@@ -205,7 +205,9 @@
 
 .food-shelf-card:hover {
   border-color: rgb(50 216 204 / 34%);
-  transform: translateY(-1px);
+}
+@media (hover: hover) and (pointer: fine) {
+  .food-shelf-card:hover { transform: translateY(-1px); }
 }
 
 .food-shelf-card__image {
@@ -443,7 +445,9 @@
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 1rem;
+  padding-block: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
   background: rgb(0 12 12 / 80%);
   backdrop-filter: blur(.5rem);
 }
@@ -451,7 +455,7 @@
 .food-dialog {
   position: relative;
   width: min(100%, 48rem);
-  max-height: min(88svh, 50rem);
+  max-height: min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem), 50rem);
   overflow: auto;
   box-sizing: border-box;
   padding: clamp(1.3rem, 4vw, 2.3rem);

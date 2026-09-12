@@ -151,13 +151,13 @@
   transition: transform var(--fitsho-duration-fast) var(--fitsho-ease), color var(--fitsho-duration-fast) var(--fitsho-ease);
 }
 
-.more-row:hover .more-row__chevron {
-  color: var(--fitsho-aqua);
-  transform: translateX(-2px);
-}
+.more-row:hover .more-row__chevron { color: var(--fitsho-aqua); }
 
 [dir="rtl"] .more-row__chevron { transform: scaleX(-1); }
-[dir="rtl"] .more-row:hover .more-row__chevron { transform: scaleX(-1) translateX(-2px); }
+@media (hover: hover) and (pointer: fine) {
+  .more-row:hover .more-row__chevron { transform: translateX(-2px); }
+  [dir="rtl"] .more-row:hover .more-row__chevron { transform: scaleX(-1) translateX(-2px); }
+}
 
 .more-language-row .language-switcher {
   min-height: 2.5rem;
@@ -185,7 +185,9 @@
   border-color: rgb(246 120 89 / 45%);
   background: rgb(246 120 89 / 12%);
   color: #ffc4b5;
-  transform: translateY(-1px);
+}
+@media (hover: hover) and (pointer: fine) {
+  .more-page__logout:hover:not(:disabled) { transform: translateY(-1px); }
 }
 
 .more-page__logout:active:not(:disabled) {

@@ -45,7 +45,9 @@
 .workout-day { overflow: hidden; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-card); }
 .workout-day--focus { border-color: var(--fitsho-line-strong); box-shadow: var(--fitsho-shadow-focus); }
 .workout-day > summary { min-height: 3.75rem; display: flex; align-items: center; gap: .65rem; padding: .65rem .85rem; cursor: pointer; list-style: none; transition: background var(--fitsho-duration-fast) var(--fitsho-ease); }
-.workout-day > summary:hover { background: var(--fitsho-surface-interactive); }
+@media (hover: hover) and (pointer: fine) {
+  .workout-day > summary:hover { background: var(--fitsho-surface-interactive); }
+}
 .workout-day > summary::-webkit-details-marker { display: none; }
 .workout-day > summary::after { margin-inline-start: auto; color: var(--fitsho-muted); content: "+"; font-size: 1.2rem; }
 .workout-day[open] > summary::after { content: "−"; }
@@ -142,7 +144,7 @@
 .workout-quick-action:disabled svg { color: rgb(234 244 241 / 48%); }
 .workout-quick-action:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--fitsho-aqua); outline-offset: -2px; }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .workout-plan-shell { padding-inline: .75rem; }
   .workout-plan-main { padding-top: .65rem; }
   .workout-version-history { grid-template-columns: 1fr; display: grid; }

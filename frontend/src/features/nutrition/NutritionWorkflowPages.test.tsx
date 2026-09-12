@@ -124,6 +124,10 @@ it("shows planned versus actual tracking and saves photo corrections before conf
   expect(await screen.findByRole("button", { name: "Chicken breast · 120 g" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: /Food photo/i }));
   await user.click(screen.getByRole("checkbox", { name: /third-party image processing/i }));
+  expect(screen.getByLabelText("Choose food photo")).toHaveAttribute(
+    "accept",
+    "image/jpeg,image/png,image/webp,image/heic,image/heif",
+  );
   await user.upload(screen.getByLabelText("Choose food photo"), new File(["image"], "meal.jpg", { type: "image/jpeg" }));
   expect(await screen.findByRole("img", { name: "Meal photo preview" })).toBeInTheDocument();
   expect(screen.getByText(/≈ 200/)).toBeInTheDocument();

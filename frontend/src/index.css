@@ -47,6 +47,7 @@ html[lang="en"] .fitsho-display {
 }
 
 html {
+  min-height: 100%;
   max-width: 100%;
   overflow-x: clip;
 }
@@ -56,7 +57,8 @@ body {
   width: 100%;
   max-width: 100%;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   overflow-x: clip;
 }
 
@@ -68,8 +70,11 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
+  max-width: 100%;
 }
 
 button,
@@ -83,9 +88,34 @@ a {
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--fitsho-aqua);
   outline-offset: 2px;
+}
+
+img,
+video,
+canvas {
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
+:where(main, section, article, aside, header, footer, nav, form, fieldset, div) {
+  min-width: 0;
+}
+
+:where(p, h1, h2, h3, h4, h5, h6, a, button, label, small, td, th, dd, li) {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(1rem, 16px) !important;
+  }
 }
 
 .auth-shell {
@@ -230,11 +260,13 @@ a:focus-visible {
     transform 180ms ease;
 }
 
-.language-switcher:hover,
-.logout-button:hover {
-  border-color: var(--turquoise);
-  background: rgb(56 183 165 / 13%);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .language-switcher:hover,
+  .logout-button:hover {
+    border-color: var(--turquoise);
+    background: rgb(56 183 165 / 13%);
+    transform: translateY(-1px);
+  }
 }
 
 .brand-copy {
@@ -537,10 +569,12 @@ html[dir="rtl"] .next-step-card h2 {
     box-shadow 180ms ease;
 }
 
-.primary-button:hover:not(:disabled) {
-  background: var(--petrol-800);
-  box-shadow: 0 1rem 2.4rem rgb(18 51 50 / 22%);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .primary-button:hover:not(:disabled) {
+    background: var(--petrol-800);
+    box-shadow: 0 1rem 2.4rem rgb(18 51 50 / 22%);
+    transform: translateY(-1px);
+  }
 }
 
 .primary-button:active:not(:disabled) {
@@ -933,7 +967,7 @@ html[dir="ltr"] .primary-button span:last-child {
   }
 }
 
-@media (max-width: 620px) {
+@media (max-width: 767px) {
   .app-shell__content {
     padding-block-end: calc(5.8rem + env(safe-area-inset-bottom));
   }
@@ -1259,10 +1293,12 @@ html[dir="ltr"] .primary-button span:last-child {
   box-shadow: 0 2px 10px rgb(80 223 206 / 20%);
 }
 
-.auth-shell .primary-button:hover:not(:disabled) {
-  background: #61e5d5;
-  box-shadow: 0 4px 18px rgb(80 223 206 / 32%);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .auth-shell .primary-button:hover:not(:disabled) {
+    background: #61e5d5;
+    box-shadow: 0 4px 18px rgb(80 223 206 / 32%);
+    transform: translateY(-1px);
+  }
 }
 
 .auth-shell .primary-button:active:not(:disabled) {
@@ -1271,7 +1307,16 @@ html[dir="ltr"] .primary-button span:last-child {
 .auth-shell .form-alternative a { color: var(--fitsho-aqua); }
 .auth-shell .brand-mark--dark { color: var(--fitsho-ink); }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
+  .auth-shell {
+    padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom);
+  }
+
+  .auth-shell .form-panel {
+    min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding-block-start: max(1.2rem, env(safe-area-inset-top));
+  }
+
   .auth-shell .form-panel { background: var(--fitsho-canvas); }
   .auth-shell .form-panel__mobile-nav { border-bottom-color: var(--fitsho-line); }
 }
@@ -1310,22 +1355,24 @@ html[dir="ltr"] .primary-button span:last-child {
   background: var(--fitsho-surface);
   transition: border-color var(--fitsho-duration-fast) var(--fitsho-ease), background var(--fitsho-duration-fast) var(--fitsho-ease), transform var(--fitsho-duration-fast) var(--fitsho-ease);
 }
-.fitsho-page .dashboard-header .language-switcher:hover,
-.fitsho-page .dashboard-header .logout-button:hover {
-  border-color: var(--fitsho-line-strong);
-  background: var(--fitsho-surface-raised);
-  transform: translateY(-1px);
-}
-
 .fitsho-page .member-menu-button {
   border-color: var(--fitsho-line);
   color: var(--fitsho-ink);
   background: var(--fitsho-surface);
   transition: border-color var(--fitsho-duration-fast) var(--fitsho-ease), transform var(--fitsho-duration-fast) var(--fitsho-ease);
 }
-.fitsho-page .member-menu-button:hover {
-  border-color: var(--fitsho-line-strong);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .fitsho-page .dashboard-header .language-switcher:hover,
+  .fitsho-page .dashboard-header .logout-button:hover {
+    border-color: var(--fitsho-line-strong);
+    background: var(--fitsho-surface-raised);
+    transform: translateY(-1px);
+  }
+
+  .fitsho-page .member-menu-button:hover {
+    border-color: var(--fitsho-line-strong);
+    transform: translateY(-1px);
+  }
 }
 
 .fitsho-page .member-menu {
@@ -1360,7 +1407,9 @@ html[dir="ltr"] .primary-button span:last-child {
   max-width: none;
   min-height: 4.75rem;
   margin: 0;
-  padding: 0.8rem clamp(1rem, 3vw, 2rem);
+  padding-block: 0.8rem;
+  padding-left: max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-left));
+  padding-right: max(clamp(1rem, 3vw, 2rem), env(safe-area-inset-right));
   border-color: var(--fitsho-line);
   color: var(--fitsho-ink);
   background: rgb(2 11 12 / 88%);
@@ -1382,6 +1431,7 @@ html[dir="ltr"] .primary-button span:last-child {
 .app-shell__content {
   grid-area: content;
   min-height: calc(100svh - 4.75rem);
+  min-height: calc(100dvh - 4.75rem);
 }
 
 .app-shell__nav {
@@ -1390,6 +1440,7 @@ html[dir="ltr"] .primary-button span:last-child {
   inset-block-start: 0;
   grid-area: nav;
   height: calc(100svh - 4.75rem);
+  height: calc(100dvh - 4.75rem);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1414,7 +1465,9 @@ html[dir="ltr"] .primary-button span:last-child {
   transition: color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
-.app-shell__nav-link:hover { color: var(--fitsho-ink); background: rgb(255 255 255 / 4%); }
+@media (hover: hover) and (pointer: fine) {
+  .app-shell__nav-link:hover { color: var(--fitsho-ink); background: rgb(255 255 255 / 4%); }
+}
 .app-shell__nav-link--active { color: var(--fitsho-aqua); background: rgb(80 223 206 / 9%); }
 .app-shell__nav-link--active::before { position: absolute; inset-inline-start: 0; width: 0.2rem; height: 2rem; border-radius: 99rem; background: var(--fitsho-aqua); content: ""; }
 .app-shell__nav-link { position: relative; }
@@ -1428,15 +1481,34 @@ html[dir="ltr"] .primary-button span:last-child {
 
 .app-shell__nav-icon--workout { width: 1.55rem; height: 1.55rem; stroke-width: 1.9; }
 
-@media (max-width: 760px) {
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-shell { grid-template-columns: 5.25rem minmax(0, 1fr); }
+
+  .app-shell > .dashboard-header {
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+  }
+
+  .app-shell__nav {
+    gap: 0.35rem;
+    padding-inline: 0.45rem;
+  }
+
+  .app-shell__nav-link { min-height: 4rem; }
+}
+
+@media (max-width: 767px) {
   .app-shell {
     display: block;
     min-height: 100svh;
+    min-height: 100dvh;
   }
 
   .app-shell > .dashboard-header {
-    min-height: 3.65rem;
-    padding: 0.45rem 0.85rem;
+    min-height: calc(3.65rem + env(safe-area-inset-top));
+    padding-block: calc(0.45rem + env(safe-area-inset-top)) 0.45rem;
+    padding-left: max(0.85rem, env(safe-area-inset-left));
+    padding-right: max(0.85rem, env(safe-area-inset-right));
   }
 
   .app-shell > .dashboard-header .language-switcher,
@@ -1444,7 +1516,8 @@ html[dir="ltr"] .primary-button span:last-child {
 
   .app-shell__content {
     min-height: 100svh;
-    padding-block-end: calc(5.4rem + env(safe-area-inset-bottom));
+    min-height: 100dvh;
+    padding-block-end: var(--fitsho-bottom-nav-space);
   }
 
   .app-shell__nav {
@@ -1482,7 +1555,7 @@ html[dir="ltr"] .primary-button span:last-child {
 }
 
 @media (max-width: 380px) {
-  .app-shell__nav { padding-inline: 0.2rem; }
+  .app-shell__nav { padding-left: max(0.2rem, env(safe-area-inset-left)); padding-right: max(0.2rem, env(safe-area-inset-right)); }
   .app-shell__nav-link { font-size: 0.62rem; }
 }
 

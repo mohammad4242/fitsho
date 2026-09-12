@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppIcon } from "../../shared/AppIcon";
+import {
+  normalizeImageForUpload,
+  UserImageNormalizationError,
+} from "../../shared/imageNormalization";
 import * as api from "./api";
 import type { FoodPhotoEstimate, FoodPhotoEstimateItem, FoodPhotoEstimateStatus } from "./api";
 import type { DailyTrackingSummary } from "./types";
@@ -145,16 +149,27 @@ export function NutritionTrackingPage() {
     setError(null);
     setItemFoodSelections({});
     setItemGramInputs({});
-    const reader = new FileReader();
-    reader.addEventListener("load", () => setPhotoPreview(typeof reader.result === "string" ? reader.result : null), { once: true });
-    reader.readAsDataURL(file);
     setPhotoUploading(true);
     try {
-      const queued = await api.estimateFoodPhoto(file, fa ? "fa" : "en");
+      const normalized = await normalizeImageForUpload(file, {
+        maximumInputBytes: 8 * 1024 * 1024,
+        maximumOutputBytes: 8 * 1024 * 1024,
+        maximumPixelCount: 20_000_000,
+      });
+      const reader = new FileReader();
+      reader.addEventListener("load", () => setPhotoPreview(typeof reader.result === "string" ? reader.result : null), { once: true });
+      reader.readAsDataURL(normalized);
+      const queued = await api.estimateFoodPhoto(normalized, fa ? "fa" : "en");
       setPhotoEstimate(queued);
       setPhotoHistory((current) => upsertFoodPhotoHistory(current, queued));
     }
-    catch { setError(l("برآورد عکس فعلاً در دسترس نیست؛ ثبت دستی همچنان کار می‌کند.", "Photo estimation is unavailable; manual tracking still works.")); }
+    catch (photoError) {
+      if (photoError instanceof UserImageNormalizationError) {
+        setError(l("فرمت عکس پشتیبانی نمی‌شود یا قابل تبدیل نیست.", "This image format is not supported or could not be converted."));
+      } else {
+        setError(l("برآورد عکس فعلاً در دسترس نیست؛ ثبت دستی همچنان کار می‌کند.", "Photo estimation is unavailable; manual tracking still works."));
+      }
+    }
     finally { setPhotoUploading(false); }
   }
 
@@ -329,7 +344,7 @@ export function NutritionTrackingPage() {
         "The image is sent only for approximate food recognition through the configured AI service. Account and medical information are not included."
       )}</p>
       <label className="nutrition-photo-consent"><input type="checkbox" checked={photoConsent} onChange={(event) => setPhotoConsent(event.target.checked)} /> {l("با پردازش عکس توسط سرویس ثالث موافقم", "I consent to third-party image processing")}</label>
-      <label className={`nutrition-photo-picker${photoConsent ? " is-enabled" : ""}`}><span>{photoPreview ? l("تغییر عکس", "Change photo") : l("انتخاب عکس", "Choose photo")}</span><input aria-label={l("انتخاب عکس غذا", "Choose food photo")} type="file" accept="image/jpeg,image/png,image/webp" disabled={!photoConsent || photoUploading} onChange={(event) => void analyzePhoto(event.target.files?.[0])} /></label>
+      <label className={`nutrition-photo-picker${photoConsent ? " is-enabled" : ""}`}><span>{photoPreview ? l("تغییر عکس", "Change photo") : l("انتخاب عکس", "Choose photo")}</span><input aria-label={l("انتخاب عکس غذا", "Choose food photo")} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" disabled={!photoConsent || photoUploading} onChange={(event) => { void analyzePhoto(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
       {photoHistory.length > 0 && <section className="nutrition-photo-history" aria-labelledby="nutrition-photo-history-title">
         <div className="nutrition-photo-history__heading">
           <h3 id="nutrition-photo-history-title">{l("سابقه تحلیل عکس", "Photo analysis history")}</h3>

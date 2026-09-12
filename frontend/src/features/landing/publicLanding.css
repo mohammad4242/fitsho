@@ -82,7 +82,11 @@
   z-index: 30;
   inset: 0 0 0 auto;
   width: min(88vw, 22rem);
-  padding: 1.2rem;
+  padding-block: max(1.2rem, env(safe-area-inset-top)) max(1.2rem, env(safe-area-inset-bottom));
+  padding-left: max(1.2rem, env(safe-area-inset-left));
+  padding-right: max(1.2rem, env(safe-area-inset-right));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-inline-start: 1px solid var(--fitsho-line);
   color: var(--fitsho-mist);
   background: rgb(6 21 19 / 98%);
@@ -92,8 +96,8 @@
 [dir="ltr"] .landing-menu { inset: 0 auto 0 0; }
 
 .landing-menu > button {
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 2.75rem;
+  height: 2.75rem;
   display: grid;
   place-items: center;
   margin-inline-start: auto;
@@ -132,7 +136,10 @@
   transition: transform var(--fitsho-duration-fast) ease, box-shadow var(--fitsho-duration-fast) ease;
 }
 
-.landing-primary-cta:hover { transform: translateY(-2px); box-shadow: 0 1rem 2.8rem rgb(80 223 206 / 16%); }
+.landing-primary-cta:hover { box-shadow: 0 1rem 2.8rem rgb(80 223 206 / 16%); }
+@media (hover: hover) and (pointer: fine) {
+  .landing-primary-cta:hover { transform: translateY(-2px); }
+}
 .landing-primary-cta:focus-visible { outline: 2px solid var(--fitsho-mist); outline-offset: 0.22rem; }
 [dir="ltr"] .landing-primary-cta span { transform: rotate(180deg); }
 

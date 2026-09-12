@@ -42,6 +42,17 @@
   --fitsho-content: 82rem;
   --fitsho-content-max: 82rem;
   --fitsho-reading: 68rem;
+  --fitsho-page-gutter: 0.75rem;
+  --fitsho-header-height: 4.75rem;
+  --fitsho-bottom-nav-space: calc(5.4rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  :root { --fitsho-page-gutter: 1.5rem; }
+}
+
+@media (min-width: 1024px) {
+  :root { --fitsho-page-gutter: 2rem; }
 }
 
 .fitsho-app {

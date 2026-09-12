@@ -389,7 +389,9 @@
 .body-photo-camera-btn:hover {
   background: linear-gradient(135deg, rgb(80 223 206 / 24%), var(--fitsho-surface-raised));
   box-shadow: 0 0 1.5rem rgb(80 223 206 / 25%);
-  transform: translateY(-1px);
+}
+@media (hover: hover) and (pointer: fine) {
+  .body-photo-camera-btn:hover { transform: translateY(-1px); }
 }
 .body-photo-upload-control {
   display: grid;
@@ -599,8 +601,10 @@
 }
 .body-photo-summary__item:hover {
   border-color: var(--fitsho-aqua);
-  transform: translateY(-2px);
   box-shadow: 0 .5rem 1.5rem rgb(80 223 206 / 15%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .body-photo-summary__item:hover { transform: translateY(-2px); }
 }
 .body-photo-summary__media {
   position: relative;
@@ -636,8 +640,8 @@
 .body-photo-icon-xs { width: .85rem; height: .85rem; }
 .body-photo-icon-sm { width: 1.1rem; height: 1.1rem; }
 
-.body-photo-modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgb(0 0 0 / 65%); backdrop-filter: blur(8px); }
-.body-photo-modal { width: min(100%, 34rem); display: grid; gap: .9rem; padding: 1.75rem; border-radius: var(--fitsho-radius-xl); border: 1px solid var(--fitsho-line-strong); background: var(--fitsho-surface); color: var(--fitsho-ink); }
+.body-photo-modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding-block: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-bottom)); padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); background: rgb(0 0 0 / 65%); backdrop-filter: blur(8px); }
+.body-photo-modal { width: min(100%, 34rem); max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem); display: grid; gap: .9rem; overflow-y: auto; overscroll-behavior: contain; padding: 1.75rem; border-radius: var(--fitsho-radius-xl); border: 1px solid var(--fitsho-line-strong); background: var(--fitsho-surface); color: var(--fitsho-ink); }
 .body-photo-modal h2, .body-photo-modal p { margin: 0; line-height: 1.7; }
 .body-progress-page { display: grid; gap: 1rem; }
 .body-progress-list { display: grid; gap: .6rem; margin: 0; padding: 0; list-style: none; }
@@ -922,6 +926,7 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 .body-analysis-home.fitsho-page {
   width: min(calc(100% - 2rem), 64rem);
   min-height: calc(100svh - 4.75rem);
+  min-height: calc(100dvh - 4.75rem);
   display: grid;
   align-content: start;
   gap: clamp(1.25rem, 3vw, 2rem);
@@ -1016,8 +1021,10 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 }
 
 .body-analysis-feature-chip:hover {
-  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--fitsho-aqua) 38%, transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .body-analysis-feature-chip:hover { transform: translateY(-2px); }
 }
 
 .body-analysis-feature-chip__icon {
@@ -1238,8 +1245,10 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   transition: transform 0.4s ease;
 }
 
-.body-analysis-empty:hover .body-analysis-empty__image {
-  transform: scale(1.02);
+@media (hover: hover) and (pointer: fine) {
+  .body-analysis-empty:hover .body-analysis-empty__image {
+    transform: scale(1.02);
+  }
 }
 
 .body-analysis-empty__overlay {
@@ -1421,8 +1430,10 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 }
 
 .body-analysis-empty__action:hover {
-  transform: translateY(-2px);
   box-shadow: 0 1rem 2.5rem rgb(18 199 189 / 40%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .body-analysis-empty__action:hover { transform: translateY(-2px); }
 }
 
 .body-analysis-empty__action-icon {
@@ -1538,8 +1549,10 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 }
 
 .body-analysis-home__start:hover {
-  transform: translateY(-1px);
   box-shadow: 0 .75rem 2rem rgb(18 199 189 / 32%);
+}
+@media (hover: hover) and (pointer: fine) {
+  .body-analysis-home__start:hover { transform: translateY(-1px); }
 }
 
 .body-analysis-home__start-icon {
@@ -1592,7 +1605,9 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 1.25rem;
+  padding-block: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-bottom));
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
   background: rgb(1 10 12 / 72%);
   backdrop-filter: blur(10px) saturate(.8);
 }
@@ -1600,7 +1615,9 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 .body-analysis-delete-dialog {
   position: relative;
   width: min(100%, 31rem);
-  overflow: hidden;
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.35rem;
   border: 1px solid color-mix(in srgb, var(--fitsho-danger) 30%, var(--fitsho-line));
   border-radius: 1.35rem;
@@ -1664,7 +1681,7 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
   .body-analysis-session figure { width: 5.25rem; height: 6rem; }
   .body-analysis-session > a { grid-column: 2 / -1; }
   .body-analysis-session > .body-analysis-session__actions { grid-column: 2 / -1; }
-  .body-analysis-delete-overlay { align-items: end; padding: 0; }
+  .body-analysis-delete-overlay { align-items: end; padding: max(0px, env(safe-area-inset-top)) max(.5rem, env(safe-area-inset-right)) 0 max(.5rem, env(safe-area-inset-left)); }
   .body-analysis-delete-dialog { width: 100%; padding: 1.2rem 1rem calc(1rem + env(safe-area-inset-bottom)); border-radius: 1.5rem 1.5rem 0 0; }
 }
 
@@ -2543,7 +2560,9 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 
 .fitsho-score-ring-card:hover {
   border-color: rgb(80 223 206 / 35%);
-  transform: translateY(-2px);
+}
+@media (hover: hover) and (pointer: fine) {
+  .fitsho-score-ring-card:hover { transform: translateY(-2px); }
 }
 
 .fitsho-score-ring-card--balance {
@@ -2915,7 +2934,7 @@ html[dir="rtl"] :is(.body-photo-wizard h1, .body-photo-wizard h2, .body-progress
 }
 
 /* RESPONSIVE BREAKPOINTS */
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .fitsho-scan-overview__stage {
     grid-template-columns: 1fr;
     gap: 1.25rem;

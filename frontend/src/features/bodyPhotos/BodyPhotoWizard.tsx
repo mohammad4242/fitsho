@@ -3,6 +3,10 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../shared/apiClient";
+import {
+  normalizeImageForUpload,
+  UserImageNormalizationError,
+} from "../../shared/imageNormalization";
 import { useOptionalProfile } from "../profile/ProfileContext";
 
 import {
@@ -170,9 +174,24 @@ export function BodyPhotoWizard({
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (file !== undefined) {
-      setError(null);
-      setEditorFile(file);
+    if (file === undefined) return;
+    const selectionToken = ++selectionTokenRef.current;
+    setError(null);
+    void normalizeSelectedFile(file, selectionToken);
+  }
+
+  async function normalizeSelectedFile(file: File, selectionToken: number) {
+    try {
+      const normalized = await normalizeImageForUpload(file, {
+        maximumInputBytes: 8 * 1024 * 1024,
+        maximumOutputBytes: 8 * 1024 * 1024,
+        maximumPixelCount: 20_000_000,
+      });
+      if (mountedRef.current && selectionToken === selectionTokenRef.current) setEditorFile(normalized);
+    } catch (normalizationError) {
+      if (mountedRef.current && selectionToken === selectionTokenRef.current) {
+        setError(imageNormalizationErrorMessage(normalizationError, t));
+      }
     }
   }
 
@@ -522,7 +541,7 @@ export function BodyPhotoWizard({
                       </span>
                       <input
                         aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}
-                        accept="image/jpeg,image/png,image/webp"
+                        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
                         type="file"
                         onChange={selectFile}
                         disabled={busy || sessionLoading}
@@ -695,6 +714,17 @@ function PhotoQualityFeedback({ photo }: { photo: ProcessedBodyPhoto }) {
 function processingErrorMessage(error: unknown, t: ReturnType<typeof useTranslation>["t"]): string {
   if (error instanceof BodyPhotoProcessingError) {
     return t(`bodyPhotos.errors.${error.code}`, { defaultValue: t("bodyPhotos.errors.processing") });
+  }
+  return t("bodyPhotos.errors.processing");
+}
+
+function imageNormalizationErrorMessage(error: unknown, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (error instanceof UserImageNormalizationError) {
+    if (error.code === "image_too_large") return t("bodyPhotos.errors.invalid_file_size");
+    if (error.code === "unsupported_image_format" || error.code === "invalid_heif") {
+      return t("bodyPhotos.errors.unsupported_format");
+    }
+    return t("bodyPhotos.errors.invalid_image");
   }
   return t("bodyPhotos.errors.processing");
 }

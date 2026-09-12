@@ -125,6 +125,15 @@ it("keeps the photo workflow optional and offers a skip path", async () => {
   expect(screen.getByText(/you can still receive a complete workout plan/i)).toBeInTheDocument();
 });
 
+it("offers HEIC and HEIF files for body-photo uploads", async () => {
+  renderWizard();
+
+  expect(await screen.findByLabelText(/front photo upload/i)).toHaveAttribute(
+    "accept",
+    "image/jpeg,image/png,image/webp,image/heic,image/heif",
+  );
+});
+
 it("requires operational consent before the confirm upload action is enabled", async () => {
   const user = userEvent.setup();
   const processor: BodyPhotoProcessor = { process: vi.fn().mockResolvedValue(processed("front")) };

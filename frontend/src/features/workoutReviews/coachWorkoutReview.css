@@ -378,7 +378,7 @@
 
 .coach-review-actions {
   position: sticky;
-  inset-block-end: 0.75rem;
+  inset-block-end: max(0.75rem, env(safe-area-inset-bottom));
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;

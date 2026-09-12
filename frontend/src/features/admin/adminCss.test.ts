@@ -19,7 +19,7 @@ describe("AI settings mobile containment", () => {
 
   it("collapses observability rows to one column on phones", () => {
     expect(css).toMatch(
-      /@media \(max-width:\s*760px\)[\s\S]*?\.admin-ai-observability div\s*{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/,
+      /@media \(max-width:\s*767px\)[\s\S]*?\.admin-ai-observability div\s*{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/,
     );
   });
 });

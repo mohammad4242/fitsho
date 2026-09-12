@@ -2,11 +2,14 @@ import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ApiError } from "../../shared/apiClient";
+import {
+  normalizeImageForUpload,
+  UserImageNormalizationError,
+} from "../../shared/imageNormalization";
 import * as api from "./api";
 import "./profilePhoto.css";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-const SUPPORTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export type ProfilePhotoAvatarProps = {
   url?: string | null;
@@ -67,19 +70,24 @@ export function ProfilePhotoControl({
     };
   }, [previewUrl]);
 
-  function chooseFile(file: File | undefined) {
+  async function chooseFile(file: File | undefined) {
     if (file === undefined) return;
-    if (!SUPPORTED_TYPES.has(file.type)) {
-      setError(l("فرمت عکس پشتیبانی نمی‌شود", "This image format is not supported"));
-      return;
-    }
     if (file.size > MAX_FILE_BYTES) {
       setError(l("حجم عکس باید کمتر از ۵ مگابایت باشد", "The image must be smaller than 5 MB"));
       return;
     }
-    setError(null);
-    setSelectedFile(file);
-    setPreviewUrl(typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : null);
+    try {
+      const normalized = await normalizeImageForUpload(file, {
+        maximumInputBytes: MAX_FILE_BYTES,
+        maximumOutputBytes: MAX_FILE_BYTES,
+        maximumPixelCount: 16_000_000,
+      });
+      setError(null);
+      setSelectedFile(normalized);
+      setPreviewUrl(typeof URL.createObjectURL === "function" ? URL.createObjectURL(normalized) : null);
+    } catch (normalizationError) {
+      setError(imageNormalizationError(normalizationError, l));
+    }
   }
 
   function clearSelection() {
@@ -136,11 +144,11 @@ export function ProfilePhotoControl({
           id={inputId}
           className="profile-photo-control__input"
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
           aria-label={l("انتخاب عکس پروفایل", "Choose profile photo")}
           disabled={busy !== null}
           onChange={(event) => {
-            chooseFile(event.currentTarget.files?.[0]);
+            void chooseFile(event.currentTarget.files?.[0]);
             event.currentTarget.value = "";
           }}
         />
@@ -188,6 +196,16 @@ function photoError(
     if (cause.code === "unsupported_format") return l("فرمت عکس پشتیبانی نمی‌شود.", "This image format is not supported.");
   }
   return l("ذخیره عکس انجام نشد. دوباره تلاش کن.", "The photo could not be saved. Try again.");
+}
+
+function imageNormalizationError(
+  error: unknown,
+  l: (persian: string, english: string) => string,
+): string {
+  if (error instanceof UserImageNormalizationError && error.code === "image_too_large") {
+    return l("حجم عکس باید کمتر از ۵ مگابایت باشد", "The image must be smaller than 5 MB");
+  }
+  return l("فرمت عکس پشتیبانی نمی‌شود", "This image format is not supported");
 }
 
 async function cropToSquare(file: File): Promise<File> {

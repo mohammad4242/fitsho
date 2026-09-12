@@ -413,8 +413,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan__meal-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .weekly-plan__meal-actions button.is-selected, .weekly-plan__replacement-options button.is-selected, .weekly-plan__food-targets button.is-selected { border-color: var(--fitsho-aqua); background: rgb(80 223 206 / 18%); color: var(--fitsho-aqua); box-shadow: 0 0 0 .12rem rgb(80 223 206 / 12%); }
 .weekly-plan__meal-actions button:focus-visible, .weekly-plan__modal button:focus-visible { outline: .2rem solid #fff; outline-offset: .15rem; }
-.weekly-plan__modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 1rem; background: rgb(0 15 14 / 76%); }
-.weekly-plan__modal { position: relative; width: min(100%, 38rem); max-height: min(90svh, 48rem); overflow-y: auto; padding: 1.4rem; border: 1px solid rgb(128 255 232 / 32%); border-radius: 1.2rem; background: var(--fitsho-surface); box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 35%); }
+.weekly-plan__modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding-block: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-bottom)); padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); background: rgb(0 15 14 / 76%); }
+.weekly-plan__modal { position: relative; width: min(100%, 38rem); max-height: min(calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem), 48rem); overflow-y: auto; overscroll-behavior: contain; padding: 1.4rem; border: 1px solid rgb(128 255 232 / 32%); border-radius: 1.2rem; background: var(--fitsho-surface); box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 35%); }
 .weekly-plan__modal h3 { margin: 0 2.5rem .8rem 0; }
 .weekly-plan__modal h4 { margin-bottom: .6rem; color: var(--fitsho-aqua); }
 .weekly-plan__modal p { color: rgb(234 244 241 / 76%); line-height: 1.7; }
@@ -449,7 +449,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .weekly-plan__pdf-section { margin-top: 1.5rem; }
 .weekly-plan__pdf-button { width: 100%; min-height: 4.8rem; display: flex; align-items: center; gap: 1.1rem; padding: 1rem 1.35rem; border: 1px solid rgb(80 223 206 / 24%); border-radius: 1.2rem; background: linear-gradient(135deg, rgb(9 54 51 / 75%) 0%, rgb(3 28 27 / 85%) 100%); color: var(--fitsho-ink, #eaf4f1); font: inherit; text-align: right; cursor: pointer; transition: all .2s ease; box-shadow: 0 4px 16px rgb(0 0 0 / 20%); }
 [dir="ltr"] .weekly-plan__pdf-button { text-align: left; }
-.weekly-plan__pdf-button:hover:not(:disabled) { border-color: var(--fitsho-aqua); background: linear-gradient(135deg, rgb(12 68 64 / 85%) 0%, rgb(5 38 36 / 90%) 100%); transform: translateY(-2px); box-shadow: 0 6px 20px rgb(80 223 206 / 15%); }
+.weekly-plan__pdf-button:hover:not(:disabled) { border-color: var(--fitsho-aqua); background: linear-gradient(135deg, rgb(12 68 64 / 85%) 0%, rgb(5 38 36 / 90%) 100%); box-shadow: 0 6px 20px rgb(80 223 206 / 15%); }
+@media (hover: hover) and (pointer: fine) { .weekly-plan__pdf-button:hover:not(:disabled) { transform: translateY(-2px); } }
 .weekly-plan__pdf-button:focus-visible { outline: 2px solid var(--fitsho-aqua); outline-offset: 2px; }
 .weekly-plan__pdf-button:disabled { opacity: .6; cursor: not-allowed; transform: none; }
 .weekly-plan__pdf-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: .85rem; background: rgb(80 223 206 / 15%); border: 1px solid rgb(80 223 206 / 30%); color: var(--fitsho-aqua, #50dfce); flex-shrink: 0; }
@@ -500,6 +501,7 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 
 .physician-review-shell {
   min-height: 100svh;
+  min-height: 100dvh;
   color: #e9f7f3;
   background: radial-gradient(circle at 82% 8%, rgb(40 182 166 / 13%), transparent 28rem), #061918;
 }
@@ -623,9 +625,15 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-doctor-item__tag { display: inline-block; padding: .1rem .45rem; border-radius: 999px; font-size: .62rem; font-weight: 700; background: rgb(80 223 206 / 14%); color: var(--fitsho-aqua); border: 1px solid rgb(80 223 206 / 30%); }
 .nutrition-doctor-item b, .nutrition-doctor-item__chevron { color: var(--fitsho-muted); font-size: 1.25rem; font-weight: 500; transition: transform var(--fitsho-duration-fast) var(--fitsho-ease), color var(--fitsho-duration-fast) var(--fitsho-ease); }
 .nutrition-doctor-status--pending { display: flex; align-items: center; gap: .3rem; color: var(--fitsho-coral) !important; }
-.nutrition-doctor-item--link:hover, .nutrition-doctor-item--link:focus-visible { border-color: var(--fitsho-aqua); background: linear-gradient(140deg, rgb(80 223 206 / 12%), var(--fitsho-surface-subtle)); box-shadow: 0 4px 16px rgb(80 223 206 / 12%); transform: translateY(-1px); outline: none; }
-.nutrition-doctor-item--link:hover .nutrition-doctor-item__chevron, .nutrition-doctor-item--link:hover b, .nutrition-doctor-item--link:focus-visible .nutrition-doctor-item__chevron, .nutrition-doctor-item--link:focus-visible b { color: var(--fitsho-aqua); transform: translateX(-4px); }
-[dir="ltr"] .nutrition-doctor-item--link:hover .nutrition-doctor-item__chevron, [dir="ltr"] .nutrition-doctor-item--link:hover b, [dir="ltr"] .nutrition-doctor-item--link:focus-visible .nutrition-doctor-item__chevron, [dir="ltr"] .nutrition-doctor-item--link:focus-visible b { transform: translateX(4px); }
+.nutrition-doctor-item--link:hover, .nutrition-doctor-item--link:focus-visible { border-color: var(--fitsho-aqua); background: linear-gradient(140deg, rgb(80 223 206 / 12%), var(--fitsho-surface-subtle)); box-shadow: 0 4px 16px rgb(80 223 206 / 12%); outline: none; }
+.nutrition-doctor-item--link:hover .nutrition-doctor-item__chevron, .nutrition-doctor-item--link:hover b, .nutrition-doctor-item--link:focus-visible .nutrition-doctor-item__chevron, .nutrition-doctor-item--link:focus-visible b { color: var(--fitsho-aqua); }
+@media (hover: hover) and (pointer: fine) {
+  .nutrition-doctor-item--link:hover { transform: translateY(-1px); }
+  .nutrition-doctor-item--link:hover .nutrition-doctor-item__chevron,
+  .nutrition-doctor-item--link:hover b { transform: translateX(-4px); }
+  [dir="ltr"] .nutrition-doctor-item--link:hover .nutrition-doctor-item__chevron,
+  [dir="ltr"] .nutrition-doctor-item--link:hover b { transform: translateX(4px); }
+}
 [dir="ltr"] .nutrition-doctor-item b, [dir="ltr"] .nutrition-doctor-item__chevron { transform: rotate(180deg); }
 .weekly-plan-empty, .weekly-plan { margin-top: .75rem; }
 .weekly-plan-empty { width: min(100% - 2rem, 72rem); margin-block: .75rem 6rem; padding: 0; border-color: var(--fitsho-line-strong); border-radius: var(--fitsho-radius-lg); background: linear-gradient(115deg, rgb(80 223 206 / 9%), rgb(255 255 255 / 2%)), var(--fitsho-surface); }
@@ -746,8 +754,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   background: var(--fitsho-surface-interactive);
   box-shadow: 0 .55rem 1.2rem rgb(80 223 206 / 10%);
   outline: none;
-  transform: translateY(-2px);
 }
+@media (hover: hover) and (pointer: fine) { .nutrition-entry-choice:hover { transform: translateY(-2px); } }
 .nutrition-entry-choice.is-active {
   border-color: var(--fitsho-aqua);
   background: linear-gradient(135deg, rgb(80 223 206 / 10%), transparent), var(--fitsho-surface-raised);
@@ -918,7 +926,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   transition: border-color var(--fitsho-duration-fast) var(--fitsho-ease), color var(--fitsho-duration-fast) var(--fitsho-ease), background var(--fitsho-duration-fast) var(--fitsho-ease), transform var(--fitsho-duration-fast) var(--fitsho-ease);
 }
 .nutrition-checkin__options button:hover:not(:disabled),
-.nutrition-checkin__options button:focus-visible { border-color: var(--fitsho-aqua); color: var(--fitsho-aqua); background: var(--fitsho-surface-interactive); outline: none; transform: translateY(-1px); }
+.nutrition-checkin__options button:focus-visible { border-color: var(--fitsho-aqua); color: var(--fitsho-aqua); background: var(--fitsho-surface-interactive); outline: none; }
+@media (hover: hover) and (pointer: fine) { .nutrition-checkin__options button:hover:not(:disabled) { transform: translateY(-1px); } }
 .nutrition-checkin__options button.is-active { border-color: var(--fitsho-aqua); color: var(--fitsho-aqua); background: rgb(80 223 206 / 7%); }
 .nutrition-checkin__options button:disabled { opacity: .55; cursor: not-allowed; }
 
@@ -947,7 +956,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-catalogue-submit { border: 1px solid var(--fitsho-line-strong); color: var(--fitsho-aqua); background: rgb(80 223 206 / 7%); }
 .nutrition-catalogue-submit:hover:not(:disabled), .nutrition-catalogue-submit:focus-visible { border-color: var(--fitsho-aqua); background: rgb(80 223 206 / 12%); outline: none; }
 .nutrition-off-plan-primary { min-width: 8.5rem; margin: 0; border: 0; color: var(--fitsho-canvas); background: var(--fitsho-aqua); box-shadow: 0 .65rem 1.5rem rgb(80 223 206 / 12%); }
-.nutrition-off-plan-primary:hover:not(:disabled), .nutrition-off-plan-primary:focus-visible { color: var(--fitsho-canvas); background: #79eee0; box-shadow: 0 .8rem 1.8rem rgb(80 223 206 / 18%); outline: none; transform: translateY(-.08rem); }
+.nutrition-off-plan-primary:hover:not(:disabled), .nutrition-off-plan-primary:focus-visible { color: var(--fitsho-canvas); background: #79eee0; box-shadow: 0 .8rem 1.8rem rgb(80 223 206 / 18%); outline: none; }
+@media (hover: hover) and (pointer: fine) { .nutrition-off-plan-primary:hover:not(:disabled) { transform: translateY(-.08rem); } }
 .nutrition-catalogue-submit:disabled, .nutrition-off-plan-primary:disabled { opacity: .45; cursor: not-allowed; }
 .nutrition-adherence-card { overflow: hidden; margin-block: .65rem; border: 1px solid var(--fitsho-line); border-radius: var(--fitsho-radius-lg); background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); }
 .nutrition-adherence-header { min-height: 3.65rem; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .55rem .75rem; }
@@ -1140,7 +1150,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-labs-field input[type="date"] { color-scheme: dark; }
 .nutrition-labs-upload__row { min-width: 0; display: grid; gap: .55rem; }
 .nutrition-labs-upload__button { position: relative; justify-content: center; min-height: 2.85rem; padding: .65rem .9rem; border: 1px solid var(--fitsho-aqua); border-radius: .82rem; color: var(--fitsho-canvas); background: var(--fitsho-aqua); font-size: .76rem; font-weight: 850; cursor: pointer; transition: transform var(--fitsho-duration-fast) ease, background var(--fitsho-duration-fast) ease, box-shadow var(--fitsho-duration-fast) ease; }
-.nutrition-labs-upload__button:hover { background: #79eee0; box-shadow: 0 .65rem 1.5rem rgb(80 223 206 / 14%); transform: translateY(-1px); }
+.nutrition-labs-upload__button:hover { background: #79eee0; box-shadow: 0 .65rem 1.5rem rgb(80 223 206 / 14%); }
+@media (hover: hover) and (pointer: fine) { .nutrition-labs-upload__button:hover { transform: translateY(-1px); } }
 .nutrition-labs-upload__button:has(input:focus-visible) { outline: 3px solid var(--saffron); outline-offset: 3px; }
 .nutrition-labs-upload__button input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 .nutrition-labs-upload__filename { min-width: 0; display: flex; align-items: center; gap: .55rem; padding: .55rem .7rem; border: 1px dashed var(--fitsho-line); border-radius: .75rem; color: var(--fitsho-muted); background: rgb(255 255 255 / 2%); font-size: .72rem; }
@@ -1165,7 +1176,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-labs-section-heading > span { color: var(--fitsho-muted); font-size: .7rem; white-space: nowrap; }
 .nutrition-labs-list { display: grid; gap: .75rem; }
 .nutrition-labs-item { min-width: 0; padding: 1rem; border: 1px solid var(--fitsho-line); border-radius: 1.15rem; background: var(--fitsho-surface); box-shadow: var(--fitsho-shadow-soft); transition: border-color var(--fitsho-duration-fast) ease, background var(--fitsho-duration-fast) ease, transform var(--fitsho-duration-fast) ease; }
-.nutrition-labs-item:hover { border-color: var(--fitsho-line-strong); background: var(--fitsho-surface-interactive); transform: translateY(-1px); }
+.nutrition-labs-item:hover { border-color: var(--fitsho-line-strong); background: var(--fitsho-surface-interactive); }
+@media (hover: hover) and (pointer: fine) { .nutrition-labs-item:hover { transform: translateY(-1px); } }
 .nutrition-labs-item__top { min-width: 0; align-items: flex-start; gap: .7rem; }
 .nutrition-labs-item__file-icon { width: 2.65rem; height: 2.65rem; border-radius: .8rem; }
 .nutrition-labs-item__title { min-width: 0; flex: 1 1 auto; }
@@ -1852,8 +1864,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .nutrition-bundle-card:hover {
   border-color: rgb(80 223 206 / 35%);
   box-shadow: 0 6px 20px rgb(0 0 0 / 30%);
-  transform: translateY(-2px);
 }
+@media (hover: hover) and (pointer: fine) { .nutrition-bundle-card:hover { transform: translateY(-2px); } }
 
 .nutrition-bundle-card.is-selected {
   border-color: var(--fitsho-aqua);
@@ -2446,12 +2458,9 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
   color: var(--fitsho-aqua);
 }
 
-[dir="rtl"] .supplement-back-button:hover .supplement-back-button__icon {
-  transform: translateX(3px);
-}
-
-[dir="ltr"] .supplement-back-button:hover .supplement-back-button__icon {
-  transform: translateX(-3px);
+@media (hover: hover) and (pointer: fine) {
+  [dir="rtl"] .supplement-back-button:hover .supplement-back-button__icon { transform: translateX(3px); }
+  [dir="ltr"] .supplement-back-button:hover .supplement-back-button__icon { transform: translateX(-3px); }
 }
 
 [dir="ltr"] .supplement-back-button__icon {
@@ -2580,8 +2589,8 @@ html[dir="rtl"] .nutrition-estimate-hero h1 { letter-spacing: 0; }
 .supplement-card:hover {
   border-color: rgb(80 223 206 / 35%);
   box-shadow: 0 4px 20px rgb(0 0 0 / 25%);
-  transform: translateY(-2px);
 }
+@media (hover: hover) and (pointer: fine) { .supplement-card:hover { transform: translateY(-2px); } }
 
 .supplement-card__header {
   display: flex;

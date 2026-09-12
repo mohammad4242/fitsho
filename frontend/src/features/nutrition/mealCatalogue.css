@@ -138,7 +138,9 @@
 
 .meal-catalogue-add-btn:hover {
   opacity: 0.92;
-  transform: translateY(-1px);
+}
+@media (hover: hover) and (pointer: fine) {
+  .meal-catalogue-add-btn:hover { transform: translateY(-1px); }
 }
 
 .meal-catalogue-state {
@@ -383,7 +385,7 @@
   color: var(--fitsho-muted, #94a3b8);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 767px) {
   .admin-meal-ingredients li {
     grid-template-columns: 1fr;
     gap: 0.4rem;
@@ -405,7 +407,9 @@
   z-index: 70;
   display: grid;
   place-items: center;
-  padding: 1rem;
+  padding-block: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
   background: rgb(4 31 29 / 75%);
   backdrop-filter: blur(8px);
 }
@@ -414,6 +418,8 @@
 .meal-delete-dialog {
   position: relative;
   width: min(100%, 28rem);
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem);
+  overflow-y: auto;
   padding: 1.35rem;
   border-radius: 1.25rem;
   background: #0d2826;

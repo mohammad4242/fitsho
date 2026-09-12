@@ -19,7 +19,12 @@
 .end-cycle-feedback__locked-message { display: block; max-height: 0; overflow: hidden; padding-inline: 3.05rem .4rem; color: var(--fitsho-muted); font-size: .72rem; line-height: 1.65; opacity: 0; pointer-events: none; transform: translateY(-.25rem); transition: max-height .2s ease, opacity .2s ease, transform .2s ease; }
 .end-cycle-feedback--locked:hover .end-cycle-feedback__locked-message,
 .end-cycle-feedback--locked:focus-within .end-cycle-feedback__locked-message,
-.end-cycle-feedback__locked-message[data-visible="true"] { max-height: 6rem; opacity: 1; pointer-events: auto; transform: translateY(0); }
+.end-cycle-feedback__locked-message[data-visible="true"] { max-height: 6rem; opacity: 1; pointer-events: auto; }
+.end-cycle-feedback--locked:focus-within .end-cycle-feedback__locked-message { transform: translateY(0); }
+.end-cycle-feedback__locked-message[data-visible="true"] { transform: translateY(0); }
+@media (hover: hover) and (pointer: fine) {
+  .end-cycle-feedback--locked:hover .end-cycle-feedback__locked-message { transform: translateY(0); }
+}
 @media (prefers-reduced-motion: reduce) { .end-cycle-feedback__locked-chevron, .end-cycle-feedback__locked-message { transition: none; } }
 .end-cycle-feedback__header { display: flex; align-items: start; justify-content: space-between; gap: .8rem; }
 .end-cycle-feedback__header .eyebrow { margin: 0 0 .2rem; color: var(--fitsho-aqua); font-size: .67rem; font-weight: 850; }

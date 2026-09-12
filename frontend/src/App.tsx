@@ -16,6 +16,7 @@ import {
   PhysicianRoute,
 } from "./features/profile/ProfileRouteGuards";
 import { AppShell } from "./shared/AppShell";
+import { PwaUpdatePrompt } from "./pwa/PwaUpdatePrompt";
 
 const AdminAiSettingsPage = lazy(() => import("./features/admin/AdminAiSettingsPage").then(({ AdminAiSettingsPage }) => ({ default: AdminAiSettingsPage })));
 const AdminExerciseEditPage = lazy(() => import("./features/admin/AdminExerciseEditPage").then(({ AdminExerciseEditPage }) => ({ default: AdminExerciseEditPage })));
@@ -185,6 +186,7 @@ export default function App() {
       <AuthProvider>
         <ProfileProvider>
           <AppRoutes />
+          <PwaUpdatePrompt />
         </ProfileProvider>
       </AuthProvider>
     </BrowserRouter>
