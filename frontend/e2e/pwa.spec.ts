@@ -38,7 +38,7 @@ test("serves a valid Fitician manifest and icons", async ({ request }) => {
   }
 });
 
-test("registers the production service worker without critical console errors", async ({ page, browserName }) => {
+test("registers the production service worker without critical console errors", async ({ page }) => {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
@@ -49,13 +49,11 @@ test("registers the production service worker without critical console errors", 
     body: JSON.stringify({ detail: "Not authenticated in the browser fixture" }),
   }));
   await page.goto("/", { waitUntil: "networkidle" });
-  if (browserName === "chromium") {
-    await expect.poll(() => page.evaluate(async () => (
-      "serviceWorker" in navigator
-        ? (await navigator.serviceWorker.getRegistrations()).some((registration) => registration.scope.endsWith("/"))
-        : false
-    )), { timeout: 15_000 }).toBe(true);
-  }
+  await expect.poll(() => page.evaluate(async () => (
+    "serviceWorker" in navigator
+      ? (await navigator.serviceWorker.getRegistrations()).some((registration) => registration.scope.endsWith("/"))
+      : false
+  )), { timeout: 15_000 }).toBe(true);
   expect(errors.filter((message) => (
     !message.includes("favicon")
     && !message.includes("status of 401 (Unauthorized)")
