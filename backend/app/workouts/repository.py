@@ -153,9 +153,7 @@ def persist_pending_review_plan(
             .where(
                 WorkoutPlan.user_id == plan.user_id,
                 WorkoutPlan.id != plan.id,
-                WorkoutPlan.status.in_(
-                    [WorkoutPlanStatus.ACTIVE, WorkoutPlanStatus.PENDING_REVIEW]
-                ),
+                WorkoutPlan.status == WorkoutPlanStatus.PENDING_REVIEW,
                 WorkoutPlan.deleted_at.is_(None),
             )
             .with_for_update()

@@ -1063,7 +1063,7 @@ def test_generation_persists_valid_snapshot_for_pending_review(db: Session) -> N
     assert result.plan.days[0].title_fa == "روز 1: سینه + زیربغل + چهارسر + پشت پا + ساق"
 
 
-def test_generation_supersedes_existing_active_plan_when_new_plan_is_pending_review(
+def test_generation_keeps_existing_active_plan_when_new_plan_is_pending_review(
     db: Session,
 ) -> None:
     user = _user_with_profile(db)
@@ -1073,11 +1073,14 @@ def test_generation_supersedes_existing_active_plan_when_new_plan_is_pending_rev
     result = asyncio.run(_service(db).generate(user.id))
 
     assert result.plan.status is WorkoutPlanStatus.PENDING_REVIEW
-    assert db.get(WorkoutPlan, active_plan.id).status is WorkoutPlanStatus.SUPERSEDED
+    stored_active = db.get(WorkoutPlan, active_plan.id)
+    assert stored_active is not None
+    assert stored_active.status is WorkoutPlanStatus.ACTIVE
+    assert stored_active.superseded_at is None
     assert db.query(WorkoutPlan).filter(
         WorkoutPlan.user_id == user.id,
         WorkoutPlan.status.in_([WorkoutPlanStatus.ACTIVE, WorkoutPlanStatus.PENDING_REVIEW]),
-    ).count() == 1
+    ).count() == 2
 
 
 def test_generation_reuses_the_current_pending_plan(db: Session) -> None:
@@ -1452,7 +1455,10 @@ def test_expired_plan_is_replaced_with_structured_difference(db: Session) -> Non
     assert replacement.plan.status is WorkoutPlanStatus.PENDING_REVIEW
     assert replacement.plan.previous_program_id == first.id
     assert replacement.plan.difference_summary["previous_program_id"] == str(first.id)
-    assert db.get(WorkoutPlan, first.id).status is WorkoutPlanStatus.SUPERSEDED
+    stored_first = db.get(WorkoutPlan, first.id)
+    assert stored_first is not None
+    assert stored_first.status is WorkoutPlanStatus.ACTIVE
+    assert stored_first.superseded_at is None
 
 
 def test_active_plan_is_stale_when_profile_changes(db: Session) -> None:

@@ -154,8 +154,9 @@ def test_replacement_approval_preserves_edits_provenance_and_is_idempotent(
         "notes_fa": original_item.notes_fa,
     }
     snapshot_ids = [UUID(value) for value in source.exercise_catalog_snapshot["exercises"]]
+    day_one_exercise_ids = {item.exercise_id for item in source.days[0].exercises}
     replacement_id = next(
-        exercise_id for exercise_id in snapshot_ids if exercise_id != original_item.exercise_id
+        exercise_id for exercise_id in snapshot_ids if exercise_id not in day_one_exercise_ids
     )
     draft_payload = deepcopy(claimed.draft_payload)
     draft_payload["expected_revision"] = claimed.draft_revision

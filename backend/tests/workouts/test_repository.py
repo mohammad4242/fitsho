@@ -105,11 +105,13 @@ def test_activate_plan_creates_review_and_supersedes_previous_open_review(db: Se
     assert replacement_review.status is WorkoutReviewStatus.PENDING
 
 
-def test_persist_pending_review_plan_supersedes_previous_active_plan(db: Session) -> None:
+def test_persist_pending_review_plan_keeps_previous_active_plan(db: Session) -> None:
     user = make_user(db)
     previous = new_plan(user.id, "a" * 64)
     previous.status = WorkoutPlanStatus.ACTIVE
+    previous_review = WorkoutPlanReview(source_plan=previous, user_id=user.id)
     db.add(previous)
+    db.add(previous_review)
     db.flush()
     generation = create_generation(
         db,
@@ -135,11 +137,13 @@ def test_persist_pending_review_plan_supersedes_previous_active_plan(db: Session
     review = db.scalar(
         select(WorkoutPlanReview).where(WorkoutPlanReview.source_plan_id == replacement.id)
     )
-    assert previous.status is WorkoutPlanStatus.SUPERSEDED
-    assert previous.superseded_at is not None
+    assert previous.status is WorkoutPlanStatus.ACTIVE
+    assert previous.superseded_at is None
+    assert previous_review.status is WorkoutReviewStatus.PENDING
     assert replacement.status is WorkoutPlanStatus.PENDING_REVIEW
     assert replacement.activated_at is None
-    assert [plan.id for plan in foreground] == [replacement.id]
+    assert {plan.id for plan in foreground} == {previous.id, replacement.id}
+    assert workout_repository.get_current_foreground_plan(db, user.id) is replacement
     assert review is not None
     assert review.status is WorkoutReviewStatus.PENDING
 
@@ -174,7 +178,7 @@ def test_persist_pending_review_plan_supersedes_previous_pending_review_and_open
         assert current_foreground_plan(db, user.id) is replacement
 
 
-def test_persist_pending_review_plan_cleans_up_legacy_active_and_pending_plans(
+def test_persist_pending_review_plan_keeps_active_and_cleans_up_pending_plans(
     db: Session,
 ) -> None:
     user = make_user(db)
@@ -206,8 +210,9 @@ def test_persist_pending_review_plan_cleans_up_legacy_active_and_pending_plans(
             )
         ).all()
     )
-    assert active.status is WorkoutPlanStatus.SUPERSEDED
+    assert active.status is WorkoutPlanStatus.ACTIVE
+    assert active.superseded_at is None
     assert pending.status is WorkoutPlanStatus.SUPERSEDED
     assert pending_review.status is WorkoutReviewStatus.SUPERSEDED
     assert replacement.status is WorkoutPlanStatus.PENDING_REVIEW
-    assert [plan.id for plan in foreground] == [replacement.id]
+    assert {plan.id for plan in foreground} == {active.id, replacement.id}
