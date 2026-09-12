@@ -164,7 +164,9 @@ export function PublicNutritionOnboardingFlow({
     setTrainingValues((current) => ({
       ...current,
       [field]: value,
-      ...(field === "training_location" && value === "gym" ? { home_training_setup: "" } : {}),
+      ...(field === "training_location" && value === "gym"
+        ? { home_training_setup: "", available_equipment: [] }
+        : {}),
     }));
   }
 

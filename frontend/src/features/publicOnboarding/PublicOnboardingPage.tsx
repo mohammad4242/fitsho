@@ -199,7 +199,13 @@ function TrainingDraftFlow({ onExit, onComplete }: { onExit: () => void; onCompl
   }, [errors]);
 
   function update(field: keyof ProfileFormValues, value: ProfileFormValue) {
-    setValues((current) => ({ ...current, [field]: value, ...(field === "training_location" && value === "gym" ? { home_training_setup: "" } : {}) }));
+    setValues((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "training_location" && value === "gym"
+        ? { home_training_setup: "", available_equipment: [] }
+        : {}),
+    }));
     setErrors((current) => { const next = { ...current }; delete next[field]; return next; });
   }
 

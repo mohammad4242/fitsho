@@ -278,7 +278,9 @@ export function NutritionOnboardingFlow({
     setValues((current) => ({
       ...current,
       [field]: value,
-      ...(field === "training_location" && value === "gym" ? { home_training_setup: "" } : {}),
+      ...(field === "training_location" && value === "gym"
+        ? { home_training_setup: "", available_equipment: [] }
+        : {}),
     }));
     setErrors((current) => {
       const next = { ...current };
