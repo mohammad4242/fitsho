@@ -80,9 +80,7 @@ export function resolveHomeTrainingSetup(
   setup: HomeTrainingSetup | null | undefined,
   equipment: readonly Equipment[] | null | undefined,
 ): HomeTrainingSetup | null {
-  return setup
-    ?? deriveHomeTrainingSetupFromEquipment(equipment)
-    ?? (equipment?.length ? "bodyweight_only" : null);
+  return setup ?? deriveHomeTrainingSetupFromEquipment(equipment);
 }
 
 export const sessionDurations = [30, 45, 60, 75, 90, 120] as const;

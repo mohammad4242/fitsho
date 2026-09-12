@@ -66,6 +66,18 @@ it("requires a valid home preset even when legacy equipment is present", () => {
       today,
     ),
   ).toEqual({ available_equipment: "required" });
+
+  expect(
+    validateStep(
+      {
+        ...baseValues,
+        home_training_setup: "invalid" as ProfileFormValues["home_training_setup"],
+        available_equipment: ["bodyweight"],
+      },
+      3,
+      today,
+    ),
+  ).toEqual({ available_equipment: "required" });
 });
 
 it("keeps gym serialization free of home setup and equipment", () => {

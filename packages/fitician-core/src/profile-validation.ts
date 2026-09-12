@@ -1,6 +1,7 @@
 import {
   availableEquipment,
   equipmentForHomeTrainingSetup,
+  homeTrainingSetups,
   resolveHomeTrainingSetup,
   sessionDurations,
   type Equipment,
@@ -209,7 +210,10 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
   if (values.training_location === "") errors.training_location = "required";
   if (
     values.training_location === "home"
-    && values.home_training_setup === ""
+    && (
+      values.home_training_setup === ""
+      || !homeTrainingSetups.some((setup) => setup === values.home_training_setup)
+    )
   ) {
     errors.available_equipment = "required";
   }
