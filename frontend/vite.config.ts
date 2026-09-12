@@ -46,6 +46,9 @@ export default defineConfig({
           "**/media/**",
         ],
         additionalManifestEntries: [
+          { url: "/pwa/icon-192.png", revision: null },
+          { url: "/pwa/icon-512.png", revision: null },
+          { url: "/pwa/icon-maskable-512.png", revision: null },
           { url: "/pwa/apple-touch-icon.png", revision: null },
         ],
         navigateFallback: "/index.html",
