@@ -343,7 +343,7 @@ it("uses English copy and left-to-right flow", async () => {
   expect(screen.queryByText("Not found")).not.toBeInTheDocument();
   expect(container.querySelector("main")).toHaveAttribute("dir", "ltr");
   expect(container.querySelector("main")).toHaveClass("fitsho-page");
-  await user.click(screen.getByRole("button", { name: "More details" }));
+  await user.click(await screen.findByRole("button", { name: "More details" }));
   expect(screen.getByText("Vitamin C")).toBeVisible();
 });
 

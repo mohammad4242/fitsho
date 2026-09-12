@@ -630,7 +630,7 @@ it("uses complete English copy and left-to-right layout", async () => {
 
   const heading = await screen.findByRole("heading", { name: "Nutrition" });
   expect(heading.closest("main")).toHaveAttribute("dir", "ltr");
-  expect(screen.getByText("High confidence")).toBeInTheDocument();
+  expect(await screen.findByText("High confidence")).toBeInTheDocument();
   expect(screen.getByText(/scientific estimate, not a diagnosis or medical prescription/i)).toBeInTheDocument();
 });
 
@@ -1303,5 +1303,3 @@ it("prevents double submission when clicked multiple times rapidly", async () =>
     });
   });
 });
-
-

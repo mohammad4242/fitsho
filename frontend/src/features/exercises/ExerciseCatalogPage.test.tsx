@@ -151,12 +151,13 @@ describe("catalog selection flow", () => {
     expect(
       await screen.findByRole("heading", { name: "کتابخانه حرکات" }),
     ).toHaveClass("fitsho-display");
-    expect(screen.getByRole("button", { name: /بالاتنه.*Upper Body/ })).toBeVisible();
-    expect(screen.getByRole("button", { name: /پایین‌تنه.*Lower Body/ })).toBeVisible();
-    expect(screen.getByRole("button", { name: /میان‌تنه.*Core/ })).toBeVisible();
+    const upperBody = await screen.findByRole("button", { name: /بالاتنه.*Upper Body/ });
+    expect(upperBody).toBeVisible();
+    expect(await screen.findByRole("button", { name: /پایین‌تنه.*Lower Body/ })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /میان‌تنه.*Core/ })).toBeVisible();
     expect(screen.queryByRole("button", { name: /سینه.*Chest/ })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /بالاتنه.*Upper Body/ }));
+    await user.click(upperBody);
 
     expect(locationValue()).toBe("/exercises?body_region=upper_body");
     expect(screen.getByRole("button", { name: /سینه.*Chest/ })).toBeVisible();
