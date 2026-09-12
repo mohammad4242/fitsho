@@ -27,7 +27,7 @@ describe("formatPrescriptionTarget", () => {
       duration_max_seconds: 40,
     };
 
-    expect(formatPrescriptionTarget(exercise, "fa")).toBe("20–40 ثانیه");
+    expect(formatPrescriptionTarget(exercise, "fa")).toBe("۲۰–۴۰ ثانیه");
     expect(formatPrescriptionTarget(exercise, "en")).toBe("20–40 seconds");
   });
 
@@ -39,7 +39,7 @@ describe("formatPrescriptionTarget", () => {
       reps_max: 12,
     };
 
-    expect(formatPrescriptionTarget(exercise, "fa")).toBe("8–12 تکرار");
+    expect(formatPrescriptionTarget(exercise, "fa")).toBe("۸–۱۲ تکرار");
     expect(formatPrescriptionTarget(exercise, "en")).toBe("8–12 reps");
   });
 });

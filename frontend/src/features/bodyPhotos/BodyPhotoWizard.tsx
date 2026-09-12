@@ -537,7 +537,7 @@ export function BodyPhotoWizard({
                         {t("bodyPhotos.uploadExistingPhoto", { view: t(`bodyPhotos.views.${view}`) })}
                       </span>
                       <span className="body-photo-upload-control__hint" aria-hidden="true">
-                        JPG, PNG, WebP
+                        JPG, PNG, WebP, HEIC, HEIF
                       </span>
                       <input
                         aria-label={t("bodyPhotos.inputLabel", { view: t(`bodyPhotos.views.${view}`) })}

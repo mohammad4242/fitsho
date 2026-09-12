@@ -103,6 +103,14 @@ function hasHeifSignature(bytes: Uint8Array): boolean {
 }
 
 async function convertHeifWithBrowser(file: File, maximumPixelCount: number): Promise<Blob> {
+  try {
+    return await convertHeifWithNativeBrowser(file, maximumPixelCount);
+  } catch {
+    return convertHeifWithWasm(file, maximumPixelCount);
+  }
+}
+
+async function convertHeifWithNativeBrowser(file: File, maximumPixelCount: number): Promise<Blob> {
   const sourceUrl = URL.createObjectURL(file);
   try {
     const image = await loadImage(sourceUrl);
@@ -119,15 +127,64 @@ async function convertHeifWithBrowser(file: File, maximumPixelCount: number): Pr
     const context = canvas.getContext("2d");
     if (context === null) throw new UserImageNormalizationError("heif_decode_failed");
     context.drawImage(image, 0, 0, width, height);
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((value) => {
-        if (value === null) reject(new UserImageNormalizationError("heif_decode_failed"));
-        else resolve(value);
-      }, "image/jpeg", 0.9);
-    });
+    return canvasToJpeg(canvas);
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
+}
+
+async function convertHeifWithWasm(file: File, maximumPixelCount: number): Promise<Blob> {
+  const { decode } = await import("@discourse/heic");
+  const decoded = await decode(await file.arrayBuffer());
+  const sourceWidth = decoded.width;
+  const sourceHeight = decoded.height;
+  if (!Number.isInteger(sourceWidth) || !Number.isInteger(sourceHeight) || sourceWidth < 1 || sourceHeight < 1) {
+    throw new UserImageNormalizationError("heif_decode_failed");
+  }
+
+  const pixels = new Uint8ClampedArray(decoded.data);
+  if (pixels.length !== sourceWidth * sourceHeight * 4) {
+    throw new UserImageNormalizationError("heif_decode_failed");
+  }
+  const scale = Math.min(1, Math.sqrt(maximumPixelCount / (sourceWidth * sourceHeight)));
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = sourceWidth;
+  sourceCanvas.height = sourceHeight;
+  const sourceContext = sourceCanvas.getContext("2d");
+  if (sourceContext === null) throw new UserImageNormalizationError("heif_decode_failed");
+  sourceContext.putImageData(new ImageData(pixels, sourceWidth, sourceHeight), 0, 0);
+
+  const outputCanvas = width === sourceWidth && height === sourceHeight
+    ? sourceCanvas
+    : document.createElement("canvas");
+  outputCanvas.width = width;
+  outputCanvas.height = height;
+  if (outputCanvas !== sourceCanvas) {
+    const outputContext = outputCanvas.getContext("2d");
+    if (outputContext === null) throw new UserImageNormalizationError("heif_decode_failed");
+    outputContext.drawImage(sourceCanvas, 0, 0, width, height);
+  }
+  try {
+    return await canvasToJpeg(outputCanvas);
+  } finally {
+    sourceCanvas.width = 0;
+    sourceCanvas.height = 0;
+    if (outputCanvas !== sourceCanvas) {
+      outputCanvas.width = 0;
+      outputCanvas.height = 0;
+    }
+  }
+}
+
+function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => {
+      if (value === null) reject(new UserImageNormalizationError("heif_decode_failed"));
+      else resolve(value);
+    }, "image/jpeg", 0.9);
+  });
 }
 
 function loadImage(sourceUrl: string): Promise<HTMLImageElement> {

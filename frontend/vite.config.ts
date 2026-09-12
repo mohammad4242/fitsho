@@ -41,6 +41,7 @@ export default defineConfig({
           "**/exercises/**",
           "**/image&videos/**",
           "**/mediapipe/**",
+          "**/heic-*.js",
           "**/api/**",
           "**/media/**",
         ],
