@@ -117,6 +117,7 @@ jobs:
           node-version: "20.19.4"
           cache: npm
       - run: npm ci
+      - run: npm run build:core
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e --workspace frontend
 
