@@ -51,7 +51,7 @@ it("creates a resumable draft without persisting photo bytes or paths", () => {
   const draft = createBodyPhotoFlowDraft("initial_plan", "session-1");
 
   expect(draft).toEqual({
-    capture_mode: "camera",
+    capture_mode: "library",
     current_view: "front",
     ghost_scale: 1,
     purpose: "initial_plan",
