@@ -43,6 +43,11 @@ test("registers the production service worker without critical console errors", 
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
   });
+  await page.route("**/api/**", (route) => route.fulfill({
+    status: 401,
+    contentType: "application/json",
+    body: JSON.stringify({ detail: "Not authenticated in the browser fixture" }),
+  }));
   await page.goto("/", { waitUntil: "networkidle" });
   if (browserName === "chromium") {
     await expect.poll(() => page.evaluate(async () => (
