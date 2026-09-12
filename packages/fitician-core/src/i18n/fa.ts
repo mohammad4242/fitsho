@@ -229,7 +229,7 @@ const fa = {
         preferredWeekdays: "حداکثر به اندازه تعداد روزهای تمرین انتخاب کن.",
         priorityMuscles: "اگر بخواهی، فقط یک عضله را برای تمرکز بیشتر انتخاب کن.",
         circumference: "برای تحلیل تناسب بدن؛ در پهن‌ترین بخش اندازه بگیر.",
-        homeTrainingSetup: "در حالت تمرین با وزن بدن، میله بارفیکس به‌صورت پیش‌فرض انتخاب می‌شود تا تمرین عضلات پشت و زیربغل هم امکان‌پذیر باشد. اگر میله بارفیکس ندارید می‌توانید تیک آن را بردارید.",
+        homeTrainingSetup: "تمرین با وزن بدن به‌صورت خودکار شامل حرکات وزن بدن و حرکات با میله بارفیکس است.",
       },
       options: {
         select: "انتخاب کن",
@@ -260,8 +260,10 @@ const fa = {
           gym: "باشگاه",
         },
         homeTrainingSetup: {
-          bodyweight_only: "فقط وزن بدن",
-          dumbbells_available: "دمبل دارم",
+          bodyweight_only: "وزن بدن",
+          dumbbells_available: "دمبل",
+          resistance_bands_available: "کش",
+          dumbbells_and_resistance_bands_available: "دمبل + کش",
         },
         equipment: {
           bodyweight: "وزن بدن",

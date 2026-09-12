@@ -21,7 +21,12 @@ export type TrainingIntensity = (typeof trainingIntensities)[number];
 export const trainingLocations = ["home", "gym"] as const;
 export type TrainingLocation = (typeof trainingLocations)[number];
 
-export const homeTrainingSetups = ["bodyweight_only", "dumbbells_available"] as const;
+export const homeTrainingSetups = [
+  "bodyweight_only",
+  "dumbbells_available",
+  "resistance_bands_available",
+  "dumbbells_and_resistance_bands_available",
+] as const;
 export type HomeTrainingSetup = (typeof homeTrainingSetups)[number];
 
 export const availableEquipment = [
@@ -35,6 +40,41 @@ export const availableEquipment = [
   "pull_up_bar",
 ] as const;
 export type Equipment = (typeof availableEquipment)[number];
+
+export const homeTrainingSetupEquipment = {
+  bodyweight_only: ["bodyweight", "pull_up_bar"],
+  dumbbells_available: ["bodyweight", "dumbbell", "pull_up_bar"],
+  resistance_bands_available: ["bodyweight", "resistance_band", "pull_up_bar"],
+  dumbbells_and_resistance_bands_available: [
+    "bodyweight",
+    "dumbbell",
+    "resistance_band",
+    "pull_up_bar",
+  ],
+} satisfies Record<HomeTrainingSetup, readonly Equipment[]>;
+
+export function equipmentForHomeTrainingSetup(setup: HomeTrainingSetup): Equipment[] {
+  return [...homeTrainingSetupEquipment[setup]];
+}
+
+export function deriveHomeTrainingSetupFromEquipment(
+  equipment: readonly Equipment[] | null | undefined,
+): HomeTrainingSetup | null {
+  if (equipment == null) return null;
+  const selected = new Set(equipment);
+  if (selected.has("dumbbell") && selected.has("resistance_band")) {
+    return "dumbbells_and_resistance_bands_available";
+  }
+  if (selected.has("resistance_band")) return "resistance_bands_available";
+  if (selected.has("dumbbell")) return "dumbbells_available";
+  if (
+    selected.size > 0
+    && [...selected].every((item) => item === "bodyweight" || item === "pull_up_bar")
+  ) {
+    return "bodyweight_only";
+  }
+  return null;
+}
 
 export const sessionDurations = [30, 45, 60, 75, 90, 120] as const;
 export type SessionDurationMinutes = (typeof sessionDurations)[number];

@@ -1,10 +1,11 @@
 import {
   availableEquipment,
+  deriveHomeTrainingSetupFromEquipment,
+  equipmentForHomeTrainingSetup,
   sessionDurations,
   type Equipment,
   type ExperienceLevel,
   type FitnessGoal,
-  type HomeTrainingSetup,
   type MeasurementField,
   type MeasurementFormValues,
   type PlanDurationWeeks,
@@ -208,9 +209,7 @@ function validateStepThree(values: ProfileFormValues): ProfileValidationErrors {
   if (values.training_location === "") errors.training_location = "required";
   if (
     values.training_location === "home"
-    && (values.available_equipment === undefined
-      ? values.home_training_setup === ""
-      : values.available_equipment.length === 0)
+    && values.home_training_setup === ""
   ) {
     errors.available_equipment = "required";
   }
@@ -256,13 +255,16 @@ export function validateAll(
 }
 
 export function toProfileInput(values: ProfileFormValues): ProfileInput {
-  const normalizedEquipment = normalizeEquipment(values.available_equipment ?? []);
-  const homeEquipment = values.training_location === "home"
-    ? values.available_equipment === undefined
-      ? legacySetupEquipment(values.home_training_setup)
-      : normalizedEquipment
+  const homeTrainingSetup = values.training_location === "home"
+    ? values.home_training_setup !== ""
+      ? values.home_training_setup
+      : deriveHomeTrainingSetupFromEquipment(values.available_equipment)
     : null;
-  const homeTrainingSetup = deriveHomeTrainingSetup(homeEquipment);
+  const homeEquipment = values.training_location === "home"
+    ? homeTrainingSetup === null
+      ? null
+      : equipmentForHomeTrainingSetup(homeTrainingSetup)
+    : null;
   return {
     display_name: values.display_name.trim(),
     birth_date: values.birth_date.trim(),
@@ -329,10 +331,21 @@ export function profileToFormValues(profile: Profile): ProfileFormValues {
       ? profile.priority_muscles[0]
       : "",
     training_location: profile.training_location,
-    home_training_setup: profile.home_training_setup ?? "",
-    available_equipment: profile.available_equipment === null
-      ? legacySetupEquipment(profile.home_training_setup ?? "")
-      : [...(profile.available_equipment ?? [])],
+    home_training_setup: profile.training_location === "home"
+      ? profile.home_training_setup
+        ?? deriveHomeTrainingSetupFromEquipment(profile.available_equipment)
+        ?? (profile.available_equipment?.length ? "bodyweight_only" : "")
+      : "",
+    available_equipment: profile.training_location === "home"
+      ? (() => {
+        const setup = profile.home_training_setup
+          ?? deriveHomeTrainingSetupFromEquipment(profile.available_equipment)
+          ?? (profile.available_equipment?.length ? "bodyweight_only" : null);
+        return setup === null ? [] : equipmentForHomeTrainingSetup(setup);
+      })()
+      : profile.available_equipment === null
+        ? []
+        : [...(profile.available_equipment ?? [])],
     session_duration_minutes: String(profile.session_duration_minutes),
     training_intensity: profile.training_intensity ?? "",
     training_cautions: profile.training_cautions,
@@ -411,23 +424,4 @@ export function toProfilePatch(
 function normalizeEquipment(values: Equipment[]): Equipment[] {
   const selected = new Set(values);
   return availableEquipment.filter((equipment) => selected.has(equipment));
-}
-
-function legacySetupEquipment(setup: ProfileFormValues["home_training_setup"]): Equipment[] {
-  if (setup === "bodyweight_only") return ["bodyweight", "pull_up_bar"];
-  if (setup === "dumbbells_available") return ["bodyweight", "dumbbell"];
-  return [];
-}
-
-function deriveHomeTrainingSetup(equipment: Equipment[] | null): HomeTrainingSetup | null {
-  if (equipment === null) return null;
-  const selected = new Set(equipment);
-  if (
-    selected.has("bodyweight")
-    && [...selected].every((item) => item === "bodyweight" || item === "pull_up_bar")
-  ) {
-    return "bodyweight_only";
-  }
-  if (equipment.includes("dumbbell")) return "dumbbells_available";
-  return null;
 }

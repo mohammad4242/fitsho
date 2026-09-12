@@ -229,7 +229,7 @@ const en = {
         preferredWeekdays: "Choose no more than your number of training days.",
         priorityMuscles: "If you want, choose one muscle for extra focus.",
         circumference: "Used for body-proportion analysis; measure at the widest point.",
-        homeTrainingSetup: "In bodyweight mode, the pull-up bar is selected by default so back and lat exercises are available too. If you do not have a pull-up bar, you can uncheck it.",
+        homeTrainingSetup: "Bodyweight training automatically includes bodyweight exercises and pull-up-bar exercises.",
       },
       options: {
         select: "Select an option",
@@ -260,8 +260,10 @@ const en = {
           gym: "Gym",
         },
         homeTrainingSetup: {
-          bodyweight_only: "Bodyweight only",
-          dumbbells_available: "I have dumbbells",
+          bodyweight_only: "Bodyweight",
+          dumbbells_available: "Dumbbells",
+          resistance_bands_available: "Resistance band",
+          dumbbells_and_resistance_bands_available: "Dumbbells + resistance band",
         },
         equipment: {
           bodyweight: "Bodyweight",
